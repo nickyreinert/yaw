@@ -1,0 +1,46 @@
+# Kit CI (Y-2.2, ADR-0008, ADR-0014): kit tests on Node 22.13 (floor) and 24, macOS and Linux;
+# install.sh end-to-end in a Debian container; shellcheck on every shell script; schema examples validate.
+name: kit-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['22.13', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
+      - run: npm test
+      - run: npm run validate
+
+  install-in-container:
+    # install.sh end-to-end on a clean Debian image (Y-2.3), Node at the floor.
+    runs-on: ubuntu-latest
+    container: node:22.13-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: node --test test/install.test.js
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck --version
+      - name: shellcheck every shell script
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck

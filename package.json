@@ -8,7 +8,7 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test \"test/**/*.test.js\" \"modules/*/tests/*.test.js\" \"profiles/*/tests/*.test.js\"",
     "validate": "node core/schema/validate.js"
   }
 }

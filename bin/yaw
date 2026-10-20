@@ -1,0 +1,5 @@
+#!/usr/bin/env node
+// YAW CLI entry (Node >= 22.13, zero dependencies). install.sh links this file into ~/.local/bin.
+import { main } from '../core/cli/main.js';
+
+process.exitCode = await main(process.argv.slice(2));

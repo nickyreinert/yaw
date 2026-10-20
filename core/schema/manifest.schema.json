@@ -82,7 +82,7 @@
         "hash": { "description": "SHA-256 of the content as written (ADR-0003).", "$ref": "common.schema.json#/$defs/sha256" },
         "managed": { "description": "false once the user owns the file; yaw update then leaves it alone.", "type": "boolean" },
         "fragments": {
-          "description": "Shared files: parts contributed by other modules. Provisional until ADR-0004.",
+          "description": "Shared files (owner core): parts contributed by other modules, each with the hash of its part (ADR-0004).",
           "type": "array",
           "items": {
             "type": "object",
