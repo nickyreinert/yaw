@@ -57,10 +57,10 @@ requires: [docker, just, uv]
 ## 3. Flexibility rules
 
 - Profiles define **verbs and checks**, not application architecture. The architecture comes from the proposal and is recorded as ADRs.
-- `options` cover common forks (framework, DB). Anything else: the agent adapts the generated files and records an ADR; the manifest marks those files `managed: false`.
+- `options` cover common forks (framework, DB); they are offered with the full interview (step 7), step 3 renders the defaults (ADR-0020). Anything else: the agent adapts the generated files and records an ADR; the manifest marks those files `managed: false`.
 - Combining profiles: each brings its own `just` fragment under a namespace (`just api::test`); the top-level verbs call all of them.
 - Existing repos (retrofit): `yaw init --detect` inspects lockfiles/manifests to suggest profiles and skips `scaffold/`.
 
 ## 4. Adding a profile
 
-`yaw profile new <name>` copies a template folder with all verbs stubbed as "not applicable". Done when: `profile.yaml` validates, `just check` passes on `examples/<name>/`, and the kit CI runs that example. Keep a profile small; if it needs more than ≈ 10 files, split options or move logic into a module.
+`yaw profile new <name>` copies a template folder with all verbs stubbed as "not applicable". Done when: `profile.yaml` validates, `just check` passes in a project made from `examples/<name>/answers.yaml` (the smoke test runs `yaw init` on it in a temp folder), and the kit CI runs that test. Keep a profile small; if it needs more than ≈ 10 files, split options or move logic into a module.

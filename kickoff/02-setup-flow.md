@@ -32,9 +32,11 @@ The LLM only proposes. Collection and application are scripts, so the result is 
 
 | Mode | For | Asks | Typical output |
 |---|---|---|---|
-| **Quick** | "spin up a short Python project" | Idea, profile confirm, agents, 3–5 essentials | ≈ 5–8 files |
+| **Quick** | "spin up a short Python project" | Idea, profile confirm, agents, and the Q questions of the enabled modules (ADR-0009) | `core` + one CLI profile: 10 files; complete Quick ≈ 12–16 |
 | **Standard** (default) | Most projects | Quick + one screen per enabled module | Core + chosen modules |
 | **Full** | Long-lived products, teams | Everything, including governance strictness, budgets, roles | Full scaffold |
+
+"Mode" (`quick`/`standard`/`full`, stored as `answers.yaml#mode` and `manifest.json#preset`) is not a "preset": a saved setup is called a preset only in `yaw presets` and `~/.yaw/presets/` (ADR-0009). Files are counted without the `.yaw/base/` copies. Phase-1 contents of the modes: doc 04 §1.
 
 Mode changes how many questions are **shown**, never what is possible: every skipped question takes the documented default and is listed in the summary as "default". `yaw add <module>` later asks only that module's questions.
 
@@ -44,7 +46,7 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 
 ### CLI lane
 
-- Prompts in batches per section, defaults in brackets, `?` expands help, `skip` takes the default.
+- Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).
 - Non-interactive: `yaw init --answers answers.yaml --yes` (CI, repeat setups).
 
 ### Browser-form lane
