@@ -1,6 +1,6 @@
 # ADR-0017: Format conventions (names, agent keys, facts, questions and answers)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issues: #10–#17 (Y-1.6 – Y-1.13)
 - Resolves: F6, F7, F8 (partly), F10 (`docs/build/plan.md` §1.1)
