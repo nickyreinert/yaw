@@ -29,11 +29,12 @@ Vendor facts this relies on (Claude Code and Codex hook docs, GitHub Copilot CLI
 
 - A guard's deny reason is model-visible by design: the model must learn that the call was blocked, or it retries. It is one line (≤ 300 characters), only on a deny, never on an allow. An allow prints nothing (no `permissionDecision: allow`, so the agent's own permission flow stays in charge).
 - `context` on any other event than `SessionStart` (e.g. `UserPromptSubmit` recall) is refused in phase 1. The `decisions` module (Y-5.6) needs prompt-time recall; it must amend this ADR with its own budget before it may return context there.
-- Anything a handler returns that its kind does not allow is **dropped by the dispatcher**, not only flagged by tests. A comfort or evaluation handler that returns `additionalContext` produces no output at all.
+- Anything a handler returns that its kind does not allow is **dropped by the dispatcher**, not only flagged by tests: a comfort or evaluation handler's `additionalContext` is dropped (a comfort handler's `systemMessage` still goes out).
+- Handlers cannot print: while they run, the dispatcher swallows their writes to stdout, stderr and `console`; only the dispatcher's final JSON is written.
 
 ### How YAW talks to the agent
 
-- Exit code is always 0. YAW never uses exit 2 (it would put stderr in front of the model) and never writes to stderr from a hook; errors go to `~/.yaw/logs/hook-errors.log` (message only, never payload content).
+- Exit code is always 0. YAW never uses exit 2 (it would put stderr in front of the model) and never writes to stderr from a hook: the shim drops Node's stderr and exits 0 whatever happens. Errors go to `~/.yaw/logs/hook-errors.log`: YAW's own messages in full, other errors (handlers, `JSON.parse`, which quotes its input) by name and code only, never payload content.
 - Output is a single JSON object or nothing. Plain-text stdout is never used (it would be model context on `UserPromptSubmit` / `SessionStart`).
 - YAW registers no hook with `async: true`. Background work (evaluation, phase 2) runs inside a sync hook that prints nothing, appends to a local file and detaches itself.
 - One shape per agent: Claude and Codex get `hookSpecificOutput` (`hookEventName` + `permissionDecision` / `additionalContext`) and top-level `systemMessage` / `terminalSequence`; Copilot gets top-level `permissionDecision` / `permissionDecisionReason` / `additionalContext`.
@@ -41,7 +42,7 @@ Vendor facts this relies on (Claude Code and Codex hook docs, GitHub Copilot CLI
 
 ### Tests (Y-4.8)
 
-`test/silent-hooks.test.js` runs every recorded fixture of every agent through the dispatcher with handlers of each kind that try to return everything (context, messages, deny), and asserts: evaluation → exit 0 and empty stdout; comfort → no `additionalContext` anywhere in stdout; context → output only on `SessionStart`; guard → output only on `PreToolUse` and only for a deny. The same holds through the real shim in a subprocess, and for every hook of every kit module.
+`test/silent-hooks.test.js` runs every recorded fixture of every agent through the dispatcher with handlers of each kind that try to return everything (context, messages, deny), and asserts: evaluation → exit 0 and empty stdout; comfort → no `additionalContext` anywhere in stdout; context → output only on `SessionStart`; guard → output only on `PreToolUse` and only for a deny. The same runs through the real shim in a subprocess (identical output, empty stderr), handlers that print are shown to stay silent, every kit module's `context` hooks must be on `SessionStart` with a `tokenCost` above `none`, and `test/policy.test.js` checks the size limits.
 
 ## Consequences
 

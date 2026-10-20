@@ -4,6 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { hookCommand } from '../core/render/agents.js';
 import { dirname, join } from 'node:path';
 import { normalise, patchPaths, record } from '../core/hooks/adapters.js';
 import { schemas } from '../core/render/kit.js';
@@ -104,6 +106,11 @@ test('fails open: bad payload, unknown module, no manifest, handler that throws 
     const r = await hook({ root: c.root ?? root, agent: 'claude', event: 'PreToolUse', module: c.module ?? 'security', payload: c.payload });
     assert.deepEqual([r.code, r.stdout, r.stderr], [0, '', ''], JSON.stringify(c).slice(0, 80));
   }
+  // an invalid payload is logged by size only: JSON.parse would quote the payload (B rule 6)
+  const bad = await hook({ root, agent: 'claude', event: 'PreToolUse', payload: '{"tool_input":{"command": cat_secret_TOKEN123}}' });
+  const badLog = readFileSync(join(bad.home, '.yaw', 'logs', 'hook-errors.log'), 'utf8');
+  assert.match(badLog, /yaw hook: invalid JSON payload \(47 bytes\)/);
+  assert.doesNotMatch(badLog, /cat_secret|TOKEN123/);
   // bad arguments
   for (const args of [['hook'], ['hook', 'PreToolUse'], ['hook', 'PreToolUse', '--agent', 'gemini', '--module', 'security'], ['hook', '--frob']]) {
     const { main } = await import('../core/cli/main.js');
@@ -120,8 +127,14 @@ test('fails open: bad payload, unknown module, no manifest, handler that throws 
   const r = await hook({ root: proj, kitRoot, agent: 'claude', event: 'PreToolUse', module: 'probe', payload: toolCall('claude', { command: 'rm -rf /' }) });
   assert.deepEqual([r.code, r.stdout, r.stderr], [0, '', '']);
   const log = readFileSync(join(r.home, '.yaw', 'logs', 'hook-errors.log'), 'utf8');
-  assert.match(log, /probe\/guard-pretooluse: handler failed/);
+  assert.match(log, /probe\/guard-pretooluse: Error \(message not logged\)/);
   assert.ok(!log.includes('rm -rf'), 'no payload content in the error log');
+});
+
+test('the registered command skips a missing shim silently (exit 0, no output)', () => {
+  const command = hookCommand('codex', 'PreToolUse', 'security');
+  const r = spawnSync('/bin/sh', ['-c', command], { cwd: tmp('yaw-nogit-'), env: { PATH: NODE_PATH, HOME: tmp('yaw-home-') }, encoding: 'utf8', input: '{}' });
+  assert.deepEqual([r.status, r.stdout, r.stderr], [0, '', '']);
 });
 
 test('shim: runs the kit from YAW_KIT and blocks through it; fails open without the kit or without node', async () => {

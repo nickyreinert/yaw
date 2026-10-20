@@ -94,7 +94,10 @@ test('every hook of every kit module is token-free by kind (real modules)', asyn
   for (const m of modules) {
     for (const h of loadModule(KIT_ROOT, m).outputs?.hooks ?? []) {
       assert.ok(['guard', 'context', 'comfort', 'evaluation'].includes(h.kind), `${m}/${h.name}`);
-      if (h.kind === 'context') assert.equal(h.event, 'SessionStart', `${m}/${h.name}: context only on SessionStart (ADR-0007)`);
+      if (h.kind === 'context') {
+        assert.equal(h.event, 'SessionStart', `${m}/${h.name}: context only on SessionStart (ADR-0007)`);
+        assert.notEqual(h.tokenCost ?? loadModule(KIT_ROOT, m).tokenCost, 'none', `${m}/${h.name}: a context hook costs tokens`);
+      }
     }
   }
   // the recorded fixtures are harmless calls: the security guards print nothing for them
@@ -110,5 +113,24 @@ test('through the real shim in a child process: silent for harmless calls', asyn
   for (const f of fixtures) {
     const r = shim({ root: project, agent: declaredAgent(f.agent), event: f.event, payload: f.payload, env });
     assert.deepEqual([r.code, r.stdout, r.stderr], [0, '', ''], `${f.agent}/${f.name}`);
+  }
+});
+
+test('handlers that print are muted: nothing reaches stdout or stderr, in-process and through the real shim', async () => {
+  const k = probeKit({ noisy: true });
+  const project = await makeProject({ kitRoot: k, modules: ['core', 'probe'] });
+  const env = { HOME: tmp('yaw-home-'), PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':'), YAW_KIT: k };
+  for (const f of fixtures) {
+    const r = shim({ root: project, agent: declaredAgent(f.agent), event: f.event, module: 'probe', payload: f.payload, env });
+    assert.deepEqual([r.code, r.stdout, r.stderr], [0, '', ''], `${f.agent}/${f.name}`);
+  }
+});
+
+test('every kind through the real shim behaves as in-process', async () => {
+  const env = { HOME: tmp('yaw-home-'), PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':'), YAW_KIT: kitRoot };
+  for (const f of fixtures) {
+    const viaShim = shim({ root, agent: declaredAgent(f.agent), event: f.event, module: 'probe', payload: f.payload, env });
+    const inProcess = await run({ root, kitRoot }, f);
+    assert.deepEqual([viaShim.code, viaShim.stdout, viaShim.stderr], [0, inProcess.stdout, ''], `${f.agent}/${f.name}`);
   }
 });

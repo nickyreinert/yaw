@@ -73,14 +73,17 @@ export function toolCall(agent, toolInput, toolName) {
 
 // A kit with `core` and a module `probe` that has one hook of every kind on every event; each handler
 // tries to return everything (context, messages, a deny), so tests see what the dispatcher lets through.
-// `throws: true` makes every handler throw instead; `kinds` limits the hooks to some kinds.
+// `throws: true` makes every handler throw instead; `noisy: true` makes it print to stdout/stderr and return
+// nothing; `kinds` limits the hooks to some kinds.
 export const KINDS = ['guard', 'context', 'comfort', 'evaluation'];
 export const EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Stop', 'Notification'];
 
-export function probeKit({ throws = false, kinds = KINDS } = {}) {
+export function probeKit({ throws = false, noisy = false, kinds = KINDS } = {}) {
   const kitRoot = makeKit(tmp('yaw-probekit-'), { modules: { core: { templates: { 'AGENTS.md.tmpl': '# Agents\n' } } } });
   const hooks = [];
-  for (const kind of kinds) for (const event of EVENTS) hooks.push(`    - { name: ${kind}-${event.toLowerCase()}, event: ${event}, kind: ${kind} }`);
+  for (const kind of kinds) {
+    for (const event of EVENTS) hooks.push(`    - { name: ${kind}-${event.toLowerCase()}, event: ${event}, kind: ${kind}${kind === 'context' ? ', tokenCost: low' : ''} }`);
+  }
   writeTree(kitRoot, {
     'modules/probe/module.yaml': [
       'name: probe',
@@ -99,9 +102,13 @@ export function probeKit({ throws = false, kinds = KINDS } = {}) {
       '',
     ].join('\n'),
   });
+ // A bin/yaw that runs this checkout's CLI against the probe kit, so the real shim can be used.
+  writeTree(kitRoot, { 'bin/yaw': `import { main } from ${JSON.stringify(join(KIT_ROOT, 'core', 'cli', 'main.js'))};\nprocess.exitCode = await main(process.argv.slice(2), { kitRoot: ${JSON.stringify(kitRoot)} });\n` });
   const body = throws
     ? 'export default function () { throw new Error("handler failed"); }\n'
-    : 'export default function () { return { decision: "deny", reason: "probe says no", context: "probe context", additionalContext: "leak", systemMessage: "probe message", terminalSequence: "\\u001b]777;notify;YAW;probe\\u0007", hookSpecificOutput: { additionalContext: "leak" } }; }\n';
+    : noisy
+      ? 'export default function () { console.log("stray stdout"); console.error("stray stderr"); process.stdout.write("raw stdout\\n"); process.stderr.write("raw stderr\\n"); return null; }\n'
+      : 'export default function () { return { decision: "deny", reason: "probe says no", context: "probe context", additionalContext: "leak", systemMessage: "probe message", terminalSequence: "\\u001b]777;notify;YAW;probe\\u0007", hookSpecificOutput: { additionalContext: "leak" } }; }\n';
   for (const kind of KINDS) {
     for (const event of EVENTS) {
       const file = join(kitRoot, 'modules', 'probe', 'hooks', `${kind}-${event.toLowerCase()}.js`);

@@ -9,7 +9,7 @@
 
 Step 4 needs one hook entry point that every agent calls, a per-agent translation of payloads and outputs, and the rendering of each agent's hook registration. ADR-0006 fixed the shim and left the command strings to Y-4.3 – Y-4.5; ADR-0018 left the field mapping as a draft to be confirmed with fixtures; H4 asked how Copilot, which also reads `.claude/settings.json`, avoids firing twice.
 
-**Sources.** No live Claude Code, Codex or Copilot session could record payloads in this step. The mapping below was checked on 2026-10-20 against the vendor documentation (Claude Code hooks reference, Codex hooks docs, GitHub Copilot CLI hooks reference). The fixtures in `test/fixtures/<agent>/<event>.json` are written from that documentation ("recorded-style"), without secrets. "Documented" below means: stated in the vendor docs; "assumed": not stated there, chosen by YAW, to be confirmed with a real recording.
+**Sources.** No live Claude Code, Codex or Copilot session could record payloads in this step (follow-up: #94). The mapping below was checked on 2026-10-20 against the vendor documentation (Claude Code hooks reference, Codex hooks docs, GitHub Copilot CLI hooks reference). The fixtures in `test/fixtures/<agent>/<event>.json` are written from that documentation ("recorded-style"), without secrets. "Documented" below means: stated in the vendor docs; "assumed": not stated there, chosen by YAW, to be confirmed with a real recording.
 
 ## Decision
 
@@ -23,8 +23,8 @@ Step 4 needs one hook entry point that every agent calls, a per-agent translatio
 
 ### Shim and command strings (ADR-0006, H7)
 
-- `core` renders `.yaw/bin/yaw-hook` (from `core/hooks/yaw-hook.sh`) whenever an enabled module has hooks for a selected agent, and drops it with the last one. It uses only shell builtins until `node` runs, prefers `.yaw/lib/bin/yaw` when it exists (vendored), then `${YAW_KIT:-$HOME/.yaw/kit}`; no Node or no kit → exit 0, no output. It is called through `sh`, so no executable bit is needed in git.
-- Command (all agents): `sh "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook" <Event> --agent <agent> --module <module>`, `timeout: 10`, never `async`. Claude sets `CLAUDE_PROJECT_DIR` (documented); Codex runs commands in the session cwd and uses `git rev-parse --show-toplevel` in its own examples (documented); Copilot sets no project variable (not documented, so the git fallback applies).
+- `core` renders `.yaw/bin/yaw-hook` (from `core/hooks/yaw-hook.sh`) whenever an enabled module has hooks for a selected agent, and drops it with the last one. It uses only shell builtins until `node` runs, drops Node's stderr and always exits 0, prefers `.yaw/lib/bin/yaw` when it exists (vendored), then `${YAW_KIT:-$HOME/.yaw/kit}`; no Node or no kit → exit 0, no output. It is called through `sh`, so no executable bit is needed in git.
+- Command (all agents): `f="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook"; [ ! -f "$f" ] || sh "$f" <Event> --agent <agent> --module <module>`, `timeout: 10`, never `async`. A missing shim (wrong root, file deleted) is skipped with exit 0 and no output. Claude sets `CLAUDE_PROJECT_DIR` (documented); Codex runs commands in the session cwd and uses `git rev-parse --show-toplevel` in its own examples (documented); Copilot sets no project variable (not documented, so the git fallback applies).
 
 ### Claude Code (Y-4.3)
 
@@ -61,6 +61,6 @@ Rows: each enabled module, its hooks and skills (outside a project: every kit mo
 
 ## Consequences
 
-- `docs/spec/formats.md` replaces the draft mapping with this one. Fields marked "assumed" must be re-checked with one real recording per agent before v0.1 (Y-8.2 can do it).
+- `docs/spec/formats.md` replaces the draft mapping with this one. Fields marked "assumed" must be re-checked with one real recording per agent before v0.1 (#94).
 - If Copilot ever sets `CLAUDE_PROJECT_DIR` or Claude adds a `timestamp`, the detection moves to an explicit marker (e.g. an env variable in the command).
 - A user's own `.github/hooks/*.json` keeps working; YAW does not touch it.

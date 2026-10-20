@@ -107,6 +107,17 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
+test('Quick footprint with security (ADR-0022): 12 files for Claude, 13 with Codex', async () => {
+  for (const [agents, count] of [['claude', 12], ['claude, codex', 13]]) {
+    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
+    const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /modules: core, security/);
+    const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
+    assert.equal(files.length, count, files.join(', '));
+  }
+});
+
 test('answers without a proposal: the profile is suggested from the answers and written back', async () => {
   const text = 'mode: quick\nanswers:\n  user.agents: [codex]\n  arch.language: python\n  arch.runs-on: local\n';
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);

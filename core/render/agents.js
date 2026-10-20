@@ -68,9 +68,9 @@ export function matcherAccepts(agent, matcher, toolNames) {
 
 // The command an agent runs for one module's hooks on one event. The shim path is found from the
 // project root: Claude sets CLAUDE_PROJECT_DIR; Codex runs commands in the session cwd and Copilot
-// sets no project variable, so git (or the cwd) gives the root.
+// sets no project variable, so git (or the cwd) gives the root. A missing shim is skipped silently.
 export function hookCommand(agent, event, module) {
-  return `sh "\${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/${HOOK_SHIM}" ${event} --agent ${agent} --module ${module}`;
+  return `f="\${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/${HOOK_SHIM}"; [ ! -f "$f" ] || sh "$f" ${event} --agent ${agent} --module ${module}`;
 }
 
 // Hook registrations of the enabled modules, as JSON parts of the agents' settings files (ADR-0004

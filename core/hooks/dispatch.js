@@ -43,9 +43,31 @@ function appendLog(env, file, line) {
   } catch { /* logging must not affect the session */ }
 }
 
-// Error log: message and context only, never payload content (B rule 6).
+// Errors YAW raises itself; their messages hold no payload content.
+class HookError extends Error {}
+
+// Error log, never payload content (B rule 6): YAW's own messages in full; for anything else (a handler,
+// JSON.parse, which quotes the input) only the error's name and code.
 function logError(env, where, error) {
-  appendLog(env, 'hook-errors.log', `${new Date().toISOString()} ${where}: ${String(error?.message ?? error).split('\n')[0]}`);
+  const text = error instanceof HookError ? error.message : `${error?.name ?? 'Error'}${error?.code ? ` ${error.code}` : ''} (message not logged)`;
+  appendLog(env, 'hook-errors.log', `${new Date().toISOString()} ${where}: ${text}`);
+}
+
+// While handlers run, their own writes to stdout/stderr/console are swallowed: on UserPromptSubmit and
+// SessionStart plain stdout would reach the model, and stray text breaks the JSON answer (ADR-0007).
+async function muted(fn) {
+  const saved = { out: process.stdout.write, err: process.stderr.write, console: { ...console } };
+  const none = () => true;
+  process.stdout.write = none;
+  process.stderr.write = none;
+  for (const k of ['log', 'info', 'warn', 'error', 'debug', 'trace', 'dir', 'table']) console[k] = () => {};
+  try {
+    return await fn();
+  } finally {
+    process.stdout.write = saved.out;
+    process.stderr.write = saved.err;
+    Object.assign(console, saved.console);
+  }
 }
 
 // -> { stdout, result, ran } for one call; exported for tests.
@@ -64,7 +86,7 @@ export async function dispatch({ agent, event, module, payload, root, kitRoot = 
     let result;
     try {
       const handler = (await import(pathToFileURL(file).href)).default;
-      result = await handler(ev, { root, kitRoot, manifest, module: def, item, env });
+      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env }));
     } catch (e) {
       logError(env, `${module}/${item.name}`, e);
       continue;
@@ -87,9 +109,14 @@ export async function runHook(args, io) {
   try {
     const { values, positionals } = parseArgs({ args, options: { agent: { type: 'string' }, module: { type: 'string' } }, allowPositionals: true, strict: true });
     const [event] = positionals;
-    if (!event || !AGENTS.includes(values.agent) || !values.module) throw new Error('usage: yaw hook <event> --agent claude|codex|copilot --module <module>');
+    if (!event || !AGENTS.includes(values.agent) || !values.module) throw new HookError('usage: yaw hook <event> --agent claude|codex|copilot --module <module>');
     const text = await readStdin(io.stdin ?? process.stdin);
-    const payload = JSON.parse(text);
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new HookError(`invalid JSON payload (${Buffer.byteLength(text)} bytes)`);
+    }
     const { ev, stdout, result } = await dispatch({ agent: values.agent, event, module: values.module, payload, root: io.cwd ?? process.cwd(), kitRoot: io.kitRoot ?? KIT_ROOT, env });
     const hookMs = Math.round((performance.now() - started) * 10) / 10;
     if (EVENTS.includes(ev.event) && ev.sessionId) {
