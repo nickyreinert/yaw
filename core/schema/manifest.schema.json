@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "manifest.schema.json",
+  "title": ".yaw/manifest.json",
+  "description": "Transparency contract: everything YAW generated in a project (doc 01 §5). Kit-written.",
+  "type": "object",
+  "required": ["kit", "profiles", "preset", "agents", "vendored", "modules", "files"],
+  "properties": {
+    "kit": {
+      "description": "Pinned kit version; the git tag is v<kit>. CI installs exactly this tag (BD10).",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/name" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "preset": { "$ref": "common.schema.json#/$defs/mode" },
+    "agents": { "$ref": "common.schema.json#/$defs/agentSelection" },
+    "vendored": {
+      "description": "true: kit logic copied into .yaw/lib/ (--vendor); false: hooks call the global kit through the shim.",
+      "type": "boolean"
+    },
+    "modules": {
+      "description": "Module name -> { enabled, ...options }.",
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "description": "Task mode per BD4.",
+          "properties": { "mode": { "enum": ["local", "github", "both"] } },
+          "anyOf": [
+            { "properties": { "enabled": { "const": false } } },
+            { "required": ["mode"] }
+          ]
+        }
+      },
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": { "$ref": "#/$defs/moduleEntry" }
+      },
+      "additionalProperties": false
+    },
+    "mcpServers": {
+      "description": "Every enabled MCP server, each recorded as an ADR (doc 09 §6).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "module"],
+        "properties": {
+          "name": { "$ref": "common.schema.json#/$defs/name" },
+          "module": { "$ref": "common.schema.json#/$defs/name" },
+          "adr": { "type": "string", "pattern": "^ADR-[0-9]{4}$" },
+          "agents": { "$ref": "common.schema.json#/$defs/agentSelection" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "moduleEntry": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": { "enabled": { "type": "boolean" } },
+      "additionalProperties": {
+        "description": "Module option, from the module's answers.",
+        "type": ["string", "number", "boolean", "array"],
+        "items": { "type": ["string", "number", "boolean"] }
+      }
+    },
+    "file": {
+      "type": "object",
+      "required": ["path", "module", "hash", "managed"],
+      "properties": {
+        "path": { "$ref": "common.schema.json#/$defs/relPath" },
+        "module": { "description": "Module that owns the file.", "$ref": "common.schema.json#/$defs/name" },
+        "hash": { "description": "SHA-256 of the content as written (ADR-0003).", "$ref": "common.schema.json#/$defs/sha256" },
+        "managed": { "description": "false once the user owns the file; yaw update then leaves it alone.", "type": "boolean" },
+        "fragments": {
+          "description": "Shared files: parts contributed by other modules. Provisional until ADR-0004.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["module", "hash"],
+            "properties": {
+              "module": { "$ref": "common.schema.json#/$defs/name" },
+              "hash": { "$ref": "common.schema.json#/$defs/sha256" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

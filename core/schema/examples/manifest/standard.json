@@ -1,0 +1,139 @@
+{
+  "kit": "0.1.0",
+  "profiles": [
+    "static-site",
+    "cloudflare-workers"
+  ],
+  "preset": "standard",
+  "agents": [
+    "claude",
+    "codex"
+  ],
+  "vendored": false,
+  "modules": {
+    "core": {
+      "enabled": true
+    },
+    "communication": {
+      "enabled": true
+    },
+    "standards": {
+      "enabled": true
+    },
+    "devenv": {
+      "enabled": true
+    },
+    "tasks": {
+      "enabled": true,
+      "mode": "both"
+    },
+    "git-hooks": {
+      "enabled": true
+    },
+    "github": {
+      "enabled": true
+    },
+    "ci": {
+      "enabled": true
+    },
+    "decisions": {
+      "enabled": true
+    },
+    "security": {
+      "enabled": true
+    },
+    "sessions": {
+      "enabled": true
+    },
+    "comfort": {
+      "enabled": true,
+      "items": [
+        "session-hygiene",
+        "status-line"
+      ]
+    },
+    "ui-design": {
+      "enabled": false
+    }
+  },
+  "mcpServers": [
+    {
+      "name": "playwright",
+      "module": "ui-design",
+      "adr": "ADR-0003",
+      "agents": [
+        "claude"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "module": "core",
+      "hash": "sha256:dc9b2c5e50e4572ce409f8466a1162712d251fa46f52f1228ae2cb356946e77c",
+      "managed": true,
+      "fragments": [
+        {
+          "module": "decisions",
+          "hash": "sha256:3183d37be5060278b0f0b2ea1095fea98e027d276f661719821018f5511f4927"
+        },
+        {
+          "module": "security",
+          "hash": "sha256:5d2d3ceb7abe552344276d47d36a8175b7aeb250a9bf0bf00e850cd23ecf2e43"
+        }
+      ]
+    },
+    {
+      "path": "CLAUDE.md",
+      "module": "core",
+      "hash": "sha256:6ebdb617a8104a7756d0cf36578ab01103dc9f07e4dc6feb751296b9c402faf7",
+      "managed": true
+    },
+    {
+      "path": "justfile",
+      "module": "core",
+      "hash": "sha256:b6a518b49883f5097adc9ff6f86d4b997792ec6dfb20f791b57af6760c0f7c11",
+      "managed": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "module": "core",
+      "hash": "sha256:cde0fb0dec1400c54a0f7e7eafa73624c53e4da258bbd34b3380a0defeba95c1",
+      "managed": true,
+      "fragments": [
+        {
+          "module": "security",
+          "hash": "sha256:dd088a5dc338a2f837ed78e8e985a994fc466e10d1c5257fcfe84eba0a79f4cd"
+        },
+        {
+          "module": "comfort",
+          "hash": "sha256:a3e8233a550fc13c3191a7c3ce88c3e9f7ad3757daa1fbb7c6716346af10935d"
+        }
+      ]
+    },
+    {
+      "path": ".codex/hooks.json",
+      "module": "core",
+      "hash": "sha256:cb384978c34616e5e8839d448e708cd93f2b2ca07a43fa53f5c724207608450d",
+      "managed": true
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "module": "ci",
+      "hash": "sha256:0def7989a207eb9c6778b5516262ea86ddd2305b55dad751c40213384d2f2ae6",
+      "managed": true
+    },
+    {
+      "path": ".decisions/index.json",
+      "module": "decisions",
+      "hash": "sha256:1bc04b5291c26a46d918139138b992d2de976d6851d0893b0476b85bfbdfc6e6",
+      "managed": true
+    },
+    {
+      "path": "lefthook.yml",
+      "module": "git-hooks",
+      "hash": "sha256:4733c73e47dfd8ef572b8ccb5a30b6131973215963b2ede016bcc904c202cb35",
+      "managed": false
+    }
+  ]
+}

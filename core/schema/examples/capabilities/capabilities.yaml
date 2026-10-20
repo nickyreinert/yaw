@@ -1,0 +1,50 @@
+# adapters/capabilities.yaml: per-agent defaults (doc 09 §2); items override them
+lastVerified: 2026-10-20
+agents:
+  claude:
+    name: Claude Code
+    phase: 1
+    capabilities:
+      rulesFile: { support: native, via: "CLAUDE.md imports AGENTS.md" }
+      skills: { support: native, via: .claude/skills/ }
+      hooks: { support: native, via: .claude/settings.json }
+      promptContext: { support: native, via: "UserPromptSubmit additionalContext" }
+      sessionStartContext: { support: native, via: "SessionStart additionalContext" }
+      userMessage: { support: native, via: systemMessage }
+      blockTool: { support: native, via: "PreToolUse permissionDecision deny" }
+      stopCheck: { support: native, via: "Stop decision block" }
+      notification: { support: native, via: "Notification + terminalSequence" }
+      subagents: { support: native, via: .claude/agents/ }
+      statusLine: { support: native, via: status line script }
+      telemetry: { support: native, via: OpenTelemetry }
+  codex:
+    name: Codex
+    phase: 1
+    note: Hooks must be trusted once via /hooks; yaw doctor reminds you.
+    capabilities:
+      rulesFile: { support: native, via: AGENTS.md }
+      skills: { support: native, via: .agents/skills/ }
+      hooks: { support: partial, via: .codex/hooks.json, note: must be trusted via /hooks }
+      promptContext: { support: native, via: "UserPromptSubmit additionalContext" }
+      sessionStartContext: { support: native, via: "SessionStart additionalContext" }
+      userMessage: { support: native, via: systemMessage }
+      blockTool: { support: native, via: "PreToolUse permissionDecision deny" }
+      stopCheck: { support: native, via: "Stop decision block" }
+      notification: { support: fallback, via: Stop hook }
+      subagents: { support: native }
+      telemetry: { support: partial, via: OpenTelemetry, note: "only in the user's ~/.codex/config.toml" }
+  copilot:
+    name: Copilot
+    phase: 1
+    note: "No prompt-time recall: userPromptSubmitted output is dropped; the AGENTS.md rule is used instead."
+    capabilities:
+      rulesFile: { support: native, via: "AGENTS.md + .github/copilot-instructions.md" }
+      skills: { support: native, via: .agents/skills/ }
+      hooks: { support: native, via: ".github/hooks/*.json, also reads .claude/settings.json" }
+      promptContext: { support: none, note: userPromptSubmitted output is dropped }
+      sessionStartContext: { support: native, via: "sessionStart additionalContext" }
+      blockTool: { support: native, via: preToolUse }
+      stopCheck: { support: partial, via: agentStop, note: verify with recorded fixtures }
+      notification: { support: partial, via: notification, note: CLI only }
+      subagents: { support: partial, via: custom agents (.agent.md) }
+      telemetry: { support: fallback, via: hook events to the YAW receiver }

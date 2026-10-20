@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "capabilities.schema.json",
+  "title": "adapters/capabilities.yaml",
+  "description": "Per-agent default support per capability (doc 09 §2–3). Items override these defaults with their own agents map.",
+  "type": "object",
+  "required": ["agents", "lastVerified"],
+  "properties": {
+    "agents": {
+      "type": "object",
+      "properties": {
+        "claude": { "$ref": "#/$defs/agent" },
+        "codex": { "$ref": "#/$defs/agent" },
+        "copilot": { "$ref": "#/$defs/agent" },
+        "gemini": { "$ref": "#/$defs/agent" },
+        "antigravity": { "$ref": "#/$defs/agent" },
+        "pi": { "$ref": "#/$defs/agent" },
+        "hermes": { "$ref": "#/$defs/agent" }
+      },
+      "additionalProperties": false
+    },
+    "lastVerified": { "$ref": "common.schema.json#/$defs/date" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "agent": {
+      "type": "object",
+      "required": ["name", "phase", "capabilities"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "phase": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "note": { "description": "Capability note shown after the agent choice (doc 03 §0).", "type": "string", "minLength": 1 },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "rulesFile": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "skills": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "hooks": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "promptContext": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "sessionStartContext": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "userMessage": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "blockTool": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "stopCheck": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "notification": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "subagents": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "statusLine": { "$ref": "common.schema.json#/$defs/agentCompat" },
+            "telemetry": { "$ref": "common.schema.json#/$defs/agentCompat" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

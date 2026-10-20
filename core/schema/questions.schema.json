@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "questions.schema.json",
+  "title": "Question definitions (interview/base.yaml)",
+  "description": "One question format for interview/base.yaml and module.yaml#questions (ADR-0017). There is no secret question type: secrets go through the secret flow (doc 08).",
+  "type": "object",
+  "required": ["questions"],
+  "properties": {
+    "questions": { "type": "array", "items": { "$ref": "#/$defs/question" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "question": {
+      "type": "object",
+      "required": ["id", "mode", "type", "label", "default"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/questionId" },
+        "ref": { "description": "Catalogue number in kickoff/03-interview.md.", "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "scope": {
+          "description": "project: stored in .yaw/answers.yaml. user: default stored in ~/.yaw/user-profile.yaml, a project may override it.",
+          "enum": ["project", "user"]
+        },
+        "mode": { "description": "Q: shown in Quick, S: Standard, F: Full only.", "enum": ["Q", "S", "F"] },
+        "type": { "enum": ["text", "choice", "multi", "boolean", "number"] },
+        "label": { "type": "string", "minLength": 1 },
+        "hint": { "type": "string", "minLength": 1 },
+        "help": { "description": "Help topic: interview/help/<topic>.md (why it matters, example).", "$ref": "common.schema.json#/$defs/name" },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "anyOf": [
+              { "type": ["string", "number", "boolean"] },
+              {
+                "type": "object",
+                "required": ["value"],
+                "properties": {
+                  "value": { "type": ["string", "number", "boolean"] },
+                  "label": { "type": "string", "minLength": 1 },
+                  "note": { "type": "string", "minLength": 1 },
+                  "phase": { "description": "Phase in which the choice becomes available; later phases are shown greyed out.", "type": "integer", "minimum": 1, "maximum": 3 }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "default": { "$ref": "common.schema.json#/$defs/answerValue" },
+        "when": {
+          "description": "Ask only when these earlier answers match (a list means any of its values).",
+          "$ref": "common.schema.json#/$defs/answerMap"
+        },
+        "agents": { "$ref": "common.schema.json#/$defs/agentsMap" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

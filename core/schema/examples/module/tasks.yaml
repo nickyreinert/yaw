@@ -1,0 +1,40 @@
+# modules/tasks/module.yaml: shows a module-owned question (same format as interview/base.yaml)
+name: tasks
+description: Task ledger, local, GitHub or both (doc 10).
+depends: [core]
+default: { quick: true, standard: true, full: true }
+questions:
+  - id: tasks.mode
+    ref: "10.1"
+    mode: Q
+    type: choice
+    label: Task tracking
+    hint: Where tasks live; local works without GitHub.
+    help: task-modes
+    choices:
+      - { value: local, label: Local only (TASKS.md) }
+      - { value: github, label: GitHub only (issues) }
+      - { value: both, label: Both (local-first) }
+    default: local
+outputs:
+  templates: [TASKS.md]
+  hooks:
+    - name: stop-resume-point
+      event: Stop
+      kind: guard
+      tokenCost: low
+    - name: session-start-task
+      event: SessionStart
+      matcher: clear
+      kind: context
+      tokenCost: low
+  just: just/tasks.just
+agentsMd: |
+  - Start of session: read *Active* in `TASKS.md` and continue from the resume point.
+  - On stop: append a journal line and update the resume point.
+agents:
+  claude:  { support: native, via: "Stop hook + SessionStart re-injection" }
+  codex:   { support: native, via: "Stop hook + SessionStart re-injection" }
+  copilot: { support: partial, note: "resume point is an AGENTS.md rule (tier 2)" }
+tokenCost: low
+lastVerified: 2026-10-20

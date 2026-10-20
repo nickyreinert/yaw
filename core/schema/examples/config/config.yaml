@@ -1,0 +1,9 @@
+# .yaw/config.yaml: change with yaw config set (comments are not preserved then)
+hygiene:
+  enabled: true
+  drift: 0.7
+  maxPrompts: 40
+  maxAgeMinutes: 120
+  cooldownPrompts: 20
+knowledge:
+  namespaces: [personal]

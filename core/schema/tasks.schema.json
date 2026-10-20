@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tasks.schema.json",
+  "title": "Task ledger",
+  "description": "Parsed form of TASKS.md (BD4, doc 10 §2). Grammar: docs/spec/formats.md#task-ledger. readOnly=false: local / both mode, IDs T-NNN (both: optional linked issue). readOnly=true: generated view of GitHub issues, IDs #123.",
+  "type": "object",
+  "required": ["readOnly", "active", "backlog"],
+  "properties": {
+    "readOnly": { "type": "boolean" },
+    "active": { "type": "array" },
+    "backlog": { "type": "array" },
+    "archive": { "$ref": "common.schema.json#/$defs/relPath" }
+  },
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "properties": {
+        "readOnly": { "const": false },
+        "active": { "items": { "$ref": "#/$defs/activeTask", "properties": { "id": { "$ref": "#/$defs/localId" } } } },
+        "backlog": { "items": { "$ref": "#/$defs/backlogItem", "properties": { "id": { "$ref": "#/$defs/localId" } } } }
+      }
+    },
+    {
+      "properties": {
+        "readOnly": { "const": true },
+        "active": { "items": { "$ref": "#/$defs/activeTask", "properties": { "id": { "$ref": "#/$defs/issueId" }, "issue": false } } },
+        "backlog": { "items": { "$ref": "#/$defs/backlogItem", "properties": { "id": { "$ref": "#/$defs/issueId" }, "issue": false } } }
+      }
+    }
+  ],
+  "$defs": {
+    "localId": { "type": "string", "pattern": "^T-[0-9]{3,}$" },
+    "issueId": { "type": "string", "pattern": "^#[1-9][0-9]*$" },
+    "text": { "type": "string", "minLength": 1, "pattern": "^[^\\n]+$" },
+    "activeTask": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "issue": { "description": "Linked issue number (both mode).", "type": "integer", "minimum": 1 },
+        "title": { "$ref": "#/$defs/text" },
+        "status": { "enum": ["todo", "in progress", "blocked", "in review"] },
+        "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "brief": { "$ref": "#/$defs/text" },
+        "model": { "description": "Model / effort suggestion.", "$ref": "#/$defs/text" },
+        "spec": { "description": "Links to spec, plan, issue, ADRs.", "$ref": "#/$defs/text" },
+        "resume": { "description": "Resume point.", "$ref": "#/$defs/text" },
+        "journal": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["date", "text"],
+            "properties": {
+              "date": { "$ref": "common.schema.json#/$defs/date" },
+              "text": { "$ref": "#/$defs/text" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "backlogItem": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "type": "string" },
+        "issue": { "type": "integer", "minimum": 1 },
+        "title": { "$ref": "#/$defs/text" },
+        "note": { "description": "Size / model hint and links.", "$ref": "#/$defs/text" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": ".yaw/config.yaml",
+  "description": "Project settings changed with yaw config set (BD1): hygiene thresholds (doc 11 §1), knowledge namespaces (doc 12 §3).",
+  "type": "object",
+  "properties": {
+    "hygiene": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "drift": { "description": "Topic drift threshold (1 - cosine).", "type": "number", "minimum": 0, "maximum": 1 },
+        "maxPrompts": { "type": "integer", "minimum": 1 },
+        "maxAgeMinutes": { "type": "integer", "minimum": 1 },
+        "cooldownPrompts": { "description": "Show the hint at most once per this many prompts.", "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "knowledge": {
+      "type": "object",
+      "properties": {
+        "namespaces": {
+          "description": "Global knowledge namespaces this project may read.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/name" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

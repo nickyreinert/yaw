@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "module.schema.json",
+  "title": "module.yaml",
+  "description": "Module definition (doc 04 §2).",
+  "type": "object",
+  "required": ["name", "description", "default", "agents", "tokenCost", "lastVerified"],
+  "properties": {
+    "name": { "$ref": "common.schema.json#/$defs/name" },
+    "description": { "type": "string", "minLength": 1 },
+    "appliesTo": {
+      "description": "Module is offered only when these facts match.",
+      "$ref": "common.schema.json#/$defs/facts"
+    },
+    "depends": {
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/name" },
+      "uniqueItems": true
+    },
+    "default": {
+      "description": "Preselection per mode.",
+      "$ref": "common.schema.json#/$defs/presetDefaults"
+    },
+    "questions": {
+      "type": "array",
+      "items": { "$ref": "questions.schema.json#/$defs/question" }
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "templates": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/relPath" }, "uniqueItems": true },
+        "skills": { "type": "array", "items": { "$ref": "#/$defs/outputItem" } },
+        "agents": { "type": "array", "items": { "$ref": "#/$defs/outputItem" } },
+        "hooks": { "type": "array", "items": { "$ref": "#/$defs/hookItem" } },
+        "just": { "$ref": "common.schema.json#/$defs/relPath" },
+        "gates": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/name" }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "agentsMd": {
+      "description": "At most 5 lines injected into AGENTS.md.",
+      "type": "string",
+      "pattern": "^[^\\n]*(\\n[^\\n]*){0,4}\\n?$"
+    },
+    "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
+    "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" },
+    "lastVerified": { "$ref": "common.schema.json#/$defs/date" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "outputItem": {
+      "description": "A name, or an object that overrides the module's agents / tokenCost for this item.",
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/name" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "$ref": "common.schema.json#/$defs/name" },
+            "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
+            "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "hookItem": {
+      "type": "object",
+      "required": ["name", "event", "kind"],
+      "properties": {
+        "name": { "$ref": "common.schema.json#/$defs/name" },
+        "event": { "$ref": "hook-event.schema.json#/$defs/event" },
+        "matcher": { "type": "string", "minLength": 1 },
+        "kind": {
+          "description": "Token-free class (B rule 5): guard blocks, context is model-visible (needs tokenCost), comfort talks to the user only, evaluation is silent.",
+          "enum": ["guard", "context", "comfort", "evaluation"]
+        },
+        "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
+        "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

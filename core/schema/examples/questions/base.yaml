@@ -1,0 +1,85 @@
+# interview/base.yaml (excerpt): questions every setup asks. Modules add theirs in module.yaml#questions.
+questions:
+  - id: user.agents
+    ref: "0.0"
+    scope: user
+    mode: Q
+    type: multi
+    label: Which coding agents should this setup support?
+    help: agents
+    choices:
+      - { value: claude, label: Claude Code }
+      - { value: codex, label: Codex }
+      - { value: copilot, label: Copilot }
+      - { value: gemini, label: Gemini CLI (enterprise / API key), phase: 3 }
+      - { value: antigravity, label: Antigravity CLI, phase: 3 }
+      - { value: pi, label: Pi, phase: 3 }
+      - { value: hermes, label: Hermes, phase: 3 }
+    default: [claude]
+  - id: user.expertise
+    ref: "0.1"
+    scope: user
+    mode: Q
+    type: choice
+    label: Your experience with software development?
+    choices: [layperson, intermediate, expert]
+    default: intermediate
+  - id: user.language
+    ref: "0.2"
+    scope: user
+    mode: Q
+    type: text
+    label: Language for chat with the agent?
+    hint: Two-letter code, e.g. de or en.
+    default: de
+  - id: user.autonomy
+    ref: "0.7"
+    scope: user
+    mode: Q
+    type: choice
+    label: How often should the agent ask before acting?
+    choices:
+      - { value: ask-often, label: Ask often }
+      - { value: ask-risky, label: Ask on risky or ambiguous steps }
+      - { value: act-and-report, label: Act and report }
+    default: ask-risky
+    agents:
+      claude:  { support: native, via: "permissions in .claude/settings.json" }
+      codex:   { support: fallback, via: AGENTS.md rule }
+      copilot: { support: fallback, via: AGENTS.md rule }
+  - id: idea.text
+    ref: "1.1"
+    mode: Q
+    type: text
+    label: Describe the idea in a few sentences.
+    help: idea
+    default: ""
+  - id: idea.audience
+    ref: "1.2"
+    mode: Q
+    type: choice
+    label: Who uses it?
+    choices: [me, group, public]
+    default: me
+  - id: idea.team
+    ref: "1.5"
+    mode: Q
+    type: choice
+    label: Solo or team?
+    hint: Team mode makes issues and PRs mandatory (doc 14).
+    choices: [solo, team, external-reviewers]
+    default: solo
+  - id: arch.runs-on
+    ref: "3.2"
+    mode: Q
+    type: choice
+    label: Where should it run?
+    choices: [local, self-hosted, serverless, edge, app-store, auto]
+    default: auto
+  - id: team.approvals
+    ref: "12.2"
+    mode: Q
+    type: number
+    label: Approvals per PR
+    default: 1
+    when: { idea.team: team }

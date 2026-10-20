@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "item.schema.json",
+  "title": "Customisation item (modules/<module>/items/<id>.yaml)",
+  "description": "A separately selectable item of a module, e.g. a comfort feature (doc 09 §3, doc 11).",
+  "type": "object",
+  "required": ["id", "title", "tokenCost", "agents", "lastVerified"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/name" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "default": { "$ref": "common.schema.json#/$defs/presetDefaults" },
+    "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" },
+    "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
+    "lastVerified": { "$ref": "common.schema.json#/$defs/date" }
+  },
+  "additionalProperties": false
+}

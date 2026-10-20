@@ -1,0 +1,14 @@
+{
+  "name": "yaw",
+  "version": "0.0.0",
+  "private": true,
+  "description": "YAW (Yet Another Wrapper): project setup kit for coding agents",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "test": "node --test",
+    "validate": "node core/schema/validate.js"
+  }
+}

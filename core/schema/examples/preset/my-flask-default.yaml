@@ -1,0 +1,11 @@
+# ~/.yaw/presets/my-flask-default.yaml: answers only, never secrets
+name: my-flask-default
+description: Flask app with Postgres, self-hosted, tasks on GitHub.
+created: 2026-10-20
+mode: standard
+answers:
+  user.agents: [claude]
+  idea.audience: public
+  idea.team: solo
+  arch.runs-on: self-hosted
+  tasks.mode: github

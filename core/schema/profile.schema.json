@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "profile.schema.json",
+  "title": "profile.yaml",
+  "description": "Stack profile definition (doc 05 §2).",
+  "type": "object",
+  "required": ["name", "summary", "suggestWhen"],
+  "properties": {
+    "name": { "$ref": "common.schema.json#/$defs/name" },
+    "summary": { "type": "string", "minLength": 1 },
+    "suggestWhen": {
+      "description": "Rule-based suggestion: the profile is suggested when all listed facts match.",
+      "$ref": "common.schema.json#/$defs/facts"
+    },
+    "options": {
+      "description": "Common forks (framework, DB). The default must be one of the choices.",
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-zA-Z0-9]*$": {
+          "type": "object",
+          "required": ["choices", "default"],
+          "properties": {
+            "choices": { "type": "array", "items": { "type": ["string", "number", "boolean"] }, "minItems": 1, "uniqueItems": true },
+            "default": { "type": ["string", "number", "boolean"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "modules": {
+          "description": "Module preselection by this profile; auto = decided by the module's appliesTo and default rules.",
+          "type": "object",
+          "patternProperties": { "^[a-z][a-z0-9-]*$": { "enum": [true, false, "auto"] } },
+          "additionalProperties": false
+        },
+        "budgets": {
+          "type": "object",
+          "patternProperties": { "^[a-z][a-zA-Z0-9]*$": { "type": "number", "minimum": 0 } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "requires": {
+      "description": "Tools that must be installed, optionally with a minimum version (node>=22.13).",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(>=[0-9]+(\\.[0-9]+)*)?$" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
