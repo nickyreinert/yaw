@@ -1,0 +1,50 @@
+# ADR-0007: Hook output policy (token-free hooks)
+
+- Status: Proposed
+- Date: 2026-10-20
+- Issue: #40 (Y-4.1); implemented in #41 (Y-4.2), tested in #47 (Y-4.8)
+- Resolves: H1 (`docs/build/plan.md` §1.4); records BD9 / `BUILD.md` rule 5
+
+## Context
+
+Every hook output that reaches the model costs tokens on every turn it fires. BD9 fixed the split: evaluation hooks are silent, comfort hooks talk to the user only, the status line is exempt, and the only model-visible output is the `SessionStart` re-injection of the active task. Doc 11 adds that async hooks are no loophole: Claude Code and Codex deliver an async hook's output on the next turn. ADR-0017 §9 gave every hook in `module.yaml` a `kind`: `guard`, `context`, `comfort`, `evaluation`. Open was how the rule is enforced, and where a blocking guard fits, because the deny reason of a guard is shown to the model.
+
+Vendor facts this relies on (Claude Code and Codex hook docs, GitHub Copilot CLI hooks reference, read 2026-10-20):
+
+- Claude Code: exit 0 + plain stdout on `UserPromptSubmit` and `SessionStart` is added to the model's context; on other events stdout goes to the debug log. JSON on stdout is read only when stdout is a single JSON object. Exit 2 blocks and feeds stderr to the model. `systemMessage` is shown to the user; `terminalSequence` emits allowlisted escape sequences (desktop notification).
+- Codex: plain stdout on `SessionStart` becomes developer context; `systemMessage` is a user warning; `hookSpecificOutput.additionalContext` is model context; exit 2 + stderr blocks.
+- Copilot CLI: `userPromptSubmitted` output is dropped; for `sessionStart` only `additionalContext` is read; `preToolUse` reads `permissionDecision` / `permissionDecisionReason`.
+
+## Decision
+
+### What each kind may output
+
+| Kind | Allowed output | Agents | Model tokens |
+|---|---|---|---|
+| `evaluation` | nothing: empty stdout, exit 0 | all | none |
+| `comfort` | `systemMessage`, `terminalSequence` (sync only) | `systemMessage`: Claude, Codex; `terminalSequence`: Claude | none |
+| `context` | `additionalContext` on `SessionStart` only, at most 10 lines and 1000 characters | Claude, Codex, Copilot | a few lines once per session |
+| `guard` | `permissionDecision: deny` + one-line reason on `PreToolUse` | Claude, Codex, Copilot | only when it blocks (one line) |
+| status line | not a hook; exempt (rendered by the agent UI) | Claude | none |
+
+- A guard's deny reason is model-visible by design: the model must learn that the call was blocked, or it retries. It is one line (≤ 300 characters), only on a deny, never on an allow. An allow prints nothing (no `permissionDecision: allow`, so the agent's own permission flow stays in charge).
+- `context` on any other event than `SessionStart` (e.g. `UserPromptSubmit` recall) is refused in phase 1. The `decisions` module (Y-5.6) needs prompt-time recall; it must amend this ADR with its own budget before it may return context there.
+- Anything a handler returns that its kind does not allow is **dropped by the dispatcher**, not only flagged by tests. A comfort or evaluation handler that returns `additionalContext` produces no output at all.
+
+### How YAW talks to the agent
+
+- Exit code is always 0. YAW never uses exit 2 (it would put stderr in front of the model) and never writes to stderr from a hook; errors go to `~/.yaw/logs/hook-errors.log` (message only, never payload content).
+- Output is a single JSON object or nothing. Plain-text stdout is never used (it would be model context on `UserPromptSubmit` / `SessionStart`).
+- YAW registers no hook with `async: true`. Background work (evaluation, phase 2) runs inside a sync hook that prints nothing, appends to a local file and detaches itself.
+- One shape per agent: Claude and Codex get `hookSpecificOutput` (`hookEventName` + `permissionDecision` / `additionalContext`) and top-level `systemMessage` / `terminalSequence`; Copilot gets top-level `permissionDecision` / `permissionDecisionReason` / `additionalContext`.
+- Fail open: missing kit, missing Node, invalid payload, a handler that throws or a module that left the kit all end in exit 0 with empty stdout (ADR-0006 shim, ADR-0021 dispatcher). A guard that fails therefore allows; `permissions.deny` in Claude is the static backstop for secret reads (ADR-0022).
+
+### Tests (Y-4.8)
+
+`test/silent-hooks.test.js` runs every recorded fixture of every agent through the dispatcher with handlers of each kind that try to return everything (context, messages, deny), and asserts: evaluation → exit 0 and empty stdout; comfort → no `additionalContext` anywhere in stdout; context → output only on `SessionStart`; guard → output only on `PreToolUse` and only for a deny. The same holds through the real shim in a subprocess, and for every hook of every kit module.
+
+## Consequences
+
+- The token cost of a module is visible in its `kind`s; `tokenCost` in `module.yaml` must agree (`context` > `none`).
+- Modules cannot "just print" a hint; they return data and the dispatcher decides. A new output type needs an amendment here.
+- Notification-style comfort for Copilot (CLI `notification`) and Codex `terminalSequence` stay off until verified.
