@@ -104,7 +104,7 @@ test('smoke node-cli: yaw init in an empty folder, just setup && just check pass
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /\$ just setup\n/);
   assert.match(r.stdout, /\$ just check\n/);
-  assert.match(r.stdout, /# pass 1\n/, 'the scaffold test ran');
+  assert.match(r.stdout, /(# |ℹ )pass 1\n/, 'the scaffold test ran');
   assert.match(r.stdout, /verified: just setup and just check passed/);
 
   // the gate fails when it should
