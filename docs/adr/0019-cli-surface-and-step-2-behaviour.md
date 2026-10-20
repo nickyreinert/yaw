@@ -1,6 +1,6 @@
 # ADR-0019: Phase-1 CLI surface and the behaviour of the step-2 commands
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issues: #23 (Y-2.4), #24 – #29 (Y-2.5 – Y-2.10)
 - Resolves: S2, S3 (`docs/build/plan.md` §1.6); fixes the flag names left open by ADR-0003; records the rule-10 details of step 2

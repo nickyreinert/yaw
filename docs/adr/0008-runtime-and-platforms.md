@@ -1,6 +1,6 @@
 # ADR-0008: Runtime floor, platforms and development tools
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #20 (Y-2.1); CI in #21 (Y-2.2)
 - Resolves: H9, H10, S7 (dev tools) (`docs/build/plan.md` §1.4, §1.6); records BD11

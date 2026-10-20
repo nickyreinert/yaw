@@ -1,6 +1,6 @@
 # ADR-0014: Kit repository and test layout
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #20 (Y-2.1); implemented in #21 (Y-2.2)
 - Resolves: S5 (`docs/build/plan.md` §1.6). Supersedes ADR-0016 (interim step-1 layout) once accepted; ADR-0016's table stays valid and is included below.
