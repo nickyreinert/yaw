@@ -107,7 +107,7 @@ Technical spec: [reference/governance-blueprint.md](reference/governance-bluepri
 
 Each contributes (a) commands to `just check`, (b) a review checklist file, (c) a subagent or a section of `change-reviewer`. To avoid bloat, Standard uses **one** `change-reviewer` that loads the checklists of the enabled modules; Full can split into dedicated `security-reviewer`, `perf-reviewer`.
 
-Guard hooks (security module): `PreToolUse` on `Bash` denies patterns from `profiles/<p>/guards.yaml` + `modules/security/guards.yaml` (force-push, `rm -rf` outside the repo, deploy, remote migrations, secret reads) unless authorised. Prefer Claude Code `permissions.deny` where a static rule suffices; use a hook only for logic.
+Guard hooks (security module): `PreToolUse` on `Bash` (and file tools, Codex `apply_patch`) denies patterns from `profiles/<p>/guards.yaml` + `modules/security/guards.yaml` (force-push, every `rm -rf`, prod deploy, remote migrations, secret reads); the user runs a blocked command themselves (ADR-0022). Prefer Claude Code `permissions.deny` where a static rule suffices; use a hook only for logic.
 
 ### ui-design
 

@@ -7,6 +7,9 @@ import { init } from './init.js';
 import { doctor } from './doctor.js';
 import { selfUninstall, selfUpdate } from './self.js';
 import { createPrompter } from './prompt.js';
+import { runHook } from '../hooks/dispatch.js';
+import { agents } from './agents.js';
+import { sync } from './sync.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -22,9 +25,9 @@ export const COMMANDS = [
   { name: 'help', args: '[<command>]', summary: 'show this help', options: {} },
   { name: 'apply', step: 3, summary: 'apply .yaw/answers.yaml again' },
   { name: 'add', step: 5, summary: 'add a module, asking only its questions' },
-  { name: 'hook', step: 4, summary: 'hook entry point for coding agents' },
-  { name: 'sync', step: 4, summary: 'render skills per agent; --check fails on drift' },
-  { name: 'agents', step: 4, summary: 'compatibility matrix of the enabled modules' },
+  { name: 'hook', args: '<event> --agent claude|codex|copilot --module <module>', summary: 'hook entry point for coding agents (reads the payload on stdin; always exits 0)', options: {} },
+  { name: 'sync', args: '--check', summary: 'check that agent adapter files match their source (fails on drift)', options: { check: { type: 'boolean' } }, run: sync },
+  { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },
   { name: 'config', step: 5, summary: 'change .yaw/config.yaml' },
   { name: 'gh', step: 5, summary: 'GitHub setup and helpers' },
   { name: 'decisions', step: 5, summary: 'decision journal (ADRs, notices)' },
@@ -37,7 +40,7 @@ export const COMMANDS = [
 ];
 
 export function usage() {
-  const built = COMMANDS.filter((c) => c.run || c.name === 'help');
+  const built = COMMANDS.filter((c) => c.run || c.name === 'help' || c.name === 'hook');
   const planned = COMMANDS.filter((c) => c.step);
   const lines = [
     'usage: yaw <command> [options]',
@@ -88,9 +91,11 @@ export async function main(argv, io = {}) {
       ctx.stderr.write(`yaw: unknown command "${rest[0]}"\n\n${usage()}`);
       return 1;
     }
-    ctx.stdout.write(target ? (target.run ? commandUsage(target) : `yaw ${target.name}: ${target.summary} (step ${target.step})\n`) : usage());
+    ctx.stdout.write(target ? (target.step ? `yaw ${target.name}: ${target.summary} (step ${target.step})\n` : commandUsage(target)) : usage());
     return 0;
   }
+  // The hook entry point parses its own arguments and never fails (ADR-0007): no usage, no stderr.
+  if (command.name === 'hook') return runHook(rest, { ...ctx, stdin: io.stdin ?? process.stdin });
   if (!command.run) {
     ctx.stderr.write(`yaw ${command.name}: not available yet; it comes with step ${command.step} of phase 1\n`);
     return 1;

@@ -1,0 +1,8 @@
+{
+  "hook_event_name": "SessionStart",
+  "session_id": "copilot-0f3e9a12-0000-4000-8000-000000000003",
+  "timestamp": "2026-10-20T11:30:00.000Z",
+  "cwd": "/home/user/projects/photo-renamer",
+  "source": "new",
+  "initial_prompt": "Add a --dry-run flag to the rename command."
+}

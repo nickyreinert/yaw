@@ -9,6 +9,7 @@ import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
 import { AGENTS_MAX_LINES, compose, SHARED_FILES } from './compose.js';
 import { checkRelPath } from './files.js';
+import { HOOK_SHIM, hookParts, pathWanted, shimContent, skillFiles } from './agents.js';
 
 export const KIT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -211,11 +212,19 @@ export function renderModules({ kitRoot, modules, context, definitions, profileO
     if (!shared.has(path)) shared.set(path, []);
     shared.get(path).push(part);
   };
+  const agents = context.agents ?? [];
+  const defs = new Map(modules.map((name) => [name, definitions?.get(name) ?? loadModule(kitRoot, name)]));
+  const addOwned = (path, file) => {
+    if (owned.has(path)) throw new KitError(`${path} is written by modules "${owned.get(path).module}" and "${file.module}" but is not a shared file`);
+    owned.set(path, file);
+  };
   for (const name of modules) {
-    const def = definitions?.get(name) ?? loadModule(kitRoot, name);
+    const def = defs.get(name);
     const dir = join(moduleDir(kitRoot, name), 'templates');
     for (const path of def.outputs?.templates ?? []) {
       checkRelPath(path);
+      // agent-specific files only for the selected agents (.claude/, .codex/; ADR-0021)
+      if (!pathWanted(path, agents)) continue;
       const tmpl = join(dir, `${path}.tmpl`);
       const plain = join(dir, path);
       const hasTmpl = existsSync(tmpl);
@@ -234,7 +243,13 @@ export function renderModules({ kitRoot, modules, context, definitions, profileO
       }
     }
     if (def.agentsMd) addPart('AGENTS.md', { module: name, kind: 'agentsMd', content: def.agentsMd });
+    // skills: .agents/skills/ + the Claude copy (ADR-0012)
+    for (const [path, content] of skillFiles({ moduleDir: moduleDir(kitRoot, name), def, agents })) addOwned(path, { module: name, content, fragments: [] });
   }
+  // hook registrations in the agents' settings files, and the shim they call (ADR-0006, ADR-0021)
+  const hooks = hookParts({ definitions: defs, modules, agents });
+  for (const part of hooks) addPart(part.path, { module: part.module, kind: part.kind, content: part.content });
+  if (hooks.length > 0 && modules.includes('core')) addOwned(HOOK_SHIM, { module: 'core', content: shimContent(), fragments: [] });
   for (const part of profileOutput?.parts ?? []) {
     if (!SHARED_FILES[part.path]) throw new KitError(`${part.path} is not a shared file`);
     addPart(part.path, { module: part.module, kind: part.kind, content: part.content });

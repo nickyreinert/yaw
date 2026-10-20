@@ -19,6 +19,8 @@ import { readManifest } from '../render/manifest.js';
 import { ANSWERS, ProjectError, initProject, parseAnswers, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
 import { confirm } from './prompt.js';
+import { codexTrustNote } from './doctor.js';
+import { CODEX_HOOKS } from '../render/agents.js';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose.
 async function chooseProfile({ prompter, profiles, suggestion }) {
@@ -177,6 +179,7 @@ export async function init({ values, positionals, io }) {
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
+  if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 
   // verify
   if (values['skip-verify']) {

@@ -1,0 +1,9 @@
+{
+  "session_id": "5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001",
+  "transcript_path": "/home/user/.claude/projects/-home-user-projects-photo-renamer/5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001.jsonl",
+  "cwd": "/home/user/projects/photo-renamer",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission to use Bash",
+  "title": "Permission needed",
+  "notification_type": "permission_prompt"
+}

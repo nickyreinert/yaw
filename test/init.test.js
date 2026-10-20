@@ -47,10 +47,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core'],
+    modules: ['core', 'security'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  assert.equal(readManifest(dir).files.length, 9);
+  // Quick = core + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
+  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
+  assert.equal(readManifest(dir).files.length, 11);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -102,6 +104,17 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
     const manifest = readManifest(r.cwd);
     // every file but the base copies is in the manifest, with its hash
     assert.deepEqual(manifest.files.map((f) => f.path).sort(), [...files.filter((p) => p !== '.yaw/manifest.json')].sort());
+  }
+});
+
+test('Quick footprint with security (ADR-0022): 12 files for Claude, 13 with Codex', async () => {
+  for (const [agents, count] of [['claude', 12], ['claude, codex', 13]]) {
+    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
+    const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /modules: core, security/);
+    const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
+    assert.equal(files.length, count, files.join(', '));
   }
 });
 

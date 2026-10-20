@@ -1,0 +1,9 @@
+{
+  "hook_event_name": "Stop",
+  "session_id": "copilot-0f3e9a12-0000-4000-8000-000000000003",
+  "timestamp": "2026-10-20T11:30:00.000Z",
+  "cwd": "/home/user/projects/photo-renamer",
+  "transcript_path": "/home/user/.copilot/session-state/copilot-0f3e9a12-0000-4000-8000-000000000003/events.jsonl",
+  "stop_reason": "end_turn",
+  "stop_hook_active": false
+}

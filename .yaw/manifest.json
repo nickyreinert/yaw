@@ -50,13 +50,13 @@
     {
       "path": "just/node-cli.just",
       "module": "core",
-      "hash": "sha256:b4925c6b72a69ce98855b4c79a4a05d277787915e44954cb3a1d75b1399074f1",
+      "hash": "sha256:8a6e30e5c35873b83a31ff35a33ce5f63f8fa09dbaf21a285ca914a3a8fce4b5",
       "managed": true
     },
     {
       "path": "justfile",
       "module": "core",
-      "hash": "sha256:f7ee61fd9a4f21087d76fbd14d100dedb0ebf6d8b7228b001f42670f0db670e8",
+      "hash": "sha256:0972e19d75f404b25b55f5db79f88bf24f75afc1dc59d49c4e4657f1c9680e48",
       "managed": true,
       "fragments": [
         {

@@ -51,14 +51,7 @@ function checkKitNotOlder(manifest, kitRoot) {
 export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, ...options }) {
   const manifest = requireManifest(root);
   checkKitNotOlder(manifest, kitRoot);
-  const answersDoc = readAnswers(root);
-  const available = modules.filter((m) => hasModule(kitRoot, m));
-  const missing = modules.filter((m) => !available.includes(m));
-  const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
-  const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
-  // Profile files belong to core: they go away with it (the scaffold is user code and stays).
-  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles }) : undefined;
-  const desired = renderModules({ kitRoot, modules: available, context, definitions, profileOutput });
+  const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules });
   const version = kitVersion(kitRoot);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
 
@@ -73,6 +66,20 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
   }
   const written = writeManifest(root, { ...manifest, kit: version, modules: nextModules, files: result.files });
   return { ...result, manifest: written, missingModules: missing, missingProfiles: profileOutput?.missing ?? [] };
+}
+
+// Render `modules` for an existing project from the installed kit and its answers; writes nothing.
+// -> { desired, missing (modules not in the kit), profileOutput }
+export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules }) {
+  const answersDoc = readAnswers(root);
+  const available = modules.filter((m) => hasModule(kitRoot, m));
+  const missing = modules.filter((m) => !available.includes(m));
+  const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
+  const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
+  // Profile files belong to core: they go away with it (the scaffold is user code and stays).
+  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles }) : undefined;
+  const desired = renderModules({ kitRoot, modules: available, context, definitions, profileOutput });
+  return { desired, missing, profileOutput };
 }
 
 export function enabledModules(manifest) {

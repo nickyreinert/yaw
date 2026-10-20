@@ -16,6 +16,7 @@ Schemas are the binding definition; this page is the readable overview. Check fi
 | `.yaw/config.yaml` | user / `yaw config set` | YAML | `config.schema.json` | `config/config.yaml` |
 | `.yaw/github.yaml` | user + `yaw gh setup` | YAML | `github.schema.json` | `github/github.yaml` |
 | `TASKS.md` | user (local, both) / kit (GitHub view) | Markdown | `tasks.schema.json` (parsed form) | `tasks/local.md`, `both.md`, `github-view.md` |
+| `modules/security/guards.yaml`, `profiles/<p>/guards.yaml` | kit authors | YAML | `guards.schema.json` | `guards/security.yaml`, `guards/node-cli.yaml` |
 | normalised hook event | kit | JSON | `hook-event.schema.json` | `hook-event/*.json` |
 | `~/.yaw/yaw.db` | kit | SQLite | `core/lib/db.js` migrations | `test/db.test.js` |
 
@@ -61,20 +62,22 @@ One JSON record per hook call; no prompt text, tool input or output (ADR-0018).
   "timing": { "ts": "2026-10-20T09:15:02.120Z", "hookMs": 41 } }
 ```
 
-**Draft mapping, not yet verified against recorded payloads** (H8; confirmed or corrected with fixtures in Y-4.3 – Y-4.5):
+Mapping per agent (ADR-0021). Checked on 2026-10-20 against the vendor docs and covered by the fixtures in `test/fixtures/<agent>/<event>.json`; no live session was recorded yet, so fields ADR-0021 marks "assumed" stay to be confirmed.
 
-| Field | Claude Code | Codex | Copilot |
+| Field | Claude Code | Codex | Copilot (runs the `.claude/settings.json` hooks) |
 |---|---|---|---|
-| `event` ← | `hook_event_name` (same names) | `hook_event_name` (same names as Claude) | configured event: `sessionStart`, `sessionEnd`, `userPromptSubmitted` → `UserPromptSubmit`, `preToolUse`, `postToolUse`, `agentStop` → `Stop`, `subagentStop`, `errorOccurred` → `StopFailure`, `notification` |
-| `sessionId` ← | `session_id` | `session_id` | session id field (name to verify) |
+| `agent` | command `--agent claude` | `--agent codex` | `--agent claude` + payload has `timestamp` → `copilot` |
+| `event`, `nativeEvent` ← | `hook_event_name` | `hook_event_name` (same names; no `Notification`) | `hook_event_name` (Claude names under Claude event names) |
+| `sessionId` ← | `session_id` | `session_id` | `session_id` |
 | `cwd` ← | `cwd` | `cwd` | `cwd` |
-| `modelId` ← | `SessionStart` payload `model` if present (`payload`), else transcript (`transcript`) or OTel (`otel`) | payload `model` if present (`payload`) | not expected in the payload: Copilot settings (`settings`) or `null` |
-| `promptLength` ← | length of `prompt` (`UserPromptSubmit`) | length of `prompt` | length of `prompt` (`userPromptSubmitted`) |
-| `tool.name` ← | `tool_name` | `tool_name` (incl. `apply_patch`) | `toolName` |
-| `result` | `PostToolUse` → `ok`, `PostToolUseFailure` → `error`; YAW decision on `PreToolUse` / `Stop` | same | `postToolUse` result type → `ok` / `error`; YAW decision on `preToolUse` |
-| `timing.ts` | time YAW received the event | same | payload timestamp if present, else receipt time |
+| `modelId` ← | `model` on `SessionStart` when present (`payload`), else `null` | `model` on every event (`payload`) | not in the payload: `null` |
+| `promptLength` ← | code points of `prompt` (`UserPromptSubmit`) | same | same |
+| `tool.name` ← | `tool_name` | `tool_name` (`Bash`, `apply_patch`) | `tool_name` (Claude names) |
+| `result` | `allow`/`deny` when a guard ran on `PreToolUse`; `PostToolUse` → `ok`, `PostToolUseFailure` → `error` | same | same |
+| `timing.ts` | time YAW received the event | same | payload `timestamp` |
+| `timing.hookMs` | run time of `yaw hook` | same | same |
 
-Copilot also runs hooks from `.claude/settings.json` with Claude event names; how those payloads look and how double firing is avoided is decided in Y-4.5 (H4).
+Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against the schema).
 
 ## Session registry (`~/.yaw/yaw.db`)
 

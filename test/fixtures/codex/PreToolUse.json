@@ -1,0 +1,14 @@
+{
+  "session_id": "019a3c5e-7b21-7d40-9e1a-000000000002",
+  "transcript_path": "/home/user/.codex/sessions/2026/10/20/rollout-2026-10-20T10-02-44-019a3c5e-7b21-7d40-9e1a-000000000002.jsonl",
+  "cwd": "/home/user/projects/photo-renamer",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-5-codex",
+  "turn_id": "turn-0001",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm test"
+  },
+  "tool_use_id": "call_EXAMPLE0001"
+}

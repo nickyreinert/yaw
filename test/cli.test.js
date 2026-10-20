@@ -46,9 +46,9 @@ test('unknown option and planned commands exit 1', () => {
   const opt = yaw(['update', '--frob']);
   assert.equal(opt.status, 1);
   assert.match(opt.stderr, /usage: yaw update/);
-  const planned = yaw(['hook', 'PreToolUse']);
+  const planned = yaw(['config']);
   assert.equal(planned.status, 1);
-  assert.match(planned.stderr, /comes with step 4/);
+  assert.match(planned.stderr, /comes with step 5/);
   assert.equal(yaw(['update', '--strategy', 'yolo'], { cwd: tmp() }).status, 1);
 });
 

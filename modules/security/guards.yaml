@@ -1,0 +1,12 @@
+# modules/security/guards.yaml (Y-5.0, ADR-0022): minimal guards of the security module (BD6).
+# Patterns are JavaScript regular expressions. Profiles add stack guards in profiles/<p>/guards.yaml.
+guards:
+  - { id: rm-rf, pattern: '(^|[\s;&|(`])rm\s(?=(?:[^;&|\n]*\s)?(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)(?:\s|$))(?=(?:[^;&|\n]*\s)?(?:-[a-zA-Z]*f[a-zA-Z]*|--force)(?:\s|$))', reason: rm -rf is blocked. }
+  - { id: force-push, pattern: '\bgit\b[^;&|\n]*\spush\b(?=[^;&|\n]*(?:\s--force(?:-with-lease|-if-includes)?\b|\s-[a-zA-Z]*f[a-zA-Z]*\b|\s\+[^\s]))', reason: A force push is blocked. }
+  - { id: prod-deploy, pattern: '\bdeploy\b[^;&|\n]*\b(?:prod|production)\b|\bvercel\b[^;&|\n]*\s--prod\b', reason: A production deploy is blocked. }
+secretFiles:
+  - { id: dotenv, pattern: '^\.env(?:[.*?\[].*)?$', reason: .env files hold secrets. }
+  - { id: private-key, pattern: '\.(?:pem|key|p12|pfx|jks|keystore)$|^id_(?:rsa|dsa|ecdsa|ed25519)$', reason: Key files hold secrets. }
+  - { id: credentials, pattern: '^(?:\.netrc|\.pgpass|\.pypirc|credentials|credentials\.json|secrets?\.(?:ya?ml|json|toml))$', reason: Credential files hold secrets. }
+secretAllow:
+  - { id: dotenv-template, pattern: '^\.env\.(?:example|sample|template|dist|defaults)$' }
