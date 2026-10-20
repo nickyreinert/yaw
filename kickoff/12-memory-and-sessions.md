@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | **Decision journal** | Project | ADRs, notices (`security`, `business-logic`, `privacy`) | `.decisions/` | yes |
 | **Global knowledge** | User, all projects | Personal rules, preferences, lessons learned, reusable snippets | user-chosen, default `~/.yaw/knowledge/` | optional (own git repo) |
-| **Session registry** | Project (+ global index) | Which agent session worked on what, with links | `.yaw/sessions/` + `~/.yaw/sessions.index.json` | no (default) |
+| **Session registry** | Project (+ global index) | Which agent session worked on what, with links | `.yaw/sessions/` + `~/.yaw/yaw.db` (registry tables, ADR-0018) | no (default) |
 
 All three use the **same storage pattern**: Markdown (or JSON line) records as truth, a derived index with metadata + local embedding, the same retrieval code. One engine, three folders.
 
@@ -59,7 +59,7 @@ Goal: find the conversation behind a task, decision or commit later, and resume 
 ```json
 {
   "id": "claude:5f2c…",
-  "agent": "claude-code",
+  "agent": "claude",
   "title": "Invite flow: signaling server + token expiry",
   "started": "2026-10-20T09:12:00Z",
   "ended": "2026-10-20T11:40:00Z",
