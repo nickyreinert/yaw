@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile python-cli (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small command-line tool that renames photos by their EXIF date.
+  idea.team: solo
+  arch.language: python
+  arch.runs-on: local
+proposal:
+  status: confirmed
+  summary: python-cli - Python script, tool or data job; uv venv, no Docker.
+  profiles: [python-cli]
+  modules: [core]

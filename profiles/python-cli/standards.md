@@ -1,0 +1,8 @@
+- Python >= 3.11 with type hints on all public functions; `pyright` must pass (`just typecheck`).
+- Manage the environment with `uv` (`uv add`, `uv sync`); never `pip install` into the system Python.
+- Format and lint with `ruff` (`just fmt`, `just lint`); do not add a second formatter.
+- Tests use `pytest`, live in `tests/`, are deterministic and make no network calls.
+- Use `pathlib` for paths, `logging` instead of `print` outside the CLI entry point.
+- Validate input at the boundary (arguments, files, environment); raise specific exceptions, no bare `except`.
+- Keep dependencies few; run `just audit` (`pip-audit`) after changing them.
+- Publishing to PyPI needs the user's approval.

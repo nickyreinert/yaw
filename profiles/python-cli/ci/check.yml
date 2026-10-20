@@ -1,0 +1,7 @@
+# CI steps fragment: toolchain, then `just check` (same gate as local).
+steps:
+  - uses: actions/checkout@v4
+  - uses: extractions/setup-just@v2
+  - uses: astral-sh/setup-uv@v5
+  - run: just setup
+  - run: just check

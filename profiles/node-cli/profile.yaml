@@ -1,0 +1,11 @@
+# profiles/node-cli/profile.yaml (BD7: used for YAW itself)
+# Profile options (doc 05 §2, e.g. tsc --checkJs) come with the full interview (step 7); step 3 renders the defaults.
+name: node-cli
+summary: Node CLI or tool, zero dependencies where possible; node --test, no Docker.
+suggestWhen:
+  language: [javascript, typescript]
+  runsOn: [local]
+  hasUI: [false]
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [node>=22.13, just]
