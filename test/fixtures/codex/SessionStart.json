@@ -1,0 +1,8 @@
+{
+  "session_id": "019a3c5e-7b21-7d40-9e1a-000000000002",
+  "transcript_path": "/home/user/.codex/sessions/2026/10/20/rollout-2026-10-20T10-02-44-019a3c5e-7b21-7d40-9e1a-000000000002.jsonl",
+  "cwd": "/home/user/projects/photo-renamer",
+  "hook_event_name": "SessionStart",
+  "model": "gpt-5-codex",
+  "source": "startup"
+}

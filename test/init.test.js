@@ -47,10 +47,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core'],
+    modules: ['core', 'security'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  assert.equal(readManifest(dir).files.length, 9);
+  // Quick = core + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
+  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
+  assert.equal(readManifest(dir).files.length, 11);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {

@@ -1,0 +1,11 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "copilot-0f3e9a12-0000-4000-8000-000000000003",
+  "timestamp": "2026-10-20T11:30:00.000Z",
+  "cwd": "/home/user/projects/photo-renamer",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "npm test",
+    "description": "Run the test suite"
+  }
+}

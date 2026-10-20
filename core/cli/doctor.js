@@ -7,6 +7,7 @@ import { basePath, hashContent, readProjectFile } from '../render/files.js';
 import { KIT_ROOT, compareVersions, hasModule, kitVersion } from '../render/kit.js';
 import { readManifest } from '../render/manifest.js';
 import { fileStates } from '../render/project.js';
+import { CODEX_HOOKS, HOOK_SHIM } from '../render/agents.js';
 import { UsageError } from './commands.js';
 
 export const NODE_FLOOR = '22.13.0';
@@ -79,6 +80,15 @@ export function runChecks({ cwd, kitRoot = KIT_ROOT, env = process.env, nodeVers
       else if (hashContent(base) !== s.hash) add('warn', `${basePath(s.path)} does not match the manifest hash`);
     }
   }
+  // hook shim (ADR-0006): hooks fail open, so a missing kit silently disables the guards
+  if (manifest.files.some((f) => f.path === HOOK_SHIM)) {
+    const kit = env.YAW_KIT || join(env.HOME ?? '', '.yaw', 'kit');
+    const vendored = existsSync(join(cwd, '.yaw', 'lib', 'bin', 'yaw'));
+    if (vendored) add('ok', `${HOOK_SHIM} runs the vendored kit in .yaw/lib/`);
+    else if (existsSync(join(kit, 'bin', 'yaw'))) add('ok', `${HOOK_SHIM} finds the kit at ${kit}`);
+    else add('warn', `${HOOK_SHIM} finds no kit at ${kit}: agent hooks (incl. the security guards) do nothing until the kit is installed`);
+  }
+  if (manifest.files.some((f) => f.path === CODEX_HOOKS)) add('note', codexTrustNote());
   const edited = states.filter((s) => s.state === 'edited').length;
   add('ok', `${states.length} files in the manifest, ${edited} edited by you`);
 
@@ -90,6 +100,11 @@ export function runChecks({ cwd, kitRoot = KIT_ROOT, env = process.env, nodeVers
     }
   }
   return checks;
+}
+
+// Codex runs project hooks only after the user trusted them (Codex hooks docs); YAW cannot check that.
+export function codexTrustNote() {
+  return `Codex runs ${CODEX_HOOKS} only after you trust it: open Codex in this project and review the hooks with /hooks (again after each change)`;
 }
 
 export async function doctor({ positionals, io }) {

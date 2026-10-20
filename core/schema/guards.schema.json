@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "guards.schema.json",
+  "title": "guards.yaml",
+  "description": "Guard rules of the security module (modules/security/guards.yaml) and of a profile (profiles/<p>/guards.yaml). ADR-0020 shape, extended by ADR-0022. Patterns are JavaScript regular expressions.",
+  "type": "object",
+  "required": ["guards"],
+  "properties": {
+    "guards": {
+      "description": "Destructive-command guards: pattern is matched against the shell command line.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "secretFiles": {
+      "description": "Secret files: pattern is matched against the file name (last path segment) of a path the tool touches or a word of the command line.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "secretAllow": {
+      "description": "File names that look like secret files but are not (e.g. .env.example); checked before secretFiles.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "pattern"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/name" },
+          "pattern": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "pattern", "reason"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/name" },
+        "pattern": { "type": "string", "minLength": 1 },
+        "reason": { "description": "One sentence shown to the agent when it is blocked.", "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "session_id": "5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001",
+  "transcript_path": "/home/user/.claude/projects/-home-user-projects-photo-renamer/5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001.jsonl",
+  "cwd": "/home/user/projects/photo-renamer",
+  "permission_mode": "default",
+  "prompt_id": "0b7e2d0c-8a51-4f7e-a0c4-000000000101",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "Add a --dry-run flag to the rename command and list what would change."
+}

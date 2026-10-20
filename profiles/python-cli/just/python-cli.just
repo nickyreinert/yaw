@@ -20,7 +20,7 @@ typecheck:
 test:
     uv run pytest
 
-check: lint typecheck test audit
+check: lint typecheck test audit sync-check
 
 build:
     @echo "build: not applicable for python-cli (nothing is built; publish with uv build only with your approval)"
