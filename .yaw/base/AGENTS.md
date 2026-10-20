@@ -18,3 +18,8 @@ Rules for coding agents in this project, written by YAW (quick setup). Edit free
 - Run `just check` before you report a task as done; `just --list` shows all recipes.
 - Never read, print or commit secrets (`.env*`, keys, tokens); ask the user to enter them.
 <!-- /yaw:core -->
+
+<!-- yaw:security -->
+- Never read `.env*` or other secret files; ask the user to run the command instead.
+- Destructive commands (rm -rf, force push, prod deploy) are blocked unless the user runs them.
+<!-- /yaw:security -->

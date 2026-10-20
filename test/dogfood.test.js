@@ -8,11 +8,11 @@ import { readManifest } from '../core/render/manifest.js';
 import { fileStates } from '../core/render/project.js';
 import { KIT_ROOT, hasTool, run } from './helpers/fixtures.js';
 
-test('this repo has a valid YAW manifest for node-cli with core', () => {
+test('this repo has a valid YAW manifest for node-cli with core and security', () => {
   const m = readManifest(KIT_ROOT);
   assert.ok(m, '.yaw/manifest.json exists');
   assert.deepEqual(m.profiles, ['node-cli']);
-  assert.deepEqual(Object.keys(m.modules), ['core']);
+  assert.deepEqual(Object.keys(m.modules), ['core', 'security']);
   for (const f of ['AGENTS.md', 'CLAUDE.md', 'justfile', 'just/node-cli.just', '.yaw/answers.yaml']) {
     assert.ok(m.files.some((x) => x.path === f), f);
   }
