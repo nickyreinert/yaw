@@ -151,3 +151,28 @@ export function makeKitRepo(dir, { env, tag = 'v0.0.0' } = {}) {
   if (tag) run('git', ['tag', tag], { cwd: dir, env });
   return dir;
 }
+
+// Output sink for in-process CLI runs: { write, text() }.
+export function capture() {
+  const chunks = [];
+  return {
+    write(chunk) {
+      chunks.push(String(chunk));
+      return true;
+    },
+    text: () => chunks.join(''),
+  };
+}
+
+// Is a tool on the PATH? (tests that need just or uv skip with a reason when it is not)
+export function hasTool(name, env = process.env) {
+  const r = spawnSync(name, ['--version'], { encoding: 'utf8', env });
+  return !r.error && r.status === 0;
+}
+
+// A folder with an executable `just` stand-in that logs "<cwd> <args>" and exits with `code`.
+export function fakeJust(dir, { code = 0 } = {}) {
+  const log = join(dir, 'just.log');
+  writeFileSync(join(dir, 'just'), `#!/bin/sh\necho "$(pwd) $*" >> '${log}'\nexit ${code}\n`, { mode: 0o755 });
+  return log;
+}

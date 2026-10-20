@@ -1,13 +1,13 @@
 // Kit access for the render engine: version, module definitions, rendering module outputs.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../lib/yaml.js';
 import { formatError } from '../lib/schema.js';
 import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
-import { compose, SHARED_FILES } from './compose.js';
+import { AGENTS_MAX_LINES, compose, SHARED_FILES } from './compose.js';
 import { checkRelPath } from './files.js';
 
 export const KIT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -65,29 +65,146 @@ export function loadModule(kitRoot, name) {
   return value;
 }
 
+export function profileDir(kitRoot, name) {
+  return join(kitRoot, 'profiles', name);
+}
+
+export function hasProfile(kitRoot, name) {
+  return /^[a-z][a-z0-9-]*$/.test(name) && existsSync(join(profileDir(kitRoot, name), 'profile.yaml'));
+}
+
+// Read and validate profiles/<name>/profile.yaml.
+export function loadProfile(kitRoot, name) {
+  if (!hasProfile(kitRoot, name)) throw new KitError(`profile "${name}" does not exist in this kit`);
+  const file = join(profileDir(kitRoot, name), 'profile.yaml');
+  const { value, lines } = parseDocument(readFileSync(file, 'utf8'), { file });
+  const errors = schemas().validate('profile.schema.json', value, { lines });
+  if (errors.length > 0) throw new KitError(errors.map((e) => formatError(e, file)).join('\n'));
+  if (value.name !== name) throw new KitError(`${file}: name "${value.name}" does not match its folder "${name}"`);
+  return value;
+}
+
+export function listProfiles(kitRoot) {
+  const dir = join(kitRoot, 'profiles');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((n) => hasProfile(kitRoot, n)).sort().map((n) => loadProfile(kitRoot, n));
+}
+
+// interview/base.yaml: the questions every setup asks (doc 02 §3).
+export function loadBaseQuestions(kitRoot) {
+  const file = join(kitRoot, 'interview', 'base.yaml');
+  if (!existsSync(file)) return [];
+  const { value, lines } = parseDocument(readFileSync(file, 'utf8'), { file });
+  const errors = schemas().validate('questions.schema.json', value, { lines });
+  if (errors.length > 0) throw new KitError(errors.map((e) => formatError(e, file)).join('\n'));
+  return value.questions;
+}
+
+// Base questions plus the inline questions of the given modules; ids are unique across the kit (ADR-0017).
+export function collectQuestions(kitRoot, modules, definitions) {
+  const all = [...loadBaseQuestions(kitRoot)];
+  for (const m of modules) all.push(...((definitions?.get(m) ?? loadModule(kitRoot, m)).questions ?? []));
+  const seen = new Set();
+  for (const q of all) {
+    if (seen.has(q.id)) throw new KitError(`question id "${q.id}" is defined twice`);
+    seen.add(q.id);
+  }
+  return all;
+}
+
+const AUTONOMY = {
+  'ask-often': 'Ask before every change that is not trivial.',
+  'ask-risky': 'Ask before risky or ambiguous steps; otherwise act.',
+  'act-and-report': 'Act, then report what you did and why.',
+};
+
+// One line of free text that is safe inside AGENTS.md (no markers, no line breaks).
+function oneLine(text) {
+  return String(text ?? '').replace(/<!--|-->/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // Context for templates (ADR-0002): computed in JS, templates only read it.
-// Answers are nested by question group: "idea.text" is answers.idea.text.
-export function templateContext({ kitRoot, answersDoc, modules }) {
+// Answers are nested by question group: "idea.text" is answers.idea.text. Questions the user did not
+// answer take their default, so a template never sees a missing answer.
+export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
+  const flat = {};
+  for (const q of collectQuestions(kitRoot, modules, definitions)) flat[q.id] = q.default;
+  Object.assign(flat, answersDoc.answers ?? {});
   const answers = {};
-  for (const [id, value] of Object.entries(answersDoc.answers ?? {})) {
+  for (const [id, value] of Object.entries(flat)) {
     const [group, name] = id.split('.');
     answers[group] ??= {};
     answers[group][name] = value;
   }
+  const profiles = answersDoc.proposal?.profiles ?? [];
+  const stack = profiles.map((p) => (hasProfile(kitRoot, p) ? `${p} - ${loadProfile(kitRoot, p).summary}` : p)).join('; ');
   return {
     kit: { version: kitVersion(kitRoot) },
     mode: answersDoc.mode,
     answers,
     proposal: answersDoc.proposal ?? null,
-    agents: answersDoc.answers?.['user.agents'] ?? [],
-    profiles: answersDoc.proposal?.profiles ?? [],
+    agents: flat['user.agents'] ?? [],
+    profiles,
     modules: [...modules],
+    ideaLine: oneLine(flat['idea.text']),
+    stack,
+    rules: { autonomy: AUTONOMY[flat['user.autonomy']] ?? '' },
   };
 }
 
-// Render the outputs of the given modules.
-// -> Map<path, { module, content: Buffer, fragments: [{ module, hash }] }>
-export function renderModules({ kitRoot, modules, context, definitions }) {
+// Files of the given profiles (ADR-0004: owned by core; profiles are not modules).
+//   just/<p>.just   <- profiles/<p>/just/<p>.just          (plus `import` in the justfile)
+//   .gitignore part <- profiles/<p>/gitignore
+//   scaffold        <- profiles/<p>/scaffold/**            (user-owned code, written once; `scaffold` is a
+//                      function rel -> boolean (file exists); one existing file skips the whole scaffold)
+// standards.md, guards.yaml and ci/check.yml are read by the modules that need them (standards, security, ci).
+// Profiles missing from the kit are reported, not rendered.
+// -> { parts: [{ path, module, kind, content }], files: Map<path, { module, content, fragments, managed }>, missing }
+export function renderProfiles({ kitRoot, profiles, scaffold = null }) {
+  const parts = [];
+  const files = new Map();
+  const missing = [];
+  for (const name of profiles) {
+    if (!hasProfile(kitRoot, name)) {
+      missing.push(name);
+      continue;
+    }
+    const dir = profileDir(kitRoot, name);
+    const justFile = join(dir, 'just', `${name}.just`);
+    if (existsSync(justFile)) {
+      files.set(`just/${name}.just`, { module: 'core', content: readFileSync(justFile), fragments: [], managed: true });
+      parts.push({ path: 'justfile', module: name, kind: 'part', content: `import 'just/${name}.just'\n` });
+    }
+    const ignore = join(dir, 'gitignore');
+    if (existsSync(ignore)) parts.push({ path: '.gitignore', module: name, kind: 'part', content: readFileSync(ignore) });
+    if (scaffold) {
+      const rels = walk(join(dir, 'scaffold'));
+      if (!rels.some((rel) => scaffold(rel))) {
+        for (const rel of rels) {
+          checkRelPath(rel);
+          if (files.has(rel)) throw new KitError(`profiles write ${rel} twice`);
+          files.set(rel, { module: 'core', content: readFileSync(join(dir, 'scaffold', rel)), fragments: [], managed: false });
+        }
+      }
+    }
+  }
+  return { parts, files, missing };
+}
+
+function walk(dir, prefix = '') {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const name of readdirSync(dir).sort()) {
+    const rel = prefix ? `${prefix}/${name}` : name;
+    if (statSync(join(dir, name)).isDirectory()) out.push(...walk(join(dir, name), rel));
+    else out.push(rel);
+  }
+  return out;
+}
+
+// Render the outputs of the given modules (and of the profile output from renderProfiles).
+// -> Map<path, { module, content: Buffer, fragments: [{ module, hash }], managed? }>
+export function renderModules({ kitRoot, modules, context, definitions, profileOutput }) {
   const owned = new Map();
   const shared = new Map();
   const addPart = (path, part) => {
@@ -118,10 +235,29 @@ export function renderModules({ kitRoot, modules, context, definitions }) {
     }
     if (def.agentsMd) addPart('AGENTS.md', { module: name, kind: 'agentsMd', content: def.agentsMd });
   }
+  for (const part of profileOutput?.parts ?? []) {
+    if (!SHARED_FILES[part.path]) throw new KitError(`${part.path} is not a shared file`);
+    addPart(part.path, { module: part.module, kind: part.kind, content: part.content });
+  }
+  for (const [path, file] of profileOutput?.files ?? []) {
+    if (owned.has(path) || shared.has(path)) throw new KitError(`${path} is written by a profile and by "${owned.get(path)?.module ?? 'a module'}"`);
+    owned.set(path, file);
+  }
   for (const [path, parts] of shared) {
     const spec = SHARED_FILES[path];
     const { content, fragments } = compose(path, spec, parts);
-    if (content !== null) owned.set(path, { module: spec.owner, content: Buffer.from(content, 'utf8'), fragments });
+    if (content === null) continue;
+    if (path === 'AGENTS.md') checkAgentsBudget(content, parts);
+    owned.set(path, { module: spec.owner, content: Buffer.from(content, 'utf8'), fragments });
   }
   return owned;
+}
+
+// M16: AGENTS.md has a hard line budget in every mode (ADR-0009); the error names the contributors.
+function checkAgentsBudget(content, parts) {
+  const lines = content.replace(/\n$/, '').split('\n').length;
+  if (lines <= AGENTS_MAX_LINES) return;
+  const count = (text) => String(text).replace(/\n$/, '').split('\n').length;
+  const per = parts.map((p) => `${p.module} ${p.kind === 'agentsMd' ? 'rules' : 'frame'} ${count(p.content)}`).join(', ');
+  throw new KitError(`AGENTS.md would have ${lines} lines, the budget is ${AGENTS_MAX_LINES} (${per}); shorten a module's agentsMd or move detail into docs/spec/`);
 }

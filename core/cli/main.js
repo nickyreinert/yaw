@@ -2,7 +2,8 @@
 
 import { parseArgs } from 'node:util';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
-import { init, remove, status, update, UsageError } from './commands.js';
+import { remove, status, update, UsageError } from './commands.js';
+import { init } from './init.js';
 import { doctor } from './doctor.js';
 import { selfUninstall, selfUpdate } from './self.js';
 import { createPrompter } from './prompt.js';
@@ -11,7 +12,7 @@ const yes = { yes: { type: 'boolean', short: 'y' } };
 
 // The phase-1 command list (ADR-0019). Commands without `run` are planned for a later step.
 export const COMMANDS = [
-  { name: 'init', args: '--answers <file> --yes', summary: 'set up YAW in this folder (core only until step 3)', options: { answers: { type: 'string' }, ...yes }, run: init },
+  { name: 'init', args: '[--answers <file> [--yes]] [--skip-verify]', summary: 'set up YAW in this folder: interview, confirm, write, verify', options: { answers: { type: 'string' }, 'skip-verify': { type: 'boolean' }, ...yes }, run: init },
   { name: 'update', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
   { name: 'remove', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'remove a module and exactly its files', options: { ...yes, strategy: { type: 'string' } }, run: remove },
   { name: 'status', args: '', summary: 'show modules and files with their state', options: {}, run: status },

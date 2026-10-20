@@ -3,7 +3,7 @@
 import { MANIFEST } from '../render/files.js';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
 import { STRATEGIES } from '../render/reconcile.js';
-import { ANSWERS, enabledModules, fileStates, initProject, planRemove, removeModule, requireManifest, updateProject } from '../render/project.js';
+import { enabledModules, fileStates, planRemove, removeModule, requireManifest, updateProject } from '../render/project.js';
 import { confirm } from './prompt.js';
 
 export class UsageError extends Error {
@@ -43,6 +43,7 @@ export function printReport(out, result) {
     if (r.diff) out.write(`${r.diff.replace(/\n?$/, '\n')}`);
   }
   for (const m of result.missingModules ?? []) out.write(`  warning: module "${m}" is not in this kit; its files were treated as removed\n`);
+  for (const p of result.missingProfiles ?? []) out.write(`  warning: profile "${p}" is not in this kit; its files were treated as removed\n`);
   const changed = result.report.filter((r) => r.action !== 'edited').length;
   if (changed === 0) out.write('  nothing to do\n');
 }
@@ -51,18 +52,6 @@ function parseStrategy(value) {
   if (value === undefined) return undefined;
   if (!STRATEGIES.includes(value)) throw new UsageError(`--strategy must be one of ${STRATEGIES.join(', ')}`);
   return value;
-}
-
-export async function init({ values, positionals, io }) {
-  if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
-  if (!values.answers || !values.yes) {
-    throw new UsageError('the interactive interview comes with step 3; for now run: yaw init --answers <file> --yes');
-  }
-  const result = await initProject({ root: io.cwd, kitRoot: io.kitRoot, answersFile: values.answers });
-  io.stdout.write(`yaw init (kit ${result.manifest.kit}, core only)\n`);
-  printReport(io.stdout, result);
-  io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
-  return 0;
 }
 
 export async function update({ values, positionals, io }) {

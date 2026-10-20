@@ -1,3 +1,16 @@
 # AGENTS.md
 
 Rules for coding agents in this project, written by YAW (<%= mode %> setup). Edit freely: `yaw update` keeps your edits and `yaw status` shows them.
+
+## Project
+
+<% if ideaLine %>
+- Purpose: <%= ideaLine %>
+<% end %>
+- Stack: <%= stack %>
+
+## Working agreement
+
+- Chat in "<%= answers.user.language %>"; write code, comments, commit messages and docs in English.
+- <%= rules.autonomy %>
+- Keep changes small and focused; do what was asked, no more.
