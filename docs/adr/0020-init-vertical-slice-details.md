@@ -1,6 +1,6 @@
 # ADR-0020: `yaw init` vertical slice: profiles, interview and pipeline details
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issues: #32 – #38 (Y-3.2 – Y-3.8)
 - Resolves: implementation details of step 3 that the docs leave open (B rule 10); extends ADR-0004, ADR-0014, ADR-0019
