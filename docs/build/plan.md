@@ -44,7 +44,7 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | F5 | G | Step 1 schema list omits `answers.yaml` + question definitions, `user-profile.yaml`, presets, `capabilities.yaml`, comfort items, `.yaw/config.yaml`, `github.yaml`, `guards.yaml`, `visual.yaml`, `vendors/*.yaml`, `~/.yaw/notify.yaml`. | B Step 1; D01 §2; D02 §5; D09 §3; D11 §1–2; D05 §2; D08 §2 | 1, 3, 7 | ◐ Step 1 defines answers, questions, user profile, presets, capabilities, config, github (ADR-0017); `guards.yaml`, `visual.yaml`, `vendors/*.yaml`, `notify.yaml` come with their modules |
 | F6 | G | Question ID scheme (`6.1` vs. `ui.direction`) and location of question definitions undefined. | D02 §3; D03; D04 §2 | 1 | ADR-0017 (Proposed): `<group>.<name>` IDs, doc 03 number in `ref` |
 | F7 | G | Derived-facts vocabulary (`hasUI`, `language`, `runsOn`, "if public/data/hosted", `auto`) undefined. | D04 §1–2; D05 §2 | 1, 3 | ADR-0017 (Proposed): facts vocabulary |
-| F8 | G | Manifest lacks vendor mode, MCP servers, pinned-version semantics, fragment ownership; task-mode enum differs (D01 vs. D10). | D01 §3, §5; D09 §6; D10 §1; D14 §5 | 1 | ◐ enum follows BD4; vendor mode, MCP servers, pinned version in ADR-0017; fragment owner provisional until ADR-0004 |
+| F8 | G | Manifest lacks vendor mode, MCP servers, pinned-version semantics, fragment ownership; task-mode enum differs (D01 vs. D10). | D01 §3, §5; D09 §6; D10 §1; D14 §5 | 1 | ◐ enum follows BD4; vendor mode, MCP servers, pinned version in ADR-0017; fragment owner in ADR-0004 (Proposed) |
 | F9 | A | Task ledger: `TASKS.md` parsed as source, or rendered from JSON? | B Step 1; K; D10 §2 | 1, 5.3 | ✅ BD4 |
 | F10 | C | `agents` key enum in `module.yaml` undefined; Gemini/Antigravity separate. | D04 §2; D09 §2–3; D03 0.0 | 1 | ◐ BD8: phase-1 enum `claude`, `codex`, `copilot`; schema leaves room for phase-3 keys |
 | F11 | A | `yaw.db` evaluation tables and `release-plan.yaml` now or phase 2? | B Step 1; K "Phase plan" | 1 | ✅ BD3 (phase 2) |
@@ -53,12 +53,12 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 
 | # | Sev | Finding | References | Blocks | Status |
 |---|---|---|---|---|---|
-| U1 | G | Shared files (`AGENTS.md`, `justfile`, `.claude/settings.json`, `.gitignore`, PR template) written by several modules; no fragment model. | D01 §5–6; D04; D09 §4 | 2 | Open → ADR-0004 |
+| U1 | G | Shared files (`AGENTS.md`, `justfile`, `.claude/settings.json`, `.gitignore`, PR template) written by several modules; no fragment model. | D01 §5–6; D04; D09 §4 | 2 | ADR-0004 (Proposed): owner `core` renders the whole file, fragments hashed |
 | U2 | G | 3-way merge needs a base (`.yaw/base/` vs. re-render from old tag). | D01 §4 | 2 | ADR-0003 (Proposed): `.yaw/base/` |
 | U3 | A | `managed: false` files on `remove` / `update`. | D01 §5; D05 §3 | 2 | ADR-0003 (Proposed) |
-| U4 | C | Project-pinned kit version vs. single global `~/.yaw/kit` used by hooks. | D01 §3; D14 §5 | 2, 4 | ◐ CI part ✅ BD10; local hooks → ADR-0006 |
+| U4 | C | Project-pinned kit version vs. single global `~/.yaw/kit` used by hooks. | D01 §3; D14 §5 | 2, 4 | ◐ CI part ✅ BD10; rest ADR-0006 (Proposed): one global kit, doctor warns, writes refuse an older kit |
 | U5 | G | CI and collaborators without the kit fail `just check`. | D01 §3, §6; D04; D09 §3; D12 §2 | 2, 5.5 | ✅ BD10 |
-| U6 | A | Is `core` removable? | B rule 4; D04 §1 | 2 | Open → ADR-0004 |
+| U6 | A | Is `core` removable? | B rule 4; D04 §1 | 2 | ADR-0004 (Proposed): yes, as the last module |
 
 ### 1.3 Presets, modes, phases (block Step 3)
 
@@ -84,9 +84,9 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | H4 | A | Copilot + Claude hooks: double firing; Copilot-only hook location. | B Step 4; D09 §2; D14 §5 | 4 | Open → Y-4.5 (ADR) |
 | H5 | A | Skills to Claude: generated copies vs. symlinks; Copilot duplicates. | B Step 4; D09 §2 | 4 | Open → ADR-0012 |
 | H6 | G | Which blocking hook proves Step 4? | B Step 4; D04 §3; D14 §2 | 4 | ✅ BD6 (`security` guard) |
-| H7 | G | Hook command resolution; shim location/format/fail-open. | D01 §3; B Step 4 | 4 | Open → ADR-0006 |
+| H7 | G | Hook command resolution; shim location/format/fail-open. | D01 §3; B Step 4 | 4 | ADR-0006 (Proposed): `.yaw/bin/yaw-hook`, built in Y-4.2 |
 | H8 | A | Model id availability per agent/event; vendor facts must be re-verified with fixtures. | B Steps 1, 4; D09 §2; D13 §0 | 1, 4 | ◐ draft mapping in `docs/spec/formats.md` (ADR-0018); verify in Y-4.3–4.5 |
-| H9 | G | No platform statement. | D01 §4; D11; D13 §3 | 2 | ✅ BD11 |
+| H9 | G | No platform statement. | D01 §4; D11; D13 §3 | 2 | ✅ BD11 (ADR-0008) |
 | H10 | A | `node:sqlite` needs 22.13; ExperimentalWarning. | K; D13 §2 | 1, 4 | ✅ BD11 |
 
 ### 1.5 Modules, tasks, team mode (block Step 5)
@@ -98,7 +98,7 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | M3 | C | `TASKS.md` in GitHub-only mode: not generated vs. read-only view. | D10 §1; D14 | 5.3 | ✅ BD4 (generated read-only view) |
 | M4 | C | `T-NNN` vs. issue-number IDs and branch names. | D10 §2–3; D14 §1–2 | 5.3, 5.5 | ✅ BD4 (IDs); branch pattern follows the ID → ADR-0010 |
 | M5 | C | Recipe naming (`just task …`, `just gh-init`, `just commit/pr/branch`). | D01 §6; D10 §3; D12 §4; D14 §1 | 5.3, 5.5 | Open → ADR-0010 |
-| M6 | C | Just `import` (flat) vs. `mod` (namespaced); verb collisions. | D01 §6; D05 §3 | 3, 6 | Open → ADR-0004 |
+| M6 | C | Just `import` (flat) vs. `mod` (namespaced); verb collisions. | D01 §6; D05 §3 | 3, 6 | ADR-0004 (Proposed): `import` per module, `mod` per profile when several |
 | M7 | C | Personal vs. committed config (comfort hooks, `.yaw/config.yaml`, communication in team repos). | D04; D11 §1; D12 §3; D14 §5 | 5.1, 5.8, 5.9 | Open → ADR-0013 |
 | M8 | G | Comfort depends on sessions/tasks; "last `just check` status" not stored. | D04 §1; D11 §1, §1a | 5.8 | Open → Y-5.8 |
 | M9 | C | Phase-1 `pr-policy` vs. phase-2 launch plan; `docs` type; boundary rules. | K; D14 §1, §2, §4; B 5.9 | 5.9 | ✅ BD3 (open-issue check only; rest phase 2) |
@@ -115,12 +115,12 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | # | Sev | Finding | References | Blocks | Status |
 |---|---|---|---|---|---|
 | S1 | G | Claude plugin + marketplace (`/kickoff`) in no build step. | D02 §1; D09 §4; B | 3 / later | Open → `later`; Step 3 `init` works without `/kickoff` |
-| S2 | G | Phase-1 CLI surface undefined; `init` vs. `apply`. | D01 §2, §4; D02; D09–D14 | 2 | Open → Y-2.4 (ADR) |
-| S3 | A | Minimal Step 2 `init`. | B Steps 2, 3 | 2 | Open → Y-2.10 |
-| S4 | G | No release tag before v0.1; repo existence. | D01 §4; B Steps 2, 9 | 2 | ◐ repo ✅ BD12; pre-tag install via `--channel main` / local path → ADR-0006 |
-| S5 | C | `tests/` vs. `test/` vs. `examples/` dirs. | D01 §2; D05 §2, §4; B | 2 | ◐ `test/` at the root (ADR-0016, interim); rest → ADR-0014 |
+| S2 | G | Phase-1 CLI surface undefined; `init` vs. `apply`. | D01 §2, §4; D02; D09–D14 | 2 | ADR-0019 (Proposed) |
+| S3 | A | Minimal Step 2 `init`. | B Steps 2, 3 | 2 | ADR-0019 (Proposed): `--answers <file> --yes`, `core` stub only |
+| S4 | G | No release tag before v0.1; repo existence. | D01 §4; B Steps 2, 9 | 2 | ◐ repo ✅ BD12; pre-tag install via `--channel main` / `YAW_REPO` in ADR-0006 (Proposed) |
+| S5 | C | `tests/` vs. `test/` vs. `examples/` dirs. | D01 §2; D05 §2, §4; B | 2 | ADR-0014 (Proposed): `test/`, `modules/*/tests/`, `examples/<profile>/` (not `test/profiles/`) |
 | S6 | G | Form secret fields and design picker depend on non-phase-1 modules. | D02 §3; D08; K | 7 | Open → Y-7 (ADR) |
-| S7 | G | Dev-tool ADR (`shellcheck`); JSON Schema subset. | B rule 3, Steps 1, 2 | 1, 2 | ◐ dev tools in ADR-0008; schema subset ADR-0005 (Proposed) |
+| S7 | G | Dev-tool ADR (`shellcheck`); JSON Schema subset. | B rule 3, Steps 1, 2 | 1, 2 | dev tools ADR-0008 (Proposed); schema subset ADR-0005 (Accepted) |
 | S8 | A | Who creates remote, labels, issues, and when. | B rule 2 | 1 | ✅ BD12 |
 
 ---
@@ -134,21 +134,22 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0001 | YAML for human-edited files, JSON for kit-written files; strict subset parser + emitter; block scalars; YAML 1.2 core typing; comments dropped on rewrite with header comment; `github.yaml` / `taxonomy.json` exceptions | F1–F4 | Step 1 | **Decided** (BD1, BD2); written, Proposed (PR #87) |
 | 0002 | Template engine: plain JS template functions vs. tiny built-in renderer | B Step 1 | Step 1 | Proposed (PR #87): tiny `<% %>` renderer |
 | 0003 | Hash/merge strategy for `yaw update`: SHA-256, base store, `git merge-file`, keep/take/merge UX, `managed:false` | U2, U3 | Step 1 | Proposed (PR #87): `.yaw/base/` + `git merge-file` |
-| 0004 | Shared-file composition and fragment ownership; just `import` vs. `mod`; `core` removability | U1, U6, M6 | Step 2 | Proposed |
+| 0004 | Shared-file composition and fragment ownership; just `import` vs. `mod`; `core` removability | U1, U6, M6 | Step 2 | Written, Proposed (Step 2 PR) |
 | 0005 | JSON Schema subset and validator | S7 | Step 1 | Proposed (PR #87) |
-| 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Proposed; CI part **decided** (BD10) |
+| 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Written, Proposed (Step 2 PR); CI part **decided** (BD10) |
 | 0007 | Hook output policy (token-free) | H1 | Step 4 | **Decided** (BD9); write up |
-| 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); write up |
+| 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (Step 2 PR) |
 | 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15 | Step 3 | Partly decided (BD5, BD6) |
 | 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only | M4, M5, M11, M13 | Step 5.3 | Partly decided (BD4) |
 | 0011 | Shared retrieval engine in `core/lib/` + Unicode-aware tokenizer | M1, M2 | Step 5.6 | Proposed |
 | 0012 | Skill distribution to Claude: generated copies vs. symlinks; drift check | H5 | Step 4 | Proposed |
 | 0013 | Personal vs. committed configuration; hygiene opt-out | M7, M14 | Step 5.1 | Proposed |
-| 0014 | Kit repo and test layout | S5 | Step 2 | Proposed |
+| 0014 | Kit repo and test layout (supersedes 0016 when accepted) | S5 | Step 2 | Written, Proposed (Step 2 PR) |
 | 0015 | Phase-1 scope: `yaw.db` registry-only, `release-plan.yaml` + evaluation deferred, `pr-policy` open-issue check only, minimal `security` in, `quality-code` out, Gemini CLI phase 3, `node-cli` profile | F11, M9, P5, P6, H3, H6 | Step 1 | **Decided** (BD3, BD6, BD7, BD8); written, Proposed (PR #87) |
 | 0016 | Step 1 code, schema and test layout (interim until ADR-0014) | S5 (part) | Step 1 | Proposed (PR #87) |
 | 0017 | Format conventions: names, agent keys, facts vocabulary, question IDs, answers by ID, manifest fields | F6, F7, F8, F10 | Step 1 | Proposed (PR #87) |
 | 0018 | Normalised hook event (no content) and session registry in `yaw.db` | H8, H10 | Step 1 | Proposed (PR #87) |
+| 0019 | Phase-1 CLI surface and step-2 command behaviour (flags, non-TTY rules, remove of edited files, minimal `init`, renderer details) | S2, S3 | Step 2 | Written, Proposed (Step 2 PR) |
 
 ---
 
