@@ -139,7 +139,7 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Written, Proposed (PR #89); CI part **decided** (BD10) |
 | 0007 | Hook output policy (token-free) | H1 | Step 4 | **Decided** (BD9); write up |
 | 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (PR #89) |
-| 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15 | Step 3 | Partly decided (BD5, BD6) |
+| 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15, M16 | Step 3 | Written, Proposed (Step 3 PR); partly decided (BD5, BD6); `security` stays out of Quick pending the user |
 | 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only | M4, M5, M11, M13 | Step 5.3 | Partly decided (BD4) |
 | 0011 | Shared retrieval engine in `core/lib/` + Unicode-aware tokenizer | M1, M2 | Step 5.6 | Proposed |
 | 0012 | Skill distribution to Claude: generated copies vs. symlinks; drift check | H5 | Step 4 | Proposed |
@@ -150,6 +150,7 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0017 | Format conventions: names, agent keys, facts vocabulary, question IDs, answers by ID, manifest fields | F6, F7, F8, F10 | Step 1 | Proposed (PR #87) |
 | 0018 | Normalised hook event (no content) and session registry in `yaw.db` | H8, H10 | Step 1 | Proposed (PR #87) |
 | 0019 | Phase-1 CLI surface and step-2 command behaviour (flags, non-TTY rules, remove of edited files, minimal `init`, renderer details) | S2, S3 | Step 2 | Written, Proposed (PR #89) |
+| 0020 | `yaw init` vertical slice: profile files and ownership, scaffold, uniform verbs, suggestion, init pipeline, interview files, examples and CI | step 3 details (B rule 10) | Step 3 | Written, Proposed (Step 3 PR) |
 
 ---
 
@@ -212,17 +213,19 @@ Status: **implemented, awaiting the user's ADR review and a green kit-ci run** (
 
 ### Step 3 — First vertical slice (`yaw init`, CLI lane, Quick with `core` only, two profiles)
 
+Status: **implemented, awaiting the user's ADR review (0009, 0020) and a green kit-ci run** (PR: see GitHub). Done-when met locally: `yaw init` in an empty folder (CLI interview or `--answers`) runs `just setup && just check` green for `node-cli` and `python-cli`; the core-only result is 10 files (without `.yaw/base/`). `npm test` 267/267 on Node 22.21.1 with `just` and `uv`, 266/266 + 1 skipped (python smoke, offline) on Node 22.13.0. Open: ADR-0009 acceptance (Y-3.1), whether `security` joins Quick, kit-ci incl. `just`/`uv` setup actions and Node 24.
+
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
 | Y-3 | Step 3: first vertical slice | Epic | P0 | Y-2 | `yaw init` in an empty folder → `just check` passes; `core`-only result is a handful of files |
-| Y-3.1 | ADR-0009 terminology + preset contents | Chore | P0 | Y-2 | Accepted; Quick = BD5 list; Standard/Full phase-1 contents fixed; D02/D04 updated in the same PR |
-| Y-3.2 | `core` module | Feature | P0 | Y-3.1 | `AGENTS.md` assembled from `agentsMd` with the line budget enforced (M16); `CLAUDE.md` = `@AGENTS.md`; root `justfile` composing fragments per ADR-0004; removability per ADR-0004 |
-| Y-3.3 | CLI interview engine (Quick subset) | Feature | P0 | Y-1.9 | Batches, `[default]`, `?` help, `skip`; skipped questions listed as "default" in the summary; nothing written before confirmation |
-| Y-3.4 | Profile `python-cli` | Feature | P0 | Y-1.8 | `profile.yaml`, `standards.md`, just fragment with all verbs (n/a verbs exit 0), `guards.yaml`, `ci/check.yml`, scaffold, smoke test in a temp dir |
-| Y-3.5 | Profile `node-cli` | Feature | P0 | Y-1.8 | Same parts as Y-3.4; Node ≥ 22.13, `node --test`, no deps (BD7) |
-| Y-3.6 | Rule-based profile suggestion (`suggestWhen`) | Feature | P1 | Y-3.4, Y-3.5 | Picks the matching profile for an answers file without an LLM; deterministic test |
-| Y-3.7 | `yaw init` pipeline (collect → confirm → apply → verify) | Feature | P0 | Y-3.2–Y-3.5 | Runs `just setup && just check` at the end; non-interactive mode reproducible (same answers → identical files and hashes) |
-| Y-3.8 | Dogfooding: set this repo up with YAW (`node-cli`) | Chore | P1 | Y-3.7 | This repo has a YAW manifest; `just check` runs the kit tests; ADRs stay in `docs/adr/` (BD7) |
+| Y-3.1 | ADR-0009 terminology + preset contents (written; awaiting acceptance) | Chore | P0 | Y-2 | Accepted; Quick = BD5 list; Standard/Full phase-1 contents fixed; D02/D04 updated in the same PR |
+| Y-3.2 | `core` module (**done**) | Feature | P0 | Y-3.1 | `AGENTS.md` assembled from `agentsMd` with the line budget enforced (M16); `CLAUDE.md` = `@AGENTS.md`; root `justfile` composing fragments per ADR-0004; removability per ADR-0004 |
+| Y-3.3 | CLI interview engine (Quick subset) (**done**) | Feature | P0 | Y-1.9 | Batches, `[default]`, `?` help, `skip`; skipped questions listed as "default" in the summary; nothing written before confirmation |
+| Y-3.4 | Profile `python-cli` (**done**) | Feature | P0 | Y-1.8 | `profile.yaml`, `standards.md`, just fragment with all verbs (n/a verbs exit 0), `guards.yaml`, `ci/check.yml`, scaffold, smoke test in a temp dir |
+| Y-3.5 | Profile `node-cli` (**done**) | Feature | P0 | Y-1.8 | Same parts as Y-3.4; Node ≥ 22.13, `node --test`, no deps (BD7) |
+| Y-3.6 | Rule-based profile suggestion (`suggestWhen`) (**done**) | Feature | P1 | Y-3.4, Y-3.5 | Picks the matching profile for an answers file without an LLM; deterministic test |
+| Y-3.7 | `yaw init` pipeline (collect → confirm → apply → verify) (**done**) | Feature | P0 | Y-3.2–Y-3.5 | Runs `just setup && just check` at the end; non-interactive mode reproducible (same answers → identical files and hashes) |
+| Y-3.8 | Dogfooding: set this repo up with YAW (`node-cli`) (**done**) | Chore | P1 | Y-3.7 | This repo has a YAW manifest; `just check` runs the kit tests; ADRs stay in `docs/adr/` (BD7) |
 
 ### Step 4 — Agent adapter layer and hook wrapper (+ Step 5.0 `security`)
 
