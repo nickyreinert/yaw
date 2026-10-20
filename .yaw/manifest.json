@@ -13,10 +13,37 @@
   "modules": {
     "core": {
       "enabled": true
+    },
+    "security": {
+      "enabled": true
     }
   },
   "mcpServers": [],
   "files": [
+    {
+      "path": ".claude/settings.json",
+      "module": "core",
+      "hash": "sha256:d1eab2cdfd558581be22868ae4d6c5c9d9dfd6a7038eb1a9b76f1d9d46aacc49",
+      "managed": true,
+      "fragments": [
+        {
+          "module": "security",
+          "hash": "sha256:a9a83820fb3934d78bfdd5b7bed2d2d6e35de5f7af835f0390cc698cb826b875"
+        }
+      ]
+    },
+    {
+      "path": ".codex/hooks.json",
+      "module": "core",
+      "hash": "sha256:90636c4b0f5de1a5d3c21285ec1ca56d154051a11b2d995b4273323c4332259b",
+      "managed": true,
+      "fragments": [
+        {
+          "module": "security",
+          "hash": "sha256:edcc2550031064c3df6164930d33bfcce2fe85e56416fc6defb10c4fc06cd17b"
+        }
+      ]
+    },
     {
       "path": ".gitignore",
       "module": "core",
@@ -36,10 +63,22 @@
       "managed": false
     },
     {
+      "path": ".yaw/bin/yaw-hook",
+      "module": "core",
+      "hash": "sha256:01febb1801037c0ef003a421071023a3b75920fb127977bdc4806d0dfb19e928",
+      "managed": true
+    },
+    {
       "path": "AGENTS.md",
       "module": "core",
-      "hash": "sha256:14f1130cf770d9a6c9210d6cb028dfbb519503966f893432be617a68b4236583",
-      "managed": true
+      "hash": "sha256:4df84d11359d6412d7b2c025e3bfa0e3b4b38ac73dadc0f1359328da0cff714d",
+      "managed": true,
+      "fragments": [
+        {
+          "module": "security",
+          "hash": "sha256:a2c57948947a88958e2860c98fedbfb40e05a636afa3b280a94a07b5102aed72"
+        }
+      ]
     },
     {
       "path": "CLAUDE.md",
