@@ -35,7 +35,7 @@ yaw/
 ├── vendors/<vendor>.yaml           # see doc 08
 ├── adapters/{claude,codex,copilot}/          # see doc 09; gemini, antigravity, pi, hermes in phase 3
 ├── examples/<profile>/             # sample projects, used by the kit's own CI
-└── tests/
+└── test/                           # kit tests (node --test), ADR-0016
 ```
 
 ## 3. Footprint in a target project
