@@ -143,7 +143,7 @@ test('rendered settings: Claude hooks + permissions.deny, Codex hooks, shim; Cop
   assert.equal(claude.hooks.PreToolUse[0].matcher, 'Read|Edit|MultiEdit|Grep|Bash');
   assert.deepEqual(claude.hooks.PreToolUse[0].hooks, [{
     type: 'command',
-    command: 'sh "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook" PreToolUse --agent claude --module security',
+    command: 'f="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook"; [ ! -f "$f" ] || sh "$f" PreToolUse --agent claude --module security',
     timeout: 10,
   }]);
   assert.ok(claude.permissions.deny.includes('Read(**/.env)'));
@@ -152,6 +152,7 @@ test('rendered settings: Claude hooks + permissions.deny, Codex hooks, shim; Cop
   assert.equal(codex.hooks.PreToolUse[0].matcher, 'apply_patch|Bash');
   assert.match(codex.hooks.PreToolUse[0].hooks[0].command, / PreToolUse --agent codex --module security$/);
   assert.equal(codex.permissions, undefined);
+  assert.ok(!JSON.stringify(codex).includes('"async"'), 'no async hooks (ADR-0007)');
   assert.ok(!existsSync(join(root, '.github/hooks')), 'no Copilot hook file (no double firing, ADR-0021)');
   assert.match(readFileSync(join(root, '.yaw/bin/yaw-hook'), 'utf8'), /^#!\/bin\/sh\n/);
   const m = readManifest(root);
