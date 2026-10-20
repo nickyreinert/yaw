@@ -1,6 +1,6 @@
 # ADR-0007: Hook output policy (token-free hooks)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #40 (Y-4.1); implemented in #41 (Y-4.2), tested in #47 (Y-4.8)
 - Resolves: H1 (`docs/build/plan.md` §1.4); records BD9 / `BUILD.md` rule 5
