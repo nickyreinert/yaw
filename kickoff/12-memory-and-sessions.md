@@ -78,5 +78,5 @@ Goal: find the conversation behind a task, decision or commit later, and resume 
 - **Links:** tasks from the active `TASKS.md` entry / branch name; decisions from IDs cited in the session; commits from the git range between start and end HEAD; files from the diff.
 - **Commit trailer:** `just commit` adds `Agent-Session: claude:5f2c…` so `git log` leads back to the conversation.
 - **Back-links:** the task journal line, the ADR `refs`, and the PR description get the session ID.
-- **Search:** `yaw sessions find "token expiry"` (same retrieval engine over title + summary), `yaw sessions for T-012`, `yaw sessions resume <id>`.
+- **Search:** `yaw sessions find "token expiry"` (same retrieval engine over title; a `summary` column comes with Y-5.7 if search needs it), `yaw sessions for T-012`, `yaw sessions resume <id>`.
 - **Privacy:** transcripts stay where the agent stores them (local); the registry only holds metadata and paths. Not committed by default because transcripts may contain secrets or personal data; opt-in commit of titles + links only.
