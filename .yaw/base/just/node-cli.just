@@ -22,7 +22,7 @@ typecheck:
 test:
     npm test
 
-check: lint typecheck test audit
+check: lint typecheck test audit sync-check
 
 build:
     @echo "build: not applicable for node-cli (no build step; a release is a git tag)"
