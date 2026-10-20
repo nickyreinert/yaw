@@ -54,7 +54,7 @@ Facts come from answers only where a question exists (`deriveFacts`): `language`
 
 ### Examples and CI
 
-`examples/<profile>/answers.yaml` is the input of the smoke test per profile (ADR-0014): `yaw init`, then `just setup && just check`, in a temp folder (`test/profiles.test.js`). The tests skip with a reason when `just` (or, for python-cli, `uv` or the network, `YAW_TEST_OFFLINE`) is missing. Kit CI installs `just` and `uv` with the setup actions `extractions/setup-just` and `astral-sh/setup-uv`; these two actions and the `ci/check.yml` fragments are unverified until the first CI run.
+`examples/<profile>/answers.yaml` is the input of the smoke test per profile (ADR-0014): `yaw init`, then `just setup && just check`, in a temp folder (`test/profiles.test.js`). The tests skip with a reason when `just` (or, for python-cli, `uv` or the network, `YAW_TEST_OFFLINE`) is missing. Kit CI installs `just` and `uv` with the setup actions `extractions/setup-just` and `astral-sh/setup-uv`; these two actions and the `ci/check.yml` fragments are unverified until the first CI run. Pin both actions (and the others in `kit-ci.yml` and the fragments) by commit SHA before v0.1.
 
 ### Dogfooding (Y-3.8)
 

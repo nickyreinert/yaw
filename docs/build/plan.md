@@ -16,7 +16,7 @@ Abbreviations: `K` = KICK-OFF.md, `B` = BUILD.md, `D01`…`D14` = kickoff docs, 
 | 2 | `github.yaml` stays YAML (user-edited). `taxonomy.json` stays JSON (managed via `yaw decisions`). | F4 |
 | 3 | Phase 1 `yaw.db` = session registry tables only. Evaluation tables and `release-plan.yaml` → phase 2. Phase-1 `pr-policy` enforces only "PR links an open issue". | F11, M9 |
 | 4 | Local mode: `TASKS.md` is the source of truth, IDs `T-NNN`. GitHub-only and team mode: issues are the source, IDs `#123`, `TASKS.md` is a generated read-only view. Both mode: `T-NNN` with linked issue number. | F9, M3, M4 |
-| 5 | "Lean" = **Quick** (one name; docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`. Step 3 builds `core` only; Quick complete after 5.3. No reordering. | P1, P4 |
+| 5 | "Lean" = **Quick** (one name; docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`. Step 3 builds `core` only; Quick complete after 5.3. No reordering. **Amended by the user (ADR-0009): Quick also includes minimal `security`.** | P1, P4 |
 | 6 | Minimal `security` in phase 1 (deny `.env*`/secret reads, guard `rm -rf`, force push, prod deploy). It is the blocking hook proving Step 4. `quality-code` reviewer stays phase 2; `just check` gates come from profiles. | P6 (partly), M15, H6 |
 | 7 | 9th profile **`node-cli`** (Node ≥ 22, `node --test`, no deps), used for this repo. ADRs in `docs/adr/` until Step 5.6, then moved to `.decisions/` by the decisions module. | P5, M12 |
 | 8 | Gemini CLI → phase 3 with Antigravity. Phase-1 agents: Claude, Codex, Copilot. | H3, F10 (partly) |
@@ -139,7 +139,7 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Written, Proposed (PR #89); CI part **decided** (BD10) |
 | 0007 | Hook output policy (token-free) | H1 | Step 4 | **Decided** (BD9); write up |
 | 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (PR #89) |
-| 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15, M16 | Step 3 | Written, Proposed (Step 3 PR); partly decided (BD5, BD6); `security` stays out of Quick pending the user |
+| 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15, M16 | Step 3 | Written, Proposed (Step 3 PR); partly decided (BD5, BD6); `security` joins Quick (decided by the user, changes BD5) |
 | 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only | M4, M5, M11, M13 | Step 5.3 | Partly decided (BD4) |
 | 0011 | Shared retrieval engine in `core/lib/` + Unicode-aware tokenizer | M1, M2 | Step 5.6 | Proposed |
 | 0012 | Skill distribution to Claude: generated copies vs. symlinks; drift check | H5 | Step 4 | Proposed |
@@ -213,7 +213,7 @@ Status: **implemented, awaiting the user's ADR review and a green kit-ci run** (
 
 ### Step 3 — First vertical slice (`yaw init`, CLI lane, Quick with `core` only, two profiles)
 
-Status: **implemented, awaiting the user's ADR review (0009, 0020) and a green kit-ci run** (PR: see GitHub). Done-when met locally: `yaw init` in an empty folder (CLI interview or `--answers`) runs `just setup && just check` green for `node-cli` and `python-cli`; the core-only result is 10 files (without `.yaw/base/`). `npm test` 267/267 on Node 22.21.1 with `just` and `uv`, 266/266 + 1 skipped (python smoke, offline) on Node 22.13.0. Open: ADR-0009 acceptance (Y-3.1), whether `security` joins Quick, kit-ci incl. `just`/`uv` setup actions and Node 24.
+Status: **implemented, awaiting the user's ADR review (0009, 0020) and a green kit-ci run** (PR: see GitHub). Done-when met locally: `yaw init` in an empty folder (CLI interview or `--answers`) runs `just setup && just check` green for `node-cli` and `python-cli`; the core-only result is 10 files (without `.yaw/base/`). `npm test` 267/267 on Node 22.21.1 with `just` and `uv`, 266/266 + 1 skipped (python smoke, offline) on Node 22.13.0. Open: ADR-0009 acceptance (Y-3.1), kit-ci incl. `just`/`uv` setup actions and Node 24.
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
@@ -318,6 +318,6 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 
 None need a user answer before Step 1. Per B rule 10 each is decided by the ADR named in §1 and listed in that step's summary. A question goes to the user only if an ADR changes scope, user-visible behaviour or security, or is hard to reverse. Likely candidates:
 
-1. **ADR-0009:** Does Quick include minimal `security`? (BD5 Quick list excludes it; M15 leaves Quick without `.env` read protection.)
+1. **ADR-0009:** Does Quick include minimal `security`? Answered: yes (changes BD5).
 2. **ADR-0009:** Phase-1 contents of Standard and Full.
 3. **ADR-0013:** Personal vs. committed config in team repos (M7).

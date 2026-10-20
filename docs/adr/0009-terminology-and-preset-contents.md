@@ -25,7 +25,7 @@ Docs say "mode" for the first and "saved setup" for the second; "preset" is used
 
 | Mode | Modules in phase 1 |
 |---|---|
-| **Quick** | `core`, `communication`, `standards`, `devenv`, `tasks` (BD5). Step 3 builds `core`; Quick is complete after 5.3 |
+| **Quick** | `core`, `communication`, `standards`, `devenv`, `tasks` (BD5) **+ `security` (minimal, BD6; this ADR changes BD5)**. Step 3 builds `core`; Quick is complete after 5.3 and 5.0 |
 | **Standard** | Quick + `git-hooks`, `github`, `ci`, `decisions`, `security` (minimal, BD6), `sessions`, `comfort` (hygiene + status line) |
 | **Full** | Standard + the questions marked F (governance strictness, budgets, roles), team-mode options, `comfort` items asked one by one |
 
@@ -33,7 +33,7 @@ Not in phase 1, labelled `later`: `quality-code`, `performance`, `business-logic
 
 ### `security` in Quick (M15)
 
-Quick keeps the BD5 list and does **not** include `security`. Quick still tells the agent not to read or print secrets (a line in `core`'s `agentsMd`); there is no blocking hook in Quick. Adding `security` to Quick is a one-line change of `default.quick` in its `module.yaml` (asked as a question in the step 3 report).
+**Decided by the user: minimal `security` is part of Quick.** This changes BD5, whose Quick list had five modules; Quick now has six. The `security` module (step 5.0) therefore ships with `default: { quick: true, standard: true, full: true }`, and Quick has the `.env*`/secret read deny and the destructive-command guard (BD6). `core`'s `agentsMd` keeps its rule not to read or print secrets as well (agents without a blocking hook, and Quick before step 5.0). The module does not exist in the kit yet, so `yaw init` in step 3 renders `core` only.
 
 ### Quick question count (P2)
 
@@ -61,4 +61,5 @@ The assembled `AGENTS.md` has a **hard limit of 80 lines in every mode** (`AGENT
 
 - Docs 02 §2 and 04 §1 are updated in the same PR (terminology note, footprint, mode contents).
 - `yaw presets` stays reserved for saved setups (step 7); no command is called "preset" for modes.
-- If the user wants `security` in Quick, it changes one default and the Quick footprint by the hook registration files (step 4/5.0).
+- Quick's footprint grows by the hook registration files of `security` (step 4/5.0); the numbers above are re-counted when it lands.
+- BD5 in `BUILD.md` and `docs/build/plan.md` §0 still lists five Quick modules; `BUILD.md` is left to its owner, the plan carries a note.
