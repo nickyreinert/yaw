@@ -9,9 +9,18 @@ export function createPrompter({ input = process.stdin, output = process.stdout 
     show(text) {
       output.write(text);
     },
-    async ask(question) {
+    // Rejects when the input ends before an answer arrives (instead of hanging or exiting silently).
+    ask(question) {
       rl ??= createInterface({ input, output });
-      return rl.question(question);
+      const reader = rl;
+      return new Promise((resolve, reject) => {
+        const onClose = () => reject(new Error('input ended before all questions were answered'));
+        reader.once('close', onClose);
+        reader.question(question).then((answer) => {
+          reader.off('close', onClose);
+          resolve(answer);
+        }, reject);
+      });
     },
     close() {
       rl?.close();

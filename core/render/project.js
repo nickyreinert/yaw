@@ -1,12 +1,13 @@
 // Project operations behind `yaw init`, `yaw update`, `yaw remove` and `yaw status`.
 // All of them render the enabled modules and hand the result to reconcile() (ADR-0003).
 
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { parseDocument } from '../lib/yaml.js';
+import { matchFacts } from '../interview/facts.js';
 import { formatError } from '../lib/schema.js';
 import { BASE_DIR, MANIFEST, hashContent, pruneEmptyDirs, readProjectFile, writeAtomic } from './files.js';
-import { compareVersions, hasModule, kitVersion, loadModule, renderModules, schemas, templateContext, KIT_ROOT } from './kit.js';
+import { compareVersions, hasModule, kitVersion, loadModule, renderModules, renderProfiles, schemas, templateContext, KIT_ROOT } from './kit.js';
 import { deleteManifest, readManifest, writeManifest } from './manifest.js';
 import { hasConflictMarkers, reconcile } from './reconcile.js';
 
@@ -54,8 +55,10 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
   const available = modules.filter((m) => hasModule(kitRoot, m));
   const missing = modules.filter((m) => !available.includes(m));
   const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
-  const context = templateContext({ kitRoot, answersDoc, modules: available });
-  const desired = renderModules({ kitRoot, modules: available, context, definitions });
+  const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
+  // Profile files belong to core: they go away with it (the scaffold is user code and stays).
+  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles }) : undefined;
+  const desired = renderModules({ kitRoot, modules: available, context, definitions, profileOutput });
   const version = kitVersion(kitRoot);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
 
@@ -66,10 +69,10 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
   if (modules.length === 0) {
     deleteManifest(root);
     pruneEmptyDirs(root, BASE_DIR);
-    return { ...result, manifest: null, missingModules: missing };
+    return { ...result, manifest: null, missingModules: missing, missingProfiles: [] };
   }
   const written = writeManifest(root, { ...manifest, kit: version, modules: nextModules, files: result.files });
-  return { ...result, manifest: written, missingModules: missing };
+  return { ...result, manifest: written, missingModules: missing, missingProfiles: profileOutput?.missing ?? [] };
 }
 
 export function enabledModules(manifest) {
@@ -88,30 +91,63 @@ export function updateProject({ root, kitRoot = KIT_ROOT, ...options }) {
   return applyModules({ root, kitRoot, modules: enabledModules(manifest), mode: 'update', ...options });
 }
 
-// `yaw init --answers <file> --yes` (Y-2.10): core only, no interview.
-export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, modules = ['core'], ...options }) {
-  if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
-  const source = resolve(answersFile);
-  let text;
-  try {
-    text = readFileSync(source);
-  } catch (e) {
-    throw new ProjectError(`cannot read ${answersFile}: ${e.code ?? e.message}`);
+// Choose the modules a mode starts with: every module the kit has whose default for the mode is true or
+// whose facts condition matches (doc 04 §1). `appliesTo` hides a module whose facts do not match.
+export function selectModules({ kitRoot = KIT_ROOT, mode, facts = {} }) {
+  const dir = join(kitRoot, 'modules');
+  const names = existsSync(dir) ? readdirSync(dir).filter((n) => hasModule(kitRoot, n)).sort() : [];
+  const chosen = [];
+  for (const name of names) {
+    const def = loadModule(kitRoot, name);
+    if (def.appliesTo && matchFacts(def.appliesTo, facts).mismatched > 0) continue;
+    const d = def.default[mode];
+    if (d === true || (d && typeof d === 'object' && matchFacts(d, facts).mismatched === 0 && matchFacts(d, facts).matched > 0)) chosen.push(name);
   }
-  const answersDoc = parseAnswers(text.toString('utf8'), answersFile);
-  const agents = answersDoc.answers['user.agents'];
-  if (!agents) throw new ProjectError(`${answersFile}: answers need user.agents`);
-  if (!answersDoc.proposal?.profiles) throw new ProjectError(`${answersFile}: answers need proposal.profiles`);
+  // core first: it owns the shared files
+  return chosen.includes('core') ? ['core', ...chosen.filter((n) => n !== 'core')] : chosen;
+}
 
-  const target = resolve(root, ANSWERS);
-  const sameFile = existsSync(target) && realpathSync(target) === realpathSync(source);
-  if (!sameFile && existsSync(target)) throw new ProjectError(`${ANSWERS} already exists; pass it with --answers ${ANSWERS}`);
+// Render what `yaw init` would write, without writing anything.
+// -> { desired: Map<path, { module, content, fragments, managed? }>, definitions, missingProfiles }
+export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
+  for (const m of modules) if (!hasModule(kitRoot, m)) throw new ProjectError(`module "${m}" does not exist in this kit`);
+  const profiles = answersDoc.proposal.profiles;
+  if (profiles.length > 1) throw new ProjectError(`several profiles (${profiles.join(', ')}) come with composition (Y-6.8); choose one`);
+  const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
+  const context = templateContext({ kitRoot, answersDoc, modules, definitions });
+  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null });
+  const desired = renderModules({ kitRoot, modules, context, definitions, profileOutput });
+  return { desired, definitions, missingProfiles: profileOutput.missing };
+}
+
+// `yaw init`: render, then write files, bases and the manifest. The answers come from a file
+// (`answersFile`, copied byte for byte, ADR-0019) or from the interview (`answers: { text, doc }`).
+export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answers, modules = ['core'], ...options }) {
+  if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
+  let text;
+  let answersDoc;
+  let sameFile = false;
+  if (answers) {
+    ({ text, doc: answersDoc } = answers);
+  } else {
+    const source = resolve(answersFile);
+    try {
+      text = readFileSync(source);
+    } catch (e) {
+      throw new ProjectError(`cannot read ${answersFile}: ${e.code ?? e.message}`);
+    }
+    answersDoc = parseAnswers(text.toString('utf8'), answersFile);
+    const target = resolve(root, ANSWERS);
+    sameFile = existsSync(target) && realpathSync(target) === realpathSync(source);
+    if (!sameFile && existsSync(target)) throw new ProjectError(`${ANSWERS} already exists; pass it with --answers ${ANSWERS}`);
+  }
+  const agents = answersDoc.answers['user.agents'];
+  const label = answersFile ?? 'the answers';
+  if (!agents) throw new ProjectError(`${label}: answers need user.agents`);
+  if (!answersDoc.proposal?.profiles) throw new ProjectError(`${label}: answers need proposal.profiles`);
 
   // Render first: a template error must not leave files behind.
-  for (const m of modules) if (!hasModule(kitRoot, m)) throw new ProjectError(`module "${m}" does not exist in this kit`);
-  const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
-  const context = templateContext({ kitRoot, answersDoc, modules });
-  const desired = renderModules({ kitRoot, modules, context, definitions });
+  const { desired, missingProfiles } = renderInit({ root, kitRoot, answersDoc, modules });
   const version = kitVersion(kitRoot);
 
   if (!sameFile) writeAtomic(root, ANSWERS, text);
@@ -127,7 +163,7 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, modul
     mcpServers: [],
     files: [...result.files, answersEntry],
   });
-  return { ...result, manifest };
+  return { ...result, manifest, missingProfiles };
 }
 
 // What `yaw remove <module>` would do; refuses when other modules depend on it.

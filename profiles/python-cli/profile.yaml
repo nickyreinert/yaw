@@ -1,0 +1,11 @@
+# profiles/python-cli/profile.yaml
+# Profile options (doc 05 §2, e.g. pyright or mypy) come with the full interview (step 7); step 3 renders pyright.
+name: python-cli
+summary: Python script, tool or data job; uv venv, no Docker.
+suggestWhen:
+  language: [python]
+  runsOn: [local]
+  hasUI: [false]
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [just, uv]

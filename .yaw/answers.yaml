@@ -1,0 +1,16 @@
+# .yaw/answers.yaml: this repo is set up with YAW itself (dogfooding, BUILD.md rule 9, BD7: profile node-cli).
+mode: quick
+answers:
+  user.agents: [claude, codex, copilot]
+  user.expertise: expert
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: YAW (Yet Another Wrapper), a project setup kit for coding agents; zero-dependency Node CLI.
+  idea.team: solo
+  arch.language: javascript
+  arch.runs-on: local
+proposal:
+  status: confirmed
+  summary: node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.
+  profiles: [node-cli]
+  modules: [core]

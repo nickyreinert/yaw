@@ -24,7 +24,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - uses: extractions/setup-just@v2
+      - uses: astral-sh/setup-uv@v5
       - run: node --version
+      - run: just --version && uv --version
       - run: npm test
       - run: npm run validate
 

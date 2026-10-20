@@ -2,7 +2,9 @@
 
 A module is a folder in `modules/` with a `module.yaml`. It owns its questions, templates, customisation (skills, agents, hooks), scripts, `just` recipes and tests. Enabling a module adds exactly these; removing it deletes exactly these.
 
-## 1. Catalogue and preset defaults
+## 1. Catalogue and mode defaults
+
+Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; ADR-0009 adds it to BD5); **Standard** = Quick + `git-hooks`, `github`, `ci`, `decisions`, `security` (minimal), `sessions`, `comfort` (hygiene + status line); **Full** = Standard + the F questions and team-mode options. Modules in the table that are in none of these lists (`quality-code`, `performance`, `business-logic`, `ui-design`, `privacy`, `backup`, `environments`, `vendors`, `knowledge`, `dashboard`, `evaluation`, `remote`) are phase 2 or 3.
 
 | Module | Purpose | Quick | Standard | Full | Depends |
 |---|---|:-:|:-:|:-:|---|
@@ -16,7 +18,7 @@ A module is a folder in `modules/` with a `module.yaml`. It owns its questions, 
 | `ci` | CI workflow running `just check`, PR template | – | ✔ | ✔ | github |
 | `decisions` | ADR + notice journal, local RAG, recall hook | – | ✔ | ✔ | core |
 | `quality-code` | Lint/type/test gates, `change-reviewer` subagent (phase 2; phase-1 gates come from the profiles) | – | ✔ | ✔ | standards |
-| `security` | `security-reviewer`, guard hooks, `just audit`, secret scan (phase 1: only `.env*`/secret read deny and destructive-command guard) | – | ✔ | ✔ | standards |
+| `security` | `security-reviewer`, guard hooks, `just audit`, secret scan (phase 1: only `.env*`/secret read deny and destructive-command guard) | ✔ (minimal) | ✔ | ✔ | standards |
 | `performance` | Budgets, Lighthouse/bench recipes, perf review checklist | – | – | ✔ | quality-code |
 | `business-logic` | Domain-rule checklist from interview 2.3, business notices, reviewer pass | – | ✔ | ✔ | decisions |
 | `ui-design` | Design direction, tokens, `just screenshot`, `visual-reviewer`, a11y | – | if UI | if UI | standards |
@@ -65,7 +67,7 @@ lastVerified: 2026-10-20
 
 Each output item (hook, skill, agent) can override `agents` and `tokenCost`. Full format: `core/schema/module.schema.json`, reference in `docs/spec/formats.md`. The form uses both: unsupported items are greyed out with the reason, and the live summary shows the expected per-turn token overhead of the selection.
 
-`AGENTS.md` is assembled from each enabled module's `agentsMd`, with a hard budget (target ≤ 80 lines). Detail goes into `docs/spec/` or the skill.
+`AGENTS.md` is assembled from the `core` frame and each enabled module's `agentsMd`, with a hard budget of 80 lines in every mode: rendering fails, naming the contributors, when it is exceeded (ADR-0009). Detail goes into `docs/spec/` or the skill.
 
 ## 3. Module notes
 

@@ -1,0 +1,9 @@
+# CI steps fragment: toolchain, then `just check` (same gate as local).
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: "22.13"
+  - uses: extractions/setup-just@v2
+  - run: just setup
+  - run: just check

@@ -52,21 +52,29 @@ test('unknown option and planned commands exit 1', () => {
   assert.equal(yaw(['update', '--strategy', 'yolo'], { cwd: tmp() }).status, 1);
 });
 
-test('init needs --answers and --yes until the interview exists (step 3)', () => {
-  const r = yaw(['init'], { cwd: tmp() });
+test('init without a terminal needs --answers; --answers without a terminal needs --yes', () => {
+  const dir = tmp();
+  const r = yaw(['init'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /yaw init --answers <file> --yes/);
+  assert.match(r.stderr, /no terminal for the interview: run yaw init --answers <file> --yes/);
+  const noYes = yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-')), '--skip-verify'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.equal(noYes.status, 1);
+  assert.match(noYes.stderr, /confirmation needed: run again with --yes/);
+  assert.deepEqual(readTree(dir), {});
 });
 
-test('init --answers --yes renders the core stub; a second init is refused', () => {
+test('init --answers --yes renders core and the profile; a second init is refused', () => {
   const dir = tmp('yaw-proj-');
   const answers = writeAnswers(tmp('yaw-ans-'));
-  const r = yaw(['init', '--answers', answers, '--yes'], { cwd: dir });
+  const r = yaw(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd: dir });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /added: AGENTS\.md/);
-  assert.deepEqual(Object.keys(readTree(dir)), ['.yaw/answers.yaml', '.yaw/base/AGENTS.md', '.yaw/manifest.json', 'AGENTS.md']);
+  assert.match(r.stdout, /verification skipped/);
+  assert.deepEqual(Object.keys(readTree(dir)).filter((p) => !p.startsWith('.yaw/base/')), [
+    '.gitignore', '.yaw/answers.yaml', '.yaw/manifest.json', 'AGENTS.md', 'CLAUDE.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js',
+  ]);
   assert.equal(readTree(dir)['.yaw/answers.yaml'], readFileSync(answers, 'utf8'));
-  const again = yaw(['init', '--answers', answers, '--yes'], { cwd: dir });
+  const again = yaw(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd: dir });
   assert.equal(again.status, 1);
   assert.match(again.stderr, /already exists; use yaw update/);
 });
@@ -74,7 +82,7 @@ test('init --answers --yes renders the core stub; a second init is refused', () 
 test('init rejects invalid answers with file and line', () => {
   const dir = tmp('yaw-proj-');
   const bad = writeAnswers(tmp('yaw-ans-'), 'mode: quick\nanswers:\n  user.agents: [claude]\n  user.api-token: x\n');
-  const r = yaw(['init', '--answers', bad, '--yes'], { cwd: dir });
+  const r = yaw(['init', '--answers', bad, '--yes', '--skip-verify'], { cwd: dir });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /answers\.yaml:4: /);
   assert.deepEqual(readTree(dir), {});
@@ -82,7 +90,7 @@ test('init rejects invalid answers with file and line', () => {
 
 test('update without a terminal behaves like --yes and says so', () => {
   const dir = tmp('yaw-proj-');
-  yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-')), '--yes'], { cwd: dir });
+  yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-')), '--yes', '--skip-verify'], { cwd: dir });
   const r = yaw(['update'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /no terminal: edited files are kept \(same as --yes\)/);
@@ -91,11 +99,11 @@ test('update without a terminal behaves like --yes and says so', () => {
 
 test('status prints the module and file table', () => {
   const dir = tmp('yaw-proj-');
-  yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-')), '--yes'], { cwd: dir });
+  yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-')), '--yes', '--skip-verify'], { cwd: dir });
   const r = yaw(['status'], { cwd: dir });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, new RegExp(`kit: project pinned to ${VERSION.replace(/\./g, '\\.')}, installed`));
-  assert.match(r.stdout, /^ {2}core +2 files$/m);
+  assert.match(r.stdout, /^ {2}core +9 files$/m);
   assert.match(r.stdout, /^ {2}AGENTS\.md +core +unedited$/m);
   assert.match(r.stdout, /^ {2}\.yaw\/answers\.yaml +core +owned$/m);
   assert.equal(yaw(['status'], { cwd: tmp() }).status, 1);

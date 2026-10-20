@@ -58,8 +58,8 @@ export function mergeFile(current, base, next, { label = 'kit' } = {}) {
   }
 }
 
-function entryFor(path, d) {
-  return { path, module: d.module, hash: hashContent(d.content), managed: true, fragments: d.fragments ?? [] };
+function entryFor(path, d, content = d.content) {
+  return { path, module: d.module, hash: hashContent(content), managed: d.managed ?? true, fragments: d.fragments ?? [] };
 }
 
 // options:
@@ -112,6 +112,17 @@ export async function reconcile(root, entries, desired, options = {}) {
     // New output, not in the manifest yet.
     if (!e) {
       const next = d.content;
+      if (d.managed === false) {
+        // User-owned from the start (scaffold): written once, no base copy, never overwritten.
+        if (current === null) {
+          writeAtomic(root, path, next);
+          note(path, 'added');
+        } else {
+          note(path, 'kept', { reason: 'existing file' });
+        }
+        files.push(entryFor(path, d, current === null ? next : current));
+        continue;
+      }
       if (current === null) {
         writeWithBase(path, next);
         files.push(entryFor(path, d));

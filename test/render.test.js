@@ -181,13 +181,16 @@ test('init records every written file with its SHA-256 and a pristine base copy'
   const root = tmp('yaw-proj-');
   await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-ans-')) });
   const manifest = readManifest(root);
-  assert.deepEqual(manifest.files.map((f) => f.path), ['.yaw/answers.yaml', 'AGENTS.md']);
+  assert.deepEqual(manifest.files.map((f) => f.path), ['.gitignore', '.yaw/answers.yaml', 'AGENTS.md', 'CLAUDE.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js']);
   for (const f of manifest.files) {
     assert.equal(hashContent(read(root, f.path)), f.hash, f.path);
     if (f.managed) assert.equal(read(root, `.yaw/base/${f.path}`), read(root, f.path));
+    else assert.ok(!existsSync(join(root, `.yaw/base/${f.path}`)), `${f.path} is user code, no base copy`);
   }
   assert.equal(manifest.files.find((f) => f.path === '.yaw/answers.yaml').managed, false);
+  assert.deepEqual(manifest.files.filter((f) => !f.managed).map((f) => f.path), ['.yaw/answers.yaml', 'package.json', 'src/index.js', 'test/index.test.js']);
   assert.match(read(root, 'AGENTS.md'), /^# AGENTS\.md\n\nRules for coding agents in this project, written by YAW \(quick setup\)/);
   assert.match(read(root, 'AGENTS.md'), /<!-- yaw:core -->\n- Start every task/);
+  assert.equal(read(root, 'CLAUDE.md'), '@AGENTS.md\n');
   assert.ok(!existsSync(join(root, '.yaw/base/.yaw')));
 });

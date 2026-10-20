@@ -1,0 +1,82 @@
+# interview/base.yaml: questions every setup asks (doc 02 §3, doc 03, ADR-0017).
+# Step 3 holds the Quick subset (mode Q) that a built module or the profile suggestion uses.
+# Modules add theirs in module.yaml#questions; more questions of doc 03 follow with their modules (step 5, 7).
+questions:
+  - id: user.agents
+    ref: "0.0"
+    scope: user
+    mode: Q
+    type: multi
+    label: Which coding agents should this setup support? (comma-separated)
+    help: agents
+    choices:
+      - { value: claude, label: Claude Code }
+      - { value: codex, label: Codex }
+      - { value: copilot, label: Copilot }
+      - { value: gemini, label: Gemini CLI (enterprise / API key), phase: 3 }
+      - { value: antigravity, label: Antigravity CLI, phase: 3 }
+      - { value: pi, label: Pi, phase: 3 }
+      - { value: hermes, label: Hermes, phase: 3 }
+    default: [claude]
+  - id: user.expertise
+    ref: "0.1"
+    scope: user
+    mode: Q
+    type: choice
+    label: Your experience with software development?
+    choices: [layperson, intermediate, expert]
+    default: intermediate
+  - id: user.language
+    ref: "0.2"
+    scope: user
+    mode: Q
+    type: text
+    label: Language for chat with the agent?
+    hint: Two-letter code, e.g. de or en.
+    default: de
+  - id: user.autonomy
+    ref: "0.7"
+    scope: user
+    mode: Q
+    type: choice
+    label: How often should the agent ask before acting?
+    choices:
+      - { value: ask-often, label: Ask often }
+      - { value: ask-risky, label: Ask on risky or ambiguous steps }
+      - { value: act-and-report, label: Act and report }
+    default: ask-risky
+    agents:
+      claude:  { support: native, via: "permissions in .claude/settings.json" }
+      codex:   { support: fallback, via: AGENTS.md rule }
+      copilot: { support: fallback, via: AGENTS.md rule }
+  - id: idea.text
+    ref: "1.1"
+    mode: Q
+    type: text
+    label: Describe the idea in a few sentences.
+    help: idea
+    default: ""
+  - id: idea.team
+    ref: "1.5"
+    mode: Q
+    type: choice
+    label: Solo or team?
+    hint: Team mode makes issues and PRs mandatory (doc 14).
+    choices: [solo, team, external-reviewers]
+    default: solo
+  - id: arch.language
+    ref: "3.1"
+    mode: Q
+    type: choice
+    label: Preferred or required language? (auto = you choose)
+    help: stack
+    choices: [python, javascript, typescript, auto]
+    default: auto
+  - id: arch.runs-on
+    ref: "3.2"
+    mode: Q
+    type: choice
+    label: Where should it run?
+    help: stack
+    choices: [local, self-hosted, serverless, edge, app-store, auto]
+    default: auto

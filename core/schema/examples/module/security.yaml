@@ -2,7 +2,7 @@
 name: security
 description: Denies reading .env and secret files and guards destructive commands (rm -rf, force push, prod deploy).
 depends: [standards]
-default: { quick: false, standard: true, full: true }
+default: { quick: true, standard: true, full: true }
 outputs:
   hooks:
     - name: guard-secret-read

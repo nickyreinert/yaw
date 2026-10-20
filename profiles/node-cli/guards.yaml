@@ -1,0 +1,5 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: npm-publish, pattern: "\\bnpm\\s+publish\\b", reason: Publishing to the npm registry needs your approval. }
+  - { id: tag-push, pattern: "\\bgit\\s+push\\b.*(--tags|\\brefs/tags/|\\sv[0-9])", reason: Pushing a release tag needs your approval. }
