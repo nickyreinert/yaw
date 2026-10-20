@@ -1,0 +1,24 @@
+# modules/security/module.yaml (phase 1: minimal guards, BD6)
+name: security
+description: Denies reading .env and secret files and guards destructive commands (rm -rf, force push, prod deploy).
+depends: [standards]
+default: { quick: false, standard: true, full: true }
+outputs:
+  hooks:
+    - name: guard-secret-read
+      event: PreToolUse
+      matcher: Read|Edit|Grep|Bash
+      kind: guard
+    - name: guard-destructive
+      event: PreToolUse
+      matcher: Bash
+      kind: guard
+agentsMd: |
+  - Never read `.env*` or other secret files; ask the user to run the command instead.
+  - Destructive commands (rm -rf, force push, prod deploy) are blocked unless the user authorises them.
+agents:
+  claude:  { support: native, via: "PreToolUse permissionDecision deny + permissions.deny" }
+  codex:   { support: native, via: "PreToolUse, apply_patch included" }
+  copilot: { support: partial, via: preToolUse, note: "verify the deny shape with recorded fixtures (Y-4.5)" }
+tokenCost: none
+lastVerified: 2026-10-20

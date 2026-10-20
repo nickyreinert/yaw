@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hook-event.schema.json",
+  "title": "Normalised hook event",
+  "description": "Agent-independent record of one hook call (ADR-0018). Holds no prompt text, tool input or tool output. Mapping per agent: docs/spec/formats.md#normalised-hook-event.",
+  "type": "object",
+  "required": ["v", "agent", "event", "nativeEvent", "sessionId", "cwd", "modelId", "modelIdSource", "promptLength", "tool", "result", "timing"],
+  "properties": {
+    "v": { "const": 1 },
+    "agent": { "$ref": "common.schema.json#/$defs/agentId" },
+    "event": { "$ref": "#/$defs/event" },
+    "nativeEvent": { "description": "The agent's own event name, e.g. preToolUse.", "type": "string", "minLength": 1 },
+    "sessionId": { "description": "The agent's session id.", "type": "string", "minLength": 1 },
+    "cwd": { "type": ["string", "null"] },
+    "modelId": { "type": ["string", "null"] },
+    "modelIdSource": {
+      "description": "Where modelId came from; null when modelId is null.",
+      "enum": ["payload", "transcript", "otel", "settings", null]
+    },
+    "promptLength": {
+      "description": "Prompt length in Unicode code points (UserPromptSubmit only). The text itself is never stored.",
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tool": {
+      "description": "Tool events only: the tool name. Input and output are never stored.",
+      "type": ["object", "null"],
+      "required": ["name"],
+      "properties": { "name": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "result": {
+      "description": "ok/error: tool outcome (PostToolUse / PostToolUseFailure). allow/deny: YAW decision on PreToolUse. block: YAW kept the agent going on Stop. null: no outcome.",
+      "enum": ["ok", "error", "allow", "deny", "block", null]
+    },
+    "timing": {
+      "type": "object",
+      "required": ["ts", "hookMs"],
+      "properties": {
+        "ts": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "hookMs": { "description": "Run time of YAW's handlers in ms.", "type": ["number", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "event": {
+      "description": "Normalised event names (Claude Code names).",
+      "enum": ["SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "StopFailure", "SubagentStop", "Notification", "PreCompact"]
+    }
+  }
+}

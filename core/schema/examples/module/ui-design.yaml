@@ -1,0 +1,32 @@
+# The doc 04 §2 example (phase 2 module); questions are inline definitions (ADR-0017).
+name: ui-design
+description: Design direction, tokens, screenshots and visual review.
+appliesTo: { hasUI: true }            # hidden when the product has no UI
+depends: [standards]
+default: { quick: false, standard: { hasUI: true }, full: { hasUI: true } }
+questions:
+  - id: ui.direction
+    ref: "6.1"
+    mode: Q
+    type: choice
+    label: Pick a design direction
+    help: design-direction
+    choices: [surprise-me]
+    default: surprise-me
+outputs:
+  templates: [design/direction.md, design/tokens.json]
+  skills: [design-direction, visual-review]
+  agents: [visual-reviewer]
+  hooks: []
+  just: just/ui.just
+  gates: [screenshot, a11y]
+agentsMd: |                            # ≤ 5 lines injected into AGENTS.md
+  - UI work follows `design/direction.md` and `design/tokens.json`; never invent colours or fonts.
+  - After UI changes run `just screenshot` and use `visual-review` before reporting done.
+agents:                                # compatibility attribute, see doc 09 §3
+  claude:  { support: native }
+  codex:   { support: native }
+  gemini:  { support: partial, note: "no subagent for visual review; runs as skill" }
+  copilot: { support: partial, note: "custom agent instead of subagent" }
+tokenCost: low                         # model tokens added per turn: none | low | medium
+lastVerified: 2026-10-20

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "github.schema.json",
+  "title": ".yaw/github.yaml",
+  "description": "GitHub settings: labels and rules (user-edited, BD2) and project/field IDs (filled in by yaw gh setup, doc 14 §1). IDs are not secrets; tokens never go here.",
+  "type": "object",
+  "required": ["repo"],
+  "properties": {
+    "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "defaultBranch": { "type": "string", "minLength": 1 },
+    "issueTypes": { "description": "native: GitHub issue types (org); labels: type:* labels.", "enum": ["native", "labels"] },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "color"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "color": { "type": "string", "pattern": "^[0-9a-fA-F]{6}$" },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["number"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "fields": {
+          "description": "Field name -> field ID and option IDs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "options": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "requireIssue": { "description": "No change and no PR without an issue (team mode).", "type": "boolean" },
+        "branchPattern": { "type": "string", "minLength": 1 },
+        "approvals": { "type": "integer", "minimum": 0 },
+        "requiredChecks": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "linearHistory": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

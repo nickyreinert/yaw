@@ -1,0 +1,17 @@
+# modules/core/module.yaml
+name: core
+description: AGENTS.md, CLAUDE.md, justfile and the manifest.
+depends: []
+default: { quick: true, standard: true, full: true }
+questions: []
+outputs:
+  templates: [AGENTS.md, CLAUDE.md, justfile]
+agentsMd: |
+  - Start every task by reading `TASKS.md` (if present) and running decision retrieval (if enabled).
+  - Run `just check` before you report a task as done.
+agents:
+  claude:  { support: native, via: "CLAUDE.md imports AGENTS.md" }
+  codex:   { support: native, via: AGENTS.md }
+  copilot: { support: native, via: AGENTS.md }
+tokenCost: low
+lastVerified: 2026-10-20

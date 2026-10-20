@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "user-profile.schema.json",
+  "title": "~/.yaw/user-profile.yaml",
+  "description": "Global answers to interview section 0 (doc 02 §5, doc 03 §0), keyed by question id. Written only after the user opts in.",
+  "type": "object",
+  "required": ["answers"],
+  "properties": {
+    "answers": {
+      "type": "object",
+      "properties": {
+        "user.agents": { "$ref": "common.schema.json#/$defs/agentSelection" },
+        "user.expertise": { "enum": ["layperson", "intermediate", "expert"] },
+        "user.language": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+        "user.length": { "enum": ["brief", "balanced", "extensive"] },
+        "user.register": { "enum": ["plain", "professional", "technical", "scientific"] },
+        "user.examples": { "enum": ["when-helpful", "always", "never"] },
+        "user.explain": { "enum": ["one-line", "short-paragraph", "on-request"] },
+        "user.autonomy": { "enum": ["ask-often", "ask-risky", "act-and-report"] },
+        "user.comfort": {
+          "type": "array",
+          "items": { "enum": ["hygiene", "status-line", "notifications", "cache-reminder"] },
+          "uniqueItems": true
+        },
+        "user.knowledge": { "type": "boolean" },
+        "user.knowledge-path": { "type": "string", "minLength": 1 },
+        "user.evaluation": {
+          "description": "Empty list = evaluation off.",
+          "type": "array",
+          "items": { "enum": ["implicit", "laya", "watersheep", "kev", "semif", "ollama", "jev", "self-report"] },
+          "uniqueItems": true
+        },
+        "user.dashboard": { "type": "boolean" },
+        "user.remote": { "enum": ["none", "yaw-tg", "yaw-tg-remote-control"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

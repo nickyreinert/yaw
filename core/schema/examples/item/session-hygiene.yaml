@@ -1,0 +1,10 @@
+# modules/comfort/items/session-hygiene.yaml (doc 09 §3)
+id: session-hygiene
+title: Session hygiene hints
+tokenCost: none            # none | low | medium: model tokens consumed per turn
+agents:
+  claude:  { support: native,   via: "UserPromptSubmit + systemMessage" }
+  codex:   { support: native,   via: "UserPromptSubmit + systemMessage" }
+  gemini:  { support: partial,  via: "BeforeAgent", note: "no user-only message; verify" }
+  copilot: { support: fallback, via: "yaw hygiene (manual)" }
+lastVerified: 2026-10-20

@@ -1,0 +1,24 @@
+# .yaw/github.yaml: labels and rules are yours to edit; project IDs are filled in by yaw gh setup
+repo: example-user/shopping-list
+defaultBranch: main
+issueTypes: labels
+labels:
+  - { name: "type:feature", color: a2eeef, description: New functionality }
+  - { name: "type:bug", color: d73a4a, description: Something is broken }
+  - { name: "priority:P0", color: b60205 }
+project:
+  number: 3
+  id: PVT_example0001
+  fields:
+    Status:
+      id: PVTSSF_example0002
+      options: { Todo: opt_todo, In progress: opt_doing, In review: opt_review, Done: opt_done }
+    Priority:
+      id: PVTSSF_example0003
+      options: { P0: opt_p0, P1: opt_p1, P2: opt_p2, P3: opt_p3 }
+rules:
+  requireIssue: true
+  branchPattern: "<type>/<issue>-<slug>"
+  approvals: 1
+  requiredChecks: [quality-gate, pr-policy]
+  linearHistory: false

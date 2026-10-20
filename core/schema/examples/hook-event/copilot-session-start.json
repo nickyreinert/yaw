@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "agent": "copilot",
+  "event": "SessionStart",
+  "nativeEvent": "sessionStart",
+  "sessionId": "copilot-example-session-3",
+  "cwd": "/home/user/projects/shopping-list",
+  "modelId": null,
+  "modelIdSource": null,
+  "promptLength": null,
+  "tool": null,
+  "result": null,
+  "timing": { "ts": "2026-10-20T11:30:00+02:00", "hookMs": null }
+}

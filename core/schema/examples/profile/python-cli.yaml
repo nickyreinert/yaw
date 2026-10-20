@@ -1,0 +1,12 @@
+# profiles/python-cli/profile.yaml
+name: python-cli
+summary: Python script, tool or data job; uv venv, no Docker.
+suggestWhen:
+  language: [python]
+  runsOn: [local]
+  hasUI: [false]
+options:
+  typeChecker: { choices: [pyright, mypy], default: pyright }
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [just, uv]

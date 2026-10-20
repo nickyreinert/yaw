@@ -40,7 +40,10 @@ name: ui-design
 description: Design direction, tokens, screenshots and visual review.
 appliesTo: { hasUI: true }            # hidden when the product has no UI
 depends: [standards]
-questions: [ui.direction, ui.brand, ui.theme, ui.density, ui.a11y]
+default: { quick: false, standard: { hasUI: true }, full: { hasUI: true } }   # per mode: true | false | ask | facts
+questions:                             # inline, same format as interview/base.yaml (ADR-0017)
+  - { id: ui.direction, ref: "6.1", mode: Q, type: choice, label: Pick a design direction, choices: [surprise-me], default: surprise-me }
+  # ui.brand, ui.theme, ui.density, ui.a11y follow the same shape
 outputs:
   templates: [design/direction.md, design/tokens.json]
   skills: [design-direction, visual-review]
@@ -60,7 +63,7 @@ tokenCost: low                         # model tokens added per turn: none | low
 lastVerified: 2026-10-20
 ```
 
-Each output item (hook, skill, agent) can override `agents` and `tokenCost`. The form uses both: unsupported items are greyed out with the reason, and the live summary shows the expected per-turn token overhead of the selection.
+Each output item (hook, skill, agent) can override `agents` and `tokenCost`. Full format: `core/schema/module.schema.json`, reference in `docs/spec/formats.md`. The form uses both: unsupported items are greyed out with the reason, and the live summary shows the expected per-turn token overhead of the selection.
 
 `AGENTS.md` is assembled from each enabled module's `agentsMd`, with a hard budget (target ≤ 80 lines). Detail goes into `docs/spec/` or the skill.
 

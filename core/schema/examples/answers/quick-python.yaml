@@ -1,0 +1,21 @@
+# .yaw/answers.yaml: interview answers (no secrets, user-editable)
+mode: quick
+answers:
+  user.agents: [claude]
+  idea.text: |
+    A small command-line tool that renames photos by their EXIF date.
+  idea.audience: me
+  idea.team: solo
+  arch.runs-on: local
+  tasks.mode: local
+proposal:
+  status: confirmed
+  summary: Single Python CLI managed with uv; tasks stay local.
+  profiles: [python-cli]
+  modules: [core, communication, standards, devenv, tasks]
+  shape: single CLI
+  data: none
+  hosting: none
+  rejected:
+    - { option: node-cli, reason: The user prefers Python. }
+    - { option: python-web, reason: No UI or server is needed. }

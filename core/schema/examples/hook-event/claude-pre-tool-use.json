@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "agent": "claude",
+  "event": "PreToolUse",
+  "nativeEvent": "PreToolUse",
+  "sessionId": "5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001",
+  "cwd": "/home/user/projects/my-tool",
+  "modelId": null,
+  "modelIdSource": null,
+  "promptLength": null,
+  "tool": { "name": "Bash" },
+  "result": "deny",
+  "timing": { "ts": "2026-10-20T09:15:02.120Z", "hookMs": 41 }
+}

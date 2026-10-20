@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "preset.schema.json",
+  "title": "~/.yaw/presets/<name>.yaml",
+  "description": "Saved setup: answers only, never secrets, never generated files (doc 02 §5).",
+  "type": "object",
+  "required": ["name", "answers"],
+  "properties": {
+    "name": { "description": "Same as the file name without .yaml.", "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "description": { "type": "string", "minLength": 1 },
+    "created": { "$ref": "common.schema.json#/$defs/date" },
+    "source": { "description": "Project path, for snapshots of a past project.", "type": "string", "minLength": 1 },
+    "mode": { "$ref": "common.schema.json#/$defs/mode" },
+    "answers": {
+      "$ref": "common.schema.json#/$defs/answerMap",
+      "properties": {
+        "user.agents": { "$ref": "common.schema.json#/$defs/agentSelection" },
+        "tasks.mode": { "enum": ["local", "github", "both"] }
+      }
+    }
+  },
+  "additionalProperties": false
+}

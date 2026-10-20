@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "agent": "codex",
+  "event": "UserPromptSubmit",
+  "nativeEvent": "UserPromptSubmit",
+  "sessionId": "019a0000-0000-7000-8000-000000000002",
+  "cwd": "/home/user/projects/shopping-list",
+  "modelId": "example-codex-model",
+  "modelIdSource": "payload",
+  "promptLength": 182,
+  "tool": null,
+  "result": null,
+  "timing": { "ts": "2026-10-20T10:02:44Z", "hookMs": 12.5 }
+}

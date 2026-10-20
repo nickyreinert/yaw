@@ -1,0 +1,16 @@
+# ~/.yaw/user-profile.yaml: global answers (interview section 0), stored only after opt-in
+answers:
+  user.agents: [claude, codex]
+  user.expertise: expert
+  user.language: de
+  user.length: brief
+  user.register: technical
+  user.examples: when-helpful
+  user.explain: one-line
+  user.autonomy: ask-risky
+  user.comfort: [hygiene, status-line]
+  user.knowledge: true
+  user.knowledge-path: ~/.yaw/knowledge
+  user.evaluation: [implicit]
+  user.dashboard: true
+  user.remote: none

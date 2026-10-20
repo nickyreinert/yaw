@@ -1,0 +1,10 @@
+# .yaw/answers.yaml before the PROPOSE step: no proposal yet.
+mode: standard
+answers:
+  user.agents: [claude, codex, copilot]
+  idea.text: Shared shopping list web app for a sports club.
+  idea.audience: group
+  idea.team: team
+  team.approvals: 1
+  arch.runs-on: auto
+  tasks.mode: github
