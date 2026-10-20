@@ -134,22 +134,22 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0001 | YAML for human-edited files, JSON for kit-written files; strict subset parser + emitter; block scalars; YAML 1.2 core typing; comments dropped on rewrite with header comment; `github.yaml` / `taxonomy.json` exceptions | F1–F4 | Step 1 | **Decided** (BD1, BD2); written, Proposed (PR #87) |
 | 0002 | Template engine: plain JS template functions vs. tiny built-in renderer | B Step 1 | Step 1 | Proposed (PR #87): tiny `<% %>` renderer |
 | 0003 | Hash/merge strategy for `yaw update`: SHA-256, base store, `git merge-file`, keep/take/merge UX, `managed:false` | U2, U3 | Step 1 | Proposed (PR #87): `.yaw/base/` + `git merge-file` |
-| 0004 | Shared-file composition and fragment ownership; just `import` vs. `mod`; `core` removability | U1, U6, M6 | Step 2 | Written, Proposed (Step 2 PR) |
+| 0004 | Shared-file composition and fragment ownership; just `import` vs. `mod`; `core` removability | U1, U6, M6 | Step 2 | Written, Proposed (PR #89) |
 | 0005 | JSON Schema subset and validator | S7 | Step 1 | Proposed (PR #87) |
-| 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Written, Proposed (Step 2 PR); CI part **decided** (BD10) |
+| 0006 | Kit resolution, hook shim, versioning: shim location/format, fail-open, PATH independence, local pinned vs. global kit, pre-tag install; CI installs pinned tag | U4, H7, S4 | Step 2 | Written, Proposed (PR #89); CI part **decided** (BD10) |
 | 0007 | Hook output policy (token-free) | H1 | Step 4 | **Decided** (BD9); write up |
-| 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (Step 2 PR) |
+| 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (PR #89) |
 | 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15 | Step 3 | Partly decided (BD5, BD6) |
 | 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only | M4, M5, M11, M13 | Step 5.3 | Partly decided (BD4) |
 | 0011 | Shared retrieval engine in `core/lib/` + Unicode-aware tokenizer | M1, M2 | Step 5.6 | Proposed |
 | 0012 | Skill distribution to Claude: generated copies vs. symlinks; drift check | H5 | Step 4 | Proposed |
 | 0013 | Personal vs. committed configuration; hygiene opt-out | M7, M14 | Step 5.1 | Proposed |
-| 0014 | Kit repo and test layout (supersedes 0016 when accepted) | S5 | Step 2 | Written, Proposed (Step 2 PR) |
+| 0014 | Kit repo and test layout (supersedes 0016 when accepted) | S5 | Step 2 | Written, Proposed (PR #89) |
 | 0015 | Phase-1 scope: `yaw.db` registry-only, `release-plan.yaml` + evaluation deferred, `pr-policy` open-issue check only, minimal `security` in, `quality-code` out, Gemini CLI phase 3, `node-cli` profile | F11, M9, P5, P6, H3, H6 | Step 1 | **Decided** (BD3, BD6, BD7, BD8); written, Proposed (PR #87) |
 | 0016 | Step 1 code, schema and test layout (interim until ADR-0014) | S5 (part) | Step 1 | Proposed (PR #87) |
 | 0017 | Format conventions: names, agent keys, facts vocabulary, question IDs, answers by ID, manifest fields | F6, F7, F8, F10 | Step 1 | Proposed (PR #87) |
 | 0018 | Normalised hook event (no content) and session registry in `yaw.db` | H8, H10 | Step 1 | Proposed (PR #87) |
-| 0019 | Phase-1 CLI surface and step-2 command behaviour (flags, non-TTY rules, remove of edited files, minimal `init`, renderer details) | S2, S3 | Step 2 | Written, Proposed (Step 2 PR) |
+| 0019 | Phase-1 CLI surface and step-2 command behaviour (flags, non-TTY rules, remove of edited files, minimal `init`, renderer details) | S2, S3 | Step 2 | Written, Proposed (PR #89) |
 
 ---
 
@@ -194,19 +194,21 @@ Status: **implemented, awaiting the user's ADR review** (PR #87). All 24 example
 
 ### Step 2 — Kit skeleton, install, update
 
+Status: **implemented, awaiting the user's ADR review and a green kit-ci run** (PR #89). Done-when met locally: install → init (core only) → update → remove passes in `test/install.test.js` (temp HOME and project); `install.sh` second run changes nothing; `shellcheck install.sh` clean (0.10.0). `npm test` 215/215 on Node 22.13.0 and 24.22.0 (macOS). Open: ADRs 0004, 0006, 0008, 0014, 0019 accepted (Y-2.1); kit-ci on GitHub incl. the container job (Y-2.2, Y-2.3).
+
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
 | Y-2 | Step 2: kit skeleton, install, update | Epic | P0 | Y-1 | install → init (empty) → update → remove passes in a temp-dir test; `install.sh` idempotent and `shellcheck`-clean |
-| Y-2.1 | ADRs 0004, 0006, 0008, 0014 | Chore | P0 | Y-1 | Accepted; 0008 records BD11 |
-| Y-2.2 | Kit repo layout + test runner + kit CI | Chore | P0 | Y-2.1 | Layout per D01 §2 (adjusted by ADR-0014); `node --test` on Node 22 + 24 and `shellcheck` in CI; macOS + Linux runners |
-| Y-2.3 | `install.sh` | Feature | P0 | Y-2.2 | Checks git/node (≥ 22.13)/just, prints install hints, never installs; clones or fetches into `~/.yaw/kit`; `--tag <kit>` (BD10) and `--channel main`; links into `~/.local/bin` or prints a PATH line; no `sudo`; second run is a no-op; tested in a container |
-| Y-2.4 | CLI entry (`bin/yaw`), arg parsing, `--version`, help | Feature | P0 | Y-2.2 | `parseArgs`-based; unknown command exits 1 with usage; phase-1 command list fixed (S2) |
-| Y-2.5 | Render engine + manifest writer | Feature | P0 | Y-1.4, Y-1.6, Y-2.1 | Atomic writes; rejects paths escaping the project (traversal tests); every written file recorded with SHA-256 |
-| Y-2.6 | `yaw update` keep/take/merge | Feature | P0 | Y-1.5, Y-2.5 | Unedited files updated silently; edited files show a diff and offer keep/take/merge; conflicts left marked and reported; non-interactive flag documented |
-| Y-2.7 | `yaw remove <module>` | Feature | P0 | Y-2.5 | Deletes exactly the module's files/fragments after confirmation, unregisters its hooks, updates the manifest; test proves zero residue |
-| Y-2.8 | `yaw self-update` + `self-uninstall` | Feature | P1 | Y-2.3 | Shows the changelog and switches the tag; uninstall removes kit and shim only, prints what remains |
-| Y-2.9 | `yaw doctor` + `yaw status` | Feature | P1 | Y-2.5 | Doctor checks kit version vs. manifest pin, manifest consistency, shim reachability, Node ≥ 22.13, `just --list`; status prints the module/file table |
-| Y-2.10 | Minimal `yaw init --answers --yes` (core only) | Feature | P0 | Y-2.5 | Renders the `core` stub from an answers file; used by the Y-2 end-to-end test |
+| Y-2.1 | ADRs 0004, 0006, 0008, 0014 (written + ADR-0019; awaiting acceptance) | Chore | P0 | Y-1 | Accepted; 0008 records BD11 |
+| Y-2.2 | Kit repo layout + test runner + kit CI (written; CI run pending) | Chore | P0 | Y-2.1 | Layout per D01 §2 (adjusted by ADR-0014); `node --test` on Node 22 + 24 and `shellcheck` in CI; macOS + Linux runners |
+| Y-2.3 | `install.sh` (done locally; container job pending in CI) | Feature | P0 | Y-2.2 | Checks git/node (≥ 22.13)/just, prints install hints, never installs; clones or fetches into `~/.yaw/kit`; `--tag <kit>` (BD10) and `--channel main`; links into `~/.local/bin` or prints a PATH line; no `sudo`; second run is a no-op; tested in a container |
+| Y-2.4 | CLI entry (`bin/yaw`), arg parsing, `--version`, help (**done**) | Feature | P0 | Y-2.2 | `parseArgs`-based; unknown command exits 1 with usage; phase-1 command list fixed (S2) |
+| Y-2.5 | Render engine + manifest writer (**done**) | Feature | P0 | Y-1.4, Y-1.6, Y-2.1 | Atomic writes; rejects paths escaping the project (traversal tests); every written file recorded with SHA-256 |
+| Y-2.6 | `yaw update` keep/take/merge (**done**) | Feature | P0 | Y-1.5, Y-2.5 | Unedited files updated silently; edited files show a diff and offer keep/take/merge; conflicts left marked and reported; non-interactive flag documented |
+| Y-2.7 | `yaw remove <module>` (**done**) | Feature | P0 | Y-2.5 | Deletes exactly the module's files/fragments after confirmation, unregisters its hooks, updates the manifest; test proves zero residue |
+| Y-2.8 | `yaw self-update` + `self-uninstall` (**done**) | Feature | P1 | Y-2.3 | Shows the changelog and switches the tag; uninstall removes kit and shim only, prints what remains |
+| Y-2.9 | `yaw doctor` + `yaw status` (**done**) | Feature | P1 | Y-2.5 | Doctor checks kit version vs. manifest pin, manifest consistency, shim reachability, Node ≥ 22.13, `just --list`; status prints the module/file table |
+| Y-2.10 | Minimal `yaw init --answers --yes` (core only) (**done**) | Feature | P0 | Y-2.5 | Renders the `core` stub from an answers file; used by the Y-2 end-to-end test |
 
 ### Step 3 — First vertical slice (`yaw init`, CLI lane, Quick with `core` only, two profiles)
 
