@@ -1,6 +1,6 @@
 # ADR-0009: Terminology and preset contents (Quick / Standard / Full)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #31 (Y-3.1); implemented in #32 – #37
 - Resolves: P1, P2, P3, P6, P9, M15, M16 (`docs/build/plan.md` §1.3, §1.5)
