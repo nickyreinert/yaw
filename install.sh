@@ -92,7 +92,7 @@ if [ -d "$KIT/.git" ]; then
 elif [ -e "$KIT" ]; then
   fail "$KIT exists but is not a git checkout; move it away and run install.sh again"
 else
-  git clone --quiet "$REPO" "$KIT"
+  git clone --quiet -- "$REPO" "$KIT"
   fetched="cloned"
 fi
 if [ -n "$(git -C "$KIT" status --porcelain)" ]; then
