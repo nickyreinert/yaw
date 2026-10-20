@@ -1,6 +1,6 @@
 # YAW — Phase 1 Build Plan (Step 0 output)
 
-Status: **approved (2026-10-20).** BD1–BD12 applied to this plan and to the concept docs (Y-0.1 done). Open: Y-0.2 repository bootstrap (needs `github.com/nickyreinert/yaw`, BD12).
+Status: **approved (2026-10-20).** BD1–BD12 applied to this plan and to the concept docs (Y-0.1 done). Y-0.2 repository bootstrap **done**: private repo `github.com/nickyreinert/yaw`; labels (incl. `later`), 10 milestones (one per step) and 85 issues (10 epics, 75 sub-issues) created idempotently with `gh`. Docs pushed to `main` (`ab8de70`; its commit message wrongly says "empty root commit").
 
 Sources read: `BUILD.md`, `KICK-OFF.md`, `kickoff/01`–`14`, `kickoff/reference/governance-blueprint.md`.
 
