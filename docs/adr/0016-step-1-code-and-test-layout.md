@@ -1,6 +1,6 @@
 # ADR-0016: Code, schema and test layout for step 1 (interim)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #4 (Y-1)
 - Resolves: S5 for the parts step 1 needs (`docs/build/plan.md` §1.6); ADR-0014 (step 2) decides the full kit layout and may supersede this ADR

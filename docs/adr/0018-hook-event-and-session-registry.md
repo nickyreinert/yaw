@@ -1,6 +1,6 @@
 # ADR-0018: Normalised hook event and session registry storage
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issues: #14 (Y-1.10), #18 (Y-1.14)
 - Resolves: H8 (draft), H10 (`docs/build/plan.md` §1.4); BD3, BD11
