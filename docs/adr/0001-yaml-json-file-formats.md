@@ -1,6 +1,6 @@
 # ADR-0001: YAML for human-edited files, JSON for kit-written files; strict YAML subset
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #5 (Y-1.1), implemented in #6 (Y-1.2)
 - Resolves: F1, F2, F3, F4 (`docs/build/plan.md` §1.1); binding decisions BD1, BD2

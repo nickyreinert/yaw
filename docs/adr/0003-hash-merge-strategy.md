@@ -1,6 +1,6 @@
 # ADR-0003: Hash and merge strategy for `yaw update`
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #9 (Y-1.5); implemented in Y-2.5 / Y-2.6 / Y-2.7
 - Resolves: U2, U3 (`docs/build/plan.md` §1.2)

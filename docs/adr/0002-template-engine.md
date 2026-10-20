@@ -1,6 +1,6 @@
 # ADR-0002: Template engine
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #8 (Y-1.4); implemented in Y-2.5 (render engine)
 - Resolves: `BUILD.md` step 1 "decide by ADR: template engine"

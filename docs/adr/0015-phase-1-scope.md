@@ -1,6 +1,6 @@
 # ADR-0015: Phase-1 scope
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #5 (Y-1.1)
 - Resolves: F11, M9, P5, P6 (partly), H3, H6 (`docs/build/plan.md` §1); binding decisions BD3, BD6, BD7, BD8

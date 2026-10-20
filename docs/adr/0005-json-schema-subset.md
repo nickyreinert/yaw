@@ -1,6 +1,6 @@
 # ADR-0005: JSON Schema subset and validator
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #7 (Y-1.3)
 - Resolves: S7, schema part (`docs/build/plan.md` §1.6)
