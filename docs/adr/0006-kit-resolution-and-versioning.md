@@ -1,6 +1,6 @@
 # ADR-0006: Kit resolution, hook shim, versioning, pre-tag install
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #20 (Y-2.1); implemented in #22 (Y-2.3), #27 (Y-2.8); hook shim in Y-4.2
 - Resolves: U4, H7, S4 (`docs/build/plan.md` §1.2, §1.4, §1.6); records BD10

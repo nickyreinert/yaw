@@ -1,6 +1,6 @@
 # ADR-0004: Shared-file composition and fragment ownership; just `import` vs. `mod`; `core` removability
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #20 (Y-2.1); implemented in #24 (Y-2.5) and #26 (Y-2.7)
 - Resolves: U1, U6, M6 (`docs/build/plan.md` §1.2, §1.5)
