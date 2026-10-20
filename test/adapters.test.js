@@ -76,16 +76,27 @@ test('yaw sync --check: passes when in sync, fails on an edited copy, a missing 
   unlinkSync(join(root, '.codex/hooks.json'));
   r = await yaw(['sync', '--check'], { cwd: root, kitRoot });
   assert.equal(r.code, 1);
-  assert.match(r.out, /^drift: \.claude\/skills\/greet\/SKILL\.md differs from its source$/m);
-  assert.match(r.out, /^drift: \.codex\/hooks\.json is missing$/m);
-  assert.match(r.out, /run yaw update/);
+  assert.match(r.out, /^drift: \.claude\/skills\/greet\/SKILL\.md was edited by hand; fix: git checkout -- \.claude\/skills\/greet\/SKILL\.md \(or delete it and run yaw update --restore \.claude\/skills\/greet\/SKILL\.md\)$/m);
+  assert.match(r.out, /^drift: \.codex\/hooks\.json is missing; fix: yaw update --restore \.codex\/hooks\.json$/m);
+  // the suggested fix works
+  unlinkSync(join(root, '.claude/skills/greet/SKILL.md'));
+  for (const p of ['.claude/skills/greet/SKILL.md', '.codex/hooks.json']) assert.equal((await yaw(['update', '--yes', '--restore', p], { cwd: root, kitRoot })).code, 0);
+  assert.equal((await yaw(['sync', '--check'], { cwd: root, kitRoot })).code, 0);
+
+  // a newer kit renders a different skill: yaw update brings the copies in line
+  const root3 = await makeProject({ kitRoot, agents: ['claude'], modules: ['core', 'helper'] });
+  writeFileSync(join(kitRoot, 'modules/helper/skills/greet/SKILL.md'), '---\nname: greet\ndescription: Say hello politely.\n---\nSay hello.\n');
+  r = await yaw(['sync', '--check'], { cwd: root3, kitRoot });
+  assert.match(r.out, /^drift: \.claude\/skills\/greet\/SKILL\.md differs from its source; fix: yaw update$/m);
+  assert.equal((await yaw(['update', '--yes'], { cwd: root3, kitRoot })).code, 0);
+  assert.equal((await yaw(['sync', '--check'], { cwd: root3, kitRoot })).code, 0);
 
   // a file the kit no longer renders (module dropped from the kit's outputs) is drift too
   const root2 = await makeProject({ kitRoot, agents: ['claude'], modules: ['core', 'helper'] });
   writeFileSync(join(kitRoot, 'modules/helper/module.yaml'), readFileSync(join(kitRoot, 'modules/helper/module.yaml'), 'utf8').replace('  skills: [greet]\n', ''));
   r = await yaw(['sync', '--check'], { cwd: root2, kitRoot });
   assert.equal(r.code, 1);
-  assert.match(r.out, /^drift: \.agents\/skills\/greet\/SKILL\.md is no longer rendered by any enabled module$/m);
+  assert.match(r.out, /^drift: \.agents\/skills\/greet\/SKILL\.md is no longer rendered by any enabled module; fix: yaw update$/m);
 
   // phase 1: --check only; outside a project: error
   assert.equal((await yaw(['sync'], { cwd: root, kitRoot })).code, 1);
@@ -115,7 +126,7 @@ test('just check runs sync-check: green in sync, red on drift, a note without th
   writeFileSync(join(root, '.claude/settings.json'), '{}\n');
   r = run('just', ['sync-check'], { cwd: root, env: { ...env, YAW_KIT: KIT_ROOT } });
   assert.equal(r.status, 1);
-  assert.match(r.stdout, /drift: \.claude\/settings\.json differs from its source/);
+  assert.match(r.stdout, /drift: \.claude\/settings\.json was edited by hand/);
 });
 
 test('yaw agents: matrix of the enabled modules for the selected agents, with notes', async () => {

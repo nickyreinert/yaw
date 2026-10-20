@@ -11,14 +11,20 @@ export function adapterDrift({ root, kitRoot }) {
   const manifest = requireManifest(root);
   const { desired } = renderProject({ root, kitRoot, manifest, modules: enabledModules(manifest) });
   const paths = new Set([...desired.keys(), ...manifest.files.map((f) => f.path)].filter(isAdapterPath));
+  const recorded = new Map(manifest.files.map((f) => [f.path, f.hash]));
   const drift = [];
   for (const path of [...paths].sort()) {
     const want = desired.get(path);
     const have = readProjectFile(root, path);
     if (!want) {
-      if (have !== null) drift.push({ path, problem: 'is no longer rendered by any enabled module' });
-    } else if (have === null) drift.push({ path, problem: 'is missing' });
-    else if (hashContent(have) !== hashContent(want.content)) drift.push({ path, problem: 'differs from its source' });
+      if (have !== null) drift.push({ path, problem: 'is no longer rendered by any enabled module', fix: 'yaw update' });
+    } else if (have === null) {
+      drift.push({ path, problem: 'is missing', fix: recorded.has(path) ? `yaw update --restore ${path}` : 'yaw update' });
+    } else if (hashContent(have) !== hashContent(want.content)) {
+      // the kit renders what the manifest recorded: the file was edited by hand (ADR-0003 keeps edits on update)
+      const handEdit = recorded.get(path) === hashContent(want.content);
+      drift.push({ path, problem: handEdit ? 'was edited by hand' : 'differs from its source', fix: handEdit ? `git checkout -- ${path} (or delete it and run yaw update --restore ${path})` : 'yaw update' });
+    }
   }
   return drift;
 }
@@ -31,7 +37,7 @@ export async function sync({ values, positionals, io }) {
     io.stdout.write('yaw sync --check: agent adapter files match their source\n');
     return 0;
   }
-  for (const d of drift) io.stdout.write(`drift: ${d.path} ${d.problem}\n`);
-  io.stdout.write('run yaw update to re-render them (personal Claude settings belong in .claude/settings.local.json)\n');
+  for (const d of drift) io.stdout.write(`drift: ${d.path} ${d.problem}; fix: ${d.fix}\n`);
+  io.stdout.write('adapter files are generated; personal Claude settings belong in .claude/settings.local.json\n');
   return 1;
 }
