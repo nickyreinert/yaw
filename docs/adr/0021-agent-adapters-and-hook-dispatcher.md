@@ -1,6 +1,6 @@
 # ADR-0021: Agent adapters and the hook dispatcher (Claude Code, Codex, Copilot)
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issues: #41 – #44 (Y-4.2 – Y-4.5), #46 (Y-4.7)
 - Resolves: H4, H7 (command strings), H8 (`docs/build/plan.md` §1.4); details of step 4 the docs leave open (B rule 10); extends ADR-0004, ADR-0006, ADR-0018

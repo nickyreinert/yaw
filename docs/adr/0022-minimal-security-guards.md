@@ -1,6 +1,6 @@
 # ADR-0022: Minimal `security` module: guard rules and their limits
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-20
 - Issue: #48 (Y-5.0)
 - Resolves: implementation details of BD6 (B rule 10); extends ADR-0020 (`guards.yaml` shape) and ADR-0009 (Quick footprint)
