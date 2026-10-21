@@ -74,11 +74,15 @@ const parse = (text) => JSON.parse(String(text));
 
 // Three reads at once; gh may be synchronous (tests) or return a promise (ghAsync).
 export async function fetchGitHub(gh) {
-  const [mine, reviews, authored] = await Promise.all([
+  // allSettled: every gh process has ended before this returns, also when one of them failed.
+  const results = await Promise.allSettled([
     ['issue', 'list', '--assignee', '@me', '--state', 'open', '--limit', '50', '--json', 'number,title,labels,milestone'],
     ['pr', 'list', '--search', 'review-requested:@me', '--state', 'open', '--limit', '20', '--json', 'number,title'],
     ['pr', 'list', '--author', '@me', '--state', 'open', '--limit', '20', '--json', 'number,title,reviewDecision,statusCheckRollup'],
   ].map((args) => Promise.resolve().then(() => gh(args)).then(parse)));
+  const failed = results.find((r) => r.status === 'rejected');
+  if (failed) throw failed.reason;
+  const [mine, reviews, authored] = results.map((r) => r.value);
   return digest({ mine, reviews, authored });
 }
 
