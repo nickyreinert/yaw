@@ -119,6 +119,53 @@ const AUTONOMY = {
   'act-and-report': 'Act, then report what you did and why.',
 };
 
+// Communication style lines, rendered from the user profile (answers user.length ... user.expertise).
+const STYLE = {
+  length: {
+    brief: 'Keep answers short and to the point.',
+    balanced: 'Give balanced answers: the result first, then the reasoning that matters.',
+    extensive: 'Give thorough answers with full detail.',
+  },
+  register: {
+    plain: 'Use plain words; avoid jargon.',
+    professional: 'Use a professional tone.',
+    technical: 'Use precise technical terms.',
+    scientific: 'Use scientific precision and name the basis for claims.',
+  },
+  examples: {
+    'when-helpful': 'Use examples or analogies when they help.',
+    always: 'Illustrate every explanation with an example or analogy.',
+    never: 'Do not use examples or analogies unless asked.',
+  },
+  explain: {
+    'one-line': 'Explain why you chose something in one line.',
+    'short-paragraph': 'Explain why you chose something in a short paragraph.',
+    'on-request': 'Explain your reasoning only when asked.',
+  },
+  expertise: {
+    layperson: 'The user is new to software development: explain terms and steps.',
+    intermediate: 'The user has intermediate development experience.',
+    expert: 'The user is an expert: skip the basics.',
+  },
+};
+const STYLE_DEFAULTS = { length: 'balanced', register: 'professional' };
+
+// ADR-0024: the stack overlay of the standards module (profiles/<p>/standards.md) has at most 20 lines.
+export const OVERLAY_MAX_LINES = 20;
+
+export function profileOverlay(kitRoot, profiles) {
+  const parts = [];
+  for (const p of profiles) {
+    const file = join(profileDir(kitRoot, p), 'standards.md');
+    if (!hasProfile(kitRoot, p) || !existsSync(file)) continue;
+    const text = readFileSync(file, 'utf8').trim();
+    const lines = text === '' ? 0 : text.split('\n').length;
+    if (lines > OVERLAY_MAX_LINES) throw new KitError(`${file}: ${lines} lines, the overlay is limited to ${OVERLAY_MAX_LINES}`);
+    if (text !== '') parts.push(text);
+  }
+  return parts.join('\n');
+}
+
 // One line of free text that is safe inside AGENTS.md (no markers, no line breaks).
 function oneLine(text) {
   return String(text ?? '').replace(/<!--|-->/g, ' ').replace(/\s+/g, ' ').trim();
@@ -149,7 +196,21 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
     stack,
-    rules: { autonomy: AUTONOMY[flat['user.autonomy']] ?? '' },
+    rules: {
+      autonomy: AUTONOMY[flat['user.autonomy']] ?? '',
+      length: STYLE.length[flat['user.length']] ?? '',
+      register: STYLE.register[flat['user.register']] ?? '',
+      examples: STYLE.examples[flat['user.examples']] ?? '',
+      explain: STYLE.explain[flat['user.explain']] ?? '',
+      expertise: STYLE.expertise[flat['user.expertise']] ?? '',
+    },
+    // ADR-0013: the user profile is personal; a team repository does not commit it.
+    team: (flat['idea.team'] ?? 'solo') !== 'solo',
+    // Output style: Claude only, and only when length or register differ from the default (doc 04).
+    outputStyle: (flat['user.agents'] ?? []).includes('claude')
+      && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
+        || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
+    profileStandards: profileOverlay(kitRoot, profiles),
   };
 }
 
@@ -234,6 +295,8 @@ export function renderModules({ kitRoot, modules, context, definitions, profileO
       const content = hasTmpl
         ? Buffer.from(render(readFileSync(tmpl, 'utf8'), context, { file: `modules/${name}/templates/${path}.tmpl` }), 'utf8')
         : readFileSync(plain);
+      // ADR-0024: a template that renders to nothing but whitespace produces no file and no part.
+      if (hasTmpl && content.toString('utf8').trim() === '') continue;
       if (SHARED_FILES[path]) {
         addPart(path, { module: name, kind: 'template', content });
       } else if (owned.has(path)) {

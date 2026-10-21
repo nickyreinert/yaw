@@ -1,0 +1,16 @@
+# Standards
+
+Baseline for every change and review. Written by YAW; edit freely.
+
+- **Clean code:** small focused units, clear names, no dead code, no speculative abstraction, comments only for what code cannot say, consistent error handling, no silent catches.
+- **Security:** validate at boundaries, parameterised queries, output encoding, least privilege, no secrets in code or logs, dependency hygiene, OWASP Top 10 awareness.
+- **Performance:** no N+1, bounded loops and queries, pagination, caching where measured, asset budgets.
+- **Testing:** tests for business rules and bug fixes, deterministic, no network in unit tests.
+- **Review:** findings with severity, location, impact and a concrete fix; behaviour over style; state what could not be verified.
+- **Git:** Conventional Commits, small PRs, no force-push to shared branches.
+<% if profileStandards %>
+
+## Stack notes (<%= stack %>)
+
+<%= profileStandards %>
+<% end %>

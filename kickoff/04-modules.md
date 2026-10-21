@@ -77,7 +77,7 @@ Each output item (hook, skill, agent) can override `agents` and `tokenCost`. Ful
 
 ### communication
 
-Renders the user profile into ≈ 6 lines (language, length, register, examples, explanation depth, autonomy). For Claude Code additionally an output style (`.claude/output-styles/<name>.md`) when verbosity or register differs from the default. Project-level language rules (code, commits, UI) go into the same section.
+Renders the user profile into ≈ 6 lines (language, length, register, examples, explanation depth, autonomy). For Claude Code additionally an output style (`.claude/output-styles/<name>.md`) when verbosity or register differs from the default. Project-level language rules (code, commits, UI) go into the same section. In team mode nothing personal is committed: the module writes no section and no output style (ADR-0013).
 
 ### standards (baseline, all projects)
 

@@ -1,0 +1,16 @@
+# modules/standards/module.yaml (Y-5.1, ADR-0024): baseline standards plus the stack overlay of the profile.
+name: standards
+description: Baseline coding, security, testing, review and git standards in docs/standards.md, plus the stack overlay from the profile.
+depends: [core]
+default: { quick: true, standard: true, full: true }
+questions: []
+outputs:
+  templates: [docs/standards.md]
+agentsMd: |
+  - Follow `docs/standards.md` (clean code, security, testing, review, git) and its stack notes.
+agents:
+  claude:  { support: native, via: "AGENTS.md rule + docs/standards.md" }
+  codex:   { support: native, via: "AGENTS.md rule + docs/standards.md" }
+  copilot: { support: native, via: "AGENTS.md rule + docs/standards.md" }
+tokenCost: low
+lastVerified: 2026-10-21
