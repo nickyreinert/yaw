@@ -4,7 +4,7 @@ Optional add-ons that make daily work smoother. Same rules as modules: opt-in, l
 
 | Feature | Value | Model tokens | Default | Phase |
 |---|---|---|---|---|
-| Session hygiene | Keeps context clean, cheaper and sharper answers | **none** (local script, user-only message) | on (Standard), personal, can be switched off (ADR-0013) | 1 |
+| Session hygiene | Keeps context clean, cheaper and sharper answers | **none** (local script, user-only message) | on (Full), personal, can be switched off (ADR-0013) | 1 |
 | Status line | Always-visible task, context size, cache warm/cold | **none** | on if Claude | 1 |
 | Notifications | Walk away safely, get pinged on "done" / "needs input" | **none** | off, asked | 1 |
 | Cache-warmth reminder | Avoid paying for a cold prompt cache after a break | **none** | off, asked | 2 |

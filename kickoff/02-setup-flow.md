@@ -32,13 +32,16 @@ The LLM only proposes. Collection and application are scripts, so the result is 
 
 | Mode | For | Asks | Typical output |
 |---|---|---|---|
-| **Quick** | "spin up a short Python project" | Idea, profile confirm, agents, and the Q questions of the enabled modules (ADR-0009) | `core` + one CLI profile: 10 files; complete Quick ≈ 12–16 |
-| **Standard** (default) | Most projects | Quick + one screen per enabled module | Core + chosen modules |
-| **Full** | Long-lived products, teams | Everything, including governance strictness, budgets, roles | Full scaffold |
+| **Quick** | Prototypes, MVPs, "spin up a short Python project": the essential baseline | Idea, profile confirm, agents, and the Q questions of the enabled modules (ADR-0009) | `core` + one CLI profile: 10 files; complete Quick ≈ 12–16 |
+| **Full** | Maintained products, teams | The Q, S and F questions of the enabled modules | Quick + the tooling that applies to the project (doc 04 §1, ADR-0032) |
 
-"Mode" (`quick`/`standard`/`full`, stored as `answers.yaml#mode` and `manifest.json#preset`) is not a "preset": a saved setup is called a preset only in `yaw presets` and `~/.yaw/presets/` (ADR-0009). Files are counted without the `.yaw/base/` copies. Phase-1 contents of the modes: doc 04 §1.
+There are two choices (ADR-0032). Standard is merged into Full; `standard` stays a valid value in existing answer files and manifests, with unchanged output, but is no longer offered. Doc 03 question 1.3 pre-selects the choice (prototype or MVP → Quick, long-lived product → Full; built in step 7).
 
-Mode changes how many questions are **shown**, never what is possible: every skipped question takes the documented default and is listed in the summary as "default". `yaw add <module>` later asks only that module's questions.
+"Mode" (`quick`/`full`, stored as `answers.yaml#mode` and `manifest.json#preset`) is not a "preset": a saved setup is called a preset only in `yaw presets` and `~/.yaw/presets/` (ADR-0009). Files are counted without the `.yaw/base/` copies. Phase-1 contents of the modes: doc 04 §1.
+
+**The mode controls the generated output**, not only the questions shown: Quick renders only its baseline modules; Full adds the modules that apply (for example `github` and `ci` only when the project uses GitHub). Every question a mode does not ask takes the documented default and is listed in the summary as "default".
+
+Quick is a baseline, not a limit: `yaw add <module>` later adds a module and asks only that module's questions (ADR-0023). The mode records the **starting depth** chosen at `yaw init`; adding modules does not change it, and the installed modules are read from the manifest, not from the mode.
 
 ## 3. Two lanes, one schema
 

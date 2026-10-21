@@ -4,35 +4,40 @@ A module is a folder in `modules/` with a `module.yaml`. It owns its questions, 
 
 ## 1. Catalogue and mode defaults
 
-Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; ADR-0009 adds it to BD5); **Standard** = Quick + `git-hooks`, `github`, `ci`, `decisions`, `security` (minimal), `sessions`, `comfort` (hygiene + status line), and `team` when the project is a team (ADR-0031); **Full** = Standard + the F questions and team-mode options. Modules in the table that are in none of these lists (`quality-code`, `performance`, `business-logic`, `ui-design`, `privacy`, `backup`, `environments`, `vendors`, `knowledge`, `dashboard`, `evaluation`, `remote`) are phase 2 or 3.
+Phase 1 (ADR-0009, amended by ADR-0032): two setup choices. **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal). **Full** = Quick + `git-hooks`, `decisions`, `sessions`, `comfort`, `github` and `ci` unless the project does not use GitHub (question 10.2), and `team` when the project is a team (ADR-0031). Standard is merged into Full; the `standard` alias keeps its previous selection. ADR-0032 lists each module's hooks and skills per mode; hooks are registered per module.
 
-| Module | Purpose | Quick | Standard | Full | Depends |
-|---|---|:-:|:-:|:-:|---|
-| `core` | `AGENTS.md`, `CLAUDE.md`, `justfile`, manifest | ✔ (always) | ✔ | ✔ | – |
-| `communication` | Speaking style from user profile into `AGENTS.md`; Claude output style | ✔ | ✔ | ✔ | core |
-| `standards` | Baseline coding + review standards, stack overlay from profile | ✔ | ✔ | ✔ | core |
-| `devenv` | `just setup/dev`, `.env.example`, Docker/devcontainer when the profile advises it | ✔ | ✔ | ✔ | core |
-| `tasks` | Task ledger (local / GitHub / both) | ✔ | ✔ | ✔ | core |
-| `git-hooks` | `lefthook`/`pre-commit`: format, lint-staged, `gitleaks` | – | ✔ | ✔ | core |
-| `github` | Repo, branch, commit, PR (and PR template), label, issue (native type or label), release, protection scripts (ADR-0027) | – | ✔ | ✔ | core |
-| `ci` | CI workflow running `just check` plus a gitleaks scan, Dependabot for the pinned actions (ADR-0027) | – | ✔ | ✔ | github |
-| `decisions` | ADR + notice journal, local RAG, recall hook | – | ✔ | ✔ | core |
-| `quality-code` | Lint/type/test gates, `change-reviewer` subagent (phase 2; phase-1 gates come from the profiles) | – | ✔ | ✔ | standards |
-| `security` | `security-reviewer`, guard hooks, `just audit`, secret scan (phase 1: only `.env*`/secret read deny and destructive-command guard) | ✔ (minimal) | ✔ | ✔ | standards |
-| `performance` | Budgets, Lighthouse/bench recipes, perf review checklist | – | – | ✔ | quality-code |
-| `business-logic` | Domain-rule checklist from interview 2.3, business notices, reviewer pass | – | ✔ | ✔ | decisions |
-| `ui-design` | Design direction, tokens, `just screenshot`, `visual-reviewer`, a11y | – | if UI | if UI | standards |
-| `privacy` | Privacy journal kind, data map, privacy gate | – | if public | ✔ | decisions |
-| `backup` | `just backup/restore`, restore test, schedule template | – | if data | ✔ | devenv |
-| `environments` | staging/prod/preview config, guarded `just deploy <env>` | – | if hosted | ✔ | devenv |
-| `vendors` | Service catalogue, key onboarding, `.env` wiring | – | if needed | if needed | devenv |
-| `comfort` | Session hygiene, status line, notifications, cache reminder (doc 11; ADR-0030: personal settings in `~/.yaw/comfort.yaml`, cache reminder is phase 2) | – | hygiene + status line | asked | core |
-| `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | ✔ | tasks |
-| `team` | Team mode (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team | if team | tasks, github, git-hooks |
-| `knowledge` | Global knowledge store recall + `/remember` (doc 12) | – | if set up | if set up | decisions |
-| `dashboard` | Local UI, OTel receiver, metrics store (doc 13) | – | ✔ | ✔ | sessions |
-| `evaluation` | Session outcome classification, tier 1/2/3 (doc 13) | – | tier 1 | tier 1 | sessions |
-| `remote` | Remote dev loop: own Telegram wrapper `yaw-tg` (Python add-on), device + preview recipes (doc 11) | – | – | – (explicit) | comfort, security |
+| Module | Purpose | Quick | Full | Depends |
+|---|---|:-:|:-:|---|
+| `core` | `AGENTS.md`, `CLAUDE.md`, `justfile`, manifest | ✔ (always) | ✔ | – |
+| `communication` | Speaking style from user profile into `AGENTS.md`; Claude output style | ✔ | ✔ | core |
+| `standards` | Baseline coding + review standards, stack overlay from profile | ✔ | ✔ | core |
+| `devenv` | `just setup/dev`, `.env.example`, Docker/devcontainer when the profile advises it | ✔ | ✔ | core |
+| `tasks` | Task ledger (local / GitHub / both) | ✔ | ✔ | core |
+| `security` | Phase 1: `.env*`/secret read deny and destructive-command guard (`security-reviewer`, `just audit`, secret scan later) | ✔ (minimal) | ✔ (minimal) | standards |
+| `git-hooks` | `lefthook`/`pre-commit`: format, lint-staged, `gitleaks` | – | ✔ | core |
+| `github` | Repo, branch, commit, PR (and PR template), label, issue (native type or label), release, protection scripts (ADR-0027) | – | if GitHub | core |
+| `ci` | CI workflow running `just check` plus a gitleaks scan, Dependabot for the pinned actions (ADR-0027) | – | if GitHub | github |
+| `decisions` | ADR + notice journal, local RAG, recall hook | – | ✔ | core |
+| `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | core |
+| `comfort` | Session hygiene, status line, notifications (doc 11; ADR-0030: one multi-select question, default hygiene + status line, personal settings in `~/.yaw/comfort.yaml`; the cache reminder is phase 2) | – | ✔ | core |
+| `team` | Team mode (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team | tasks, github, git-hooks |
+
+Later (phase 2 or 3, label `later`; in no mode until built). The last column is the target preselection in Full.
+
+| Module | Purpose | Depends | Target in Full |
+|---|---|---|---|
+| `quality-code` | Lint/type/test gates, `change-reviewer` subagent (phase-1 gates come from the profiles) | standards | ✔ |
+| `performance` | Budgets, Lighthouse/bench recipes, perf review checklist | quality-code | ✔ |
+| `business-logic` | Domain-rule checklist from interview 2.3, business notices, reviewer pass | decisions | ✔ |
+| `ui-design` | Design direction, tokens, `just screenshot`, `visual-reviewer`, a11y | standards | if UI |
+| `privacy` | Privacy journal kind, data map, privacy gate | decisions | ✔ |
+| `backup` | `just backup/restore`, restore test, schedule template | devenv | ✔ |
+| `environments` | staging/prod/preview config, guarded `just deploy <env>` | devenv | ✔ |
+| `vendors` | Service catalogue, key onboarding, `.env` wiring | devenv | if needed |
+| `knowledge` | Global knowledge store recall + `/remember` (doc 12) | decisions | if set up |
+| `dashboard` | Local UI, OTel receiver, metrics store (doc 13) | sessions | ✔ |
+| `evaluation` | Session outcome classification, tier 1/2/3 (doc 13) | sessions | tier 1 |
+| `remote` | Remote dev loop: own Telegram wrapper `yaw-tg` (Python add-on), device + preview recipes (doc 11) | comfort, security | – (explicit) |
 
 "if X" = preselected only when the interview says so. Everything can be unchecked; dependency violations are shown in the form, not silently fixed.
 
@@ -109,7 +114,7 @@ Technical spec: [reference/governance-blueprint.md](reference/governance-bluepri
 
 ### quality-code / security / performance / business-logic
 
-Each contributes (a) commands to `just check`, (b) a review checklist file, (c) a subagent or a section of `change-reviewer`. To avoid bloat, Standard uses **one** `change-reviewer` that loads the checklists of the enabled modules; Full can split into dedicated `security-reviewer`, `perf-reviewer`.
+Each contributes (a) commands to `just check`, (b) a review checklist file, (c) a subagent or a section of `change-reviewer`. To avoid bloat, **one** `change-reviewer` loads the checklists of the enabled modules; dedicated `security-reviewer` and `perf-reviewer` are a later option (phase 2, with `quality-code`).
 
 Guard hooks (security module): `PreToolUse` on `Bash` (and file tools, Codex `apply_patch`) denies patterns from `profiles/<p>/guards.yaml` + `modules/security/guards.yaml` (force-push, every `rm -rf`, prod deploy, remote migrations, secret reads); the user runs a blocked command themselves (ADR-0022). Prefer Claude Code `permissions.deny` where a static rule suffices; use a hook only for logic.
 

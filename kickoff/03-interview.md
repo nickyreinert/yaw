@@ -1,6 +1,6 @@
 # 03 — Interview Catalogue
 
-Legend: **Q** shown in Quick, **S** in Standard, **F** only in Full. `→` = module or artefact the answer drives. Questions of a disabled module are never asked. Every question has a default; "don't know" takes it and marks the resulting ADR `Provisional`.
+Legend: **Q** shown in Quick and Full, **S** and **F** only in Full (ADR-0032: Standard is merged into Full; the `standard` alias still asks Q and S). `→` = module or artefact the answer drives. Questions of a disabled module are never asked. Every question has a default; "don't know" takes it and marks the resulting ADR `Provisional`.
 
 Rules for the interviewer (CLI, form, or agent):
 
@@ -36,7 +36,7 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 |---|---|---|---|
 | 1.1 | Describe the idea in a few sentences. (free text) | Q | proposal |
 | 1.2 | Who uses it? (me only / a known group / the public) | Q | privacy, security, scale |
-| 1.3 | Prototype, MVP, or long-lived product? | Q | preset, gate strictness |
+| 1.3 | Prototype, MVP, or long-lived product? | Q | mode (prototype, MVP → Quick; long-lived product → Full; ADR-0032, built in step 7), gate strictness |
 | 1.4 | What does success look like in 3 and 12 months? What is out of scope? | F | ADRs, tasks |
 | 1.5 | Solo or team? Who approves changes? (solo / team / external reviewers) | Q | **team mode (doc 14)**, review policy, branch protection |
 | 1.6 | Budget envelope (hosting, AI, tools): free only / small monthly / flexible | S | vendors, hosting |
@@ -125,7 +125,7 @@ The proposal shows: chosen profile(s), shape (monolith, static + API, …), data
 | # | Question | Mode |
 |---|---|---|
 | 10.1 | Task tracking: **local only** / GitHub only / both (local-first) | Q |
-| 10.2 | Use GitHub for the repo? Create it now? Public or private? | Q |
+| 10.2 | Use GitHub for the repo? Create it now? Public or private? ("no" turns `github` and `ci` off in Full; not asked for a team, which implies GitHub; ADR-0032) | S |
 | 10.3 | Branch model: trunk + short branches (default) / git-flow | F |
 | 10.4 | Use milestones/epics and a GitHub Project board? | S |
 
