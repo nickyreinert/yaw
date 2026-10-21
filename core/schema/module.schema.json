@@ -33,6 +33,7 @@
         "agents": { "type": "array", "items": { "$ref": "#/$defs/outputItem" } },
         "hooks": { "type": "array", "items": { "$ref": "#/$defs/hookItem" } },
         "just": { "$ref": "common.schema.json#/$defs/relPath" },
+        "starter": { "description": "A user-owned file generated once from the project tree (managed: false; never rewritten, kept on remove).", "$ref": "common.schema.json#/$defs/relPath" },
         "gates": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/name" }, "uniqueItems": true }
       },
       "additionalProperties": false

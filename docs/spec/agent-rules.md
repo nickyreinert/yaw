@@ -23,3 +23,14 @@
 
 - CI (`.github/workflows/quality-gate.yml`) runs `just check` and a gitleaks scan; its job names `quality-gate` and `secret-scan` are what the branch ruleset requires, so do not rename them.
 - Actions are pinned by commit SHA; change them only through the Dependabot pull requests.
+
+## git-hooks
+
+- Git hooks (lefthook) run `just fmt`, `just lint` and a gitleaks scan of the staged changes on every commit, for every agent and for you; install them once with `just hooks-install`.
+- If gitleaks blocks a commit, remove the secret from the staged files (rotate it if it was ever pushed); never bypass the hook with `--no-verify`.
+
+## code-map
+
+- Read `docs/code-map.md` first (or `just map show <area>` for a bounded view), then verify the guidance against the implementation, its callers and its tests, and search wider when the map does not cover the question. The map is coarse: it lists areas, directories, entry points, tests, relationships and ADRs, not symbols.
+- After adding, moving or deleting directories run `just map update`, then review the descriptions of the areas it names (no wording change is a valid outcome). `just map check` (part of `just check`, and a pre-commit job with `git-hooks`) is read-only and proves mechanical freshness only, not that the explanations are still true.
+- The text outside the `yaw:map` markers is yours and is never rewritten; the local index lives in `~/.yaw/cache/code-map/` and can be deleted at any time.

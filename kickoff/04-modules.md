@@ -21,6 +21,7 @@ Phase 1 (ADR-0009, amended by ADR-0032): two setup choices. **Quick** = `core`, 
 | `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | core |
 | `comfort` | Session hygiene, status line, notifications (doc 11; ADR-0030: one multi-select question, default hygiene + status line, personal settings in `~/.yaw/comfort.yaml`; the cache reminder is phase 2) | – | ✔ | core |
 | `team` | Team mode (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team (requires `github`; remote can be local) | tasks, github, git-hooks |
+| `code-map` | Maintained `docs/code-map.md` (declared areas, generated sections between `yaw:map` markers, your explanations kept), rebuildable index in `~/.yaw/cache/code-map/`, `yaw map update` / `check` / `show`; `map-check` runs with `just check` and as a lefthook `pre-commit` job when `git-hooks` is installed; no GitHub, no watcher, no agent hook (ADR-0033) | – (`yaw add code-map`) | ✔ | core |
 
 Later (phase 2 or 3, label `later`; in no mode until built). The last column is the target preselection in Full.
 

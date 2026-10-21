@@ -13,6 +13,7 @@ import { sync } from './sync.js';
 import { task } from './tasks.js';
 import { gh } from './gh.js';
 import { decisions } from './decisions.js';
+import { map } from './map.js';
 import { sessions } from './sessions.js';
 import { hygiene, notify, statusline } from './comfort.js';
 import { sessionStart } from './team.js';
@@ -38,6 +39,7 @@ export const COMMANDS = [
   { name: 'config', step: 5, summary: 'change .yaw/config.yaml' },
   { name: 'gh', args: '<init|labels|protect|branch|commit|pr|pr-status|release|project-add|issue> [...]', summary: 'GitHub scripts (github module; `just gh-*`, `just branch` ... call this); guarded actions need a person at a terminal to confirm', options: { ...yes, owner: { type: 'string' }, public: { type: 'boolean' }, approvals: { type: 'string' }, verify: { type: 'boolean' }, check: { type: 'string', multiple: true }, type: { type: 'string' }, scope: { type: 'string' }, task: { type: 'string' }, title: { type: 'string' }, ready: { type: 'boolean' }, status: { type: 'string' }, body: { type: 'string' }, priority: { type: 'string' }, estimate: { type: 'string' } }, run: gh },
   { name: 'decisions', args: '<recall|record|query|list|rebuild|check|taxonomy|seed> [...]', summary: 'decision journal: ADRs and notices in .decisions/ (decisions module; `just decisions ...` calls this)', options: { type: { type: 'string' }, kind: { type: 'string' }, category: { type: 'string' }, subcategory: { type: 'string' }, summary: { type: 'string' }, context: { type: 'string' }, decision: { type: 'string' }, consequences: { type: 'string' }, consideration: { type: 'string' }, importance: { type: 'string' }, status: { type: 'string' }, supersedes: { type: 'string', multiple: true }, scope: { type: 'string', multiple: true }, 'review-by': { type: 'string' }, tag: { type: 'string', multiple: true }, ref: { type: 'string', multiple: true }, issue: { type: 'string' }, text: { type: 'string' }, path: { type: 'string', multiple: true }, keywords: { type: 'string' } }, run: decisions },
+  { name: 'map', args: '<update|check|show> [area|path-prefix]', summary: 'code map: refresh docs/code-map.md and the local index, check it (read-only), show an area (code-map module; `just map ...` calls this)', options: {}, run: map },
   { name: 'sessions', args: '<find|for|resume|list|current|handoff> [...]', summary: 'agent session registry: find, link and resume sessions (sessions module; `just sessions ...` calls this)', options: { all: { type: 'boolean' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' } }, run: sessions },
   { name: 'session', step: 5, summary: 'rename the current session' },
   { name: 'session-start', args: '', summary: 'team mode: fetch, safe fast-forward, my issues and pull requests (team module; `just start` calls this)', options: {}, run: sessionStart },

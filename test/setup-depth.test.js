@@ -38,9 +38,9 @@ test('Quick produces exactly its baseline modules and files', () => {
   assert.deepEqual([...desired.keys()].sort(), expected.files);
 });
 
-test('Full: github and ci follow the GitHub answer; git-hooks, decisions, sessions, comfort are always on', () => {
+test('Full: github and ci follow the GitHub answer; git-hooks, decisions, sessions, comfort, code-map are always on', () => {
   const on = render('node-cli', { mode: 'full' }).modules;
-  assert.deepEqual(on, ['core', 'ci', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'security', 'sessions', 'standards', 'tasks']);
+  assert.deepEqual(on, ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'security', 'sessions', 'standards', 'tasks']);
   const off = render('node-cli', { mode: 'full', github: false }).modules;
   assert.deepEqual(off, on.filter((m) => m !== 'github' && m !== 'ci'));
 });
@@ -70,7 +70,7 @@ test('standard is an alias of full: same modules, same files, same bytes', () =>
   }
 });
 
-test('standard output is byte for byte what it was before Y-5.10 (AGENTS.md excluded: it was trimmed)', () => {
+test('standard output is byte for byte the recorded fixture (AGENTS.md excluded: it was trimmed; regenerated for code-map in Y-5.11, ADR-0033)', () => {
   const before = fixture('standard-team-node-cli.json');
   const { modules, desired } = render('node-cli', { mode: 'standard', team: true });
   assert.deepEqual(modules, before.modules);
