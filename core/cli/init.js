@@ -18,6 +18,7 @@ import { MANIFEST } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
 import { ANSWERS, ProjectError, initProject, parseAnswers, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
+import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { CODEX_HOOKS } from '../render/agents.js';
@@ -179,6 +180,7 @@ export async function init({ values, positionals, io }) {
   const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules });
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);
+  printToolHints(io.stdout, modules);
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 
