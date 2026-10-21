@@ -13,7 +13,7 @@ import { addModule, initProject, moduleQuestions, readAnswers, removeModule } fr
 import { openYawDb } from '../../../core/lib/db.js';
 import { declaredAgent, fixture, hook, listFixtures, shim } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
-import { branchTask, clean, commitsOf, currentSession, openRegistry, readRegular, resumeCommand, sessionId, withRegistry } from '../lib/registry.js';
+import { branchTask, clean, commitsOf, currentSession, openRegistry, tightenHome, readRegular, resumeCommand, sessionId, withRegistry } from '../lib/registry.js';
 import { commitMessage } from '../../github/lib/names.js';
 
 const MODULES = ['core', 'tasks', 'github', 'sessions'];
@@ -449,6 +449,27 @@ test('the registry directory is 0700 even when it existed already', () => {
   mkdirSync(join(home, '.yaw'), { mode: 0o755 });
   openRegistry({ HOME: home }).close();
   assert.equal(statSync(join(home, '.yaw')).mode & 0o777, 0o700);
+});
+
+test('0700 never follows a link, never touches a foreign or user-chosen directory, never throws', () => {
+  const base = tmp('yaw-mode-');
+  const target = join(base, 'other');
+  mkdirSync(target, { mode: 0o755 });
+  symlinkSync(target, join(base, 'linked'));
+  mkdirSync(join(base, 'plain'), { mode: 0o755 });
+  assert.equal(tightenHome(join(base, 'linked'), true), false);
+  assert.equal(statSync(target).mode & 0o777, 0o755, 'the link target is untouched');
+  assert.equal(tightenHome(join(base, 'plain'), true), false, 'an existing directory not named .yaw (YAW_HOME=$HOME) is left alone');
+  assert.equal(statSync(join(base, 'plain')).mode & 0o777, 0o755);
+  mkdirSync(join(base, '.yaw'), { mode: 0o755 });
+  assert.equal(tightenHome(join(base, '.yaw'), true, process.getuid() + 1), false, 'not owned: no change, no throw');
+  assert.equal(statSync(join(base, '.yaw')).mode & 0o777, 0o755);
+  assert.equal(tightenHome(join(base, 'missing'), true), false);
+  assert.equal(tightenHome(join(base, '.yaw'), true), true);
+  assert.equal(statSync(join(base, '.yaw')).mode & 0o777, 0o700);
+  // end to end: a foreign YAW_HOME still gives a working registry
+  const home = tmp('yaw-foreign-');
+  withRegistry({ YAW_HOME: home }, (db) => assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0));
 });
 
 test('helpers: ids, branch tasks, resume commands, control characters', () => {

@@ -3,8 +3,8 @@
 // transcript content (doc 12 §4). Every path is checked before it is opened, symlinks are refused, and
 // nothing read from the database or from a project file is ever executed or opened.
 
-import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSqlite, migrate } from '../../../core/lib/db.js';
 import { parseTasks } from '../../../core/lib/tasks.js';
@@ -63,11 +63,27 @@ export function registryFile(env) {
   return join(yawHome(env), 'yaw.db');
 }
 
+// 0700 for the registry directory: when it was just created, or when it is a real directory (not a link) named
+// .yaw that we own. Never follows a link, never touches a directory the user pointed YAW_HOME at (YAW_HOME=$HOME),
+// never throws.
+export function tightenHome(home, existed, uid = process.getuid?.()) {
+  try {
+    const st = lstatSync(home);
+    if (st.isSymbolicLink() || !st.isDirectory() || st.uid !== uid) return false;
+    if (existed && basename(home) !== '.yaw') return false;
+    chmodSync(home, 0o700);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function openRegistry(env) {
   const home = yawHome(env);
   if (!home) throw new RegistryError('no home directory for ~/.yaw/yaw.db (set HOME or YAW_HOME)');
+  const existed = existsSync(home);
   mkdirSync(home, { recursive: true, mode: 0o700 });
-  chmodSync(home, 0o700); // also when ~/.yaw existed already
+  tightenHome(home, existed);
   const file = registryFile(env);
   try {
     const st = lstatSync(file);
@@ -143,7 +159,7 @@ export const sessionId = (agent, native) => (AGENTS.includes(agent) && typeof na
 // Commits whose message carries `Agent-Session: <id>` (exact match), newest first, and the files they touch.
 // Bounded (runs on every Stop): only HEAD's history, only since the session started, at most 100 commits.
 // `known` (already linked commit refs) are not diffed again.
-export function commitsOf(root, id, env, { since, known = new Set() } = {}) {
+export function commitsOf(root, id, env, { since, known = new Set(), maxFiles = MAX_FILES } = {}) {
   const out = git(root, ['log', '--fixed-strings', `--grep=${TRAILER_KEY}: ${id}`, `--max-count=${MAX_COMMITS}`,
     ...(since ? [`--since=${since}`] : []),
     `--format=%H%x1f%(trailers:key=${TRAILER_KEY},valueonly,separator=%x1f)%x1e`], env);
@@ -155,10 +171,11 @@ export function commitsOf(root, id, env, { since, known = new Set() } = {}) {
   }
   const files = new Set();
   for (const hash of commits) {
+    if (files.size >= maxFiles) break;
     if (known.has(hash.slice(0, 12))) continue;
     const names = git(root, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', hash], env) ?? '';
     for (const name of names.split('\0')) {
-      if (files.size >= MAX_FILES) break;
+      if (files.size >= maxFiles) break;
       try {
         if (name !== '') files.add(checkRelPath(name));
       } catch { /* a path the kit would not write is not recorded */ }
@@ -199,7 +216,8 @@ export function recordSession({ db, env, root, agent, native, transcript = null,
   if (end) {
     const started = db.prepare('SELECT started FROM sessions WHERE id = ?').get(id)?.started;
     const known = new Set(db.prepare("SELECT ref FROM session_links WHERE session_id = ? AND kind = 'commit'").all(id).map((r) => r.ref));
-    const found = commitsOf(project, id, env, { since: started, known });
+    const haveFiles = db.prepare("SELECT COUNT(*) AS n FROM session_links WHERE session_id = ? AND kind = 'file'").get(id).n;
+    const found = commitsOf(project, id, env, { since: started, known, maxFiles: Math.max(0, MAX_FILES - haveFiles) });
     link(db, id, 'commit', found.commits);
     link(db, id, 'file', found.files);
   }
