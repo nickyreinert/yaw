@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "name": "Architecture",
+      "subcategories": [
+        { "name": "Formats", "keywords": ["yaml", "json", "schema", "format", "manifest", "answers", "parser", "validator", "emitter", "formate"] },
+        { "name": "Rendering", "keywords": ["render", "template", "update", "merge", "fragment", "compose", "reconcile", "hash", "remove", "vorlage"] },
+        { "name": "CLI", "keywords": ["cli", "command", "init", "add", "flag", "option", "doctor", "status", "interview", "question", "befehl", "frage"] }
+      ]
+    },
+    {
+      "name": "Agents",
+      "subcategories": [
+        { "name": "Hooks", "keywords": ["hook", "dispatcher", "adapter", "claude", "codex", "copilot", "payload", "shim", "token", "systemmessage", "additionalcontext", "session", "registry", "sqlite"] },
+        { "name": "Skills", "keywords": ["skill", "sync", "drift", "matrix", "capabilities", "kompatibilität"] }
+      ]
+    },
+    {
+      "name": "Modules",
+      "subcategories": [
+        { "name": "Catalogue", "keywords": ["module", "preset", "quick", "standard", "full", "mode", "profile", "footprint", "communication", "standards", "devenv", "modul", "profil"] },
+        { "name": "Workflow", "keywords": ["task", "ledger", "issue", "branch", "commit", "pr", "label", "ruleset", "github", "ci", "workflow", "gitleaks", "lefthook", "aufgabe"] }
+      ]
+    },
+    {
+      "name": "Memory",
+      "subcategories": [
+        { "name": "Decisions", "keywords": ["adr", "decision", "notice", "journal", "retrieval", "recall", "embedding", "taxonomy", "tokenizer", "entscheidung", "abruf"] }
+      ]
+    },
+    {
+      "name": "Security",
+      "subcategories": [
+        { "name": "Guards", "keywords": ["secret", "env", "guard", "deny", "destructive", "force", "symlink", "permission", "geheimnis", "sicherheit"] }
+      ]
+    },
+    {
+      "name": "Delivery",
+      "subcategories": [
+        { "name": "Platform", "keywords": ["node", "runtime", "platform", "macos", "linux", "wsl", "install", "kit", "version", "release", "installation"] }
+      ]
+    },
+    {
+      "name": "Governance",
+      "subcategories": [
+        { "name": "Scope", "keywords": ["phase", "scope", "step", "plan", "later", "umfang"] },
+        { "name": "Repository", "keywords": ["layout", "test", "repo", "repository", "folder", "ordner"] }
+      ]
+    }
+  ]
+}

@@ -30,7 +30,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 ## Working rules (apply to every step)
 
 0. **Pre-approved actions (do not ask):** create the repo `nickyreinert/yaw` as **private** via `gh repo create`; commit and push to feature branches; create labels, milestones, issues, sub-issues and PRs; merge your own PR when CI is green and the review subagent found no blocker. **Still ask before:** making the repo public, force push, deleting branches/files outside the step, rewriting history, touching anything outside this repo.
-1. **Docs first.** Read the docs listed for the step before writing code. If the implementation must deviate from a doc, write an ADR (`docs/adr/NNNN-*.md`) and update the doc in the same PR.
+1. **Docs first.** Read the docs listed for the step before writing code. If the implementation must deviate from a doc, write an ADR (`.decisions/ADR-NNNN.md` via `just decisions record`, with a detail doc in `.decisions/details/` when needed; `docs/adr/` until step 5.6, BD7) and update the doc in the same PR.
 2. **One step = one GitHub issue = one branch = one PR.** Sub-tasks become sub-issues. No change without an issue (we follow our own team-mode rules from doc 14).
 3. **Node ≥ 22, zero runtime dependencies.** Only Node built-ins (`node:test`, `node:sqlite`, `node:http`, `node:crypto`, …). Dev-only tooling is allowed if listed in an ADR.
 4. **No black box.** Every generated file is recorded in the manifest with its hash; every module must be removable (`yaw remove <module>`), with a test proving it.

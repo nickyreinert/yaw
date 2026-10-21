@@ -1,9 +1,10 @@
 # profiles/node-cli: the uniform verbs (doc 01 §6). Verbs that do not apply print a note and exit 0.
 
-# Node >= 22.13, then install dependencies only if package.json lists any.
+# Node >= 22.13, then install dependencies only if package.json lists any; .env from .env.example (devenv module).
 setup:
     @node -e 'const [a, b] = process.versions.node.split(".").map(Number); if (a < 22 || (a === 22 && b < 13)) { console.error(`Node >= 22.13 is required, found ${process.version}`); process.exit(1); }'
     @if [ "$(node -p 'const p = require("./package.json"); Object.keys({ ...p.dependencies, ...p.devDependencies }).length')" != "0" ]; then npm install --no-audit --no-fund; else echo "setup: Node $(node --version), no dependencies to install"; fi
+    @if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env && echo "setup: created .env from .env.example, fill in the values"; fi
 
 dev:
     @if [ -f src/index.js ]; then node --watch src/index.js; else echo "dev: no src/index.js; run your entry file with node"; fi
