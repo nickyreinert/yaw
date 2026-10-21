@@ -48,6 +48,26 @@ jobs:
       - run: npm test
       - run: npm run validate
 
+  profile:
+    # Profile matrix (Y-6): yaw init (runs just setup and just check) on examples/<profile>/answers.yaml.
+    name: profile ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [static-site]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.13'
+      - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+      - name: yaw init and just check
+        run: |
+          mkdir "$RUNNER_TEMP/project"
+          cd "$RUNNER_TEMP/project"
+          node "$GITHUB_WORKSPACE/bin/yaw" init --answers "$GITHUB_WORKSPACE/examples/${{ matrix.profile }}/answers.yaml" --yes
+
   install-in-container:
     # install.sh end-to-end on a clean Debian image (Y-2.3), Node at the floor.
     runs-on: ubuntu-latest
