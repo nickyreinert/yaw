@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { parseDocument } from '../lib/yaml.js';
+import { parseDocument, stringify } from '../lib/yaml.js';
 import { matchFacts } from '../interview/facts.js';
 import { formatError } from '../lib/schema.js';
 import { BASE_DIR, MANIFEST, hashContent, pruneEmptyDirs, readProjectFile, writeAtomic } from './files.js';
@@ -48,12 +48,15 @@ function checkKitNotOlder(manifest, kitRoot) {
 
 // Render `modules` and reconcile the project with the result; writes files, bases and the manifest.
 // Used by update (same modules), remove (one fewer) and, later, add (one more).
-export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, ...options }) {
+export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, ...options }) {
   const manifest = requireManifest(root);
   checkKitNotOlder(manifest, kitRoot);
-  const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules });
+  const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules, answersDoc: answers?.doc });
   const version = kitVersion(kitRoot);
+  // New answers (yaw add) are written only after the render succeeded; the answers entry gets the new hash.
+  if (answers) writeAtomic(root, ANSWERS, answers.text);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
+  if (answers) result.files = result.files.map((f) => (f.path === ANSWERS ? { ...f, hash: hashContent(answers.text) } : f));
 
   const nextModules = {};
   for (const m of modules) nextModules[m] = manifest.modules[m] ?? { enabled: true };
@@ -70,8 +73,7 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
 
 // Render `modules` for an existing project from the installed kit and its answers; writes nothing.
 // -> { desired, missing (modules not in the kit), profileOutput }
-export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules }) {
-  const answersDoc = readAnswers(root);
+export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules, answersDoc = readAnswers(root) }) {
   const available = modules.filter((m) => hasModule(kitRoot, m));
   const missing = modules.filter((m) => !available.includes(m));
   const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
@@ -171,6 +173,42 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
     files: [...result.files, answersEntry],
   });
   return { ...result, manifest, missingProfiles };
+}
+
+// `yaw add <module>` checks. Dependency violations are reported, never fixed (doc 04 §1).
+// -> { manifest, enabled, definition }
+export function planAdd({ root, kitRoot = KIT_ROOT, module }) {
+  const manifest = requireManifest(root);
+  if (!hasModule(kitRoot, module)) throw new ProjectError(`module "${module}" does not exist in this kit`);
+  const enabled = enabledModules(manifest);
+  if (enabled.includes(module)) throw new ProjectError(`module "${module}" is already installed`);
+  const definition = loadModule(kitRoot, module);
+  const missing = (definition.depends ?? []).filter((d) => !enabled.includes(d));
+  if (missing.length > 0) {
+    throw new ProjectError(`${module} depends on ${missing.join(', ')}, which ${missing.length === 1 ? 'is' : 'are'} not installed; run: ${missing.map((m) => `yaw add ${m}`).join(' && ')}`);
+  }
+  return { manifest, enabled, definition };
+}
+
+// Questions of the module that have no answer yet (ids are unique across the kit, ADR-0017).
+export function moduleQuestions({ root, definition }) {
+  const given = readAnswers(root).answers;
+  return (definition.questions ?? []).filter((q) => !Object.hasOwn(given, q.id));
+}
+
+// Add the module: new answers are merged into answers.yaml, files are rendered and reconciled.
+export async function addModule({ root, kitRoot = KIT_ROOT, module, newAnswers = {}, ...options }) {
+  const { enabled } = planAdd({ root, kitRoot, module });
+  const doc = readAnswers(root);
+  const nextDoc = { ...doc, answers: { ...doc.answers, ...newAnswers } };
+  const text = stringify(nextDoc);
+  const previous = readProjectFile(root, ANSWERS);
+  try {
+    return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers: { text, doc: nextDoc }, ...options });
+  } catch (e) {
+    if (previous !== null) writeAtomic(root, ANSWERS, previous);
+    throw e;
+  }
 }
 
 // What `yaw remove <module>` would do; refuses when other modules depend on it.
