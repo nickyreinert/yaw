@@ -1,0 +1,87 @@
+# modules/comfort/module.yaml (Y-5.8, ADR-0030, ADR-0013): session hygiene, status line, notifications (doc 11).
+# Every hook talks to the user only (BUILD.md rule 5, ADR-0007); the status line is exempt; personal settings
+# live in ~/.yaw, never in the repository.
+name: comfort
+description: "Comfort features that cost no model tokens: session hygiene hints, a Claude status line (task, context, cache, last `just check`) and notifications after long runs; personal, switchable with `yaw hygiene`."
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions:
+  # Personal (ADR-0013): a team repository ignores this answer; ~/.yaw/comfort.yaml `features` overrides it.
+  - id: user.comfort
+    ref: "0.8"
+    scope: user
+    mode: S
+    type: multi
+    label: Which comfort features do you want?
+    hint: All run on your machine and cost no model tokens.
+    choices:
+      - { value: hygiene, label: Session hygiene hints (suggest /handoff and /clear) }
+      - { value: status-line, label: "Status line in Claude Code (task, context, cache, last check)" }
+      - { value: notifications, label: Notifications after runs longer than 3 minutes }
+      - { value: cache-reminder, label: Cache-warmth reminder, phase: 2 }
+    default: [hygiene, status-line]
+outputs:
+  # The status line is the only committed setting; it renders to nothing in a team repository (ADR-0013).
+  templates: [.claude/settings.json]
+  hooks:
+    # Comfort hooks: a synchronous systemMessage / terminalSequence for the user, never additionalContext.
+    - name: prompt
+      event: UserPromptSubmit
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "UserPromptSubmit systemMessage (user-visible only)" }
+        codex: { support: native, via: "UserPromptSubmit systemMessage (user-visible only)" }
+        copilot: { support: none, note: "userPromptSubmitted output is dropped; AGENTS.md rule + yaw hygiene" }
+    - name: stop
+      event: Stop
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "Stop terminalSequence (OSC 9 / 777) + ntfy" }
+        codex: { support: native, via: "Stop systemMessage + ntfy" }
+        copilot: { support: none, note: "no user message on agentStop" }
+    - name: notification
+      event: Notification
+      matcher: permission_prompt|idle_prompt
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "Notification terminalSequence + ntfy" }
+        codex: { support: none, note: "no Notification event; the Stop hook covers it" }
+        copilot: { support: none, note: "notification output is dropped" }
+    - name: failure
+      event: StopFailure
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "StopFailure terminalSequence + ntfy" }
+        codex: { support: none, note: "no StopFailure event" }
+        copilot: { support: none }
+    # Evaluation hooks: print nothing; they record the last `just check` result for the status line (M8).
+    - name: check-ok
+      event: PostToolUse
+      matcher: Bash
+      kind: evaluation
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "PostToolUse Bash, silent state write" }
+        codex: { support: none, note: "cannot tell a failed run from a passed one; the status line is Claude only" }
+        copilot: { support: none }
+    - name: check-fail
+      event: PostToolUseFailure
+      matcher: Bash
+      kind: evaluation
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "PostToolUseFailure Bash, silent state write" }
+        codex: { support: none }
+        copilot: { support: none }
+agentsMd: |
+  - When the topic changes or the session grows long, suggest a handoff and a fresh session (the user's hygiene hints do the same); `yaw hygiene` shows the thresholds.
+agents:
+  claude:  { support: native, via: "hygiene hint + notifications + status line (statusLine setting)" }
+  codex:   { support: partial, via: "hygiene hint + notifications through systemMessage; hooks must be trusted via /hooks", note: "no status line, no terminal notification sequence" }
+  copilot: { support: fallback, via: "AGENTS.md rule + yaw hygiene (manual)", note: "no hook output reaches the user" }
+tokenCost: none
+lastVerified: 2026-10-21

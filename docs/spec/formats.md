@@ -14,6 +14,7 @@ Schemas are the binding definition; this page is the readable overview. Check fi
 | `~/.yaw/presets/<name>.yaml` | user / `yaw presets` | YAML | `preset.schema.json` | `preset/my-flask-default.yaml` |
 | `adapters/capabilities.yaml` | kit authors | YAML | `capabilities.schema.json` | `capabilities/capabilities.yaml` |
 | `.yaw/config.yaml` | user / `yaw config set` | YAML | `config.schema.json` | `config/config.yaml` |
+| `~/.yaw/comfort.yaml` | user (YAW only reads it) | YAML | `comfort.schema.json` | `comfort/comfort.yaml` |
 | `.yaw/github.yaml` | user + `yaw gh setup` | YAML | `github.schema.json` | `github/github.yaml` |
 | `TASKS.md` | user (local, both) / kit (GitHub view) | Markdown | `tasks.schema.json` (parsed form) | `tasks/local.md`, `both.md`, `github-view.md` |
 | `modules/security/guards.yaml`, `profiles/<p>/guards.yaml` | kit authors | YAML | `guards.schema.json` | `guards/security.yaml`, `guards/node-cli.yaml` |

@@ -99,14 +99,14 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | M4 | C | `T-NNN` vs. issue-number IDs and branch names. | D10 §2–3; D14 §1–2 | 5.3, 5.5 | ✅ BD4 (IDs); branch pattern follows the ID (ADR-0010) |
 | M5 | C | Recipe naming (`just task …`, `just gh-init`, `just commit/pr/branch`). | D01 §6; D10 §3; D12 §4; D14 §1 | 5.3, 5.5 | ADR-0010 (Proposed): `just task <verb>`, `just gh-*`, `just branch/commit/pr` |
 | M6 | C | Just `import` (flat) vs. `mod` (namespaced); verb collisions. | D01 §6; D05 §3 | 3, 6 | ADR-0004 (Proposed): `import` per module, `mod` per profile when several |
-| M7 | C | Personal vs. committed config (comfort hooks, `.yaw/config.yaml`, communication in team repos). | D04; D11 §1; D12 §3; D14 §5 | 5.1, 5.8, 5.9 | ◐ ADR-0013 (Y-5.1: team repos commit no personal style) |
-| M8 | G | Comfort depends on sessions/tasks; "last `just check` status" not stored. | D04 §1; D11 §1, §1a | 5.8 | Open → Y-5.8 |
+| M7 | C | Personal vs. committed config (comfort hooks, `.yaw/config.yaml`, communication in team repos). | D04; D11 §1; D12 §3; D14 §5 | 5.1, 5.8, 5.9 | ✅ ADR-0013 (Y-5.1: team repos commit no personal style); ADR-0030 (Y-5.8: comfort settings in `~/.yaw/comfort.yaml`, status line not committed in team repos) |
+| M8 | G | Comfort depends on sessions/tasks; "last `just check` status" not stored. | D04 §1; D11 §1, §1a | 5.8 | ✅ ADR-0030 (soft dependency checked at run time; last `just check` recorded from the agent's Bash calls) |
 | M9 | C | Phase-1 `pr-policy` vs. phase-2 launch plan; `docs` type; boundary rules. | K; D14 §1, §2, §4; B 5.9 | 5.9 | ✅ BD3 (open-issue check only; rest phase 2) |
 | M10 | C | D14 §4 cites "section 13 of doc 03"; it is section 12. | D14 §4; D03 §12–13 | – | Doc fix in Y-0.1 |
 | M11 | C | ADR IDs: sequential vs. team-mode `ADR-<issue#>-<n>` / date-based. | R D5, N11; D14 §5 | 5.6 | ADR-0010 (Proposed): sequential solo, `ADR-<issue#>-<n>` in team mode; implemented in Y-5.6 (ADR-0028) |
 | M12 | C | YAW ADRs in `docs/adr/` vs. `.decisions/`. | B rules 1, 9; D12 §1 | 3 | ✅ BD7 (moved in Y-5.6: `.decisions/`, full texts in `.decisions/details/`) |
 | M13 | G | Team mode: Stop-hook journal lines when `TASKS.md` is read-only. | D10 §2; D14 | 5.3, 5.9 | ADR-0010 (Proposed): journal lines are issue comments; Stop reminder off in GitHub mode |
-| M14 | A | Hygiene "on (Standard), uncheckable". | D11 | 5.8 | Open → ADR-0013 |
+| M14 | A | Hygiene "on (Standard), uncheckable". | D11 | 5.8 | ✅ ADR-0013 + ADR-0030 (on by default, personal; `user.comfort`, `yaw hygiene off [--all]`) |
 | M15 | G | Quick has no `.env` read protection. | K non-neg. 5; D04 §1; D08 §3 | 3, 5.4 | ◐ BD6 adds `security` to phase 1; whether Quick includes it → ADR-0009 (BD5 Quick list excludes it) |
 | M16 | A | `AGENTS.md` line budget can be exceeded in Full. | D04 §2–3 | 3 | Open → Y-3.2 |
 
@@ -153,6 +153,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0020 | `yaw init` vertical slice: profile files and ownership, scaffold, uniform verbs, suggestion, init pipeline, interview files, examples and CI | step 3 details (B rule 10) | Step 3 | Written, Proposed (Step 3 PR) |
 | 0028 | `decisions` module: record format, derived index, IDs, capped critical decisions at SessionStart (BUILD.md rule 5) + agent-run recall, comfort prompt hook, gates in `just check`, path safety, migration of this repo | Y-5.6 details (B rule 10) | Step 5.6 | Written, Proposed (Y-5.6 PR) |
 | 0029 | `sessions` module: registry in `yaw.db`, silent evaluation hooks, `Agent-Session` trailer on `just commit`, `/handoff` skill, `yaw sessions find/for/resume` (prints, never runs), path safety | Y-5.7 details (B rule 10) | Step 5.7 | Written, Proposed (Y-5.7 PR) |
+| 0030 | `comfort` module: user-only hygiene hints, status line, notifications; personal config in `~/.yaw/comfort.yaml`; last `just check` status; `yaw hygiene off`; path safety | M7, M8, M14 (Y-5.8 details, B rule 10) | Step 5.8 | Written, Proposed (Y-5.8 PR) |
 
 ---
 
@@ -259,7 +260,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-5.5 | `github` + `ci` (**done**, ADR-0027) | Feature | P1 | Y-5.3 | Recipes per ADR-0010; guarded actions require authorisation; issue-type auto-detect with label fallback; `quality-gate.yml` installs the kit at the manifest tag (BD10) and runs `just check` |
 | Y-5.6 | `decisions` (ADR + notices, recall hook) (**done**, ADR-0011, ADR-0028) | Feature | P0 | ADR-0010, ADR-0011 | R D/E/F/K behaviour incl. N1–N12 upgrades listed in D04; R H4 test list passes; recall hook < 1 s, fails open; ID uniqueness in `just check`; German prompts retrieve correctly; this repo's `docs/adr/` migrated to `.decisions/` (BD7) |
 | Y-5.7 | `sessions` (registry, trailer, `/handoff`) (**done**, ADR-0029) | Feature | P1 | Y-5.3, Y-5.6, Y-1.14 | Registry in `yaw.db` per BD3 / D12 §4; `Agent-Session` trailer; title from the active task; `yaw sessions find/for/resume`; registry git-ignored |
-| Y-5.8 | `comfort`: hygiene, status line, notifications | Feature | P2 | Y-5.7, ADR-0007, ADR-0013 | Token-free per BD9 (test per hook); cooldown; `yaw hygiene off`; notifications only after N minutes; payload has no code/diff/secrets; personal config not committed |
+| Y-5.8 | `comfort`: hygiene, status line, notifications (**done**, ADR-0030) | Feature | P2 | Y-5.7, ADR-0007, ADR-0013 | Token-free per BD9 (test per hook); cooldown; `yaw hygiene off`; notifications only after N minutes; payload has no code/diff/secrets; personal config not committed |
 | Y-5.9 | Team mode enforcement | Feature | P1 | Y-5.5 | Issue-required edit/commit guards in Claude and Codex; lefthook `commit-msg` / `pre-push`; `pr-policy` CI check = "PR links an open issue" only (BD3); `just gh-protect` applies and verifies rulesets; session-start sync per D14 §3 with offline fail-open and 5-min cache |
 
 ### Step 6 — Remaining profiles

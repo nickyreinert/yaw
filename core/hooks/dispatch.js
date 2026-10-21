@@ -87,12 +87,15 @@ export async function dispatch({ agent, event, module, payload, root, kitRoot = 
   // The transcript path is metadata for the session registry (ADR-0029); like the prompt it stays in memory, and
   // no handler opens it.
   const transcript = typeof payload?.transcript_path === 'string' ? payload.transcript_path : null;
+  // The notification type (permission_prompt, idle_prompt, ...) is a short enum string; comfort notifications
+  // read it (ADR-0030). Nothing else of the payload is handed on.
+  const notificationType = typeof payload?.notification_type === 'string' && /^[a-z_]{1,40}$/.test(payload.notification_type) ? payload.notification_type : null;
   for (const item of items) {
     const file = join(moduleDir(kitRoot, module), 'hooks', `${item.name}.js`);
     let result;
     try {
       const handler = (await import(pathToFileURL(file).href)).default;
-      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env, prompt, transcript }));
+      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env, prompt, transcript, notificationType }));
     } catch (e) {
       logError(env, `${module}/${item.name}`, e);
       continue;

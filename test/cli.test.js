@@ -30,7 +30,7 @@ test('help lists every phase-1 command; no arguments prints help too', () => {
 test('the phase-1 command list is fixed (ADR-0019)', () => {
   assert.deepEqual(COMMANDS.map((c) => c.name), [
     'init', 'update', 'remove', 'status', 'doctor', 'self-update', 'self-uninstall', 'help',
-    'apply', 'add', 'hook', 'sync', 'agents', 'task', 'config', 'gh', 'decisions', 'sessions', 'session', 'session-start', 'hygiene', 'notify', 'presets',
+    'apply', 'add', 'hook', 'sync', 'agents', 'task', 'config', 'gh', 'decisions', 'sessions', 'session', 'session-start', 'hygiene', 'notify', 'statusline', 'presets',
   ]);
 });
 

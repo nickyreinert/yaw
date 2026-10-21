@@ -249,6 +249,17 @@ function taskFlags(mode) {
   return { mode, local: mode === 'local', github: mode === 'github', both: mode === 'both', source: mode !== 'github' };
 }
 
+export const COMFORT_DEFAULT = ['hygiene', 'status-line'];
+
+function comfortFlags(picked, agents, team) {
+  const list = Array.isArray(picked) ? picked : COMFORT_DEFAULT;
+  return {
+    hygiene: list.includes('hygiene'),
+    notifications: list.includes('notifications'),
+    statusLine: list.includes('status-line') && agents.includes('claude') && !team,
+  };
+}
+
 // Context for templates (ADR-0002): computed in JS, templates only read it.
 // Answers are nested by question group: "idea.text" is answers.idea.text. Questions the user did not
 // answer take their default, so a template never sees a missing answer.
@@ -294,6 +305,10 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     ci: profileCi(kitRoot, profiles),
     // ADR-0010: the effective task mode (team forces github) as booleans, since templates have no comparisons.
     tasks: taskFlags(tasksMode(flat)),
+    // ADR-0030: the comfort features the user picked. Only the status line is a committed setting, and it is
+    // personal, so a team repository never gets it (ADR-0013); hooks are registered for everyone and decide at
+    // run time, from the user's own configuration, what to do.
+    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], (flat['idea.team'] ?? 'solo') !== 'solo'),
     // ADR-0028: gate recipes of the enabled modules (`outputs.gates`); `just check` runs them via sync-check.
     gates: [...new Set(modules.flatMap((m) => (definitions?.get(m) ?? loadModule(kitRoot, m)).outputs?.gates ?? []))].sort(),
   };

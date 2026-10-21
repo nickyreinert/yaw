@@ -58,7 +58,9 @@ const negatives = [
   ['user-profile', 'user-profile/user-profile.yaml', (t) => t.replace('user.length: brief', 'user.length: endless'), /\/answers\/user.length/],
   ['preset', 'preset/my-flask-default.yaml', (t) => t.replace('name: my-flask-default', 'name: My Preset'), /\/name must match/],
   ['capabilities', 'capabilities/capabilities.yaml', (t) => t.replace('phase: 1', 'phase: 4'), /\/agents\/claude\/phase/],
-  ['config', 'config/config.yaml', (t) => t.replace('drift: 0.7', 'drift: 7'), /\/hygiene\/drift must be <= 1/],
+  ['config', 'config/config.yaml', (t) => t.replace('namespaces: [personal]', 'namespaces: personal'), /\/knowledge\/namespaces/],
+  ['comfort', 'comfort/comfort.yaml', (t) => t.replace('drift: 0.9', 'drift: 9'), /\/hygiene\/drift must be <= 1/],
+  ['comfort', 'comfort/comfort.yaml', (t) => t.replace('topic: replace-with-a-long-random-topic', 'topic: not a valid topic!'), /\/notify\/ntfy\/topic/],
   ['github', 'github/github.yaml', (t) => t.replace('color: a2eeef', 'color: blue'), /\/labels\/0\/color/],
 ];
 

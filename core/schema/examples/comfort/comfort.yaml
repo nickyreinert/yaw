@@ -1,0 +1,14 @@
+# ~/.yaw/comfort.yaml: personal, never in a repository; YAW reads it and never rewrites it.
+features: [hygiene, status-line, notifications]
+hygiene:
+  drift: 0.9
+  maxPrompts: 60
+  maxAgeMinutes: 180
+  maxKbPerPrompt: 100
+  cooldownPrompts: 20
+notify:
+  minutes: 3
+  terminal: osc9
+  ntfy:
+    server: https://ntfy.sh
+    topic: replace-with-a-long-random-topic
