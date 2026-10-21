@@ -84,12 +84,15 @@ export async function dispatch({ agent, event, module, payload, root, kitRoot = 
   // The prompt text is handed to handlers in memory (the decisions recall, ADR-0028); like tool input it never
   // enters the normalised event or any log (ADR-0018).
   const prompt = typeof payload?.prompt === 'string' ? payload.prompt : null;
+  // The transcript path is metadata for the session registry (ADR-0029); like the prompt it stays in memory, and
+  // no handler opens it.
+  const transcript = typeof payload?.transcript_path === 'string' ? payload.transcript_path : null;
   for (const item of items) {
     const file = join(moduleDir(kitRoot, module), 'hooks', `${item.name}.js`);
     let result;
     try {
       const handler = (await import(pathToFileURL(file).href)).default;
-      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env, prompt }));
+      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env, prompt, transcript }));
     } catch (e) {
       logError(env, `${module}/${item.name}`, e);
       continue;

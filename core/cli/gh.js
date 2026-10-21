@@ -14,9 +14,17 @@ export async function gh({ values, positionals, io }) {
   // A typed "y" only counts on a real terminal; without one there is no confirmer and guarded verbs refuse (ADR-0027).
   const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const confirmer = io.confirm ?? (tty ? (q) => confirm(createPrompter(), q) : undefined);
+  // The sessions module (ADR-0029) supplies the Agent-Session trailer for `commit`; github does not import it.
+  let sessionTrailer;
+  if (enabledModules(manifest).includes('sessions')) {
+    try {
+      const reg = await import(pathToFileURL(join(io.kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
+      sessionTrailer = () => reg.sessionTrailer({ root: io.cwd, env: io.env, now: io.now });
+    } catch { /* a commit never fails over the registry */ }
+  }
   try {
     return await lib.runGh({
-      verb, args, values, mode: manifest.modules.tasks?.mode,
+      verb, args, values, mode: manifest.modules.tasks?.mode, sessionTrailer,
       io: { ...io, root: io.cwd, confirm: confirmer },
     });
   } catch (e) {

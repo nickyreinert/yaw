@@ -147,12 +147,12 @@ export function nativeIssueTypes(gh, slug) {
 
 // ------------------------------------------------------------------------------------------ verbs
 
-export async function runGh({ verb, args = [], values = {}, mode, io }) {
+export async function runGh({ verb, args = [], values = {}, mode, sessionTrailer, io }) {
   if (!VERBS.includes(verb)) throw new GhUsageError(verb ? `unknown verb "${verb}"` : 'missing verb', { showUsage: true });
   if (values.yes) throw new GhUsageError('--yes does not exist: guarded actions run only when a person types y in a terminal');
   const { root, stdout, stderr } = io;
   const ctx = {
-    io, root, stdout, stderr, values, args, mode,
+    io, root, stdout, stderr, values, args, mode, sessionTrailer,
     gh: io.gh ?? ((a, o) => defaultGh(a, { cwd: root, env: io.env, ...o })),
     git: makeGit(root, io.env),
   };
@@ -358,7 +358,8 @@ function commit(c) {
   const task = values.task !== undefined ? parseTaskId(values.task) : taskFromBranch(current);
   if (!task) throw new GhUsageError(`branch "${current}" carries no task id; pass --task T-012 (or #34), or create the branch with: just branch`);
   if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0) throw new GhUsageError('nothing is staged; stage your changes with git add first');
-  const message = commitMessage({ type: args[0], scope: values.scope, subject: args.slice(1).join(' '), task });
+  const trailer = c.sessionTrailer?.() ?? null;
+  const message = commitMessage({ type: args[0], scope: values.scope, subject: args.slice(1).join(' '), task, trailers: trailer ? [trailer] : [] });
   const r = git(['commit', '--message', message], { allowFail: true });
   if (r.raw) stdout.write(r.raw);
   if (r.stderr) stderr.write(`${r.stderr}\n`);

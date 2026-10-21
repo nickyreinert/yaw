@@ -76,7 +76,7 @@ Goal: find the conversation behind a task, decision or commit later, and resume 
 
 - **Title:** Claude Code supports this natively: `UserPromptSubmit` and `SessionStart` hooks can return `sessionTitle`, and receive the current custom `session_title`. YAW sets `T-012 invite flow` style titles automatically from the active task (only if no custom title exists); other agents get the title at `/handoff`. Editable via `yaw session rename`.
 - **Links:** tasks from the active `TASKS.md` entry / branch name; decisions from IDs cited in the session; commits from the git range between start and end HEAD; files from the diff.
-- **Commit trailer:** `just commit` adds `Agent-Session: claude:5f2c…` so `git log` leads back to the conversation.
+- **Commit trailer:** `just commit` adds `Agent-Session: claude:5f2c…` so `git log` leads back to the conversation (the project's latest session active within 4 h, or `YAW_SESSION`; ADR-0029).
 - **Back-links:** the task journal line, the ADR `refs`, and the PR description get the session ID.
-- **Search:** `yaw sessions find "token expiry"` (same retrieval engine over title; a `summary` column comes with Y-5.7 if search needs it), `yaw sessions for T-012`, `yaw sessions resume <id>`.
+- **Search:** `yaw sessions find "token expiry"` (same retrieval engine over title; no `summary` column was needed, ADR-0029), `yaw sessions for T-012`, `yaw sessions resume <id>` (prints the command, never runs it; ADR-0029).
 - **Privacy:** transcripts stay where the agent stores them (local); the registry only holds metadata and paths. Not committed by default because transcripts may contain secrets or personal data; opt-in commit of titles + links only.
