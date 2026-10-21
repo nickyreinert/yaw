@@ -1,4 +1,4 @@
-// team (Y-5.9, ADR-0031): team-mode enforcement. Agent guards (edits, git commit/push) in Claude, Codex and Copilot,
+// team (Y-5.9, ADR-0031): team mode. No agent-side command guard (the AGENTS.md rules are guidance);
 // lefthook commit-msg / pre-push, the pr-policy workflow, `gh protect --verify`, the session-start sync (fetch, safe
 // fast-forward, gh reads cached for 5 minutes, offline fail-open), token-free output per hook, path safety of the
 // cache, removal with zero residue. git is real (a local bare "origin"); gh is a stand-in, never GitHub.
@@ -12,9 +12,8 @@ import { parse } from '../../../core/lib/yaml.js';
 import { loadModule } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, moduleQuestions, readAnswers, removeModule, selectModules } from '../../../core/render/project.js';
-import { declaredAgent, fixture, hook, listFixtures, shim, toolCall } from '../../../test/helpers/hooks.js';
+import { declaredAgent, fixture, listFixtures, shim } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
-import { commitSkipsHooks, editDecision, gitCalls, gitDecision, parsePush, pushTarget, simpleCommands, touchesProject } from '../lib/guards.js';
 import { CACHE_MS, cacheFile, clean, digest, readCache, sessionStart, writeCache } from '../lib/sync.js';
 
 const MODULES = ['core', 'security', 'tasks', 'github', 'git-hooks', 'ci', 'team'];
@@ -111,13 +110,13 @@ async function repo(options = {}) {
 
 // ------------------------------------------------------------------------------------------ module
 
-test('module: guards, a user-only session sync, one context hook on SessionStart; depends on tasks, github, git-hooks', () => {
+test('module: no agent-side command guard; a user-only session sync and one context hook on SessionStart; depends on tasks, github, git-hooks', () => {
   const def = loadModule(KIT_ROOT, 'team');
   assert.deepEqual(def.depends, ['tasks', 'github', 'git-hooks']);
   assert.deepEqual(def.outputs.hooks.map((h) => [h.name, h.event, h.kind]), [
-    ['guard-edit', 'PreToolUse', 'guard'], ['guard-git', 'PreToolUse', 'guard'],
     ['session-sync', 'SessionStart', 'comfort'], ['session-issue', 'SessionStart', 'context'],
   ]);
+  assert.ok(!def.outputs.hooks.some((h) => h.kind === 'guard' || h.event === 'PreToolUse'), 'ADR-0031: guidance only, no command guard');
   assert.equal(def.outputs.hooks.find((h) => h.kind === 'context').tokenCost, 'low');
   assert.deepEqual(def.questions.map((q) => [q.id, q.type, q.default]), [['team.session-context', 'boolean', true]]);
   assert.ok(def.agentsMd.trim().split('\n').length <= 3);
@@ -154,10 +153,11 @@ test('install: lefthook commit-msg / pre-push in a team block, pr-policy workflo
     assert.ok(files[shared].fragments.some((f) => f.module === 'team'), shared);
   }
   const claude = JSON.parse(tree['.claude/settings.json']).hooks;
-  assert.ok(claude.PreToolUse.some((e) => e.matcher === 'Edit|Write|MultiEdit|NotebookEdit|Bash' && /--module team/.test(e.hooks[0].command)));
+  assert.ok(!claude.PreToolUse.some((e) => /--module team/.test(e.hooks[0].command)), 'no team PreToolUse hook');
   assert.ok(claude.SessionStart.some((e) => /--module team/.test(e.hooks[0].command) && e.matcher === undefined));
   const codex = JSON.parse(tree['.codex/hooks.json']).hooks;
-  assert.ok(codex.PreToolUse.some((e) => e.matcher === 'apply_patch|Bash' && /--module team/.test(e.hooks[0].command)));
+  assert.ok(!codex.PreToolUse.some((e) => /--module team/.test(e.hooks[0].command)), 'no team PreToolUse hook');
+  assert.ok(codex.SessionStart.some((e) => /--module team/.test(e.hooks[0].command)));
 });
 
 test('remove: zero residue (lefthook, github.yaml, settings back to the pre-add state); answers kept; re-add asks again', async () => {
@@ -184,194 +184,6 @@ test('dependencies: team needs tasks, github and git-hooks; git-hooks cannot be 
   await assert.rejects(addModule({ root, module: 'team' }), /depends on git-hooks/);
   const full = await project();
   await assert.rejects(removeModule({ root: full, module: 'git-hooks' }), /team depends on git-hooks/);
-});
-
-// ------------------------------------------------------------------------------------- guards (pure)
-
-test('shell words: quotes, separators and git options are read; text inside quotes is not a command', () => {
-  assert.deepEqual(simpleCommands(`git commit -m "push to main" && git push origin 'feat/1-x'; echo a|b`), [
-    ['git', 'commit', '-m', 'push to main'], ['git', 'push', 'origin', 'feat/1-x'], ['echo', 'a'], ['b'],
-  ]);
-  assert.deepEqual(gitCalls('GIT_DIR=x sudo git -C sub -c a=b push origin main').map((c) => c.sub), ['push']);
-  assert.deepEqual(gitCalls('echo "git push origin main"'), []);
-  assert.deepEqual(gitCalls('/usr/bin/git commit -q').map((c) => c.sub), ['commit']);
-  assert.deepEqual(gitCalls('$(git push origin main)').map((c) => c.sub), ['push']);
-  assert.deepEqual(parsePush(['-u', 'origin', 'feat/1-x']), { force: false, all: false, noVerify: false, remote: 'origin', refspecs: ['feat/1-x'] });
-  for (const f of [['--force'], ['-f'], ['-uf'], ['--force-with-lease'], ['--force-with-lease=main'], ['--force-if-includes'], ['origin', '+feat/1-x']]) assert.equal(parsePush(f).force, true, f.join(' '));
-  assert.equal(parsePush(['-o', 'ci.skip', 'origin']).force, false);
-  assert.equal(parsePush(['--mirror']).all, true);
-  assert.equal(pushTarget('HEAD:refs/heads/main', 'feat/1-x'), 'main');
-  assert.equal(pushTarget('HEAD', 'feat/1-x'), 'feat/1-x');
-  assert.equal(pushTarget('+x:main', 'feat/1-x'), 'main');
-  assert.equal(commitSkipsHooks(['--no-verify']), true);
-  assert.equal(commitSkipsHooks(['-n']), true);
-  assert.equal(commitSkipsHooks(['-anm', 'x']), true);
-  assert.equal(commitSkipsHooks(['-m', '-n']), false, 'a message "-n" is not the flag');
-  assert.equal(commitSkipsHooks(['-am', 'fix n things']), false);
-});
-
-test('decisions: edits need an issue branch that has not diverged; commits and pushes stay off the default branch', () => {
-  const s = (over) => ({ branch: 'feat/34-x', defaultBranch: 'main', issue: 34, upstream: null, ahead: null, behind: null, ...over });
-  assert.equal(editDecision(null), null, 'not a git work tree: allowed');
-  assert.equal(editDecision(s()), null);
-  assert.match(editDecision(s({ branch: 'main', issue: null })), /default branch main.*just task start <#>/);
-  assert.match(editDecision(s({ branch: '', issue: null })), /detached/);
-  assert.match(editDecision(s({ branch: 'feature/abc', issue: null })), /carries no issue number/);
-  assert.match(editDecision(s({ upstream: 'origin/feat/34-x', ahead: 1, behind: 2 })), /diverged.*rebases or merges/);
-  assert.equal(editDecision(s({ upstream: 'origin/feat/34-x', ahead: 0, behind: 2 })), null, 'only behind: the session start pulls');
-  for (const r of [editDecision(s({ branch: 'main', issue: null })), gitDecision('git push --force', s())]) assert.ok(r.length <= 300 && !r.includes('\n'));
-
-  assert.equal(gitDecision('git commit -m "x"', s()), null);
-  assert.match(gitDecision('git commit -m "x"', s({ branch: 'main', issue: null })), /commits on the default branch/);
-  assert.match(gitDecision('git commit --no-verify -m x', s()), /--no-verify/);
-  assert.equal(gitDecision('git push', s()), null);
-  assert.equal(gitDecision('git push -u origin feat/34-x', s()), null);
-  assert.match(gitDecision('git push', s({ branch: 'main', issue: null })), /pushing to the default branch main/);
-  assert.match(gitDecision('git push origin HEAD:main', s()), /pushing to the default branch/);
-  assert.match(gitDecision('git push origin --delete main', s()), /pushing to the default branch/);
-  assert.match(gitDecision('npm test && git push --force-with-lease', s()), /force pushes/);
-  assert.match(gitDecision('git push --all origin', s()), /--all/);
-  assert.match(gitDecision('git push --no-verify', s()), /--no-verify/);
-  assert.equal(gitDecision('git log main && git status', s({ branch: 'main', issue: null })), null);
-  assert.equal(gitDecision('git push origin main', null), null, 'not a git work tree: allowed');
-});
-
-test('edits outside the project are not affected; a patch without readable paths counts as inside', () => {
-  const root = tmp('yaw-root-');
-  assert.equal(touchesProject(root, []), true);
-  assert.equal(touchesProject(root, ['src/a.js']), true);
-  assert.equal(touchesProject(root, [join(root, 'src', 'a.js')]), true);
-  assert.equal(touchesProject(root, ['/tmp/elsewhere/notes.md']), false);
-  assert.equal(touchesProject(root, [join(root, '..', 'sibling', 'x')]), false);
-});
-
-// ------------------------------------------------------------------------- guards through the dispatcher
-
-const editCall = (agent, path = 'src/index.js') => (agent === 'codex'
-  ? toolCall('codex', { command: `*** Begin Patch\n*** Update File: ${path}\n@@\n-a\n+b\n*** End Patch\n` }, 'apply_patch')
-  : toolCall(agent, { file_path: path, old_string: 'a', new_string: 'b' }, 'Edit'));
-
-async function decide({ root, env }, agent, payload) {
-  const r = await hook({ root, agent: declaredAgent(agent), event: 'PreToolUse', module: 'team', payload: { ...payload, cwd: root }, env });
-  assert.equal(r.code, 0);
-  assert.equal(r.stderr, '');
-  if (r.stdout === '') return null;
-  const out = JSON.parse(r.stdout);
-  return agent === 'copilot' ? out.permissionDecisionReason : out.hookSpecificOutput.permissionDecisionReason;
-}
-
-test('edit guard: denied on main and on a branch without an issue, allowed on an issue branch (Claude, Codex, Copilot)', async () => {
-  const r = await repo();
-  for (const agent of ['claude', 'codex', 'copilot']) {
-    r.git('switch', '--quiet', 'main');
-    assert.match(await decide(r, agent, editCall(agent)), /YAW team mode: edits on the default branch main are blocked/, agent);
-    assert.equal(await decide(r, agent, editCall(agent, '/tmp/outside-the-project.md')), null, `${agent}: outside the project`);
-    r.git('switch', '--quiet', '-C', 'feature/abc');
-    assert.match(await decide(r, agent, editCall(agent)), /carries no issue number/, agent);
-    r.git('switch', '--quiet', '-C', 'feat/34-login-crash');
-    assert.equal(await decide(r, agent, editCall(agent)), null, agent);
-  }
-  r.git('switch', '--quiet', '--detach');
-  assert.match(await decide(r, 'claude', editCall('claude')), /detached/);
-});
-
-test('edit guard: a branch that has diverged from its upstream is blocked until it is rebased or merged', async () => {
-  const r = await repo();
-  r.git('switch', '--quiet', '-c', 'feat/34-x');
-  r.git('push', '--quiet', '-u', 'origin', 'feat/34-x');
-  r.teammate('feat/34-x', 'theirs.txt');
-  writeFileSync(join(r.root, 'mine.txt'), 'mine\n');
-  r.git('add', 'mine.txt');
-  r.git('commit', '--quiet', '-m', 'mine #34');
-  r.git('fetch', '--quiet', 'origin');
-  assert.match(await decide(r, 'claude', editCall('claude')), /diverged from origin\/feat\/34-x \(1 ahead, 1 behind\)/);
-  r.git('merge', '--quiet', '--no-edit', 'origin/feat/34-x');
-  assert.equal(await decide(r, 'claude', editCall('claude')), null);
-});
-
-test('git guard: commit on main, push to main, force push and --no-verify are denied; issue-branch work passes', async () => {
-  const r = await repo();
-  const bash = (agent, command) => decide(r, agent, toolCall(agent, { command }));
-  for (const agent of ['claude', 'codex', 'copilot']) {
-    r.git('switch', '--quiet', 'main');
-    assert.match(await bash(agent, 'git add -A && git commit -m "fix"'), /commits on the default branch main/, agent);
-    assert.match(await bash(agent, 'git push'), /pushing to the default branch main/, agent);
-    r.git('switch', '--quiet', '-C', 'feat/34-x');
-    assert.equal(await bash(agent, 'git commit -m "fix: x" -m "Refs #34"'), null, agent);
-    assert.equal(await bash(agent, 'git push -u origin feat/34-x'), null, agent);
-    assert.match(await bash(agent, 'git push origin feat/34-x:main'), /pushing to the default branch/, agent);
-    assert.match(await bash(agent, 'git push -f'), /force pushes/, agent);
-    assert.match(await bash(agent, 'git commit --no-verify -m x'), /--no-verify/, agent);
-    assert.equal(await bash(agent, 'npm test'), null, agent);
-  }
-});
-
-test('git guard: long-option prefixes, short refspecs, hook overrides, shell keywords and wrappers are read (review of #132)', async () => {
-  const r = await repo();
-  const bash = (command) => decide(r, 'claude', toolCall('claude', { command }));
-  r.git('switch', '--quiet', '-C', 'feat/34-x');
-  // 1. unambiguous prefixes of long options
-  assert.match(await bash('git commit --no-verif -m x'), /--no-verify/);
-  assert.match(await bash('git push --no-verif'), /--no-verify/);
-  assert.match(await bash('git push --force-w'), /force pushes/);
-  assert.match(await bash('git push --mirro origin'), /--all \/ --mirror/);
-  assert.match(await bash('git push --al origin'), /--all \/ --mirror/);
-  // 3. switching the hooks off
-  assert.match(await bash('git -c core.hooksPath=/dev/null commit -m x'), /core\.hooksPath/);
-  assert.match(await bash('git --config-env=core.hooksPath=EMPTY push'), /core\.hooksPath/);
-  assert.match(await bash('git --config-env core.hooksPath=EMPTY push'), /core\.hooksPath/);
-  assert.match(await bash('GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x'), /core\.hooksPath/);
-  assert.match(await bash('git config core.hooksPath /dev/null'), /core\.hooksPath/);
-  assert.equal(await bash('git -c user.name=x commit -m "fix: y" -m "Refs #34"'), null);
-  r.git('switch', '--quiet', 'main');
-  // 2. short destinations of a refspec
-  assert.match(await bash('git push origin HEAD:heads/main'), /pushing to the default branch main/);
-  assert.match(await bash('git push origin HEAD:refs/heads/main'), /pushing to the default branch main/);
-  // 4. behind shell keywords and wrapper options
-  for (const command of [
-    'if true; then git commit -m x; fi',
-    'for f in a; do git commit -m x; done',
-    'if false; then :; else git commit -m x; fi',
-    'if false; then :; elif git commit -m x; then :; fi',
-    '! git commit -m x',
-    '{ git commit -m x; }',
-    'env -u FOO git commit -m x',
-    'env -S "git commit -m x"',
-    'nice -n 5 git commit -m x',
-    'sudo -u bob git commit -m x',
-    'timeout 30 git commit -m x',
-    'timeout -s KILL 30 git push',
-    'bash -c "git push origin main"',
-  ]) assert.match(await bash(command) ?? '', /YAW team mode/, command);
-});
-
-test('git guard: while the branch has diverged, rebase, pull, merge, reset and upstream changes are for the user', async () => {
-  const r = await repo();
-  r.git('switch', '--quiet', '-c', 'feat/34-x');
-  r.git('push', '--quiet', '-u', 'origin', 'feat/34-x');
-  const bash = (command) => decide(r, 'claude', toolCall('claude', { command }));
-  assert.equal(await bash('git pull --rebase'), null, 'not diverged: allowed');
-  r.teammate('feat/34-x', 'theirs.txt');
-  writeFileSync(join(r.root, 'mine.txt'), 'mine\n');
-  r.git('add', 'mine.txt');
-  r.git('commit', '--quiet', '-m', 'mine #34');
-  r.git('fetch', '--quiet', 'origin');
-  for (const command of ['git branch --unset-upstream', 'git branch -u origin/main', 'git branch --set-upstream-to=origin/main', 'git rebase origin/feat/34-x', 'git pull --rebase', 'git pull', 'git merge origin/feat/34-x', 'git reset --hard @{u}']) {
-    assert.match(await bash(command) ?? '', /has diverged from origin\/feat\/34-x; the user decides how to settle it/, command);
-  }
-  assert.equal(await bash('git status && git log --oneline -3'), null);
-});
-
-test('guards fail open: no git repository, no git on the PATH, a missing kit module', async () => {
-  const root = await project();
-  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
-  assert.equal(await decide({ root, env }, 'claude', editCall('claude')), null, 'not a git repository');
-  const r = await repo();
-  r.git('switch', '--quiet', 'main');
-  const noGit = { ...r.env, PATH: tmp('yaw-empty-bin-') };
-  assert.equal(await decide({ root: r.root, env: noGit }, 'claude', editCall('claude')), null, 'git is missing');
-  await removeModule({ root: r.root, module: 'team' });
-  assert.equal(await decide(r, 'claude', editCall('claude')), null, 'module removed: no guard');
 });
 
 // ------------------------------------------------------------------------------------- git hooks (lefthook)
@@ -510,6 +322,12 @@ test('gh protect: the team ruleset requires pr-policy; --verify compares without
   const differs = await yawGh(root, ['protect', '--verify'], { gh: loose });
   assert.equal(differs.code, 1);
   assert.match(differs.err, /differs from \.yaw\/github\.yaml; a person runs: just gh-protect/);
+  // a bypass actor (or a response that hides the list) is not "no bypass"
+  for (const bypass of [[{ actor_type: 'RepositoryRole', actor_id: 5, bypass_mode: 'always' }], undefined]) {
+    const r = await yawGh(root, ['protect', '--verify'], { gh: fakeApi({ rulesets: [{ ...want, bypass_actors: bypass }] }) });
+    assert.equal(r.code, 1, JSON.stringify(bypass));
+    assert.match(r.err, /differs from/);
+  }
   const none = await yawGh(root, ['protect', '--verify'], { gh: fakeApi() });
   assert.equal(none.code, 1);
   assert.match(none.err, /does not exist/);
@@ -583,7 +401,7 @@ test('sync: a dirty tree is not pulled; a diverged branch is reported; a feature
   r.teammate('feat/34-x', 'more.txt');
   const head = r.git('rev-parse', 'HEAD');
   const diverged = await sessionStart({ root: r.root, env: r.env });
-  assert.match(diverged.lines[0], /diverged from origin\/feat\/34-x \(1 ahead, 1 behind\): rebase or merge it yourself; agent edits are blocked until then/);
+  assert.match(diverged.lines[0], /diverged from origin\/feat\/34-x \(1 ahead, 1 behind\): nothing was pulled; rebase or merge it when it suits you/);
   assert.equal(r.git('rev-parse', 'HEAD'), head, 'nothing automatic');
 });
 
@@ -714,7 +532,7 @@ test('session-issue: off with team.session-context: false; nothing on main; no t
   assert.deepEqual(sessionIssue({}, { root: r.root, env: envWith(r.gh) }), { context: 'Active issue: #99 (branch feat/99-new).' });
 });
 
-test('token-free: every team hook, every recorded fixture of every agent', async () => {
+test('token-free and guard-free: every recorded fixture of every agent; only SessionStart says anything, nothing is denied', async () => {
   const r = await repo();
   r.git('switch', '--quiet', 'main');
   const def = loadModule(KIT_ROOT, 'team');
@@ -730,14 +548,9 @@ test('token-free: every team hook, every recorded fixture of every agent', async
     if (res.stdout === '') continue;
     const out = JSON.parse(res.stdout);
     const keys = Object.keys(out).sort();
-    if (f.event === 'PreToolUse') {
-      assert.ok(f.agent === 'copilot' ? out.permissionDecision === 'deny' : out.hookSpecificOutput.permissionDecision === 'deny', `${f.agent} ${f.name}: only a deny`);
-      assert.ok(!JSON.stringify(out).includes('additionalContext'));
-    } else {
-      assert.equal(f.event, 'SessionStart');
-      assert.ok(!res.stdout.includes('permissionDecision'));
-      assert.deepEqual(keys.filter((k) => !['systemMessage', 'hookSpecificOutput', 'additionalContext'].includes(k)), []);
-    }
+    assert.equal(f.event, 'SessionStart');
+    assert.ok(!res.stdout.includes('permissionDecision'), 'nothing is ever denied');
+    assert.deepEqual(keys.filter((k) => !['systemMessage', 'hookSpecificOutput', 'additionalContext'].includes(k)), []);
   }
 });
 

@@ -42,12 +42,12 @@ Skills and recipes (agent-agnostic, `just gh-*`):
 
 ## 2. Enforcement: no change without issue, no PR without issue
 
-Defence in depth; only the last two layers are binding for every agent and every human.
+Defence in depth; the agent rules are guidance, the git hooks bind locally (they can be skipped with `--no-verify`), and `pr-policy` plus the ruleset bind every agent and every human.
 
 | Layer | Rule | Applies to |
 |---|---|---|
-| Agent hook (`PreToolUse` on edit tools, Codex `apply_patch`, Copilot `preToolUse`, Gemini `BeforeTool`, Pi `tool_call`, Hermes `pre_tool_call`) | Deny edits while on the default branch or on a branch without an issue number: *"Run `just task start <#>` first."* | agents |
-| Agent hook (`PreToolUse` on shell) | Deny `git commit` / `git push` to the default branch, `--force` to shared branches | agents |
+| Agent rules (`AGENTS.md`; guidance only, ADR-0031) | Work only on an issue branch: *"Run `just task start <#>` first."* No agent-side `PreToolUse` command guard in phase 1 (decided by the user); the binding layers are the next three | agents |
+| Agent rules (`AGENTS.md`; guidance only) | No `git commit` / `git push` to the default branch, no `--force`, no `--no-verify` | agents |
 | Git hooks (`lefthook`) | `commit-msg`: requires `#<n>` or `Refs #<n>`; `pre-push`: refuses pushing to the default branch | everyone locally |
 | CI required check `pr-policy` | PR links an issue (`closingIssuesReferences` non-empty), linked issue passes Definition of Ready, branch name matches, phase rules (section 4). Phase 1 enforces only "PR links an open issue"; the rest comes in phase 2 | everyone |
 | Branch protection / rulesets | PR required, N approvals, required checks (`quality-gate`, `pr-policy`), no force-push, optional linear history | everyone |
@@ -56,7 +56,7 @@ Defence in depth; only the last two layers are binding for every agent and every
 
 Phase 1 (ADR-0031) builds these layers as the `team` module (preselected in Standard and Full for a team; depends on `tasks`, `github`, `git-hooks`):
 
-- The agent edit guard also denies edits while the branch has diverged from its upstream (the "lock flag" of §3, read live from git, so it clears itself once the user rebases or merges). Edits to files outside the project are not affected. The shell guard also denies force pushes, `--all` / `--mirror`, `--no-verify` and `core.hooksPath` overrides (long options also as prefixes), and while the branch has diverged it leaves rebase, pull, merge, reset and upstream changes to the user. Both read `git` calls in simple commands (shell keywords, wrappers such as `env` / `sudo` / `timeout`, `sh -c`); scripts, aliases and `eval` are left to the git hooks, `pr-policy` and the ruleset.
+- **Security boundary (decided by the user, ADR-0031):** the GitHub ruleset (`just gh-protect`: pull request required, no force push, no deletion, no bypass actors) plus `pr-policy` plus lefthook. The agent-side rules in `AGENTS.md` are guidance only; there is no agent-side command guard and no edit lock.
 - `commit-msg` accepts `#<n>` anywhere outside comment lines and lets git's own merge and revert messages and `fixup!` / `squash!` commits pass. `pre-push` is a lefthook script (`.lefthook/pre-push/`), because lefthook skips `run` jobs on pre-push when no new files are pushed; creating the default branch (the first push of a new repository) is allowed.
 - `pr-policy` (`.github/workflows/pr-policy.yml`, job `pr-policy`, read-only token, no checkout, no third-party action) reads `closingIssuesReferences` and needs an open issue of the same repository; GitHub fills it only for pull requests into the default branch. `requiredChecks` in `.yaw/github.yaml` gains `pr-policy` while the module is installed.
 - `just task start <#>` assigns the issue and switches to its branch, or creates `<type>/<#>-<slug>` from the fresh default branch (`fix/` for `type:bug`). Project Status, worktree and session link stay later (issue #110).
@@ -70,7 +70,7 @@ A `SessionStart` hook (or equivalent per agent) runs `yaw session-start`, which:
    - on default branch, clean, behind → `git pull --ff-only` automatically;
    - on a feature branch, behind its upstream → `git pull --ff-only` if possible;
    - default branch moved ahead of the feature branch → report "N commits behind main", suggest `just sync` (rebase or merge per team ADR); never automatic;
-   - dirty tree or diverged → no automatic action; while the branch is diverged the edit guard denies edits until the user rebases or merges it (ADR-0031: read live from git, no lock file; a merely dirty tree is reported, not locked; `just sync` is not built in phase 1).
+   - dirty tree or diverged → no automatic action; the user is told (information, not a lock: ADR-0031 has no agent-side guard, so phase 1 has no lock flag; `just sync` is not built in phase 1).
 3. Shows the user (zero tokens, `systemMessage` or terminal):
    - my open issues sorted by priority and iteration, with estimate and target date;
    - PRs waiting for my review; my PRs with failing checks or requested changes;

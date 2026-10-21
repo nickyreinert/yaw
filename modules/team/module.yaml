@@ -1,9 +1,9 @@
 # modules/team/module.yaml (Y-5.9, ADR-0031): team-mode enforcement (doc 14 §2-§3).
-# Defence in depth: agent guards (deny), lefthook commit-msg / pre-push, the pr-policy CI check and the ruleset
-# (`just gh-protect`, github module). The guards deny with one line; the session start talks to the user
-# (systemMessage); the only model-visible output is the active issue at session start (BUILD.md rule 5).
+# The binding layers are lefthook commit-msg / pre-push, the pr-policy CI check and the ruleset (`just gh-protect`,
+# github module). There is no agent-side command guard: the AGENTS.md rules are guidance (ADR-0031). The session
+# start talks to the user (systemMessage); the only model-visible output is the active issue (BUILD.md rule 5).
 name: team
-description: "Team mode: no change without an issue (agent edit and git guards, lefthook commit-msg and pre-push), the pr-policy check (the PR links an open issue), and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
+description: "Team mode: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
 depends: [tasks, github, git-hooks]
 default: { quick: false, standard: { team: true }, full: { team: true } }
 questions:
@@ -16,15 +16,6 @@ questions:
 outputs:
   templates: [lefthook.yml, .lefthook/pre-push/yaw-default-branch.sh, .github/workflows/pr-policy.yml, just/team.just, justfile]
   hooks:
-    # Guards: a one-line deny on PreToolUse, nothing on an allow (ADR-0007).
-    - name: guard-edit
-      event: PreToolUse
-      matcher: Edit|Write|MultiEdit|NotebookEdit
-      kind: guard
-    - name: guard-git
-      event: PreToolUse
-      matcher: Bash
-      kind: guard
     # User only: fetch, fast-forward when safe, my issues and pull requests (systemMessage). Runs first, so the
     # context hook below can read the issue title from the cache it writes.
     - name: session-sync
@@ -41,12 +32,12 @@ outputs:
       kind: context
       tokenCost: low
 agents:
-  claude:  { support: native, via: "PreToolUse deny on edits and git commit/push + SessionStart sync + git hooks + CI check" }
-  codex:   { support: native, via: "PreToolUse on apply_patch and Bash + SessionStart; hooks must be trusted via /hooks" }
-  copilot: { support: partial, via: "runs the .claude/settings.json guards; git hooks and CI apply", note: "deny shape from the Copilot CLI docs, not verified live; no session-start message (`just start`)" }
+  claude:  { support: native, via: "SessionStart sync + active issue; git hooks and CI check apply; AGENTS.md rules (guidance)" }
+  codex:   { support: native, via: "SessionStart sync + active issue; git hooks and CI check apply; hooks must be trusted via /hooks" }
+  copilot: { support: partial, via: "SessionStart active issue (additionalContext); git hooks and CI check apply", note: "no session-start message; `just start` is the fallback" }
 agentsMd: |
-  - Team mode: no change without an issue. Work on an issue branch (`just task start <#>`); edits on the default branch or a branch without an issue number are denied.
-  - Commit messages name the issue (`Refs #<n>`, `just commit` adds it); nobody pushes to the default branch; every PR links an open issue (`Closes #<n>`, `just pr` adds it).
+  - Team mode: no change without an issue. Work on an issue branch (`just task start <#>`), never on the default branch or a branch without an issue number.
+  - Commit messages name the issue (`Refs #<n>`, `just commit` adds it); never push to the default branch, never force-push, never skip hooks (`--no-verify`); every PR links an open issue (`Closes #<n>`, `just pr` adds it). Git hooks, the pr-policy check and the branch ruleset enforce this.
   - Without session-start hooks, run `just start` first: it fetches, fast-forwards when safe and lists your issues and pull requests.
 tokenCost: low
 lastVerified: 2026-10-21

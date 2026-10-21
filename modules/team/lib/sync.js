@@ -2,7 +2,7 @@
 //
 //   1. git fetch --prune origin (time-limited; a failure means offline)
 //   2. fast-forward only when it is safe: the tree is clean, the branch is behind its upstream and not ahead.
-//      Diverged or dirty: nothing happens, the user is told; the edit guard denies edits while diverged.
+//      Diverged or dirty: nothing happens, the user is told (information only).
 //      The default branch moved ahead of a feature branch: reported, never merged automatically.
 //   3. my open issues (priority, estimate, milestone and due date), PRs waiting for my review, my PRs with failing
 //      checks or requested changes: three gh reads at once, cached for 5 minutes in ~/.yaw/cache/; offline the
@@ -185,7 +185,7 @@ export async function sessionStart({ root, env = process.env, now = new Date(), 
     notes.push('no sync on a detached HEAD');
   } else if (state.upstream && state.behind > 0) {
     if (diverged(state)) {
-      notes.push(`diverged from ${state.upstream} (${state.ahead} ahead, ${state.behind} behind): rebase or merge it yourself; agent edits are blocked until then`);
+      notes.push(`diverged from ${state.upstream} (${state.ahead} ahead, ${state.behind} behind): nothing was pulled; rebase or merge it when it suits you`);
     } else if (state.dirty) {
       notes.push(`${plural(state.behind, 'commit')} behind ${state.upstream}; not pulled because the tree has changes`);
     } else {

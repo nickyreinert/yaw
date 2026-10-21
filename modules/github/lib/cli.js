@@ -288,6 +288,9 @@ const essentials = (r) => ({
   enforcement: r.enforcement,
   target: r.target,
   include: [...(r.conditions?.ref_name?.include ?? [])].sort(),
+  // Nobody bypasses the ruleset (ADR-0031: it is the security boundary). A response without the list is not
+  // taken as "no bypass".
+  bypass: Array.isArray(r.bypass_actors) ? r.bypass_actors.map((a) => `${a.actor_type}:${a.actor_id}:${a.bypass_mode}`).sort() : 'not reported',
   rules: (r.rules ?? []).map((x) => x.type).sort(),
   approvals: (r.rules ?? []).find((x) => x.type === 'pull_request')?.parameters?.required_approving_review_count,
   checks: ((r.rules ?? []).find((x) => x.type === 'required_status_checks')?.parameters?.required_status_checks ?? []).map((x) => x.context).sort(),
