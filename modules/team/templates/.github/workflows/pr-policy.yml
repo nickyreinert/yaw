@@ -1,0 +1,41 @@
+# pr-policy.yml (team module, ADR-0031). Phase 1 checks one rule (BD3): the pull request links an open issue
+# (closingIssuesReferences, e.g. "Closes #34" in the description, which `just pr` writes). The job name pr-policy
+# is the contract with the branch ruleset (`just gh-protect`): do not rename it.
+# GitHub fills closingIssuesReferences only for pull requests into the default branch.
+# No checkout, no third-party action: the job reads the pull request through the GitHub API only.
+name: pr-policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-policy:
+    name: pr-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: The pull request links an open issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){closingIssuesReferences(first:20){nodes{number state}}}}}'
+          open="$(gh api graphql -F owner="${REPO%%/*}" -F name="${REPO#*/}" -F pr="$PR" -f query="$query" \
+            --jq '[.data.repository.pullRequest.closingIssuesReferences.nodes[] | select(.state == "OPEN") | "#\(.number)"] | join(" ")')"
+          if [ -z "$open" ]; then
+            echo "::error title=pr-policy::This pull request links no open issue. Add \"Closes #<n>\" to its description (just pr writes it) or link the issue under Development."
+            exit 1
+          fi
+          echo "pr-policy: links the open issue(s) $open"

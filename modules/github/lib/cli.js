@@ -35,6 +35,8 @@ export class GhUsageError extends Error {
 export const CONFIG = '.yaw/github.yaml';
 export const PR_TEMPLATE = '.github/pull_request_template.md';
 export const WORKFLOW = '.github/workflows/quality-gate.yml';
+// The team module's workflow (Y-5.9, ADR-0031): it reports the pr-policy check.
+export const PR_POLICY_WORKFLOW = '.github/workflows/pr-policy.yml';
 export const RULESET = 'yaw-default-branch';
 // Verbs that change shared GitHub state (pr only on its first push); the Claude ask rules must cover each one.
 export const GUARDED = ['init', 'labels', 'protect', 'project-add', 'release', 'pr'];
@@ -43,6 +45,7 @@ export const USAGE = [
   'usage: yaw gh init [name] [--owner o] [--public] create the repository (private by default), push, labels',
   '       yaw gh labels                                                 create or update the labels of .yaw/github.yaml',
   '       yaw gh protect [--approvals n] [--check name]        ruleset for the default branch, verified afterwards',
+  '       yaw gh protect --verify [--approvals n] [--check name]  only compare the ruleset on GitHub with the wanted one (changes nothing)',
   '       yaw gh branch <T-012|#34> <slug...> [--type feat]             branch from the fresh default branch',
   '       yaw gh commit <type> "subject" [--scope s] [--task id]       Conventional Commit with the task footer',
   '       yaw gh pr [--title t] [--ready]                       push the branch, open a draft pull request',
@@ -110,7 +113,7 @@ async function authorise(io, title, plan) {
   throw new GhUsageError('not authorised; nothing was changed');
 }
 
-function defaultBranch(git, config) {
+export function defaultBranch(git, config) {
   const head = git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { allowFail: true });
   if (head.status === 0 && head.stdout.startsWith('origin/')) return head.stdout.slice('origin/'.length);
   if (config.defaultBranch && git(['check-ref-format', '--branch', config.defaultBranch], { allowFail: true }).status === 0) return config.defaultBranch;
@@ -290,6 +293,12 @@ const essentials = (r) => ({
   checks: ((r.rules ?? []).find((x) => x.type === 'required_status_checks')?.parameters?.required_status_checks ?? []).map((x) => x.context).sort(),
 });
 
+function compareRuleset(body, back, problem) {
+  const want = JSON.stringify(essentials(body));
+  const got = JSON.stringify(essentials(back));
+  if (want !== got) throw new GhError(`${problem}\n  wanted ${want}\n  found  ${got}`);
+}
+
 async function protect(c) {
   const { gh, values, stdout, root } = c;
   const config = loadConfig(root).value;
@@ -301,13 +310,24 @@ async function protect(c) {
   }
   const checks = values.check?.length ? values.check : (rules.requiredChecks ?? ['quality-gate']);
   for (const ch of checks) if (!/^[\w .:/-]{1,100}$/.test(ch)) throw new GhUsageError(`"${ch}" is not a valid check name`);
-  // A required check that no workflow reports would block every pull request for good.
-  if (checks.some((ch) => ['quality-gate', 'secret-scan'].includes(ch)) && readPlain(root, WORKFLOW) === null) {
+  // A required check that no workflow reports would block every pull request for good (not checked by --verify,
+  // which only compares).
+  if (!values.verify && checks.some((ch) => ['quality-gate', 'secret-scan'].includes(ch)) && readPlain(root, WORKFLOW) === null) {
     throw new GhUsageError(`${WORKFLOW} is missing, so the required checks ${checks.join(', ')} would never report; add the ci module (yaw add ci) or change rules.requiredChecks in ${CONFIG}`);
+  }
+  if (!values.verify && checks.includes('pr-policy') && readPlain(root, PR_POLICY_WORKFLOW) === null) {
+    throw new GhUsageError(`${PR_POLICY_WORKFLOW} is missing, so the required check pr-policy would never report; add the team module (yaw add team) or change rules.requiredChecks in ${CONFIG}`);
   }
   const body = rulesetBody({ approvals, checks, linearHistory: rules.linearHistory === true });
   const { slug } = repoInfo(gh);
   const existing = json(gh(['api', `repos/${slug}/rulesets`]), 'rulesets').find((r) => r.name === RULESET);
+  // --verify reads and compares only; it changes nothing, so it needs no person at a terminal (ADR-0031).
+  if (values.verify) {
+    if (!existing) throw new GhError(`the ruleset "${RULESET}" does not exist on ${slug}; a person runs: just gh-protect`);
+    compareRuleset(body, json(gh(['api', `repos/${slug}/rulesets/${existing.id}`]), 'ruleset'), `the ruleset "${RULESET}" on ${slug} differs from ${CONFIG}; a person runs: just gh-protect`);
+    stdout.write(`protect: ruleset "${RULESET}" on ${slug} matches ${CONFIG}\n`);
+    return 0;
+  }
   await authorise(c.io, `gh protect ${existing ? 'updates' : 'creates'} the ruleset "${RULESET}" on ${slug}:`, [
     'applies to the default branch; nobody bypasses it',
     'pull request required' + (approvals > 0 ? `, ${approvals} approval(s)` : ', no approvals'),
@@ -316,10 +336,7 @@ async function protect(c) {
   ]);
   const call = existing ? ['--method', 'PUT', `repos/${slug}/rulesets/${existing.id}`] : ['--method', 'POST', `repos/${slug}/rulesets`];
   const saved = json(gh(['api', ...call, '--input', '-'], { input: JSON.stringify(body) }), 'ruleset');
-  const back = json(gh(['api', `repos/${slug}/rulesets/${saved.id}`]), 'ruleset');
-  const want = JSON.stringify(essentials(body));
-  const got = JSON.stringify(essentials(back));
-  if (want !== got) throw new GhError(`the ruleset was saved but does not read back as requested\n  wanted ${want}\n  found  ${got}`);
+  compareRuleset(body, json(gh(['api', `repos/${slug}/rulesets/${saved.id}`]), 'ruleset'), 'the ruleset was saved but does not read back as requested');
   stdout.write(`protect: ruleset "${RULESET}" is active on ${slug} and verified\n`);
   return 0;
 }

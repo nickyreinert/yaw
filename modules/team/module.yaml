@@ -1,0 +1,52 @@
+# modules/team/module.yaml (Y-5.9, ADR-0031): team-mode enforcement (doc 14 §2-§3).
+# Defence in depth: agent guards (deny), lefthook commit-msg / pre-push, the pr-policy CI check and the ruleset
+# (`just gh-protect`, github module). The guards deny with one line; the session start talks to the user
+# (systemMessage); the only model-visible output is the active issue at session start (BUILD.md rule 5).
+name: team
+description: "Team mode: no change without an issue (agent edit and git guards, lefthook commit-msg and pre-push), the pr-policy check (the PR links an open issue), and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
+depends: [tasks, github, git-hooks]
+default: { quick: false, standard: { team: true }, full: { team: true } }
+questions:
+  - id: team.session-context
+    mode: F
+    type: boolean
+    label: Tell the agent the active issue at session start?
+    hint: One line (issue number and title of the current branch); off saves those tokens.
+    default: true
+outputs:
+  templates: [lefthook.yml, .lefthook/pre-push/yaw-default-branch.sh, .github/workflows/pr-policy.yml, just/team.just, justfile]
+  hooks:
+    # Guards: a one-line deny on PreToolUse, nothing on an allow (ADR-0007).
+    - name: guard-edit
+      event: PreToolUse
+      matcher: Edit|Write|MultiEdit|NotebookEdit
+      kind: guard
+    - name: guard-git
+      event: PreToolUse
+      matcher: Bash
+      kind: guard
+    # User only: fetch, fast-forward when safe, my issues and pull requests (systemMessage). Runs first, so the
+    # context hook below can read the issue title from the cache it writes.
+    - name: session-sync
+      event: SessionStart
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "SessionStart systemMessage (user-visible only)" }
+        codex: { support: native, via: "SessionStart systemMessage (user-visible only)" }
+        copilot: { support: none, note: "no user message at session start; `just start` is the fallback" }
+    # The active issue, one line, once per session start: the active-task re-injection of BUILD.md rule 5.
+    - name: session-issue
+      event: SessionStart
+      kind: context
+      tokenCost: low
+agents:
+  claude:  { support: native, via: "PreToolUse deny on edits and git commit/push + SessionStart sync + git hooks + CI check" }
+  codex:   { support: native, via: "PreToolUse on apply_patch and Bash + SessionStart; hooks must be trusted via /hooks" }
+  copilot: { support: partial, via: "runs the .claude/settings.json guards; git hooks and CI apply", note: "deny shape from the Copilot CLI docs, not verified live; no session-start message (`just start`)" }
+agentsMd: |
+  - Team mode: no change without an issue. Work on an issue branch (`just task start <#>`); edits on the default branch or a branch without an issue number are denied.
+  - Commit messages name the issue (`Refs #<n>`, `just commit` adds it); nobody pushes to the default branch; every PR links an open issue (`Closes #<n>`, `just pr` adds it).
+  - Without session-start hooks, run `just start` first: it fetches, fast-forwards when safe and lists your issues and pull requests.
+tokenCost: low
+lastVerified: 2026-10-21

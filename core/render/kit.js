@@ -309,6 +309,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     // personal, so a team repository never gets it (ADR-0013); hooks are registered for everyone and decide at
     // run time, from the user's own configuration, what to do.
     comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], (flat['idea.team'] ?? 'solo') !== 'solo'),
+    // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
+    teamModule: modules.includes('team'),
     // ADR-0028: gate recipes of the enabled modules (`outputs.gates`); `just check` runs them via sync-check.
     gates: [...new Set(modules.flatMap((m) => (definitions?.get(m) ?? loadModule(kitRoot, m)).outputs?.gates ?? []))].sort(),
   };

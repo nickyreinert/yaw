@@ -13,7 +13,7 @@ gh-init *args:
 gh-labels *args:
     @set -- gh labels "$@"; {{yaw_gh}}
 
-# GUARDED. Apply and verify the ruleset for the default branch (needs repo admin).
+# GUARDED. Apply and verify the ruleset for the default branch (needs repo admin). `--verify` only compares, unguarded.
 [positional-arguments]
 gh-protect *args:
     @set -- gh protect "$@"; {{yaw_gh}}

@@ -28,5 +28,5 @@ rules:
 <% else %>
   approvals: 0
 <% end %>
-  requiredChecks: [quality-gate, secret-scan]
+  requiredChecks: [quality-gate, secret-scan<% if teamModule %>, pr-policy<% end %>]
   linearHistory: false
