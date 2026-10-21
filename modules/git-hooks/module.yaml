@@ -1,0 +1,17 @@
+# modules/git-hooks/module.yaml (Y-5.4, ADR-0026): lefthook runs format, lint and a gitleaks secret scan on commit.
+name: git-hooks
+description: lefthook pre-commit (format, lint, gitleaks scan of the staged changes) installed with `just hooks-install`; git runs it for every agent and for you.
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions: []
+outputs:
+  templates: [lefthook.yml, just/git-hooks.just, justfile]
+agentsMd: |
+  - Git hooks (lefthook: `just fmt`, `just lint`, gitleaks) run on every commit; install them once with `just hooks-install`.
+  - If gitleaks blocks a commit, remove the secret from the staged files; never bypass with `--no-verify`.
+agents:
+  claude:  { support: native, via: "git pre-commit hook (lefthook) + AGENTS.md rule" }
+  codex:   { support: native, via: "git pre-commit hook (lefthook) + AGENTS.md rule" }
+  copilot: { support: native, via: "git pre-commit hook (lefthook) + AGENTS.md rule" }
+tokenCost: none
+lastVerified: 2026-10-21

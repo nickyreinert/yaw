@@ -1,0 +1,24 @@
+# ADR-0026: `git-hooks` module
+
+- Status: Accepted
+- Date: 2026-10-21
+- Issue: Y-5.4 (#54)
+- Resolves: implementation details of doc 04 (`git-hooks`) and doc 08 (gitleaks in git hooks) (B rule 10)
+
+## Decision
+
+- **lefthook, not pre-commit.** Doc 04 allows either; lefthook is a single binary (no Python), and doc 14 already plans lefthook for `commit-msg` / `pre-push` (Y-5.9), which will extend the same `lefthook.yml`.
+- **`pre-commit` jobs, in order:** `secrets` (`gitleaks git --pre-commit --staged --redact --no-banner`), `format` (`just fmt`, `stage_fixed: true`), `lint` (`just lint`). The profile verbs (doc 01 §6) are the formatter and linter, so the module needs no per-stack config. "lint-staged" is covered by lefthook running on commit; the verbs check the whole project rather than only staged files (simplest, stack-independent).
+- **No questions.** Mode defaults: Standard and Full on, Quick off (doc 04). Nothing else to ask.
+- **Installing the git hook is explicit:** `just hooks-install` (`lefthook install`), `just hooks-uninstall`. The module writes only files into the project (`lefthook.yml`, `just/git-hooks.just`, the `justfile` import); it never touches `.git/`. One `AGENTS.md` block tells the agent to install them and never to bypass with `--no-verify`.
+- **Missing tools.** lefthook missing: `hooks-install` fails with an install hint. gitleaks missing: the commit is not blocked, but the job prints a warning that nothing was scanned (same pattern as shellcheck in the `lint` verb). Blocking on a missing optional tool would lock out contributors who have not installed it; the agent rule in `AGENTS.md` and the missing-tool warning are the mitigation.
+- **Removal.** `yaw remove git-hooks` deletes the module files and fragments. A hook already installed in `.git/hooks` stays (outside the manifest) but is harmless: lefthook without a config does nothing (tested); `just hooks-uninstall` before removal, or `lefthook uninstall` after, deletes it.
+- **Agents.** Git runs the hook for every agent and for the human, so Claude, Codex and Copilot are `native` without any agent hook; the module has no agent hooks, so nothing to keep token-free (BUILD.md rule 5; `tokenCost: none`).
+
+## Tools (ADR-0008 addendum)
+
+- `lefthook` and `gitleaks` are user-side tools of the generated project, not npm dependencies and not required by the kit itself. Kit CI installs both so the module tests run; locally the tests that need them skip, in CI (`CI` set) a missing tool fails the run. On Linux, CI downloads pinned GitHub release assets (gitleaks 8.30.1, lefthook 2.2.2) and verifies their SHA-256 before extracting; on macOS it uses Homebrew, which is unpinned.
+
+## Tests
+
+- The planted secret is a GitHub-token-shaped canary built from random bytes at test time (never committed, so it cannot trip gitleaks in this repo). The test asserts the commit is blocked, the secret is redacted in the output, and a clean commit passes.

@@ -1,0 +1,18 @@
+# lefthook.yml (git-hooks module, ADR-0026). Install the git hook once with `just hooks-install`.
+# Reference: https://lefthook.dev/configuration/
+pre-commit:
+  parallel: false
+  jobs:
+    # First: a commit with a secret must not get any further.
+    - name: secrets
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks git --pre-commit --staged --redact --no-banner
+        else
+          echo "git-hooks: gitleaks is not installed, so the staged changes were NOT scanned for secrets (brew install gitleaks)" >&2
+        fi
+    - name: format
+      run: just fmt
+      stage_fixed: true
+    - name: lint
+      run: just lint
