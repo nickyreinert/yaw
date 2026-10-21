@@ -1,7 +1,11 @@
 // Checks every local href/src/anchor in public/**/*.html. No network, no dependencies.
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 
+if (!existsSync('public') || lstatSync('public').isSymbolicLink()) {
+  console.error(existsSync('public') ? 'public: symlinks in public/ are not followed' : 'public: directory not found');
+  process.exit(1);
+}
 const root = realpathSync(resolve('public'));
 const problems = [];
 // Walk without following symlinks: a symlink (file or directory) is reported and never read.

@@ -191,6 +191,18 @@ test('static-site check-links: refuses targets outside public/ without reading t
   assert.doesNotMatch(dirLink.stderr, /SECRET-MARKER/, 'the outside page was not read');
   unlinkSync(join(root, 'public', 'out_link'));
 
+  // public/ itself a symlink to an outside directory
+  const real = join(cwd, 'outside-public');
+  mkdirSync(real);
+  writeFileSync(join(real, 'index.html'), page('<a href="SECRET-MARKER-missing.html">m</a>'));
+  const other = join(cwd, 'site2');
+  mkdirSync(other);
+  symlinkSync(real, join(other, 'public'));
+  const top = run(process.execPath, [script], { cwd: other });
+  assert.notEqual(top.status, 0);
+  assert.match(top.stderr, /public: symlinks in public\/ are not followed/);
+  assert.doesNotMatch(top.stdout + top.stderr, /SECRET-MARKER/);
+
   writeFileSync(join(root, 'public', 'a b.html'), page('<h1 id="top">t</h1>'));
   writeFileSync(join(root, 'public', 'index.html'), page('<a href="a%20b.html?x=1#top">ok</a>'));
   const ok = check();
