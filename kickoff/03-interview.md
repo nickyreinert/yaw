@@ -125,7 +125,7 @@ The proposal shows: chosen profile(s), shape (monolith, static + API, …), data
 | # | Question | Mode |
 |---|---|---|
 | 10.1 | Task tracking: **local only** / GitHub only / both (local-first) | Q |
-| 10.2 | Use GitHub for the repo? Create it now? Public or private? ("no" turns `github` and `ci` off in Full; asked for team projects too, where "no" also leaves out `team`, which depends on `github`; ADR-0032) | S |
+| 10.2 | Use GitHub for the repo? Create it now? Public or private? ("no" turns `github` and `ci` off in Full; not asked for team projects: team mode always requires `github`, the remote can be a local repository, ADR-0032) | S |
 | 10.3 | Branch model: trunk + short branches (default) / git-flow | F |
 | 10.4 | Use milestones/epics and a GitHub Project board? | S |
 
