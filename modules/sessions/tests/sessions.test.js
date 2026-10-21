@@ -458,6 +458,11 @@ test('0700 never follows a link, never touches a foreign or user-chosen director
   symlinkSync(target, join(base, 'linked'));
   mkdirSync(join(base, 'plain'), { mode: 0o755 });
   assert.equal(tightenHome(join(base, 'linked'), true), false);
+  assert.equal(tightenHome(`${join(base, 'linked')}/`, true), false, 'a trailing slash does not make lstat follow the link');
+  mkdirSync(join(base, 'h'));
+  symlinkSync(target, join(base, 'h', '.yaw'));
+  assert.equal(tightenHome(`${join(base, 'h', '.yaw')}//`, true), false);
+  assert.equal(statSync(target).mode & 0o777, 0o755, 'the link target is untouched');
   assert.equal(statSync(target).mode & 0o777, 0o755, 'the link target is untouched');
   assert.equal(tightenHome(join(base, 'plain'), true), false, 'an existing directory not named .yaw (YAW_HOME=$HOME) is left alone');
   assert.equal(statSync(join(base, 'plain')).mode & 0o777, 0o755);

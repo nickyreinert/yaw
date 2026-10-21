@@ -68,6 +68,7 @@ export function registryFile(env) {
 // never throws.
 export function tightenHome(home, existed, uid = process.getuid?.()) {
   try {
+    home = home.replace(/\/+$/, '') || '/'; // a trailing slash would make lstat follow a link
     const st = lstatSync(home);
     if (st.isSymbolicLink() || !st.isDirectory() || st.uid !== uid) return false;
     if (existed && basename(home) !== '.yaw') return false;
