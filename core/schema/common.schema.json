@@ -107,6 +107,7 @@
       "description": "Derived facts vocabulary (ADR-0017). All listed keys must match; a list means any of its values.",
       "type": "object",
       "properties": {
+        "github": { "$ref": "#/$defs/boolFact" },
         "hasUI": { "$ref": "#/$defs/boolFact" },
         "language": {
           "anyOf": [

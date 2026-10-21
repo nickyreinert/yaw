@@ -16,7 +16,7 @@ import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
-import { ANSWERS, ProjectError, initProject, parseAnswers, renderInit, selectModules } from '../render/project.js';
+import { ANSWERS, ProjectError, initProject, parseAnswers, checkDependencies, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
 import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
@@ -154,6 +154,7 @@ export async function init({ values, positionals, io }) {
   }
   const wanted = answersDoc.proposal?.modules ?? selectModules({ kitRoot, mode: answersDoc.mode, facts });
   const modules = ['core', ...wanted.filter((m) => m !== 'core' && hasModule(kitRoot, m))];
+  checkDependencies({ kitRoot, modules });
   const skippedModules = wanted.filter((m) => m !== 'core' && !hasModule(kitRoot, m));
   const profile = profiles.find((p) => p.name === chosen[0]);
   // A file with a proposal is copied byte for byte (ADR-0019); otherwise the proposal is written into the answers.

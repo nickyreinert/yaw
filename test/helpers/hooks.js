@@ -31,7 +31,7 @@ export function fixture(agent, name) {
 // The agent a fixture's hook command declares: Copilot runs the commands of .claude/settings.json.
 export const declaredAgent = (agent) => (agent === 'copilot' ? 'claude' : agent);
 
-export function answersText({ agents = AGENTS, modules = ['core', 'security'], profile = 'node-cli' } = {}) {
+export function answersText({ agents = AGENTS, modules = ['core', 'standards', 'security'], profile = 'node-cli' } = {}) {
   return `mode: quick\nanswers:\n  user.agents: [${agents.join(', ')}]\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: test project\n  profiles: [${profile}]\n  modules: [${modules.join(', ')}]\n`;
 }
 

@@ -14,6 +14,9 @@ export function deriveFacts(answers = {}) {
   }
   if (typeof answers['idea.audience'] === 'string') facts.public = answers['idea.audience'] === 'public';
   if (typeof answers['idea.team'] === 'string') facts.team = answers['idea.team'] === 'team';
+  // GitHub is used unless the user says otherwise; a team project always uses it (ADR-0032).
+  if (facts.team === true) facts.github = true;
+  else if (typeof answers['tasks.use-github'] === 'boolean') facts.github = answers['tasks.use-github'];
   return facts;
 }
 
