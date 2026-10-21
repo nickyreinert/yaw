@@ -108,7 +108,7 @@ function check({ root, io, kitRoot }) {
   const problems = [];
   const warnings = [];
   if (ctx.state === 'missing') problems.push(`${MAP_FILE} does not exist: run \`just map update\``);
-  else if (ctx.formatError) problems.push(`${ctx.formatError.message}; fix it, then run \`just map update\``);
+  else if (ctx.formatError) problems.push(`${ctx.formatError.message}; fix it in ${MAP_FILE}, then run \`just map check\``);
   else {
     const r = checkMap(ctx.text, ctx.model, ctx.files);
     problems.push(...r.problems);
