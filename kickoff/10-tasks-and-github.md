@@ -42,11 +42,11 @@ Rules (in `AGENTS.md` via the tasks module):
 
 - Start of session: read *Active*; continue from the resume point unless told otherwise.
 - Every active task has: brief, model/effort suggestion, link to spec/plan/issue, resume point, dated journal.
-- On stop: append journal line, update resume point and percentage. Enforced by Claude `Stop` hook; tier-2 rule for others.
+- On stop: append journal line, update resume point and percentage (`just task log T-012 "text" --resume "next step" --progress 60`). The Claude and Codex `Stop` hook reminds the user (user-visible only, never a block: BUILD.md rule 5); tier-2 rule for the model and for Copilot (ADR-0010).
 - Done = implemented + `just check` green + reviewed; then move a one-line entry to `TASKS.archive.md` and delete the plan file in `docs/plan/` (spec updates go to `docs/spec/`).
 - IDs `T-NNN`, stable across sync; GitHub issue number stored next to it.
 
-`just task` helpers: `list`, `next`, `start T-012`, `log T-012 "text"`, `done T-012`, `new "title"`, `sync`.
+`just task` helpers: `list`, `next`, `start T-012`, `log T-012 "text"`, `done T-012`, `new "title"`, `sync` (ADR-0010: in GitHub mode they take issue numbers and journal lines are issue comments; the view `TASKS.md` is git-ignored).
 
 ## 3. GitHub scripts (github module)
 

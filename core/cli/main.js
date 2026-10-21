@@ -10,6 +10,7 @@ import { createPrompter } from './prompt.js';
 import { runHook } from '../hooks/dispatch.js';
 import { agents } from './agents.js';
 import { sync } from './sync.js';
+import { task } from './tasks.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -28,6 +29,7 @@ export const COMMANDS = [
   { name: 'hook', args: '<event> --agent claude|codex|copilot --module <module>', summary: 'hook entry point for coding agents (reads the payload on stdin; always exits 0)', options: {} },
   { name: 'sync', args: '--check', summary: 'check that agent adapter files match their source (fails on drift)', options: { check: { type: 'boolean' } }, run: sync },
   { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },
+  { name: 'task', args: '<list|next|start|log|done|new|sync> [...]', summary: 'task ledger helpers (tasks module; `just task ...` calls this)', options: { resume: { type: 'string' }, progress: { type: 'string' } }, run: task },
   { name: 'config', step: 5, summary: 'change .yaw/config.yaml' },
   { name: 'gh', step: 5, summary: 'GitHub setup and helpers' },
   { name: 'decisions', step: 5, summary: 'decision journal (ADRs, notices)' },
@@ -70,6 +72,8 @@ export async function main(argv, io = {}) {
     env: io.env ?? process.env,
     kitRoot: io.kitRoot ?? KIT_ROOT,
     prompter: io.prompter ?? createPrompter(),
+    gh: io.gh, // tests replay recorded gh output; undefined runs the GitHub CLI
+    now: io.now,
   };
   const [first, ...rest] = argv;
   if (first === undefined || first === '--help' || first === '-h') {

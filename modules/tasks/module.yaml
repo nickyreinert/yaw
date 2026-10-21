@@ -1,0 +1,44 @@
+# modules/tasks/module.yaml (Y-5.3, ADR-0010): task ledger, local / GitHub / both (doc 10, BD4).
+name: tasks
+description: Task ledger in TASKS.md (local), GitHub issues with a generated read-only TASKS.md (GitHub), or both linked; `just task` recipes, session-start re-injection of the active task and a resume-point reminder.
+depends: [core]
+default: { quick: true, standard: true, full: true }
+questions:
+  # Team mode (doc 14) forces GitHub only, so the question is not asked there (ADR-0010).
+  - id: tasks.mode
+    ref: "10.1"
+    mode: Q
+    type: choice
+    label: Task tracking
+    hint: Where tasks live; local works without GitHub.
+    help: task-modes
+    when: { idea.team: solo }
+    choices:
+      - { value: local, label: Local only (TASKS.md) }
+      - { value: github, label: GitHub only (issues) }
+      - { value: both, label: Both (local-first) }
+    default: local
+outputs:
+  # TASKS.md is the ledger (local, both) or its read-only view (github); just/tasks.just holds the recipes.
+  templates: [TASKS.md, AGENTS.md, justfile, just/tasks.just, .gitignore]
+  hooks:
+    # Comfort, not a block: a blocking Stop reason would reach the model (BUILD.md rule 5, ADR-0010).
+    - name: stop-resume-point
+      event: Stop
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "Stop systemMessage (user-visible only)" }
+        codex: { support: native, via: "Stop systemMessage (user-visible only)" }
+        copilot: { support: none, note: "no user message on Stop; the AGENTS.md rule applies (tier 2)" }
+    # The only model-visible output: the active task, a few lines, at session start (doc 11).
+    - name: session-start-task
+      event: SessionStart
+      kind: context
+      tokenCost: low
+agents:
+  claude:  { support: native, via: "Stop reminder + SessionStart re-injection" }
+  codex:   { support: native, via: "Stop reminder + SessionStart re-injection; hooks must be trusted via /hooks" }
+  copilot: { support: partial, via: "SessionStart re-injection", note: "resume point is an AGENTS.md rule (tier 2)" }
+tokenCost: low
+lastVerified: 2026-10-21

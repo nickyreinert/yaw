@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../lib/yaml.js';
+import { tasksMode } from '../lib/tasks.js';
 import { formatError } from '../lib/schema.js';
 import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
@@ -200,6 +201,10 @@ function oneLine(text) {
   return String(text ?? '').replace(/<!--|-->/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function taskFlags(mode) {
+  return { mode, local: mode === 'local', github: mode === 'github', both: mode === 'both', source: mode !== 'github' };
+}
+
 // Context for templates (ADR-0002): computed in JS, templates only read it.
 // Answers are nested by question group: "idea.text" is answers.idea.text. Questions the user did not
 // answer take their default, so a template never sees a missing answer.
@@ -241,6 +246,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
         || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
     profileStandards: profileOverlay(kitRoot, profiles),
     devenv: profileDevenv(kitRoot, profiles),
+    // ADR-0010: the effective task mode (team forces github) as booleans, since templates have no comparisons.
+    tasks: taskFlags(tasksMode(flat)),
   };
 }
 

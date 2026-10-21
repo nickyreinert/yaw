@@ -176,3 +176,12 @@ export function renderTasks(ledger) {
   if (ledger.archive !== undefined) out.push('', `## Done → ${ledger.archive}`);
   return `${out.join('\n')}\n`;
 }
+
+// Where the tasks live (BD4, ADR-0010): team mode forces GitHub only; otherwise the answer to 10.1 decides.
+export const TASK_MODES = ['local', 'github', 'both'];
+
+export function tasksMode(answers = {}) {
+  if ((answers['idea.team'] ?? 'solo') !== 'solo') return 'github';
+  const mode = answers['tasks.mode'];
+  return TASK_MODES.includes(mode) ? mode : 'local';
+}

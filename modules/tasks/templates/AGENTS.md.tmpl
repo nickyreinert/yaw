@@ -1,0 +1,16 @@
+## Tasks
+
+<% if tasks.github %>
+- `TASKS.md` is a read-only view of GitHub issues: never edit it; `just task sync` refreshes it.
+- Start of session: read *Active* in `TASKS.md` and continue from the latest journal line.
+- Work through `just task` (list, next, start #n, log #n "text" --resume "next step", done #n, new "title").
+- Done = implemented + `just check` green + reviewed; the PR closes the issue.
+<% else %>
+- Start of session: read *Active* in `TASKS.md` and continue from the resume point unless told otherwise.
+- Work through `just task` (list, next, start T-012, log T-012 "text" --resume "next step", done T-012, new "title").
+- On stop: `just task log <id> "what changed" --resume "next step" --progress 60`.
+- Done = implemented + `just check` green + reviewed; then `just task done <id>`.
+<% if tasks.both %>
+- `just task sync` mirrors tasks to GitHub issues (one way); never edit the mirrored issues by hand.
+<% end %>
+<% end %>

@@ -96,16 +96,16 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | M1 | G | Shared retrieval engine belongs in `core/lib/`, not `modules/decisions/lib/`. | D04; D11 §1; D12 §1; D13 §3 | 5.6 | Open → ADR-0011 |
 | M2 | C | ASCII-only tokenizer vs. German default; classify/embed tokenize differently. | R E2, K1, K2; D03 0.2; D13 §3 | 5.6 | Open → ADR-0011 |
 | M3 | C | `TASKS.md` in GitHub-only mode: not generated vs. read-only view. | D10 §1; D14 | 5.3 | ✅ BD4 (generated read-only view) |
-| M4 | C | `T-NNN` vs. issue-number IDs and branch names. | D10 §2–3; D14 §1–2 | 5.3, 5.5 | ✅ BD4 (IDs); branch pattern follows the ID → ADR-0010 |
-| M5 | C | Recipe naming (`just task …`, `just gh-init`, `just commit/pr/branch`). | D01 §6; D10 §3; D12 §4; D14 §1 | 5.3, 5.5 | Open → ADR-0010 |
+| M4 | C | `T-NNN` vs. issue-number IDs and branch names. | D10 §2–3; D14 §1–2 | 5.3, 5.5 | ✅ BD4 (IDs); branch pattern follows the ID (ADR-0010) |
+| M5 | C | Recipe naming (`just task …`, `just gh-init`, `just commit/pr/branch`). | D01 §6; D10 §3; D12 §4; D14 §1 | 5.3, 5.5 | ADR-0010 (Proposed): `just task <verb>`, `just gh-*`, `just branch/commit/pr` |
 | M6 | C | Just `import` (flat) vs. `mod` (namespaced); verb collisions. | D01 §6; D05 §3 | 3, 6 | ADR-0004 (Proposed): `import` per module, `mod` per profile when several |
 | M7 | C | Personal vs. committed config (comfort hooks, `.yaw/config.yaml`, communication in team repos). | D04; D11 §1; D12 §3; D14 §5 | 5.1, 5.8, 5.9 | ◐ ADR-0013 (Y-5.1: team repos commit no personal style) |
 | M8 | G | Comfort depends on sessions/tasks; "last `just check` status" not stored. | D04 §1; D11 §1, §1a | 5.8 | Open → Y-5.8 |
 | M9 | C | Phase-1 `pr-policy` vs. phase-2 launch plan; `docs` type; boundary rules. | K; D14 §1, §2, §4; B 5.9 | 5.9 | ✅ BD3 (open-issue check only; rest phase 2) |
 | M10 | C | D14 §4 cites "section 13 of doc 03"; it is section 12. | D14 §4; D03 §12–13 | – | Doc fix in Y-0.1 |
-| M11 | C | ADR IDs: sequential vs. team-mode `ADR-<issue#>-<n>` / date-based. | R D5, N11; D14 §5 | 5.6 | Open → ADR-0010 |
+| M11 | C | ADR IDs: sequential vs. team-mode `ADR-<issue#>-<n>` / date-based. | R D5, N11; D14 §5 | 5.6 | ADR-0010 (Proposed): sequential solo, `ADR-<issue#>-<n>` in team mode |
 | M12 | C | YAW ADRs in `docs/adr/` vs. `.decisions/`. | B rules 1, 9; D12 §1 | 3 | ✅ BD7 (move at Step 5.6) |
-| M13 | G | Team mode: Stop-hook journal lines when `TASKS.md` is read-only. | D10 §2; D14 | 5.3, 5.9 | Open → ADR-0010 (BD4 makes it apply to GitHub-only too) |
+| M13 | G | Team mode: Stop-hook journal lines when `TASKS.md` is read-only. | D10 §2; D14 | 5.3, 5.9 | ADR-0010 (Proposed): journal lines are issue comments; Stop reminder off in GitHub mode |
 | M14 | A | Hygiene "on (Standard), uncheckable". | D11 | 5.8 | Open → ADR-0013 |
 | M15 | G | Quick has no `.env` read protection. | K non-neg. 5; D04 §1; D08 §3 | 3, 5.4 | ◐ BD6 adds `security` to phase 1; whether Quick includes it → ADR-0009 (BD5 Quick list excludes it) |
 | M16 | A | `AGENTS.md` line budget can be exceeded in Full. | D04 §2–3 | 3 | Open → Y-3.2 |
@@ -140,7 +140,7 @@ YAW's own ADRs live in `docs/adr/` until Step 5.6, then move to `.decisions/` (B
 | 0007 | Hook output policy (token-free) | H1 | Step 4 | **Decided** (BD9); write up |
 | 0008 | Runtime floor and platforms: Node ≥ 22.13, CI on 22 + 24, macOS + Linux (WSL), `node:sqlite` warning suppressed; dev-tool list (`shellcheck`) | H9, H10, S7 | Step 2 | **Decided** (BD11); written, Proposed (PR #89) |
 | 0009 | Terminology and preset contents: Quick (= Lean) per BD5; mode vs. saved setup; phase-1 Standard/Full contents; Quick question count; footprint; ADRs without `decisions`; `security` in Quick? | P1–P3, P6, P9, M15, M16 | Step 3 | Written, Proposed (Step 3 PR); partly decided (BD5, BD6); `security` joins Quick (decided by the user, changes BD5) |
-| 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only | M4, M5, M11, M13 | Step 5.3 | Partly decided (BD4) |
+| 0010 | Task and record IDs per mode (BD4); branch names; recipe naming; ADR ID scheme; journal lines when `TASKS.md` is read-only; `tasks` module details | M3, M4, M5, M11, M13 | Step 5.3 | Written, Proposed (Y-5.3 PR); partly decided (BD4) |
 | 0011 | Shared retrieval engine in `core/lib/` + Unicode-aware tokenizer | M1, M2 | Step 5.6 | Proposed |
 | 0012 | Skill distribution to Claude: generated copies vs. symlinks; drift check | H5 | Step 4 | Proposed |
 | 0013 | Personal vs. committed configuration; hygiene opt-out | M7, M14 | Step 5.1 | Written, Proposed (Y-5.1 PR) |
@@ -252,7 +252,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-5.A | `yaw add <module>` (**done**, ADR-0023) | Feature | P0 | Y-2.5 | Asks only that module's questions; dependency violations reported, not auto-fixed |
 | Y-5.1 | `communication` + `standards` (**done**, ADR-0013, ADR-0024) | Feature | P1 | Y-5.A, ADR-0013 | ≈ 6 lines rendered from the profile; Claude output style only when non-default; profile overlay ≤ 20 lines; team-mode rule per ADR-0013 |
 | Y-5.2 | `devenv` (**done**, ADR-0025) | Feature | P1 | Y-5.A | `just setup/dev`; `.env.example`; `.env*` git-ignored; Docker/devcontainer only when the profile advises it |
-| Y-5.3 | `tasks` (local / GitHub / both) | Feature | P0 | Y-1.11, ADR-0010 | Per BD4: local `TASKS.md` source with `T-NNN`; GitHub/team issues as source with generated read-only `TASKS.md`; Both `T-NNN` + issue link. `just task …` recipes per ADR-0010; Claude Stop hook enforces the resume point; sync one-way and idempotent (recorded `gh` fixtures) |
+| Y-5.3 | `tasks` (local / GitHub / both) (**done**, ADR-0010) | Feature | P0 | Y-1.11, ADR-0010 | Per BD4: local `TASKS.md` source with `T-NNN`; GitHub/team issues as source with generated read-only `TASKS.md`; Both `T-NNN` + issue link. `just task …` recipes per ADR-0010; Claude Stop hook enforces the resume point; sync one-way and idempotent (recorded `gh` fixtures) |
 | Y-5.4 | `git-hooks` (lefthook, gitleaks) | Feature | P1 | Y-5.A | Format/lint-staged/gitleaks on commit; a planted fake secret is blocked (test) |
 | Y-5.5 | `github` + `ci` | Feature | P1 | Y-5.3 | Recipes per ADR-0010; guarded actions require authorisation; issue-type auto-detect with label fallback; `quality-gate.yml` installs the kit at the manifest tag (BD10) and runs `just check` |
 | Y-5.6 | `decisions` (ADR + notices, recall hook) | Feature | P0 | ADR-0010, ADR-0011 | R D/E/F/K behaviour incl. N1–N12 upgrades listed in D04; R H4 test list passes; recall hook < 1 s, fails open; ID uniqueness in `just check`; German prompts retrieve correctly; this repo's `docs/adr/` migrated to `.decisions/` (BD7) |
