@@ -284,6 +284,27 @@ test('the default archive is checked too: no Done line and TASKS.archive.md a sy
   assert.equal(readFileSync(join(outside, 't.md'), 'utf8'), 'secret\n');
 });
 
+test('a "> " line does not switch the archive check off (both mode)', async () => {
+  const root = await project({ mode: 'both' });
+  const outside = tmp('yaw-outside-');
+  writeFileSync(join(outside, 'done.md'), '- T-001 (#34) Old — done 2026-10-01\n');
+  symlinkSync(join(outside, 'done.md'), join(root, 'TASKS.archive.md'));
+  const cases = [
+    LOCAL_LEDGER.replace('# Tasks\n', '# Tasks\n\n> x\n').replace('TASKS.archive.md', '../outside.md'),
+    LOCAL_LEDGER.replace('# Tasks\n', '# Tasks\n\n> x\n'),
+  ];
+  for (const text of cases) {
+    writeFileSync(join(root, 'TASKS.md'), text);
+    for (const args of [['done', 'T-012'], ['new', 'x'], ['sync']]) {
+      const r = await task(root, args, { gh: () => assert.fail('gh must not be called') });
+      assert.equal(r.code, 1, args[0]);
+      assert.match(r.err, /archive/);
+    }
+    assert.equal(read(root, 'TASKS.md'), text);
+  }
+  assert.equal(readFileSync(join(outside, 'done.md'), 'utf8'), '- T-001 (#34) Old — done 2026-10-01\n');
+});
+
 // ---------------------------------------------------------------- both: one-way, idempotent sync
 
 test('sync (both): creates, links, updates, closes; recorded gh output; the second run writes nothing', async () => {

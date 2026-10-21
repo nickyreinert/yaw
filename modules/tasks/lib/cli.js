@@ -24,11 +24,12 @@ export class TaskUsageError extends Error {}
 
 const readIf = (root, rel) => (existsSync(join(root, rel)) ? readFileSync(join(root, rel), 'utf8') : null);
 
-function readLedger(root) {
+function readLedger(root, mode) {
   const text = readIf(root, TASKS_FILE);
   if (text === null) throw new LedgerError(`${TASKS_FILE} is missing; run: yaw update`);
   const ledger = parseTasks(text, { file: TASKS_FILE });
-  if (!ledger.readOnly) checkArchivePath(root, ledger.archive ?? ARCHIVE); // the default archive counts too
+  // GitHub mode never uses the archive; in the other modes it is checked whatever the ledger claims (readOnly included).
+  if (mode !== 'github') checkArchivePath(root, ledger.archive ?? ARCHIVE);
   return ledger;
 }
 
@@ -95,7 +96,7 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         } catch (e) {
           stderr.write(`task: using the last ${TASKS_FILE} (${e.message})\n`);
         }
-        const ledger = readLedger(root);
+        const ledger = readLedger(root, mode);
         stdout.write(verb === 'list' ? formatLedger(ledger) : formatNext(ledger));
         return 0;
       }
@@ -140,7 +141,7 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
   // local and both
   if (verb === 'sync') {
     if (mode !== 'both') throw new LedgerError('sync mirrors tasks to GitHub issues; this project tracks tasks locally only');
-    const ledger = readLedger(root);
+    const ledger = readLedger(root, mode);
     const result = syncBoth({ ledger, archive: readIf(root, ledger.archive ?? ARCHIVE) ?? '', gh });
     if (result.actions.some((a) => a.kind === 'created' || a.kind === 'linked')) writeLedger(root, result.ledger);
     for (const w of result.warnings) stderr.write(`task: ${w}\n`);
@@ -148,7 +149,7 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
     for (const a of result.actions) stdout.write(`sync: ${a.kind} ${a.id} -> #${a.issue}\n`);
     return 0;
   }
-  const ledger = readLedger(root);
+  const ledger = readLedger(root, mode);
   switch (verb) {
     case 'list':
       stdout.write(formatLedger(ledger));
