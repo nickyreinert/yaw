@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { parseTasks, renderTasks, tasksMode } from '../../../core/lib/tasks.js';
@@ -244,6 +244,28 @@ test('an archive path outside the project is rejected by done, new and sync, and
     assert.equal(read(root, 'TASKS.md'), LOCAL_LEDGER.replace('TASKS.archive.md', bad));
     assert.equal(existsSync(join(root, '..', 'escaped.md')), false);
   }
+});
+
+test('an archive reached through a symlink or under .git is rejected by done, new and sync', async () => {
+  const root = await project({ mode: 'both' });
+  const outside = tmp('yaw-outside-');
+  symlinkSync(outside, join(root, 'link'));
+  writeFileSync(join(outside, 'target.md'), 'secret\n');
+  symlinkSync(join(outside, 'target.md'), join(root, 'linked-file.md'));
+  mkdirSync(join(root, '.git', 'hooks'), { recursive: true });
+  for (const bad of ['link/escaped.md', 'linked-file.md', '.git/hooks/pre-commit']) {
+    const text = LOCAL_LEDGER.replace('TASKS.archive.md', bad);
+    writeFileSync(join(root, 'TASKS.md'), text);
+    for (const args of [['done', 'T-012'], ['new', 'x'], ['sync']]) {
+      const r = await task(root, args, { gh: () => assert.fail('gh must not be called') });
+      assert.equal(r.code, 1, `${bad} ${args[0]}`);
+      assert.match(r.err, /symbolic link|inside \.git/);
+    }
+    assert.equal(read(root, 'TASKS.md'), text);
+  }
+  assert.equal(existsSync(join(outside, 'escaped.md')), false);
+  assert.equal(readFileSync(join(outside, 'target.md'), 'utf8'), 'secret\n');
+  assert.equal(existsSync(join(root, '.git', 'hooks', 'pre-commit')), false);
 });
 
 // ---------------------------------------------------------------- both: one-way, idempotent sync

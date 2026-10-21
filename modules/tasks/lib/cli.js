@@ -3,7 +3,7 @@
 //   local, both   TASKS.md is the source; only `sync` (both) talks to GitHub.
 //   github        issues are the source; TASKS.md is regenerated after every change.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { parseTasks, renderTasks } from '../../../core/lib/tasks.js';
 import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, newTask, oneLine, startTask } from './ledger.js';
@@ -36,10 +36,27 @@ function readLedger(root) {
 const REL_PATH = /^(?!\/)(?!(.*\/)?\.\.(\/|$))[^\\]+$/;
 export function checkArchivePath(root, file) {
   if (file === undefined) return;
+  const bad = (why) => new LedgerError(`${TASKS_FILE}: the archive "${file}" ${why}`);
   const base = resolve(root);
-  if (!REL_PATH.test(file) || !resolve(base, file).startsWith(base + sep)) {
-    throw new LedgerError(`${TASKS_FILE}: the archive "${file}" must be a relative path inside the project`);
+  if (!REL_PATH.test(file) || !resolve(base, file).startsWith(base + sep)) throw bad('must be a relative path inside the project');
+  const parts = file.split('/').filter((p) => p !== '' && p !== '.');
+  if (parts.some((p) => p.toLowerCase() === '.git')) throw bad('must not be inside .git');
+  // No component may be a symlink (a link could point out of the project); the nearest existing ancestor is real.
+  let cur = base;
+  for (const part of parts) {
+    cur = join(cur, part);
+    let st;
+    try {
+      st = lstatSync(cur);
+    } catch (e) {
+      if (e.code === 'ENOENT') break;
+      throw bad('cannot be checked');
+    }
+    if (st.isSymbolicLink()) throw bad('must not go through a symbolic link');
   }
+  const real = realpathSync(base);
+  const probe = existsSync(cur) ? cur : base;
+  if (!(realpathSync(probe) + sep).startsWith(real + sep)) throw bad('must be inside the project');
 }
 
 const writeLedger = (root, ledger) => writeFileSync(join(root, TASKS_FILE), renderTasks(ledger));
