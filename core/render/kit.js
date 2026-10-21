@@ -196,6 +196,50 @@ export function profileDevenv(kitRoot, profiles) {
   return out;
 }
 
+// ADR-0027: the toolchain steps of the profiles' ci/check.yml fragments for the ci module's workflow.
+// The workflow itself supplies checkout, the kit install, `just setup` and `just check`, so those are
+// dropped from the fragments; identical steps of several profiles are kept once. Steps are kept as
+// text so the pin comments (`# v4.4.0`) survive. -> { steps: text for the workflow, needsNode: boolean }
+export function profileCi(kitRoot, profiles) {
+  const blocks = [];
+  let needsNode = true;
+  for (const p of profiles) {
+    const file = join(profileDir(kitRoot, p), 'ci', 'check.yml');
+    if (!hasProfile(kitRoot, p) || !existsSync(file)) continue;
+    const text = readFileSync(file, 'utf8');
+    const doc = parseDocument(text, { file: `profiles/${p}/ci/check.yml` }).value;
+    if (!Array.isArray(doc?.steps) || doc.steps.some((s) => s === null || typeof s !== 'object' || Array.isArray(s))) {
+      throw new KitError(`profiles/${p}/ci/check.yml: "steps" must be a list of steps`);
+    }
+    const lines = text.split('\n');
+    const at = lines.findIndex((l) => /^steps:\s*$/.test(l));
+    let current = null;
+    for (const line of lines.slice(at + 1)) {
+      if (/^ {2}- /.test(line)) {
+        current = [line.slice(2)];
+        blocks.push(current);
+      } else if (current && (/^ {4}/.test(line) || line.trim() === '')) {
+        current.push(line.startsWith('  ') ? line.slice(2) : line);
+      } else if (!/^\s*(#.*)?$/.test(line)) {
+        throw new KitError(`profiles/${p}/ci/check.yml: cannot read the step "${line.trim()}"; use the "  - key: value" layout`);
+      }
+    }
+  }
+  const kept = [];
+  const seen = new Set();
+  for (const block of blocks) {
+    while (block.length > 0 && block[block.length - 1].trim() === '') block.pop();
+    const head = block[0].replace(/\s+#.*$/, '').trim();
+    if (/^- uses: actions\/checkout@/.test(head) || /^- run: just (setup|check)$/.test(head)) continue;
+    const text = block.join('\n');
+    if (seen.has(text)) continue;
+    seen.add(text);
+    if (/^- uses: actions\/setup-node@/.test(head)) needsNode = false;
+    kept.push(text);
+  }
+  return { steps: kept.join('\n').replace(/\n/g, '\n      '), needsNode };
+}
+
 // One line of free text that is safe inside AGENTS.md (no markers, no line breaks).
 function oneLine(text) {
   return String(text ?? '').replace(/<!--|-->/g, ' ').replace(/\s+/g, ' ').trim();
@@ -246,6 +290,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
         || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
     profileStandards: profileOverlay(kitRoot, profiles),
     devenv: profileDevenv(kitRoot, profiles),
+    // ADR-0027: toolchain steps for the ci module.
+    ci: profileCi(kitRoot, profiles),
     // ADR-0010: the effective task mode (team forces github) as booleans, since templates have no comparisons.
     tasks: taskFlags(tasksMode(flat)),
   };

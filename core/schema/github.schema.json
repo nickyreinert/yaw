@@ -2,9 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "github.schema.json",
   "title": ".yaw/github.yaml",
-  "description": "GitHub settings: labels and rules (user-edited, BD2) and project/field IDs (filled in by yaw gh setup, doc 14 §1). IDs are not secrets; tokens never go here.",
+  "description": "GitHub settings: labels and rules (user-edited, BD2) and the project number (doc 14 §1). repo, defaultBranch and issueTypes are optional: the github module reads them from GitHub when a recipe needs them (ADR-0027). IDs are not secrets; tokens never go here.",
   "type": "object",
-  "required": ["repo"],
   "properties": {
     "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
     "defaultBranch": { "type": "string", "minLength": 1 },

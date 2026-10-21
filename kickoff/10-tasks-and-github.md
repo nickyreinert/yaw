@@ -55,20 +55,24 @@ All via `gh` CLI, wrapped as `just gh-*` recipes; agents use these instead of ad
 | Recipe | Does | Guarded |
 |---|---|---|
 | `gh-init` | Create repo (public/private), push, set default branch, labels, PR template | yes (creates remote) |
+| `gh-labels` | Create or update the labels of `.yaw/github.yaml` (never deletes; no `type:*` label where the repo has the native issue type) | yes |
+| `gh-issue <type> "title"` | Create an issue: native issue type if the repo has it, else the `type:*` label (doc 14 §1) | no |
 | `gh-protect` | Apply branch protection: required check name from CI, PR review count, no force-push; verifies afterwards | yes |
 | `branch <T-id> <slug>` | `feat/T-012-invite-flow` from up-to-date main | no |
 | `commit` | Conventional Commit with task ID footer; runs git hooks | no |
 | `pr` | Push branch, open/update PR with template filled (summary, checks run, ADR IDs, migration notes) | push yes (first time) |
 | `pr-status` | CI status + review state | no |
 | `release <version>` | Changelog, tag, GitHub release (or release-please if chosen) | yes |
-| `issues-sync` | Task sync (mode "both") | yes |
+| `issues-sync` | Task sync (mode "both"): `just task sync` (ADR-0010) | yes |
 | `project-add` | Add issue to Project board, set status field | yes |
 
-Guarded = needs explicit authorisation per the autonomy setting (interview 0.7 / 11.2). Never: force-push to shared branches, deleting remote branches with open PRs, changing repo visibility, without explicit confirmation.
+Guarded = needs explicit authorisation: the plan is printed, then a person types `y` in a terminal; there is no `--yes` and no way for a script or agent to answer (ADR-0027; stricter than the autonomy setting, which does not relax it). There is no recipe for any of the "Never" actions below, nor for merging. Never: force-push to shared branches, deleting remote branches with open PRs, changing repo visibility, without explicit confirmation.
 
 ## 4. CI module
 
 - One workflow `quality-gate.yml`: checkout → toolchain from profile `ci/check.yml` → `just check`. Job name is the contract with branch protection.
 - Least-privilege `permissions`, concurrency cancel, timeout.
 - Optional: PR check that the description cites ADR/notice IDs or "no matching record" (when decisions module is on).
-- Dependabot/Renovate config per profile ecosystem.
+- Dependabot config: `github-actions` (the actions are pinned by SHA); per profile ecosystem later (ADR-0027).
+- Job `secret-scan`: gitleaks over the history, binary pinned and SHA-256 verified (ADR-0027).
+- The kit is installed at the tag in `.yaw/manifest.json` before `just setup` (BD10).

@@ -11,6 +11,7 @@ import { runHook } from '../hooks/dispatch.js';
 import { agents } from './agents.js';
 import { sync } from './sync.js';
 import { task } from './tasks.js';
+import { gh } from './gh.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -31,7 +32,7 @@ export const COMMANDS = [
   { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },
   { name: 'task', args: '<list|next|start|log|done|new|sync> [...]', summary: 'task ledger helpers (tasks module; `just task ...` calls this)', options: { resume: { type: 'string' }, progress: { type: 'string' } }, run: task },
   { name: 'config', step: 5, summary: 'change .yaw/config.yaml' },
-  { name: 'gh', step: 5, summary: 'GitHub setup and helpers' },
+  { name: 'gh', args: '<init|labels|protect|branch|commit|pr|pr-status|release|project-add|issue> [...]', summary: 'GitHub scripts (github module; `just gh-*`, `just branch` ... call this); guarded actions need a person at a terminal to confirm', options: { ...yes, owner: { type: 'string' }, public: { type: 'boolean' }, approvals: { type: 'string' }, check: { type: 'string', multiple: true }, type: { type: 'string' }, scope: { type: 'string' }, task: { type: 'string' }, title: { type: 'string' }, ready: { type: 'boolean' }, status: { type: 'string' }, body: { type: 'string' }, priority: { type: 'string' }, estimate: { type: 'string' } }, run: gh },
   { name: 'decisions', step: 5, summary: 'decision journal (ADRs, notices)' },
   { name: 'sessions', step: 5, summary: 'find and resume agent sessions' },
   { name: 'session', step: 5, summary: 'rename the current session' },
@@ -72,6 +73,7 @@ export async function main(argv, io = {}) {
     env: io.env ?? process.env,
     kitRoot: io.kitRoot ?? KIT_ROOT,
     prompter: io.prompter ?? createPrompter(),
+    confirm: io.confirm, // tests script the typed "y" of guarded actions (ADR-0027); undefined asks on a real terminal
     gh: io.gh, // tests replay recorded gh output; undefined runs the GitHub CLI
     now: io.now,
   };
