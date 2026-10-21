@@ -4,7 +4,7 @@
 //   github        issues are the source; TASKS.md is regenerated after every change.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { parseTasks, renderTasks } from '../../../core/lib/tasks.js';
 import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, newTask, oneLine, startTask } from './ledger.js';
 import { createIssue, defaultGh, fetchView, journalComment, syncBoth } from './github.js';
@@ -27,7 +27,19 @@ const readIf = (root, rel) => (existsSync(join(root, rel)) ? readFileSync(join(r
 function readLedger(root) {
   const text = readIf(root, TASKS_FILE);
   if (text === null) throw new LedgerError(`${TASKS_FILE} is missing; run: yaw update`);
-  return parseTasks(text, { file: TASKS_FILE });
+  const ledger = parseTasks(text, { file: TASKS_FILE });
+  checkArchivePath(root, ledger.archive);
+  return ledger;
+}
+
+// The archive file comes from the "## Done → <file>" line of a user-editable file: a relative path inside the project.
+const REL_PATH = /^(?!\/)(?!(.*\/)?\.\.(\/|$))[^\\]+$/;
+export function checkArchivePath(root, file) {
+  if (file === undefined) return;
+  const base = resolve(root);
+  if (!REL_PATH.test(file) || !resolve(base, file).startsWith(base + sep)) {
+    throw new LedgerError(`${TASKS_FILE}: the archive "${file}" must be a relative path inside the project`);
+  }
 }
 
 const writeLedger = (root, ledger) => writeFileSync(join(root, TASKS_FILE), renderTasks(ledger));

@@ -232,6 +232,20 @@ test('yaw task: usage errors, sync without GitHub, and a project without the mod
   assert.match((await task(bare, ['list'])).err, /tasks module is not installed; run: yaw add tasks/);
 });
 
+test('an archive path outside the project is rejected by done, new and sync, and nothing is written', async () => {
+  const root = await project({ mode: 'both' });
+  for (const bad of ['../escaped.md', '/tmp/escaped.md', 'a/../../escaped.md', 'a\\b.md']) {
+    writeFileSync(join(root, 'TASKS.md'), LOCAL_LEDGER.replace('TASKS.archive.md', bad));
+    for (const args of [['done', 'T-012'], ['new', 'x'], ['sync']]) {
+      const r = await task(root, args, { gh: () => assert.fail('gh must not be called') });
+      assert.equal(r.code, 1, `${bad} ${args[0]}`);
+      assert.match(r.err, /must be a relative path inside the project/);
+    }
+    assert.equal(read(root, 'TASKS.md'), LOCAL_LEDGER.replace('TASKS.archive.md', bad));
+    assert.equal(existsSync(join(root, '..', 'escaped.md')), false);
+  }
+});
+
 // ---------------------------------------------------------------- both: one-way, idempotent sync
 
 test('sync (both): creates, links, updates, closes; recorded gh output; the second run writes nothing', async () => {
