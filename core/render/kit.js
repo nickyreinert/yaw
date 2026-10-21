@@ -166,6 +166,35 @@ export function profileOverlay(kitRoot, profiles) {
   return parts.join('\n');
 }
 
+// ADR-0025: files a profile ships for the devenv module. env.example (variable names, comments) is joined over
+// all profiles; the container files are profiles/<p>/devenv/{Dockerfile,compose.yaml,devcontainer.json} and
+// a file that two profiles ship is an error (a container setup cannot be concatenated).
+export const DEVENV_FILES = { dockerfile: 'Dockerfile', compose: 'compose.yaml', devcontainer: 'devcontainer.json' };
+
+export function profileDevenv(kitRoot, profiles) {
+  const out = { env: '', dockerfile: '', compose: '', devcontainer: '' };
+  const env = [];
+  const from = {};
+  for (const p of profiles) {
+    if (!hasProfile(kitRoot, p)) continue;
+    const dir = profileDir(kitRoot, p);
+    const envFile = join(dir, 'env.example');
+    if (existsSync(envFile)) {
+      const text = readFileSync(envFile, 'utf8').trim();
+      if (text !== '') env.push(text);
+    }
+    for (const [key, name] of Object.entries(DEVENV_FILES)) {
+      const file = join(dir, 'devenv', name);
+      if (!existsSync(file)) continue;
+      if (from[key]) throw new KitError(`profiles "${from[key]}" and "${p}" both ship devenv/${name}; keep one of them`);
+      from[key] = p;
+      out[key] = readFileSync(file, 'utf8').trim();
+    }
+  }
+  out.env = env.join('\n\n');
+  return out;
+}
+
 // One line of free text that is safe inside AGENTS.md (no markers, no line breaks).
 function oneLine(text) {
   return String(text ?? '').replace(/<!--|-->/g, ' ').replace(/\s+/g, ' ').trim();
@@ -211,6 +240,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
         || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
     profileStandards: profileOverlay(kitRoot, profiles),
+    devenv: profileDevenv(kitRoot, profiles),
   };
 }
 

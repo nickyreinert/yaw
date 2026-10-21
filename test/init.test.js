@@ -47,12 +47,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core', 'communication', 'security', 'standards'],
+    modules: ['core', 'communication', 'devenv', 'security', 'standards'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + communication + standards + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
+  // Quick = core + communication + standards + devenv + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 12);
+  assert.equal(readManifest(dir).files.length, 13);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -107,12 +107,12 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
-test('Quick footprint with security (ADR-0022): 13 files for Claude, 14 with Codex', async () => {
-  for (const [agents, count] of [['claude', 13], ['claude, codex', 14]]) {
+test('Quick footprint with security (ADR-0022): 14 files for Claude, 15 with Codex', async () => {
+  for (const [agents, count] of [['claude', 14], ['claude, codex', 15]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /modules: core, communication, security, standards/);
+    assert.match(r.out, /modules: core, communication, devenv, security, standards/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
     assert.equal(files.length, count, files.join(', '));
   }
@@ -148,10 +148,10 @@ test('an unknown profile and several profiles are refused with the choices', asy
 });
 
 test('modules the kit does not have yet are skipped with a note', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, devenv, tasks]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, tasks]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /note: module "devenv" is not in this kit yet; skipped/);
+  assert.match(r.out, /note: module "tasks" is not in this kit yet; skipped/);
   assert.deepEqual(Object.keys(readManifest(r.cwd).modules), ['core']);
 });
 

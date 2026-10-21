@@ -1,8 +1,9 @@
 # profiles/python-cli: the uniform verbs (doc 01 §6). Verbs that do not apply print a note and exit 0.
 
-# Create the uv environment (.venv) with the dev tools.
+# Create the uv environment (.venv) with the dev tools; .env from .env.example (devenv module).
 setup:
     uv sync
+    @if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env && echo "setup: created .env from .env.example, fill in the values"; fi
 
 dev:
     uv run python src/app/main.py

@@ -27,7 +27,8 @@ profiles/python-web/
 ├── profile.yaml          # metadata, suggestWhen, defaults, applicable modules
 ├── standards.md          # ≤ 20 lines stack overlay
 ├── just/python-web.just  # implements the uniform verbs
-├── devenv/               # Dockerfile, compose.yaml, devcontainer.json (optional)
+├── env.example           # variable names for .env.example (optional, ADR-0025)
+├── devenv/               # Dockerfile, compose.yaml, devcontainer.json (optional; the profile advises containers by having it)
 ├── ci/check.yml          # CI steps fragment (setup toolchain, cache, `just check`)
 ├── guards.yaml           # dangerous command patterns + reason
 ├── taxonomy.seed.json    # categories/keywords for the decision journal
