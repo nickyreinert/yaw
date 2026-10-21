@@ -37,8 +37,7 @@ outputs:
         codex: { support: none, note: "no SessionEnd event; the Stop hook stamps every turn" }
         copilot: { support: none, note: "the Stop hook stamps every turn" }
 agentsMd: |
-  - Before `/clear` or a topic change run the `handoff` skill: it logs the resume point and records the session (`just sessions handoff`).
-  - `just commit` adds an `Agent-Session` trailer. To find the conversation behind a task, decision, commit or file: `just sessions for <T-012|ADR-0004|hash|path>`; by words: `just sessions find "<words>"`.
+  - Before `/clear` or a topic change run the `handoff` skill (`just sessions handoff`); find the conversation behind a task, decision, commit or file with `just sessions for <T-012|ADR-0004|hash|path>` or `just sessions find "<words>"`.
 agents:
   claude:  { support: native, via: "SessionStart / Stop / SessionEnd registry hooks + /handoff skill + trailer" }
   codex:   { support: native, via: "SessionStart / Stop registry hooks + /handoff skill + trailer; hooks must be trusted via /hooks" }

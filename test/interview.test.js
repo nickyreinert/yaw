@@ -93,7 +93,7 @@ test('runInterview: input that ends is an error, not a silent exit', async () =>
 test('facts come only from answers that exist; auto leaves a fact unknown', () => {
   assert.deepEqual(deriveFacts({ 'arch.language': 'javascript', 'arch.runs-on': 'local' }), { language: 'javascript', runsOn: 'local', hosted: false });
   assert.deepEqual(deriveFacts({ 'arch.language': 'auto', 'arch.runs-on': 'auto' }), {});
-  assert.deepEqual(deriveFacts({ 'arch.runs-on': 'edge', 'idea.audience': 'public', 'idea.team': 'team' }), { runsOn: 'edge', hosted: true, public: true, team: true });
+  assert.deepEqual(deriveFacts({ 'arch.runs-on': 'edge', 'idea.audience': 'public', 'idea.team': 'team' }), { runsOn: 'edge', hosted: true, public: true, team: true, usesGitHub: true });
   assert.deepEqual(matchFacts({ language: ['python'], runsOn: ['local'], hasUI: [false] }, { language: 'python', runsOn: 'edge' }), { matched: 1, mismatched: 1 });
 });
 

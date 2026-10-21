@@ -3,13 +3,21 @@ name: github
 description: Recipes for the GitHub side of a project (repo, labels, branch, commit, pull request, release, ruleset, project board, issues with native type or label), a PR template and .yaw/github.yaml; guarded actions need explicit authorisation.
 depends: [core]
 default: { quick: false, standard: true, full: true }
-questions: []
+# Relevance (ADR-0032): off when the user says they do not use GitHub; team projects always use it (facts.usesGitHub).
+appliesTo: { usesGitHub: true }
+questions:
+  - id: tasks.use-github
+    ref: "10.2"
+    mode: S
+    type: boolean
+    label: Use GitHub for the repo?
+    hint: Off drops the github and ci modules and keeps tasks local; team projects always use GitHub.
+    when: { idea.team: solo }
+    default: true
 outputs:
   templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, just/github.just, justfile]
 agentsMd: |
-  - Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status` and `just gh-issue`; they keep branch names, footers and PRs uniform.
-  - Guarded: `gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release` and the first push in `just pr`. They run only when the user types `y` in a terminal; ask the user to run them and never try to work around that.
-  - There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
+  - Git and GitHub work goes through `just branch`, `commit`, `pr`, `pr-status`, `gh-issue`; guarded recipes (`gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release`, first push) run only when the user types `y`, so ask the user and never work around it. There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
 agents:
   claude:  { support: native, via: "just recipes + AGENTS.md rules + permissions.ask in .claude/settings.json (the user confirms guarded commands)" }
   codex:   { support: partial, via: "just recipes + AGENTS.md rules", note: "no permission prompt from the kit; Codex approval settings apply" }

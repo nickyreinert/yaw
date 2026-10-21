@@ -1,0 +1,26 @@
+{
+  "modules": [
+    "core",
+    "communication",
+    "devenv",
+    "security",
+    "standards",
+    "tasks"
+  ],
+  "files": [
+    ".claude/settings.json",
+    ".env.example",
+    ".gitignore",
+    ".yaw/bin/yaw-hook",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "TASKS.md",
+    "docs/standards.md",
+    "just/node-cli.just",
+    "just/tasks.just",
+    "justfile",
+    "package.json",
+    "src/index.js",
+    "test/index.test.js"
+  ]
+}

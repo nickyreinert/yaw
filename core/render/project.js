@@ -122,8 +122,18 @@ export function selectModules({ kitRoot = KIT_ROOT, mode, facts = {} }) {
     const d = def.default[mode];
     if (d === true || (d && typeof d === 'object' && matchFacts(d, facts).mismatched === 0 && matchFacts(d, facts).matched > 0)) chosen.push(name);
   }
+  checkDependencies({ kitRoot, modules: chosen });
   // core first: it owns the shared files
   return chosen.includes('core') ? ['core', ...chosen.filter((n) => n !== 'core')] : chosen;
+}
+
+// A violation is an error that names the missing module (ADR-0032); nothing is added silently.
+export function checkDependencies({ kitRoot = KIT_ROOT, modules }) {
+  for (const m of modules) {
+    if (!hasModule(kitRoot, m)) continue;
+    const missing = (loadModule(kitRoot, m).depends ?? []).filter((d) => !modules.includes(d));
+    if (missing.length > 0) throw new ProjectError(`${m} depends on ${missing.join(', ')}, which ${missing.length === 1 ? 'is' : 'are'} not in the selected modules; add ${missing.length === 1 ? 'it' : 'them'} or remove ${m}`);
+  }
 }
 
 // Render what `yaw init` would write, without writing anything.

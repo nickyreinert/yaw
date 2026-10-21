@@ -182,6 +182,7 @@ export const TASK_MODES = ['local', 'github', 'both'];
 
 export function tasksMode(answers = {}) {
   if ((answers['idea.team'] ?? 'solo') !== 'solo') return 'github';
+  if (answers['tasks.use-github'] === false) return 'local'; // no GitHub: tasks stay local (ADR-0032)
   const mode = answers['tasks.mode'];
   return TASK_MODES.includes(mode) ? mode : 'local';
 }

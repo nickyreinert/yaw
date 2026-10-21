@@ -3,12 +3,12 @@ name: ci
 description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and a Dependabot config that keeps the pinned action versions current.
 depends: [github]
 default: { quick: false, standard: true, full: true }
+appliesTo: { usesGitHub: true }
 questions: []
 outputs:
   templates: [.github/workflows/quality-gate.yml, .github/dependabot.yml]
 agentsMd: |
-  - CI (`.github/workflows/quality-gate.yml`) runs `just check` and a gitleaks scan; its job names `quality-gate` and `secret-scan` are what the branch ruleset requires, so do not rename them.
-  - Actions are pinned by commit SHA; change them only through the Dependabot pull requests.
+  - CI (`.github/workflows/quality-gate.yml`) runs `just check` and a gitleaks scan; the ruleset requires the job names `quality-gate` and `secret-scan`, so do not rename them; change pinned actions only through the Dependabot pull requests.
 agents:
   claude:  { support: native, via: "workflow file + AGENTS.md rule" }
   codex:   { support: native, via: "workflow file + AGENTS.md rule" }
