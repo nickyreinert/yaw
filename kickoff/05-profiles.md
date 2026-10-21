@@ -43,7 +43,8 @@ profiles/python-web/
 name: python-web
 summary: Flask or FastAPI web app, containerised, self-hosted.
 suggestWhen:
-  language: [python]   # language only (ADR-0035): runsOn would suggest it for any self-hosted project
+  language: [python]
+  runsOn: [self-hosted]   # ADR-0035; hasUI is not listed (no information)
 options:
   framework: { choices: [flask, fastapi], default: fastapi }
   db: { choices: [none, sqlite, postgres], default: postgres }

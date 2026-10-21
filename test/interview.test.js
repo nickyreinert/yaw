@@ -105,7 +105,7 @@ test('suggestion: the unique best match; ties, contradictions and unknown facts 
   assert.equal(pick({ 'arch.language': 'typescript', 'arch.runs-on': 'auto' }), 'node-cli');
   assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'local' }), 'python-cli');
   assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'local' }), null, 'both match one fact: a tie');
-  assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
+  assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
   assert.equal(pick({}), null);
 });
 

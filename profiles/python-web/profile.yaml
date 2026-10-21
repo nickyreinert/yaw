@@ -1,11 +1,11 @@
 # profiles/python-web/profile.yaml
-# Narrow on purpose (ADR-0035): only the language Python suggests it; python-cli wins when it runs locally.
-# runsOn is not listed: an unknown language plus self-hosted would otherwise suggest it for any self-hosted project.
+# Narrow on purpose (ADR-0035): Python and self-hosted; python-cli wins when it runs locally.
 # Profile options (framework, db; doc 05 §2) come with the full interview (step 7); the scaffold is FastAPI without a database.
 name: python-web
 summary: FastAPI web app, self-hosted; uv venv, ruff, pyright, pytest, bandit, pip-audit, Dockerfile.
 suggestWhen:
   language: [python]
+  runsOn: [self-hosted]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [just, uv]

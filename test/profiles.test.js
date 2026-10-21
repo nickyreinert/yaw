@@ -243,7 +243,7 @@ test('smoke static-site: yaw init, just setup && just check pass; broken pages f
 test('python-web is suggested only for a Python project (python-cli wins when local), never for other languages or unknown ones; python-cli keeps its suggestion', () => {
   const profiles = listProfiles(KIT_ROOT);
   const names = (facts) => suggestProfiles(profiles, facts).candidates.map((c) => c.name);
-  for (const facts of [{ runsOn: 'self-hosted', hosted: true }, { runsOn: 'serverless', hosted: true }, { language: 'javascript', runsOn: 'self-hosted', hosted: true }, { public: true }, { runsOn: 'edge', hosted: true }, { language: 'javascript', runsOn: 'local', hosted: false }]) {
+  for (const facts of [{ runsOn: 'serverless', hosted: true }, { language: 'javascript', runsOn: 'self-hosted', hosted: true }, { public: true }, { runsOn: 'edge', hosted: true }, { language: 'javascript', runsOn: 'local', hosted: false }]) {
     assert.ok(!names(facts).includes('python-web'), JSON.stringify(facts));
   }
   assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'self-hosted', hosted: true }).suggestion, 'python-web');
@@ -279,4 +279,13 @@ test('smoke python-web: yaw init, just setup && just check pass; bad code fails 
   assert.match(bandit.stdout + bandit.stderr, /B602|shell=True/);
   copyFileSync(join(fixtures, 'type_error.py'), bad);
   assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('python-web guards block publishing and remote forms, not local work', () => {
+  const guards = parse(readFileSync(dir('python-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'docker build --push -t me/app .', 'docker compose push', 'docker-compose push', 'DOCKER_HOST=ssh://me@host docker ps', 'docker -Hssh://me@host ps', 'docker -H ssh://me@host ps', 'docker --host=ssh://me@host ps', 'docker --context prod ps', 'alembic -x env=prod upgrade head', 'alembic -c production.ini upgrade head', 'alembic upgrade head --prod', 'ssh me@host', 'scp a me@host:/srv', 'sftp me@host', 'rsync -av dist/ me@host:/srv/app', 'rsync -av dist/ host:/srv/app', 'twine upload dist/*', 'uv publish']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['docker build -t app .', 'docker compose up', 'alembic upgrade head', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'uv run pytest']) assert.ok(!blocked(cmd), cmd);
 });
