@@ -120,7 +120,7 @@ test('the kit install step installs the kit at the tag pinned in .yaw/manifest.j
   const runner = tmp('yaw-runner-');
   const pathFile = join(runner, 'github_path');
   writeFileSync(pathFile, '');
-  const r = run('bash', ['-c', step.run], { cwd: root, env: { ...env, YAW_REPO: src, RUNNER_TEMP: runner, GITHUB_PATH: pathFile } });
+  const r = run('bash', ['-c', step.run], { cwd: root, env: { ...env, YAW_REPO: `file://${src}`, RUNNER_TEMP: runner, GITHUB_PATH: pathFile } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(run('git', ['-C', join(home, '.yaw', 'kit'), 'rev-parse', 'HEAD'], { env }).stdout.trim(), tagged);
   assert.equal(readFileSync(pathFile, 'utf8').trim(), join(home, '.local', 'bin'));
