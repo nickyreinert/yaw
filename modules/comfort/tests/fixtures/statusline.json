@@ -1,0 +1,9 @@
+{
+  "session_id": "5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001",
+  "transcript_path": "/home/user/.claude/projects/-home-user-projects-photo-renamer/5f2c1a7e-0d3b-4c1e-9a62-1b7f00000001.jsonl",
+  "cwd": "@ROOT@",
+  "workspace": { "current_dir": "@ROOT@", "project_dir": "@ROOT@" },
+  "model": { "id": "claude-sonnet-4-6", "display_name": "Sonnet 4.6" },
+  "context_window": { "used_percentage": 42, "context_window_size": 200000 },
+  "prompt_cache": { "state": "warm", "seconds_remaining": 240 }
+}

@@ -127,6 +127,19 @@
             "lefthook",
             "aufgabe"
           ]
+        },
+        {
+          "name": "Comfort",
+          "keywords": [
+            "comfort",
+            "hygiene",
+            "statusline",
+            "notification",
+            "notify",
+            "ntfy",
+            "drift",
+            "cooldown"
+          ]
         }
       ]
     },

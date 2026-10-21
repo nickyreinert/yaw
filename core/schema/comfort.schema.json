@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "comfort.schema.json",
+  "title": "~/.yaw/comfort.yaml",
+  "description": "Personal comfort settings (ADR-0030, ADR-0013): hygiene thresholds (doc 11 §1), notification channels (doc 11 §2). Lives in the user's home, never in a repository. YAW reads it and never writes it, so comments and the ntfy topic (which acts as a password) stay as the user left them.",
+  "type": "object",
+  "properties": {
+    "features": {
+      "description": "Comfort features on for this user in every project; overrides the project's user.comfort answer.",
+      "type": "array",
+      "items": { "enum": ["hygiene", "status-line", "notifications"] },
+      "uniqueItems": true
+    },
+    "hygiene": {
+      "type": "object",
+      "properties": {
+        "drift": { "description": "Topic drift threshold (1 - cosine), smoothed over the last two prompts.", "type": "number", "minimum": 0, "maximum": 1 },
+        "maxPrompts": { "type": "integer", "minimum": 1 },
+        "maxAgeMinutes": { "type": "integer", "minimum": 1 },
+        "maxKbPerPrompt": { "description": "Transcript size per prompt, in KB.", "type": "integer", "minimum": 1 },
+        "cooldownPrompts": { "description": "Show the hint at most once per this many prompts.", "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "notify": {
+      "type": "object",
+      "properties": {
+        "minutes": { "description": "Notify only when a run took at least this long.", "type": "integer", "minimum": 0 },
+        "terminal": { "description": "Terminal notification: OSC 9 or OSC 777, or off.", "enum": ["osc9", "osc777", "off"] },
+        "ntfy": {
+          "type": "object",
+          "required": ["topic"],
+          "properties": {
+            "server": { "description": "https URL (http only for localhost); default https://ntfy.sh.", "type": "string", "minLength": 1 },
+            "topic": { "description": "Acts as a password: long and random, or self-host with auth.", "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

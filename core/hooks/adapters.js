@@ -35,7 +35,7 @@ function toolInput(agent, toolName, input) {
   if (agent === 'codex' && toolName === 'apply_patch') return { command: null, paths: patchPaths(i.command ?? i.patch ?? i.input ?? '') };
   const command = Array.isArray(i.command) ? i.command.join(' ') : str(i.command);
   const paths = [i.file_path, i.path, i.notebook_path, i.glob].filter((p) => typeof p === 'string' && p !== '');
-  return { command, paths };
+  return { command, paths, runInBackground: i.run_in_background === true };
 }
 
 // Tool names a matcher is tested against: the native one plus its Claude equivalents.

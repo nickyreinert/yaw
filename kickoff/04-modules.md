@@ -26,7 +26,7 @@ Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, 
 | `backup` | `just backup/restore`, restore test, schedule template | – | if data | ✔ | devenv |
 | `environments` | staging/prod/preview config, guarded `just deploy <env>` | – | if hosted | ✔ | devenv |
 | `vendors` | Service catalogue, key onboarding, `.env` wiring | – | if needed | if needed | devenv |
-| `comfort` | Session hygiene, status line, notifications, cache reminder (doc 11) | – | hygiene + status line | asked | core |
+| `comfort` | Session hygiene, status line, notifications, cache reminder (doc 11; ADR-0030: personal settings in `~/.yaw/comfort.yaml`, cache reminder is phase 2) | – | hygiene + status line | asked | core |
 | `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | ✔ | tasks |
 | `knowledge` | Global knowledge store recall + `/remember` (doc 12) | – | if set up | if set up | decisions |
 | `dashboard` | Local UI, OTel receiver, metrics store (doc 13) | – | ✔ | ✔ | sessions |

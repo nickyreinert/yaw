@@ -1,0 +1,3 @@
+<% if comfort.statusLine %>
+{ "statusLine": { "type": "command", "command": "r=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; k=\"${YAW_KIT:-$HOME/.yaw/kit}\"; [ ! -f \"$r/.yaw/lib/bin/yaw\" ] || k=\"$r/.yaw/lib\"; [ ! -f \"$k/bin/yaw\" ] || node --no-warnings \"$k/bin/yaw\" statusline 2>/dev/null; exit 0" } }
+<% end %>

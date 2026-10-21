@@ -14,6 +14,7 @@ import { task } from './tasks.js';
 import { gh } from './gh.js';
 import { decisions } from './decisions.js';
 import { sessions } from './sessions.js';
+import { hygiene, notify, statusline } from './comfort.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -39,8 +40,9 @@ export const COMMANDS = [
   { name: 'sessions', args: '<find|for|resume|list|current|handoff> [...]', summary: 'agent session registry: find, link and resume sessions (sessions module; `just sessions ...` calls this)', options: { all: { type: 'boolean' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' } }, run: sessions },
   { name: 'session', step: 5, summary: 'rename the current session' },
   { name: 'session-start', step: 5, summary: 'team-mode sync at session start' },
-  { name: 'hygiene', step: 5, summary: 'session hygiene reminders on/off' },
-  { name: 'notify', step: 5, summary: 'send a notification' },
+  { name: 'hygiene', args: '[status|on|off] [--all]', summary: 'session hygiene hints: show the state, switch them on or off (comfort module)', options: { all: { type: 'boolean' } }, run: hygiene },
+  { name: 'notify', args: '[status|test|send] [--status done|input|failed] [--minutes N] [--summary text]', summary: 'notifications after long runs: show the channels, send a test or a message (comfort module)', options: { status: { type: 'string' }, minutes: { type: 'string' }, summary: { type: 'string' } }, run: notify },
+  { name: 'statusline', args: '[--snippet]', summary: 'status line for Claude Code (reads its JSON on stdin; comfort module)', options: { snippet: { type: 'boolean' } }, run: statusline },
   { name: 'presets', step: 7, summary: 'list, show and delete saved setups' },
 ];
 
@@ -78,6 +80,7 @@ export async function main(argv, io = {}) {
     confirm: io.confirm, // tests script the typed "y" of guarded actions (ADR-0027); undefined asks on a real terminal
     gh: io.gh, // tests replay recorded gh output; undefined runs the GitHub CLI
     now: io.now,
+    stdin: io.stdin,
   };
   const [first, ...rest] = argv;
   if (first === undefined || first === '--help' || first === '-h') {

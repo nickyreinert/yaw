@@ -4,7 +4,7 @@ Optional add-ons that make daily work smoother. Same rules as modules: opt-in, l
 
 | Feature | Value | Model tokens | Default | Phase |
 |---|---|---|---|---|
-| Session hygiene | Keeps context clean, cheaper and sharper answers | **none** (local script, user-only message) | on (Standard), uncheckable | 1 |
+| Session hygiene | Keeps context clean, cheaper and sharper answers | **none** (local script, user-only message) | on (Standard), personal, can be switched off (ADR-0013) | 1 |
 | Status line | Always-visible task, context size, cache warm/cold | **none** | on if Claude | 1 |
 | Notifications | Walk away safely, get pinged on "done" / "needs input" | **none** | off, asked | 1 |
 | Cache-warmth reminder | Avoid paying for a cold prompt cache after a break | **none** | off, asked | 2 |
@@ -28,7 +28,7 @@ Problem: one endless session, growing context, mixed topics, degrading answers.
    - **task switch** = prompt mentions a different `T-NNN` or a different branch is checked out.
 3. If a threshold is crossed, emit a short **user-visible message** (`systemMessage`), never block:
    > "This looks like a new topic (drift 0.71, 48 prompts, 2 h). Suggest: `/handoff` then `/clear`."
-4. Thresholds in `.yaw/config.yaml`; cooldown so the hint appears at most once per 20 prompts. `yaw hygiene off` silences it for the session.
+4. Thresholds in the personal `~/.yaw/comfort.yaml` (never committed; ADR-0030); cooldown so the hint appears at most once per 20 prompts. `yaw hygiene off` silences it for this project until `yaw hygiene on` (`--all`: every project); a CLI call cannot know the session id.
 
 **Make clearing cheap:** `/handoff` (skill) writes the journal line and resume point into `TASKS.md` and records the session in the registry (doc 12). After `/clear` the `SessionStart` hook (matcher `clear`) re-injects the active task, so nothing is lost. This is what turns "start a new session" from painful into a habit. (The re-injection is the only model-visible part: a few lines, once per session, and only if the tasks module is on.)
 
@@ -36,7 +36,7 @@ Other agents: Codex has the same `UserPromptSubmit` + `systemMessage`; Gemini (`
 
 ## 1a. Status line (Claude Code)
 
-A status line script (zero tokens) shows: active task `T-012`, context tokens, prompt-cache state (warm, minutes left / cold) from the status line `prompt_cache` data, hygiene warning badge, gate status of the last `just check`. It is the quietest form of all comfort hints and the first thing to enable.
+A status line script (zero tokens) shows: active task `T-012`, context tokens, prompt-cache state (warm, minutes left / cold) from the status line `prompt_cache` data, hygiene warning badge, gate status of the last `just check` (recorded from the agent's own `just check` Bash calls, Claude only; ADR-0030). In a team repository the committed `.claude/settings.json` does not carry it; `yaw statusline --snippet` prints the setting for `.claude/settings.local.json`. It is the quietest form of all comfort hints and the first thing to enable.
 
 ## 2. Notifications
 
@@ -52,7 +52,7 @@ Triggers: `Stop` (turn finished), `Notification` with `permission_prompt` / `idl
 | Email | medium | Via an email vendor from the catalogue |
 | WhatsApp | high | Business API, Meta approval, costs; not recommended |
 
-Payload: project, task ID, status (done / needs input / failed), duration, one-line summary. **No code, no diffs, no secrets** in notifications (privacy default). One `yaw notify` script, all channels behind it; configured in `~/.yaw/notify.yaml` (global) with per-project override.
+Payload: project, task ID, status (done / needs input / failed), duration, one-line summary. **No code, no diffs, no secrets** in notifications (privacy default). One `yaw notify` script, all channels behind it; configured in the personal `~/.yaw/comfort.yaml` (`notify:` block; ADR-0030). Phase 1 has the terminal and ntfy channels; the others and a per-project override come later.
 
 ## 3. Prompt-cache warmth reminder
 
