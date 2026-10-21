@@ -8,7 +8,7 @@ A profile is a **stack building block**: how to set up, run, check, build, scree
 |---|---|---|---|---|---|---|
 | `python-cli` | Script, tool, data job | `uv` venv, no Docker | `ruff`, `mypy`/`pyright`, `pytest`, `pip-audit` | n/a | none / PyPI | `twine upload` |
 | `node-cli` | Node CLI/tool, zero-dependency where possible (used for YAW itself) | Node ≥ 22, no Docker | `node --test`, `tsc --checkJs` (optional), `npm audit` if deps, `shellcheck` for scripts | n/a | git tag / npm | `npm publish`, tag push |
-| `python-web` | Flask/FastAPI app, self-hosted | Docker Compose (app + DB) | ruff, pyright, pytest, `alembic upgrade` on temp DB, `bandit`, pip-audit, image build | Playwright | Docker host via SSH / registry | prod migrations, `docker push`, `ssh prod` |
+| `python-web` | FastAPI app, self-hosted (Flask and a database come with the full interview; ADR-0035) | `uv` venv; Dockerfile (no Compose yet) | ruff, pyright, pytest, `bandit`, pip-audit; `just build` = image build, not in `check` (no `alembic` yet) | n/a (no Playwright screenshot; ADR-0035) | Docker host via SSH / registry | prod migrations, `docker push`, `ssh prod` |
 | `static-site` | Landing page, portfolio, docs | Vite or plain + nginx container | `html-validate`, `stylelint`, local link check (no Lighthouse budget; ADR-0034) | n/a (no Playwright screenshot; ADR-0034) | nginx container / Cloudflare Pages / Netlify (`preview-share` is not in this profile) | remote deploy |
 | `node-ts-vercel` | Next.js / Vite + TS app | Node, Vercel CLI, optional Docker DB | `tsc`, ESLint, Vitest, `next build`, Playwright e2e, `npm audit` | Playwright | Vercel (preview + prod) | `vercel --prod`, env changes |
 | `cloudflare-workers` | Edge API, Worker + D1/R2/KV | Wrangler local (Miniflare) | `tsc`, Vitest (workers pool), local D1 migration, `wrangler deploy --dry-run` | Playwright (if UI) | Cloudflare | `wrangler deploy`, `wrangler secret`, `d1 … --remote` |
@@ -44,8 +44,7 @@ name: python-web
 summary: Flask or FastAPI web app, containerised, self-hosted.
 suggestWhen:
   language: [python]
-  runsOn: [self-hosted, docker]
-  hasUI: [true, false]
+  runsOn: [self-hosted]   # ADR-0035; hasUI is not listed (no information)
 options:
   framework: { choices: [flask, fastapi], default: fastapi }
   db: { choices: [none, sqlite, postgres], default: postgres }

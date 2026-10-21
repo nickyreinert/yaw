@@ -1,0 +1,9 @@
+- Python >= 3.11 with type hints on all public functions; `pyright` must pass (`just typecheck`).
+- FastAPI app in `src/app/main.py`; keep routes thin, put logic in plain functions that tests call directly.
+- Manage the environment with `uv` (`uv add`, `uv sync`); never `pip install` into the system Python.
+- Format and lint with `ruff` (`just fmt`, `just lint`); `bandit` runs inside `just lint`; do not add a second formatter.
+- Tests use `pytest` and FastAPI's `TestClient`, live in `tests/`, are deterministic and make no network calls.
+- Validate input with pydantic models at the boundary; raise `HTTPException` with specific status codes, no bare `except`.
+- Secrets and settings come from environment variables (`.env` is local only); never hard-code them or log them.
+- Keep dependencies few; run `just audit` (`pip-audit`) after changing them.
+- `just build` builds the container image only; pushing an image, `ssh` to a host and production migrations need the user's approval.

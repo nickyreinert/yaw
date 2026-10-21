@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile python-web (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small API for my notes.
+  idea.team: solo
+  arch.language: python
+  arch.runs-on: self-hosted
+proposal:
+  status: confirmed
+  summary: python-web - FastAPI web app, self-hosted; uv venv, ruff, pyright, pytest, bandit, pip-audit, Dockerfile.
+  profiles: [python-web]
+  modules: [core]

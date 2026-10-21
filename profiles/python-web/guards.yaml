@@ -1,0 +1,8 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: docker-push, pattern: "\\bdocker(-compose)?\\b.*(\\bpush\\b|--push)", reason: Pushing an image to a registry needs your approval. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp)\\s+\\S|\\brsync\\b.*\\s[^\\s/.][^\\s/]*:\\S|\\bDOCKER_HOST=", reason: Reaching a remote host (production) needs your approval. }
+  - { id: remote-docker, pattern: "\\bdocker\\s+(-H|--host\\b|--context\\b)", reason: Running Docker against a remote host needs your approval. }
+  - { id: prod-migration, pattern: "\\balembic\\b.*(\\b(prod|production)\\b|\\s-x\\s)", reason: Production migrations need your approval. }
+  - { id: pypi-publish, pattern: "\\b(twine\\s+upload|uv\\s+publish)\\b", reason: Publishing to PyPI needs your approval. }

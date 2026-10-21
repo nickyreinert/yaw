@@ -1,4 +1,4 @@
-// Profiles python-cli (Y-3.4), node-cli (Y-3.5) and static-site (Y-6.1): parts, uniform verbs, and the smoke test per
+// Profiles python-cli (Y-3.4), node-cli (Y-3.5) and static-site (Y-6.1) and python-web (Y-6.2): parts, uniform verbs, and the smoke test per
 // examples/<profile>/ (init in a temp dir, then just setup && just check).
 
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'python-cli', 'static-site'];
+const PROFILES = ['node-cli', 'python-cli', 'python-web', 'static-site'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -19,7 +19,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles node-cli, python-cli and static-site, and profile.yaml validates', () => {
+test('the kit has exactly the profiles node-cli, python-cli, python-web and static-site, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -238,4 +238,54 @@ test('smoke static-site: yaw init, just setup && just check pass; broken pages f
   const links = run('just', ['test'], { cwd });
   assert.notEqual(links.status, 0, 'a broken link fails just test');
   assert.match(links.stderr, /bad\.html: broken link "missing\.html"/);
+});
+
+test('python-web is suggested only for a Python project (python-cli wins when local), never for other languages or unknown ones; python-cli keeps its suggestion', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  const names = (facts) => suggestProfiles(profiles, facts).candidates.map((c) => c.name);
+  for (const facts of [{ runsOn: 'serverless', hosted: true }, { language: 'javascript', runsOn: 'self-hosted', hosted: true }, { public: true }, { runsOn: 'edge', hosted: true }, { language: 'javascript', runsOn: 'local', hosted: false }]) {
+    assert.ok(!names(facts).includes('python-web'), JSON.stringify(facts));
+  }
+  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'self-hosted', hosted: true }).suggestion, 'python-web');
+  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'local', hosted: false }).suggestion, 'python-cli');
+});
+
+test('python-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('python-web', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'backup']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
+  assert.equal(deploy.status, 0);
+  assert.match(deploy.stdout, /deploy: not applicable/);
+});
+
+test('smoke python-web: yaw init, just setup && just check pass; bad code fails the gate (needs uv and network)', { skip: pythonSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('python-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'python-web');
+  const bad = join(cwd, 'src', 'app', 'bad.py');
+  copyFileSync(join(fixtures, 'lint_error.py'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused import fails just lint');
+  copyFileSync(join(fixtures, 'insecure.py'), bad);
+  const bandit = run('just', ['lint'], { cwd });
+  assert.notEqual(bandit.status, 0, 'shell=True fails bandit');
+  assert.match(bandit.stdout + bandit.stderr, /B602|shell=True/);
+  copyFileSync(join(fixtures, 'type_error.py'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('python-web guards block publishing and remote forms, not local work', () => {
+  const guards = parse(readFileSync(dir('python-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'docker build --push -t me/app .', 'docker compose push', 'docker-compose push', 'DOCKER_HOST=ssh://me@host docker ps', 'docker -Hssh://me@host ps', 'docker -H ssh://me@host ps', 'docker --host=ssh://me@host ps', 'docker --context prod ps', 'alembic -x env=prod upgrade head', 'alembic -c production.ini upgrade head', 'alembic upgrade head --prod', 'ssh me@host', 'scp a me@host:/srv', 'sftp me@host', 'rsync -av dist/ me@host:/srv/app', 'rsync -av dist/ host:/srv/app', 'twine upload dist/*', 'uv publish']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['docker build -t app .', 'docker compose up', 'alembic upgrade head', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'uv run pytest']) assert.ok(!blocked(cmd), cmd);
 });

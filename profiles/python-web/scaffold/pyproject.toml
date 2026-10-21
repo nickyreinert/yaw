@@ -1,0 +1,24 @@
+[project]
+name = "app"
+version = "0.0.0"
+description = ""
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6", "pyright>=1.1.380", "pip-audit>=2.7", "bandit>=1.7"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
