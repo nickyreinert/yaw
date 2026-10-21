@@ -244,7 +244,7 @@ Status: **implemented, awaiting the user's ADR review (0009, 0020) and a green k
 
 ### Step 5 — Phase-1 modules
 
-Common AC for every row: installs, works for Claude + Codex (+ Copilot where the matrix says so), removable with zero residue, tests, correct manifest entries.
+Common AC for every row: installs, works for Claude + Codex (+ Copilot where the matrix says so), removable (removal deletes the module's files, fragments and hooks; the user's answers in answers.yaml are kept, and a re-add asks the module's questions again with previous answers as defaults), tests, correct manifest entries.
 
 | ID | Title | Type | Prio | Depends | Extra acceptance criteria |
 |---|---|---|---|---|---|

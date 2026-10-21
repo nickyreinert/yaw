@@ -190,10 +190,10 @@ export function planAdd({ root, kitRoot = KIT_ROOT, module }) {
   return { manifest, enabled, definition };
 }
 
-// Questions of the module that have no answer yet (ids are unique across the kit, ADR-0017).
+// The module's questions; a previous answer (kept by `yaw remove`) becomes the default (ADR-0023).
 export function moduleQuestions({ root, definition }) {
   const given = readAnswers(root).answers;
-  return (definition.questions ?? []).filter((q) => !Object.hasOwn(given, q.id));
+  return (definition.questions ?? []).map((q) => (Object.hasOwn(given, q.id) ? { ...q, default: given[q.id] } : q));
 }
 
 // Add the module: new answers are merged into answers.yaml, files are rendered and reconciled.
@@ -201,8 +201,9 @@ export async function addModule({ root, kitRoot = KIT_ROOT, module, newAnswers =
   const { enabled } = planAdd({ root, kitRoot, module });
   const doc = readAnswers(root);
   const nextDoc = { ...doc, answers: { ...doc.answers, ...newAnswers } };
-  // No new answers: answers.yaml is not touched, so the user's comments survive.
-  const answers = Object.keys(newAnswers).length > 0 ? { text: stringify(nextDoc), doc: nextDoc } : undefined;
+  // Nothing new or changed: answers.yaml is not touched, so the user's comments survive.
+  const changed = Object.entries(newAnswers).some(([id, v]) => JSON.stringify(doc.answers[id]) !== JSON.stringify(v));
+  const answers = changed ? { text: stringify(nextDoc), doc: nextDoc } : undefined;
   const previous = readProjectFile(root, ANSWERS);
   try {
     return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers, ...options });

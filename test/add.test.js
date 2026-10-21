@@ -101,7 +101,7 @@ test('declining the confirmation writes nothing', async () => {
   assert.deepEqual(readTree(root), before);
 });
 
-test('add then remove leaves only the (kept) answers behind; re-adding does not ask again', async () => {
+test('add then remove leaves only the (kept) answers behind; re-adding asks again with the previous answers as defaults', async () => {
   const kitRoot = fixtureKit();
   const root = await setup(kitRoot);
   const before = readTree(root);
@@ -115,8 +115,16 @@ test('add then remove leaves only the (kept) answers behind; re-adding does not 
   delete after['.yaw/answers.yaml'];
   delete before['.yaw/answers.yaml'];
   assert.deepEqual(after, before);
-  const again = await yaw(['add', 'extra'], root, kitRoot, scripted(['y']));
-  assert.equal(again.prompter.asked.length, 1); // only the confirmation
+  const again = await yaw(['add', 'extra'], root, kitRoot, scripted(['high', '', 'y']));
+  assert.equal(again.prompter.asked.length, 3); // two questions + confirmation
+  assert.match(again.prompter.asked[0], /\[low\]/); // previous answer is the default
+  const kept = read(root, '.yaw/answers.yaml');
+  const third = await yaw(['remove', 'extra', '--yes'], root, kitRoot);
+  assert.equal(third.code, 0);
+  const unchanged = await yaw(['add', 'extra'], root, kitRoot, scripted(['', '', 'y']));
+  assert.equal(unchanged.prompter.asked.length, 3);
+  assert.match(unchanged.prompter.asked[0], /\[high\]/);
+  assert.equal(read(root, '.yaw/answers.yaml'), kept); // unchanged answers: file untouched
 });
 
 test('no new answers: answers.yaml is left byte for byte (comments survive)', async () => {
