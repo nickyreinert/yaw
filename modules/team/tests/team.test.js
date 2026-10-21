@@ -306,6 +306,62 @@ test('git guard: commit on main, push to main, force push and --no-verify are de
   }
 });
 
+test('git guard: long-option prefixes, short refspecs, hook overrides, shell keywords and wrappers are read (review of #132)', async () => {
+  const r = await repo();
+  const bash = (command) => decide(r, 'claude', toolCall('claude', { command }));
+  r.git('switch', '--quiet', '-C', 'feat/34-x');
+  // 1. unambiguous prefixes of long options
+  assert.match(await bash('git commit --no-verif -m x'), /--no-verify/);
+  assert.match(await bash('git push --no-verif'), /--no-verify/);
+  assert.match(await bash('git push --force-w'), /force pushes/);
+  assert.match(await bash('git push --mirro origin'), /--all \/ --mirror/);
+  assert.match(await bash('git push --al origin'), /--all \/ --mirror/);
+  // 3. switching the hooks off
+  assert.match(await bash('git -c core.hooksPath=/dev/null commit -m x'), /core\.hooksPath/);
+  assert.match(await bash('git --config-env=core.hooksPath=EMPTY push'), /core\.hooksPath/);
+  assert.match(await bash('git --config-env core.hooksPath=EMPTY push'), /core\.hooksPath/);
+  assert.match(await bash('GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x'), /core\.hooksPath/);
+  assert.match(await bash('git config core.hooksPath /dev/null'), /core\.hooksPath/);
+  assert.equal(await bash('git -c user.name=x commit -m "fix: y" -m "Refs #34"'), null);
+  r.git('switch', '--quiet', 'main');
+  // 2. short destinations of a refspec
+  assert.match(await bash('git push origin HEAD:heads/main'), /pushing to the default branch main/);
+  assert.match(await bash('git push origin HEAD:refs/heads/main'), /pushing to the default branch main/);
+  // 4. behind shell keywords and wrapper options
+  for (const command of [
+    'if true; then git commit -m x; fi',
+    'for f in a; do git commit -m x; done',
+    'if false; then :; else git commit -m x; fi',
+    'if false; then :; elif git commit -m x; then :; fi',
+    '! git commit -m x',
+    '{ git commit -m x; }',
+    'env -u FOO git commit -m x',
+    'env -S "git commit -m x"',
+    'nice -n 5 git commit -m x',
+    'sudo -u bob git commit -m x',
+    'timeout 30 git commit -m x',
+    'timeout -s KILL 30 git push',
+    'bash -c "git push origin main"',
+  ]) assert.match(await bash(command) ?? '', /YAW team mode/, command);
+});
+
+test('git guard: while the branch has diverged, rebase, pull, merge, reset and upstream changes are for the user', async () => {
+  const r = await repo();
+  r.git('switch', '--quiet', '-c', 'feat/34-x');
+  r.git('push', '--quiet', '-u', 'origin', 'feat/34-x');
+  const bash = (command) => decide(r, 'claude', toolCall('claude', { command }));
+  assert.equal(await bash('git pull --rebase'), null, 'not diverged: allowed');
+  r.teammate('feat/34-x', 'theirs.txt');
+  writeFileSync(join(r.root, 'mine.txt'), 'mine\n');
+  r.git('add', 'mine.txt');
+  r.git('commit', '--quiet', '-m', 'mine #34');
+  r.git('fetch', '--quiet', 'origin');
+  for (const command of ['git branch --unset-upstream', 'git branch -u origin/main', 'git branch --set-upstream-to=origin/main', 'git rebase origin/feat/34-x', 'git pull --rebase', 'git pull', 'git merge origin/feat/34-x', 'git reset --hard @{u}']) {
+    assert.match(await bash(command) ?? '', /has diverged from origin\/feat\/34-x; the user decides how to settle it/, command);
+  }
+  assert.equal(await bash('git status && git log --oneline -3'), null);
+});
+
 test('guards fail open: no git repository, no git on the PATH, a missing kit module', async () => {
   const root = await project();
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
@@ -396,21 +452,27 @@ test('pr-policy.yml: job pr-policy, read-only token, no action and no expression
   for (const step of wf.jobs['pr-policy'].steps) assert.ok(!String(step.run).includes('${{'), 'event data reaches the script through env only');
 });
 
-test('pr-policy: passes when the PR closes an open issue, fails when it links none', async () => {
+// The workflow's own --jq filter runs through the real jq on a GraphQL answer, so the selection is tested too.
+test('pr-policy: passes for an open issue of this repository; fails for none, a closed one, or one elsewhere', { skip: !hasTool('jq') && !process.env.CI && 'jq is needed' }, async () => {
   const root = await project();
   const script = parse(readFileSync(join(root, '.github', 'workflows', 'pr-policy.yml'), 'utf8')).jobs['pr-policy'].steps[0].run;
   const bin = tmp('yaw-prbin-');
-  const policy = (answer) => {
-    // the stand-in prints what the real gh prints after --jq: the open issues, or nothing
-    writeFileSync(join(bin, 'gh'), `#!/bin/sh\nprintf '%s' '${answer}'\n`, { mode: 0o755 });
-    return run('bash', ['-c', script], { env: { PATH: `${bin}:${process.env.PATH}`, GH_TOKEN: 'not-a-token', REPO: 'octo/demo', PR: '5' }, encoding: 'utf8' });
+  const answer = join(bin, 'answer.json');
+  // gh stand-in: applies the --jq filter of the call to the canned GraphQL answer, like gh does (raw output)
+  writeFileSync(join(bin, 'gh'), '#!/bin/sh\nwhile [ $# -gt 0 ]; do if [ "$1" = "--jq" ]; then exec jq -r "$2" "$GH_ANSWER"; fi; shift; done\nexit 1\n', { mode: 0o755 });
+  const policy = (nodes) => {
+    writeFileSync(answer, JSON.stringify({ data: { repository: { pullRequest: { closingIssuesReferences: { nodes } } } } }));
+    return run('bash', ['-c', script], { env: { PATH: `${bin}:${process.env.PATH}`, GH_TOKEN: 'not-a-token', GH_ANSWER: answer, REPO: 'octo/demo', PR: '5' }, encoding: 'utf8' });
   };
-  const ok = policy('#34');
+  const here = (number, state = 'OPEN', repo = 'Octo/Demo') => ({ number, state, repository: { nameWithOwner: repo } });
+  const ok = policy([here(33, 'CLOSED'), here(34)]);
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
-  assert.match(ok.stdout, /links the open issue\(s\) #34/);
-  const bad = policy('');
-  assert.equal(bad.status, 1);
-  assert.match(bad.stdout, /links no open issue/);
+  assert.match(ok.stdout, /links the open issue\(s\) #34$/m);
+  for (const [nodes, why] of [[[], 'none'], [[here(34, 'CLOSED')], 'closed'], [[here(34, 'OPEN', 'someone/else')], 'another repository']]) {
+    const bad = policy(nodes);
+    assert.equal(bad.status, 1, why);
+    assert.match(bad.stdout, /links no open issue/, why);
+  }
 });
 
 // ------------------------------------------------------------------------------------------ gh protect
@@ -483,9 +545,13 @@ test('digest: issues sorted by priority then due date, failing or blocked PRs on
 test('sync: main, clean and behind is fast-forwarded; my issues and PRs are listed', async () => {
   const r = await repo();
   r.teammate('main', 'theirs.txt');
+  // a post-merge hook of the project must not run inside the session-start hook
+  const marker = join(tmp('yaw-marker-'), 'ran');
+  writeFileSync(join(r.root, '.git', 'hooks', 'post-merge'), `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 });
   const before = r.git('rev-parse', 'HEAD');
   const result = await sessionStart({ root: r.root, env: r.env });
   assert.notEqual(r.git('rev-parse', 'HEAD'), before);
+  assert.equal(existsSync(marker), false, 'no git hook ran during the fast-forward');
   assert.ok(existsSync(join(r.root, 'theirs.txt')));
   const text = result.lines.join('\n');
   assert.match(text, /^YAW team · main: pulled 1 commit from origin\/main \(fast-forward\); edits need an issue branch: just task start <#>/);

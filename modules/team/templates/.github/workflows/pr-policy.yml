@@ -1,5 +1,5 @@
-# pr-policy.yml (team module, ADR-0031). Phase 1 checks one rule (BD3): the pull request links an open issue
-# (closingIssuesReferences, e.g. "Closes #34" in the description, which `just pr` writes). The job name pr-policy
+# pr-policy.yml (team module, ADR-0031). Phase 1 checks one rule (BD3): the pull request links an open issue of
+# this repository (closingIssuesReferences, e.g. "Closes #34" in the description, which `just pr` writes). The job name pr-policy
 # is the contract with the branch ruleset (`just gh-protect`): do not rename it.
 # GitHub fills closingIssuesReferences only for pull requests into the default branch.
 # No checkout, no third-party action: the job reads the pull request through the GitHub API only.
@@ -31,9 +31,10 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){closingIssuesReferences(first:20){nodes{number state}}}}}'
+          query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){closingIssuesReferences(first:20){nodes{number state repository{nameWithOwner}}}}}}'
+          # Only an open issue of this repository counts (a linked issue elsewhere is not this project's work).
           open="$(gh api graphql -F owner="${REPO%%/*}" -F name="${REPO#*/}" -F pr="$PR" -f query="$query" \
-            --jq '[.data.repository.pullRequest.closingIssuesReferences.nodes[] | select(.state == "OPEN") | "#\(.number)"] | join(" ")')"
+            --jq '[.data.repository.pullRequest.closingIssuesReferences.nodes[] | select(.state == "OPEN" and (.repository.nameWithOwner | ascii_downcase) == (env.REPO | ascii_downcase)) | "#\(.number)"] | join(" ")')"
           if [ -z "$open" ]; then
             echo "::error title=pr-policy::This pull request links no open issue. Add \"Closes #<n>\" to its description (just pr writes it) or link the issue under Development."
             exit 1

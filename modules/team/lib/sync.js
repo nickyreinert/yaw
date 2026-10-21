@@ -189,7 +189,8 @@ export async function sessionStart({ root, env = process.env, now = new Date(), 
     } else if (state.dirty) {
       notes.push(`${plural(state.behind, 'commit')} behind ${state.upstream}; not pulled because the tree has changes`);
     } else {
-      const ff = git(['merge', '--ff-only', '--quiet', state.upstream], { timeoutMs: 10000 });
+      // No hook runs inside a session-start hook (post-merge and friends are the user's, not ours).
+      const ff = git(['-c', 'core.hooksPath=/dev/null', 'merge', '--ff-only', '--quiet', state.upstream], { timeoutMs: 10000 });
       if (ff.status === 0) notes.push(`pulled ${plural(state.behind, 'commit')} from ${state.upstream} (fast-forward)`);
       else notes.push(`${plural(state.behind, 'commit')} behind ${state.upstream}; the fast-forward failed, pull it yourself`);
       state = branchState(root, git);
