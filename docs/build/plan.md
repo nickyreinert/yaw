@@ -16,7 +16,7 @@ Abbreviations: `K` = KICK-OFF.md, `B` = BUILD.md, `D01`…`D14` = kickoff docs, 
 | 2 | `github.yaml` stays YAML (user-edited). `taxonomy.json` stays JSON (managed via `yaw decisions`). | F4 |
 | 3 | Phase 1 `yaw.db` = session registry tables only. Evaluation tables and `release-plan.yaml` → phase 2. Phase-1 `pr-policy` enforces only "PR links an open issue". | F11, M9 |
 | 4 | Local mode: `TASKS.md` is the source of truth, IDs `T-NNN`. GitHub-only and team mode: issues are the source, IDs `#123`, `TASKS.md` is a generated read-only view. Both mode: `T-NNN` with linked issue number. | F9, M3, M4 |
-| 5 | "Lean" = **Quick** (one name; docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`. Step 3 builds `core` only; Quick complete after 5.3. No reordering. **Amended by the user (ADR-0009): Quick also includes minimal `security`.** | P1, P4 |
+| 5 | "Lean" = **Quick** (one name; docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`. Step 3 builds `core` only; Quick complete after 5.3. No reordering. **Amended by the user (ADR-0009): Quick also includes minimal `security`.** **ADR-0032 (Y-5.10): two setup depths, Quick and Full; Standard merged into Full, `standard` kept as an alias.** | P1, P4 |
 | 6 | Minimal `security` in phase 1 (deny `.env*`/secret reads, guard `rm -rf`, force push, prod deploy). It is the blocking hook proving Step 4. `quality-code` reviewer stays phase 2; `just check` gates come from profiles. | P6 (partly), M15, H6 |
 | 7 | 9th profile **`node-cli`** (Node ≥ 22, `node --test`, no deps), used for this repo. ADRs in `docs/adr/` until Step 5.6, then moved to `.decisions/` by the decisions module. | P5, M12 |
 | 8 | Gemini CLI → phase 3 with Antigravity. Phase-1 agents: Claude, Codex, Copilot. | H3, F10 (partly) |
@@ -69,7 +69,7 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | P3 | C | Lean footprint "≈ 5–8 files" not reachable with `devenv`, `standards`, `communication`, just fragments. | D01 §3; D02 §2; D04 §1, §3 | 3 | Open → ADR-0009 (Step 3 `core`-only result: "a handful of files", B Step 3) |
 | P4 | C | Step 3 builds lean with only `core`; other Quick modules come in 5.1–5.3. | B Steps 3, 5; D04 §1 | 3 | ✅ BD5 (no reordering) |
 | P5 | G | No Node profile for dogfooding. | B rule 9, Step 3; D05 §1 | 3 | ✅ BD7 (`node-cli`, built in Step 3) |
-| P6 | C | Phase-1 contents of Standard/Full undefined; `security`, `quality-code` etc. not in K phase 1. | K; D04 §1; B Steps 5, 9 | 3, 9 | ◐ `security` phase 1, `quality-code` phase 2 (BD6); Standard/Full phase-1 contents → ADR-0009 |
+| P6 | C | Phase-1 contents of Standard/Full undefined; `security`, `quality-code` etc. not in K phase 1. | K; D04 §1; B Steps 5, 9 | 3, 9 | ◐ `security` phase 1, `quality-code` phase 2 (BD6); Standard/Full phase-1 contents → ADR-0009, amended by ADR-0032 (Quick and Full only) |
 | P7 | C | Interview 0.1 has three expertise levels; D02 §4 defines two. | D02 §4; D03 0.1 | 7 | Open → Y-7.1 (ADR) |
 | P8 | A | Where global answers live if `~/.yaw/` storage is declined. | D02 §5; D03 §0 | 3, 7 | Open → Y-7.2 (ADR) |
 | P9 | G | Quick has no `decisions`; where do APPLY's ADRs / provisional ADRs go? | D02 §1; D03 | 3 | Open → ADR-0009 |
@@ -155,6 +155,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0029 | `sessions` module: registry in `yaw.db`, silent evaluation hooks, `Agent-Session` trailer on `just commit`, `/handoff` skill, `yaw sessions find/for/resume` (prints, never runs), path safety | Y-5.7 details (B rule 10) | Step 5.7 | Written, Proposed (Y-5.7 PR) |
 | 0030 | `comfort` module: user-only hygiene hints, status line, notifications; personal config in `~/.yaw/comfort.yaml`; last `just check` status; `yaw hygiene off`; path safety | M7, M8, M14 (Y-5.8 details, B rule 10) | Step 5.8 | Written, Proposed (Y-5.8 PR) |
 | 0031 | `team` module: ruleset + `pr-policy` + lefthook as the security boundary, agent rules as guidance only (no agent-side command guard), lefthook `commit-msg` / `pre-push` script, `pr-policy` = open linked issue (BD3), `gh protect --verify` unguarded, session-start sync (safe fast-forward, 5-min `gh` cache, offline fail-open, one active-issue context line), `task start` issue branch, path safety | M9 (Y-5.9 details, B rule 10) | Step 5.9 | Written, Proposed (Y-5.9 PR) |
+| 0032 | Setup depth: Quick and Full (Standard merged into Full, `standard` alias with unchanged output); mode controls generated output; Full gates `github` / `ci` by GitHub use; hooks and skills per mode; mode = starting depth, `yaw add` keeps it; 80-line `AGENTS.md` test for Full; question 1.3 → choice (step 7). Amends ADR-0009 | P6 (Y-5.10, B rule 10) | Step 5.10 | Written, Proposed (Y-5.10 ADR PR) |
 
 ---
 
@@ -263,6 +264,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-5.7 | `sessions` (registry, trailer, `/handoff`) (**done**, ADR-0029) | Feature | P1 | Y-5.3, Y-5.6, Y-1.14 | Registry in `yaw.db` per BD3 / D12 §4; `Agent-Session` trailer; title from the active task; `yaw sessions find/for/resume`; registry git-ignored **Design updated (ADR-0029, docs only), implementation follows as separate work:** project name on every session row (asked by `yaw init`, stored in the manifest) and `--project/--model/--session` filters on `yaw sessions` |
 | Y-5.8 | `comfort`: hygiene, status line, notifications (**done**, ADR-0030) | Feature | P2 | Y-5.7, ADR-0007, ADR-0013 | Token-free per BD9 (test per hook); cooldown; `yaw hygiene off`; notifications only after N minutes; payload has no code/diff/secrets; personal config not committed |
 | Y-5.9 | Team mode enforcement (**done**, ADR-0031) | Feature | P1 | Y-5.5 | ~~Issue-required edit/commit guards in Claude and Codex~~ removed by the user's decision on PR #132: the security boundary is the GitHub ruleset + `pr-policy` + lefthook, the agent-side rules in `AGENTS.md` are guidance only (ADR-0031); lefthook `commit-msg` / `pre-push`; `pr-policy` CI check = "PR links an open issue" only (BD3); `just gh-protect` applies and verifies rulesets; session-start sync per D14 §3 with offline fail-open and 5-min cache |
+| Y-5.10 | Setup depth: Quick Start / Full Setup (#134, ADR-0032) | Feature | P1 | Y-5.9 | Sub-steps, one PR each: (1) ADR and docs (ADR-0032, BD5, docs 02/03/04, this plan); (2) selection implementation (Full gates `github` / `ci` by question 10.2, not asked for teams: team mode requires `github`, GitHub-only parts skipped without a github.com remote; `standard` alias with byte-identical output, module rules trimmed into `docs/spec/` or skills so Full fits the 80-line limit, which is not raised, plus the line-count test); (3) hook / skill table test (generated hooks and skills per mode match ADR-0032); (4) `yaw add` expansion test (a Quick project plus `yaw add` keeps `mode: quick`, earlier answers and user edits). Quick produces only its baseline; Full respects relevance and dependencies; existing configurations still work |
 
 ### Step 6 — Remaining profiles
 
@@ -323,5 +325,5 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 None need a user answer before Step 1. Per B rule 10 each is decided by the ADR named in §1 and listed in that step's summary. A question goes to the user only if an ADR changes scope, user-visible behaviour or security, or is hard to reverse. Likely candidates:
 
 1. **ADR-0009:** Does Quick include minimal `security`? Answered: yes (changes BD5).
-2. **ADR-0009:** Phase-1 contents of Standard and Full.
+2. **ADR-0009:** Phase-1 contents of Standard and Full. Answered by the user in ADR-0032 (Y-5.10): two choices, Quick and Full; Standard merged into Full.
 3. **ADR-0013:** Personal vs. committed config in team repos (M7).

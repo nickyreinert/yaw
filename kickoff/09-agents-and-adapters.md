@@ -90,7 +90,7 @@ Verified plugin capabilities: a Claude plugin (`.claude-plugin/plugin.json`, all
 | `test-writer` | quality-code (Full) | edit tests only | mid |
 | `docs-keeper` | standards (Full) | edit `docs/spec/` only | cheap |
 
-Standard preset: only `change-reviewer` (+ `visual-reviewer` if UI). More roles only when a recurring need appears.
+Default in Full once these subagents exist (phase 2; ADR-0032 merged Standard into Full): only `change-reviewer` (+ `visual-reviewer` if UI). More roles only when a recurring need appears.
 
 ## 6. MCP vs. scripts
 

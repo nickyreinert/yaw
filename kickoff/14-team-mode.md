@@ -54,7 +54,7 @@ Defence in depth; the agent rules are guidance, the git hooks bind locally (they
 
 `just gh-protect` applies and verifies the rulesets (guarded action, needs repo admin); `just gh-protect --verify` only compares the ruleset on GitHub with `.yaw/github.yaml` and needs no confirmation.
 
-Phase 1 (ADR-0031) builds these layers as the `team` module (preselected in Standard and Full for a team; depends on `tasks`, `github`, `git-hooks`):
+Phase 1 (ADR-0031) builds these layers as the `team` module (preselected in Full for a team, ADR-0032; depends on `tasks`, `github`, `git-hooks`):
 
 - **Security boundary (decided by the user, ADR-0031):** the GitHub ruleset (`just gh-protect`: pull request required, no force push, no deletion, no bypass actors) plus `pr-policy` plus lefthook. The agent-side rules in `AGENTS.md` are guidance only; there is no agent-side command guard and no edit lock.
 - `commit-msg` accepts `#<n>` anywhere outside comment lines and lets git's own merge and revert messages and `fixup!` / `squash!` commits pass. `pre-push` is a lefthook script (`.lefthook/pre-push/`), because lefthook skips `run` jobs on pre-push when no new files are pushed; creating the default branch (the first push of a new repository) is allowed.
