@@ -8,7 +8,7 @@ outputs:
   templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, just/github.just, justfile]
 agentsMd: |
   - Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status` and `just gh-issue`; they keep branch names, footers and PRs uniform.
-  - Guarded: `gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release` and the first push in `just pr`. Show the user the plan and pass `--yes` only after they approved that exact action.
+  - Guarded: `gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release` and the first push in `just pr`. They run only when the user types `y` in a terminal; ask the user to run them and never try to work around that.
   - There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
 agents:
   claude:  { support: native, via: "just recipes + AGENTS.md rules + permissions.ask in .claude/settings.json (the user confirms guarded commands)" }

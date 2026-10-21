@@ -102,7 +102,13 @@ function fakeGh({ native = [], labels = [], rulesets = [], prs = [], repoView = 
   return gh;
 }
 
+// A `--yes` in the tests of this file means "a person typed y on a terminal": it becomes an injected confirmer.
+// The real flag is gone (see the test that passes it).
 async function yaw(root, args, { gh, env, confirm, now } = {}) {
+  if (args.includes('--yes')) {
+    args = args.filter((a) => a !== '--yes');
+    confirm ??= async () => true;
+  }
   const stdout = capture();
   const stderr = capture();
   const code = await main(['gh', ...args], { stdout, stderr, cwd: root, gh, env: env ?? ENV(), confirm, now });
@@ -215,7 +221,7 @@ async function runMain(args, cwd, env) {
 
 // ------------------------------------------------------------------ guarded actions: authorisation
 
-test('every guarded verb refuses without authorisation and changes nothing; --yes or a typed y lets it through', async () => {
+test('every guarded verb refuses without a terminal and changes nothing; a typed y on a terminal lets it through', async () => {
   const { root, git, env } = await repo();
   git('switch', '--quiet', '-c', 'feat/T-001-x');
   writeFileSync(join(root, 'a.txt'), 'x\n');
@@ -244,13 +250,37 @@ test('every guarded verb refuses without authorisation and changes nothing; --ye
     assert.equal(no.code, 1);
     assert.deepEqual(gh2.writes(), []);
   }
-  // typed y, and --yes
+  // a fake terminal where the person types y
   const a = fakeGh();
   assert.equal((await yaw(root, ['labels'], { gh: a, env, confirm: async () => true })).code, 0);
   assert.equal(a.writes().length, 1);
-  const b = fakeGh();
-  assert.equal((await yaw(root, ['labels', '--yes'], { gh: b, env })).code, 0);
-  assert.equal(b.writes().length, 1);
+});
+
+test('--yes does not exist: every guarded verb refuses it, with or without a terminal', async () => {
+  const { root, env } = await repo();
+  for (const verb of GUARDED) {
+    for (const confirm of [undefined, async () => true]) {
+      const gh = fakeGh();
+      const stdout = capture();
+      const stderr = capture();
+      const code = await main(['gh', verb, '--yes'], { stdout, stderr, cwd: root, gh, env, confirm });
+      assert.equal(code, 1, verb);
+      assert.match(stderr.text(), /--yes does not exist/, verb);
+      assert.deepEqual(gh.calls, [], verb);
+    }
+  }
+});
+
+test('the real CLI without a terminal refuses a guarded verb and changes nothing', async () => {
+  const { root, env, git } = await repo();
+  for (const args of [['release', '0.1.0'], ['release', '0.1.0', '--yes']]) {
+    const r = run(process.execPath, [join(KIT_ROOT, 'bin', 'yaw'), 'gh', ...args], { cwd: root, env, input: 'y\n' });
+    assert.equal(r.status, 1, args.join(' '));
+    assert.match(String(r.stdout) + String(r.stderr), /a person must run it in a terminal|--yes does not exist/);
+  }
+  assert.equal(git('tag', '--list'), '');
+  const piped = run(process.execPath, [join(KIT_ROOT, 'bin', 'yaw'), 'gh', 'release', '0.1.0'], { cwd: root, env, input: 'y\n' });
+  assert.match(String(piped.stderr), /a person must run it in a terminal/);
 });
 
 test('release and the first push of pr are guarded too', async () => {
@@ -728,7 +758,7 @@ test('an edited github.yaml survives update and removal asks (keep)', async () =
   assert.match(read(root, '.yaw/github.yaml'), /# mine/);
 });
 
-test('the Claude ask rules cover every guarded verb, however yaw is called', async () => {
+test('the Claude ask rules (an extra prompt, not the guard) cover the usual forms of every guarded verb', async () => {
   const ask = JSON.parse(read(await project(), '.claude/settings.json')).permissions.ask;
   const covered = (cmd) => ask.some((r) => {
     const m = /^Bash\((.*):\*\)$/.exec(r);

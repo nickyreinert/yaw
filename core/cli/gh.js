@@ -11,7 +11,7 @@ export async function gh({ values, positionals, io }) {
   if (!enabledModules(manifest).includes('github')) throw new UsageError('the github module is not installed; run: yaw add github');
   const lib = await import(pathToFileURL(join(io.kitRoot, 'modules', 'github', 'lib', 'cli.js')).href);
   const [verb, ...args] = positionals;
-  // A typed "y" only counts on a real terminal; scripts and agents have to pass --yes (ADR-0027).
+  // A typed "y" only counts on a real terminal; without one there is no confirmer and guarded verbs refuse (ADR-0027).
   const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const confirmer = io.confirm ?? (tty ? (q) => confirm(createPrompter(), q) : undefined);
   try {

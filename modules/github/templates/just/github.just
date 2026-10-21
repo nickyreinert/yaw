@@ -1,5 +1,5 @@
 # github module (ADR-0027): recipes call `yaw gh <verb>`. Guarded recipes print their plan and need
-# a typed "y" or --yes; pass --yes only after the user approved that exact action.
+# a person typing "y" in a terminal. Scripts and agents cannot run them (there is no --yes).
 # Nothing here merges, force-pushes, deletes branches or changes the visibility of a repository.
 yaw_gh := 'if command -v yaw >/dev/null 2>&1; then yaw "$@"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" "$@"; else echo "gh: the YAW kit is not installed"; exit 1; fi'
 

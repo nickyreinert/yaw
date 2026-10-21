@@ -66,7 +66,7 @@ All via `gh` CLI, wrapped as `just gh-*` recipes; agents use these instead of ad
 | `issues-sync` | Task sync (mode "both"): `just task sync` (ADR-0010) | yes |
 | `project-add` | Add issue to Project board, set status field | yes |
 
-Guarded = needs explicit authorisation: the plan is printed, then a typed `y` or `--yes` (ADR-0027; stricter than the autonomy setting, which does not relax it). There is no recipe for any of the "Never" actions below, nor for merging. Never: force-push to shared branches, deleting remote branches with open PRs, changing repo visibility, without explicit confirmation.
+Guarded = needs explicit authorisation: the plan is printed, then a person types `y` in a terminal; there is no `--yes` and no way for a script or agent to answer (ADR-0027; stricter than the autonomy setting, which does not relax it). There is no recipe for any of the "Never" actions below, nor for merging. Never: force-push to shared branches, deleting remote branches with open PRs, changing repo visibility, without explicit confirmation.
 
 ## 4. CI module
 

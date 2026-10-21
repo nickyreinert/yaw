@@ -3,8 +3,9 @@
 //   not guarded  branch, commit, pr-status, issue; pr (when the branch already has an upstream)
 //   guarded      init, labels, protect, project-add, release; pr (first push of a branch)
 //
-// A guarded action prints what it will do and then needs authorisation: a typed "y" on a terminal, or
-// --yes. Nothing is guarded by default: no template, hook or other recipe calls these verbs, and there is
+// A guarded action prints what it will do and then needs a person: stdin and stdout must both be a terminal
+// and the user types "y". There is no --yes and no environment switch; scripts and agents cannot run these.
+// Nothing is guarded by default: no template, hook or other recipe calls these verbs, and there is
 // no verb that merges, force-pushes, deletes a branch or changes the visibility of an existing repository.
 // Everything goes through argv arrays (no shell), `gh` is injectable, paths are checked before file I/O.
 
@@ -39,17 +40,17 @@ export const RULESET = 'yaw-default-branch';
 export const GUARDED = ['init', 'labels', 'protect', 'project-add', 'release', 'pr'];
 export const VERBS = ['init', 'labels', 'protect', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add', 'issue'];
 export const USAGE = [
-  'usage: yaw gh init [name] [--owner o] [--public] [--yes]          create the repository (private by default), push, labels',
-  '       yaw gh labels [--yes]                                         create or update the labels of .yaw/github.yaml',
-  '       yaw gh protect [--approvals n] [--check name] [--yes]        ruleset for the default branch, verified afterwards',
+  'usage: yaw gh init [name] [--owner o] [--public] create the repository (private by default), push, labels',
+  '       yaw gh labels                                                 create or update the labels of .yaw/github.yaml',
+  '       yaw gh protect [--approvals n] [--check name]        ruleset for the default branch, verified afterwards',
   '       yaw gh branch <T-012|#34> <slug...> [--type feat]             branch from the fresh default branch',
   '       yaw gh commit <type> "subject" [--scope s] [--task id]       Conventional Commit with the task footer',
-  '       yaw gh pr [--title t] [--ready] [--yes]                       push the branch, open a draft pull request',
+  '       yaw gh pr [--title t] [--ready]                       push the branch, open a draft pull request',
   '       yaw gh pr-status                                              checks and review state of this branch',
-  '       yaw gh release <version> [--yes]                              tag and GitHub release',
-  '       yaw gh project-add <issue#> [--status "In progress"] [--yes]  add an issue to the project board',
+  '       yaw gh release <version>                              tag and GitHub release',
+  '       yaw gh project-add <issue#> [--status "In progress"]  add an issue to the project board',
   '       yaw gh issue <feature|bug|chore|spike|epic> "title" [--body text] [--priority P1] [--estimate S]',
-  'Guarded actions print their plan first and need a typed "y" or --yes, only after the user approved that action.',
+  'Guarded actions (init, labels, protect, release, project-add, the first push of pr) print their plan and run only when a person types y in a terminal; --yes does not exist.',
 ].join('\n');
 
 // --------------------------------------------------------------------------- plumbing
@@ -99,14 +100,14 @@ export function loadConfig(root) {
 }
 
 // Print the plan, then ask. Returns when authorised; throws (nothing changed) otherwise.
-async function authorise(io, values, title, plan) {
+async function authorise(io, title, plan) {
   io.stdout.write(`${title}\n${plan.map((l) => `  - ${l}`).join('\n')}\n`);
-  if (values.yes) return;
-  if (io.confirm) {
-    if (await io.confirm('Go ahead?')) return;
-    throw new GhUsageError('not authorised; nothing was changed');
+  // io.confirm exists only when stdin and stdout are a terminal (core/cli/gh.js).
+  if (!io.confirm) {
+    throw new GhUsageError('not authorised; nothing was changed. This changes shared GitHub state, so a person must run it in a terminal and type y; scripts and agents cannot');
   }
-  throw new GhUsageError('not authorised; nothing was changed. This changes shared GitHub state: the user has to approve it, then run it again with --yes');
+  if (await io.confirm('Go ahead?')) return;
+  throw new GhUsageError('not authorised; nothing was changed');
 }
 
 function defaultBranch(git, config) {
@@ -148,6 +149,7 @@ export function nativeIssueTypes(gh, slug) {
 
 export async function runGh({ verb, args = [], values = {}, mode, io }) {
   if (!VERBS.includes(verb)) throw new GhUsageError(verb ? `unknown verb "${verb}"` : 'missing verb', { showUsage: true });
+  if (values.yes) throw new GhUsageError('--yes does not exist: guarded actions run only when a person types y in a terminal');
   const { root, stdout, stderr } = io;
   const ctx = {
     io, root, stdout, stderr, values, args, mode,
@@ -193,7 +195,7 @@ async function init(c) {
   const visibility = values.public ? 'PUBLIC (anyone on the internet can read it)' : 'private';
   const target = `${owner ? `${owner}/` : ''}${name}`;
   const wanted = (config.value.labels ?? []).length;
-  await authorise(c.io, values, 'gh init is a guarded action:', [
+  await authorise(c.io, 'gh init is a guarded action:', [
     `create the ${visibility} repository ${target} on GitHub and add it as remote "origin"`,
     `push the current branch (${branch || 'detached HEAD'}) to it`,
     `create ${wanted} label(s) from ${CONFIG}`,
@@ -201,7 +203,7 @@ async function init(c) {
   gh(['repo', 'create', target, values.public ? '--public' : '--private', '--source', '.', '--remote', 'origin', '--push']);
   stdout.write(`created ${target} (${values.public ? 'public' : 'private'}) and pushed ${branch}\n`);
   // The creation was authorised above, so the labels of the same plan need no second question.
-  await labels({ ...c, values: { ...values, yes: true }, quiet: true });
+  await labels({ ...c, quiet: true });
   return 0;
 }
 
@@ -236,7 +238,7 @@ async function labels(c) {
     return 0;
   }
   if (!c.quiet) {
-    await authorise(c.io, c.values, `gh labels changes ${slug}:`, [
+    await authorise(c.io, `gh labels changes ${slug}:`, [
       ...create.map((l) => `create ${l.name}`),
       ...edit.map((l) => `update ${l.name}`),
       'labels are never deleted',
@@ -306,7 +308,7 @@ async function protect(c) {
   const body = rulesetBody({ approvals, checks, linearHistory: rules.linearHistory === true });
   const { slug } = repoInfo(gh);
   const existing = json(gh(['api', `repos/${slug}/rulesets`]), 'rulesets').find((r) => r.name === RULESET);
-  await authorise(c.io, values, `gh protect ${existing ? 'updates' : 'creates'} the ruleset "${RULESET}" on ${slug}:`, [
+  await authorise(c.io, `gh protect ${existing ? 'updates' : 'creates'} the ruleset "${RULESET}" on ${slug}:`, [
     'applies to the default branch; nobody bypasses it',
     'pull request required' + (approvals > 0 ? `, ${approvals} approval(s)` : ', no approvals'),
     `required checks: ${checks.join(', ')}`,
@@ -375,7 +377,7 @@ async function pr(c) {
   const task = taskFromBranch(current);
   const upstream = git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], { allowFail: true }).status === 0;
   if (!upstream) {
-    await authorise(c.io, values, 'gh pr pushes a new branch:', [`push ${current} to origin (first push, no force)`, 'open a draft pull request']);
+    await authorise(c.io, 'gh pr pushes a new branch:', [`push ${current} to origin (first push, no force)`, 'open a draft pull request']);
   }
   const push = git(upstream ? ['push', 'origin', `refs/heads/${current}:refs/heads/${current}`] : ['push', '--set-upstream', 'origin', `refs/heads/${current}:refs/heads/${current}`], { allowFail: true });
   if (push.status !== 0) throw new GhUsageError(`git push failed: ${firstLine(push.stderr)}`);
@@ -445,7 +447,7 @@ async function release(c) {
   }
   if (git(['show-ref', '--verify', '--quiet', `refs/tags/${tag}`], { allowFail: true }).status === 0) throw new GhUsageError(`tag ${tag} exists already`);
   const pre = version.includes('-');
-  await authorise(c.io, values, `gh release publishes ${tag}:`, [
+  await authorise(c.io, `gh release publishes ${tag}:`, [
     `create the annotated tag ${tag} on ${git(['rev-parse', '--short', 'HEAD']).stdout}`,
     `push the tag to origin (no force)`,
     `create the GitHub ${pre ? 'pre-release' : 'release'} ${tag} with generated notes`,
@@ -468,7 +470,7 @@ async function projectAdd(c) {
   const status = values.status;
   if (status !== undefined && !/^[\w .-]{1,40}$/.test(status)) throw new GhUsageError(`"${status}" is not a valid status`);
   const { slug, owner } = repoInfo(gh);
-  await authorise(c.io, values, `gh project-add changes project ${number} of ${owner}:`, [
+  await authorise(c.io, `gh project-add changes project ${number} of ${owner}:`, [
     `add ${slug}#${task.id} to the project`,
     ...(status ? [`set Status to "${status}"`] : []),
   ]);
