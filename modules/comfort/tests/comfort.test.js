@@ -481,7 +481,7 @@ test('ntfy: a hook starts a detached silent child with no secret in its argument
   assert.match(args[1], /send\.js$/);
   assert.deepEqual(JSON.parse(args[2]), { project: root.split('/').at(-1), task: 'T-012', status: 'done', minutes: 5, summary: 'Online invite flow' });
   assert.doesNotMatch(JSON.stringify(calls), /super-secret-topic-9|must-not-be-passed/);
-  assert.deepEqual([options.detached, options.stdio, unref], [true, 'ignore', true]);
+  assert.deepEqual([options.detached, options.stdio, unref, options.cwd], [true, 'ignore', true, env.HOME]);
   assert.equal(sendDetached({}, {}, spawnFn), false, 'no home, nothing started');
 });
 
@@ -551,6 +551,8 @@ test('last `just check`: recorded from the agent\'s own plain `just check` calls
   assert.equal(key(), null);
   assert.equal((await call('PostToolUse', 'just check; echo done')).stdout, '');
   assert.equal(key(), null, 'a chained command says nothing about the exit code of check');
+  await hook({ root, agent: 'claude', event: 'PostToolUse', module: 'comfort', payload: { ...fixture('claude', 'PreToolUse'), hook_event_name: 'PostToolUse', cwd: root, tool_input: { command: 'just check', run_in_background: true } }, env });
+  assert.equal(key(), null, 'a background run has not finished');
   assert.deepEqual([await call('PostToolUse', 'just check'), key().status].map((x) => x.stdout ?? x), ['', 'pass']);
   assert.deepEqual([await call('PostToolUseFailure', 'just check'), key().status].map((x) => x.stdout ?? x), ['', 'fail']);
   assert.ok(JUST_CHECK.test('just check') && JUST_CHECK.test('  just check  ') && !JUST_CHECK.test('just check && rm x') && !JUST_CHECK.test('just checks'));

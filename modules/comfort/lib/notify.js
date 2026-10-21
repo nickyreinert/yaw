@@ -89,6 +89,7 @@ export function sendDetached(payload, env, spawnFn = spawn) {
   if (!home) return false;
   try {
     const child = spawnFn(process.execPath, ['--no-warnings', SEND_JS, JSON.stringify(payload)], {
+      cwd: env.HOME || undefined,
       detached: true,
       stdio: 'ignore',
       env: { PATH: env.PATH ?? '', HOME: env.HOME ?? '', ...(env.YAW_HOME ? { YAW_HOME: env.YAW_HOME } : {}) },

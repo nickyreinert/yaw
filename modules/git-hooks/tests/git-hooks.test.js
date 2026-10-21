@@ -8,7 +8,8 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readManifest } from '../../../core/render/manifest.js';
 import { initProject, readAnswers, removeModule, addModule } from '../../../core/render/project.js';
-import { KIT_ROOT, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
+import { main } from '../../../core/cli/main.js';
+import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, scripted, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 
 const MODULES = ['core', 'git-hooks'];
 const answers = `mode: standard\nanswers:\n  user.agents: [claude, codex, copilot]\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${MODULES.join(', ')}]\n`;
@@ -118,4 +119,20 @@ test('after removal a commit still works with the stale git hook (lefthook witho
   const u = run('lefthook', ['uninstall'], { cwd: root, env });
   assert.equal(u.status, 0);
   assert.equal(existsSync(join(root, '.git', 'hooks', 'pre-commit')), false);
+});
+
+test('yaw add git-hooks without lefthook and gitleaks on PATH prints the install hints and exits 0', async () => {
+  const root = tmp('yaw-hint-');
+  await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-ans-'), answers.replace(', git-hooks]', ']')), modules: ['core'] });
+  const stdout = capture();
+  const saved = process.env.PATH;
+  process.env.PATH = tmp('yaw-empty-path-');
+  try {
+    const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter: scripted([]) });
+    assert.equal(code, 0);
+  } finally {
+    process.env.PATH = saved;
+  }
+  assert.match(stdout.text(), /install gitleaks: brew install gitleaks/);
+  assert.match(stdout.text(), /install lefthook: brew install lefthook/);
 });

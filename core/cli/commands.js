@@ -6,6 +6,7 @@ import { STRATEGIES } from '../render/reconcile.js';
 import { addModule, enabledModules, fileStates, moduleQuestions, planAdd, planRemove, readAnswers, removeModule, renderProject, requireManifest, updateProject } from '../render/project.js';
 import { runInterview, whenMatches } from '../interview/engine.js';
 import { confirm } from './prompt.js';
+import { printToolHints } from './tool-hints.js';
 
 export class UsageError extends Error {
   constructor(message) {
@@ -115,6 +116,7 @@ export async function add({ values, positionals, io }) {
   }
   const result = await addModule({ root: io.cwd, kitRoot: io.kitRoot, module, newAnswers, strategy, interactive, prompter: io.prompter });
   printReport(io.stdout, result);
+  printToolHints(io.stdout, [module]);
   return result.conflicts.length > 0 ? 1 : 0;
 }
 
