@@ -1,0 +1,7 @@
+# Keeps the SHA-pinned actions of .github/workflows/ current (ci module, ADR-0027).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

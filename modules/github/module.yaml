@@ -1,0 +1,18 @@
+# modules/github/module.yaml (Y-5.5, ADR-0027): GitHub scripts as `just` recipes (doc 10 §3).
+name: github
+description: Recipes for the GitHub side of a project (repo, labels, branch, commit, pull request, release, ruleset, project board, issues with native type or label), a PR template and .yaw/github.yaml; guarded actions need explicit authorisation.
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions: []
+outputs:
+  templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, just/github.just, justfile]
+agentsMd: |
+  - Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status` and `just gh-issue`; they keep branch names, footers and PRs uniform.
+  - Guarded: `gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release` and the first push in `just pr`. Show the user the plan and pass `--yes` only after they approved that exact action.
+  - There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
+agents:
+  claude:  { support: native, via: "just recipes + AGENTS.md rules + permissions.ask in .claude/settings.json (the user confirms guarded commands)" }
+  codex:   { support: partial, via: "just recipes + AGENTS.md rules", note: "no permission prompt from the kit; Codex approval settings apply" }
+  copilot: { support: partial, via: "just recipes + AGENTS.md rules", note: "no permission prompt from the kit" }
+tokenCost: low
+lastVerified: 2026-10-21

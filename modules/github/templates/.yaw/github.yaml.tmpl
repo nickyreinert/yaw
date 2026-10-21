@@ -1,0 +1,32 @@
+# .yaw/github.yaml (github module, ADR-0027). Labels and rules are yours to edit; `yaw update` asks before it
+# touches an edited file. The repository, its default branch and its issue types are read from GitHub when a
+# recipe needs them, so they are not stored here.
+labels:
+  - { name: "type:feature", color: "1D76DB", description: Feature }
+  - { name: "type:bug", color: "D73A4A", description: Bug }
+  - { name: "type:chore", color: "BFD4F2", description: Chore (incl. docs work) }
+  - { name: "type:spike", color: "D4C5F9", description: Spike or review }
+  - { name: "type:epic", color: "3E4B9E", description: Epic with sub-issues }
+  - { name: "priority:P0", color: "B60205", description: Blocks the release or later work }
+  - { name: "priority:P1", color: "D93F0B", description: Needed for the release }
+  - { name: "priority:P2", color: "FBCA04", description: Desirable }
+  - { name: "priority:P3", color: "C2E0C6", description: May slip }
+  - { name: "estimate:XS", color: "EDEDED", description: Extra small }
+  - { name: "estimate:S", color: "EDEDED", description: Small }
+  - { name: "estimate:M", color: "EDEDED", description: Medium }
+  - { name: "estimate:L", color: "EDEDED", description: Large }
+  - { name: "estimate:XL", color: "EDEDED", description: Extra large }
+  - { name: "status:todo", color: "FFFFFF", description: Not started }
+  - { name: "status:in-progress", color: "0E8A16", description: Being worked on }
+  - { name: "status:in-review", color: "5319E7", description: Waiting for review }
+  - { name: "status:blocked", color: "B60205", description: Blocked }
+rules:
+  requireIssue: <%= team %>
+  branchPattern: "<type>/<issue>-<slug>"
+<% if team %>
+  approvals: 1
+<% else %>
+  approvals: 0
+<% end %>
+  requiredChecks: [quality-gate, secret-scan]
+  linearHistory: false

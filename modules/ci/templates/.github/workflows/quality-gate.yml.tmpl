@@ -1,0 +1,79 @@
+# quality-gate.yml (ci module, ADR-0027). The same `just check` as on your machine, after installing the YAW kit
+# at the tag pinned in .yaw/manifest.json (BD10). The job names quality-gate and secret-scan are the contract
+# with the branch ruleset (`just gh-protect`): do not rename them.
+# Actions are pinned by commit SHA; Dependabot proposes updates. Verified against these versions:
+#   actions/checkout v4.4.0, actions/setup-node v4.4.0, extractions/setup-just v2.0.0, astral-sh/setup-uv v5.4.2
+name: quality-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality-gate:
+    name: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+<% if ci.steps %>
+      <%= ci.steps %>
+<% end %>
+<% if ci.needsNode %>
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.13"
+<% end %>
+      - name: Install the YAW kit at the manifest tag
+        env:
+          YAW_REPO: ${{ vars.YAW_REPO }}
+        run: |
+          set -euo pipefail
+          kit="$(node -p "require('./.yaw/manifest.json').kit")"
+          if [ "$(node -p "require('./.yaw/manifest.json').vendored")" = "true" ]; then
+            echo "The kit is vendored in .yaw/lib, nothing to install"
+            exit 0
+          fi
+          case "$kit" in
+            '' | *[!0-9A-Za-z.+-]*) echo "Unexpected kit version in .yaw/manifest.json: $kit" >&2; exit 1 ;;
+          esac
+          repo="${YAW_REPO:-https://github.com/nickyreinert/yaw.git}"
+          git clone --quiet --depth 1 --branch "v${kit}" "$repo" "$RUNNER_TEMP/yaw-src"
+          bash "$RUNNER_TEMP/yaw-src/install.sh" --tag "v${kit}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: just setup
+      - run: just check
+
+  secret-scan:
+    # gitleaks over the whole history, as the backstop to the local pre-commit hook (git-hooks module).
+    name: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks 8.30.1 (pinned, SHA-256 verified)
+        run: |
+          set -euo pipefail
+          version=8.30.1
+          archive="gitleaks_${version}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${version}/${archive}"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+      - name: Scan the repository history
+        run: gitleaks git --redact --no-banner --exit-code 1 .

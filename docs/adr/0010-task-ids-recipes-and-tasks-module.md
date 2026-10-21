@@ -65,3 +65,4 @@ BD4 fixed where tasks live per mode and which IDs they use. Left open: branch na
 
 - Removal deletes `TASKS.md` when it is still the kit's version; a ledger with real tasks is kept and leaves the manifest. `TASKS.archive.md` and `~/.yaw/state/` are user data and kit state, never removed by `yaw remove`. The answer `tasks.mode` stays in `answers.yaml`; a re-add shows it as the default.
 - Y-5.5 adds `just branch`, status labels and Project fields; Y-5.6 applies the ADR ID scheme; Y-5.7 reads the active task for session titles; Y-5.9 extends `start` and the session-start sync.
+- Y-5.5 details (guarded actions, `just branch/commit/pr`, issue types, rulesets, `quality-gate.yml`): ADR-0027.

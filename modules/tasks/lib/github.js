@@ -4,26 +4,10 @@
 //   both mode:   syncBoth()   TASKS.md -> issues, one way, idempotent (an unchanged task makes no write call)
 //   github mode: viewFromIssues() issues -> generated read-only ledger; journal lines are issue comments
 
-import { spawnSync } from 'node:child_process';
+import { GhError, defaultGh } from '../../../core/lib/gh.js';
 import { localDate, oneLine, parseArchive } from './ledger.js';
 
-export class GhError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'GhError';
-  }
-}
-
-export function defaultGh(args, { cwd, env } = {}) {
-  const r = spawnSync('gh', args, { cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-  if (r.error?.code === 'ENOENT') throw new GhError('the GitHub CLI (gh) is not installed or not on the PATH');
-  if (r.error) throw new GhError(`gh could not run: ${r.error.code ?? r.error.message}`);
-  if (r.status !== 0) {
-    const reason = String(r.stderr).trim().split('\n')[0] || `exit ${r.status}`;
-    throw new GhError(`gh ${args.slice(0, 2).join(' ')} failed: ${reason}`);
-  }
-  return r.stdout;
-}
+export { GhError, defaultGh };
 
 const json = (text, what) => {
   try {

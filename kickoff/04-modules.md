@@ -14,8 +14,8 @@ Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, 
 | `devenv` | `just setup/dev`, `.env.example`, Docker/devcontainer when the profile advises it | ✔ | ✔ | ✔ | core |
 | `tasks` | Task ledger (local / GitHub / both) | ✔ | ✔ | ✔ | core |
 | `git-hooks` | `lefthook`/`pre-commit`: format, lint-staged, `gitleaks` | – | ✔ | ✔ | core |
-| `github` | Repo, branch, PR, label, release, protection scripts | – | ✔ | ✔ | core |
-| `ci` | CI workflow running `just check`, PR template | – | ✔ | ✔ | github |
+| `github` | Repo, branch, commit, PR (and PR template), label, issue (native type or label), release, protection scripts (ADR-0027) | – | ✔ | ✔ | core |
+| `ci` | CI workflow running `just check` plus a gitleaks scan, Dependabot for the pinned actions (ADR-0027) | – | ✔ | ✔ | github |
 | `decisions` | ADR + notice journal, local RAG, recall hook | – | ✔ | ✔ | core |
 | `quality-code` | Lint/type/test gates, `change-reviewer` subagent (phase 2; phase-1 gates come from the profiles) | – | ✔ | ✔ | standards |
 | `security` | `security-reviewer`, guard hooks, `just audit`, secret scan (phase 1: only `.env*`/secret read deny and destructive-command guard) | ✔ (minimal) | ✔ | ✔ | standards |

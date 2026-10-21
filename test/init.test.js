@@ -148,10 +148,10 @@ test('an unknown profile and several profiles are refused with the choices', asy
 });
 
 test('modules the kit does not have yet are skipped with a note', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, github]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, decisions]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /note: module "github" is not in this kit yet; skipped/);
+  assert.match(r.out, /note: module "decisions" is not in this kit yet; skipped/);
   assert.deepEqual(Object.keys(readManifest(r.cwd).modules), ['core']);
 });
 
