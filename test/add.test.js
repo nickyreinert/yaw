@@ -23,6 +23,7 @@ function fixtureKit() {
         agentsMd: '- Extra rule.\n',
         templates: { 'extra/notes.md.tmpl': 'Level: <%= answers.quality.level %>\n' },
       },
+      plain: { templates: { 'plain.txt': 'plain\n' } },
       leaf: { depends: ['extra'], templates: { 'leaf.txt': 'leaf\n' } },
     },
   });
@@ -116,4 +117,17 @@ test('add then remove leaves only the (kept) answers behind; re-adding does not 
   assert.deepEqual(after, before);
   const again = await yaw(['add', 'extra'], root, kitRoot, scripted(['y']));
   assert.equal(again.prompter.asked.length, 1); // only the confirmation
+});
+
+test('no new answers: answers.yaml is left byte for byte (comments survive)', async () => {
+  const kitRoot = fixtureKit();
+  const root = tmp('yaw-proj-');
+  const text = `# my notes\nmode: quick\nanswers:\n  user.agents: [claude] # keep me\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: Node CLI, local tasks.\n  profiles: [node-cli]\n  modules: [core]\n`;
+  await initProject({ root, kitRoot, answersFile: writeAnswers(tmp('yaw-ans-'), text) });
+  const before = read(root, '.yaw/answers.yaml');
+  const r = await yaw(['add', 'plain', '--yes'], root, kitRoot);
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(read(root, '.yaw/answers.yaml'), before);
+  assert.match(before, /# keep me/);
+  assert.equal(read(root, 'plain.txt'), 'plain\n');
 });

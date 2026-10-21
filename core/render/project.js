@@ -201,10 +201,11 @@ export async function addModule({ root, kitRoot = KIT_ROOT, module, newAnswers =
   const { enabled } = planAdd({ root, kitRoot, module });
   const doc = readAnswers(root);
   const nextDoc = { ...doc, answers: { ...doc.answers, ...newAnswers } };
-  const text = stringify(nextDoc);
+  // No new answers: answers.yaml is not touched, so the user's comments survive.
+  const answers = Object.keys(newAnswers).length > 0 ? { text: stringify(nextDoc), doc: nextDoc } : undefined;
   const previous = readProjectFile(root, ANSWERS);
   try {
-    return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers: { text, doc: nextDoc }, ...options });
+    return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers, ...options });
   } catch (e) {
     if (previous !== null) writeAtomic(root, ANSWERS, previous);
     throw e;
