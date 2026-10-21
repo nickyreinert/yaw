@@ -111,6 +111,7 @@ Interview additions (team mode, section 12 of doc 03): team size and roles (lead
 
 Additional team rules:
 
+- The user profile (communication style) is never rendered into committed files in team mode (ADR-0013).
 - Decision records change only via PR; ADR IDs use a collision-safe scheme in team mode (`ADR-<issue#>-<n>` or date-based), plus the uniqueness check in `just check` (blueprint N11).
 - The kit version is pinned in the manifest; `yaw update` happens in its own PR so everyone moves together.
 - Agent-specific files for agents nobody in the team uses are not generated (agent checkboxes are per project).

@@ -1,0 +1,60 @@
+# modules/communication/module.yaml (Y-5.1, ADR-0013, ADR-0024): speaking style from the user profile.
+name: communication
+description: Renders the user profile (length, register, examples, explanation, experience) into AGENTS.md and, when it is not the default, a Claude output style.
+depends: [core]
+default: { quick: true, standard: true, full: true }
+questions:
+  - id: user.length
+    ref: "0.3"
+    scope: user
+    mode: Q
+    type: choice
+    label: How long should answers be?
+    choices:
+      - { value: brief, label: Brief and on point }
+      - { value: balanced, label: Balanced }
+      - { value: extensive, label: Extensive }
+    default: balanced
+  - id: user.register
+    ref: "0.4"
+    scope: user
+    mode: S
+    type: choice
+    label: Which register should the agent use?
+    choices:
+      - { value: plain, label: Plain words }
+      - { value: professional, label: Professional }
+      - { value: technical, label: Technical }
+      - { value: scientific, label: Scientific }
+    default: professional
+  - id: user.examples
+    ref: "0.5"
+    scope: user
+    mode: S
+    type: choice
+    label: Examples and analogies?
+    choices:
+      - { value: when-helpful, label: When helpful }
+      - { value: always, label: Always }
+      - { value: never, label: Never }
+    default: when-helpful
+  - id: user.explain
+    ref: "0.6"
+    scope: user
+    mode: S
+    type: choice
+    label: Should the agent explain why it chose something?
+    choices:
+      - { value: one-line, label: In one line }
+      - { value: short-paragraph, label: In a short paragraph }
+      - { value: on-request, label: Only on request }
+    default: short-paragraph
+outputs:
+  # Each template renders to nothing (no file) in a team repository or, for the Claude ones, with default style (ADR-0013, ADR-0024).
+  templates: [AGENTS.md, .claude/output-styles/yaw.md, .claude/settings.json]
+agents:
+  claude:  { support: native, via: "AGENTS.md section + .claude/output-styles/yaw.md selected by outputStyle" }
+  codex:   { support: native, via: AGENTS.md }
+  copilot: { support: native, via: AGENTS.md }
+tokenCost: low
+lastVerified: 2026-10-21

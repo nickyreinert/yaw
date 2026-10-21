@@ -21,7 +21,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview for a local JavaScript tool.
-const INTERVIEW = ['', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local'];
+const INTERVIEW = ['', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', ''];
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
@@ -47,12 +47,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core', 'security'],
+    modules: ['core', 'communication', 'security', 'standards'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
+  // Quick = core + communication + standards + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 11);
+  assert.equal(readManifest(dir).files.length, 12);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -65,7 +65,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', 'nope', '2', 'y']);
+  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', '', 'nope', '2', 'y']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
@@ -107,12 +107,12 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
-test('Quick footprint with security (ADR-0022): 12 files for Claude, 13 with Codex', async () => {
-  for (const [agents, count] of [['claude', 12], ['claude, codex', 13]]) {
+test('Quick footprint with security (ADR-0022): 13 files for Claude, 14 with Codex', async () => {
+  for (const [agents, count] of [['claude', 13], ['claude, codex', 14]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /modules: core, security/);
+    assert.match(r.out, /modules: core, communication, security, standards/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
     assert.equal(files.length, count, files.join(', '));
   }
@@ -148,10 +148,10 @@ test('an unknown profile and several profiles are refused with the choices', asy
 });
 
 test('modules the kit does not have yet are skipped with a note', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, communication, tasks]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, devenv, tasks]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /note: module "communication" is not in this kit yet; skipped/);
+  assert.match(r.out, /note: module "devenv" is not in this kit yet; skipped/);
   assert.deepEqual(Object.keys(readManifest(r.cwd).modules), ['core']);
 });
 

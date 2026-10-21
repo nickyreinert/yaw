@@ -126,7 +126,8 @@ export async function init({ values, positionals, io }) {
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
     io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default"). Nothing is written until you confirm.\n');
-    const questions = collectQuestions(kitRoot, ['core']);
+    // Base questions plus the questions of the modules the mode preselects (ADR-0009: Quick asks the Q questions of its modules).
+    const questions = collectQuestions(kitRoot, selectModules({ kitRoot, mode: 'quick', facts: {} }));
     const r = await runInterview({ questions, mode: 'quick', prompter: io.prompter, kitRoot });
     defaulted = new Set(r.defaulted);
     answersDoc = { mode: 'quick', answers: r.answers };
@@ -166,7 +167,7 @@ export async function init({ values, positionals, io }) {
 
   // confirm
   const { desired } = renderInit({ root, kitRoot, answersDoc, modules });
-  printSummary(io.stdout, { mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, ['core']), answersDoc.answers, defaulted), defaulted, desired });
+  printSummary(io.stdout, { mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
   if (!values.yes) {
     if (!(await confirm(io.prompter, '\nWrite these files?'))) {
       io.stdout.write('cancelled; nothing was written\n');

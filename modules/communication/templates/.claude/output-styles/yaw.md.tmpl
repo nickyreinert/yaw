@@ -1,0 +1,15 @@
+<% if team %>
+<% else %>
+<% if outputStyle %>
+---
+name: YAW
+description: Answer style from the YAW communication settings.
+keep-coding-instructions: true
+---
+
+- <%= rules.length %>
+- <%= rules.register %>
+- <%= rules.examples %>
+- <%= rules.explain %>
+<% end %>
+<% end %>
