@@ -17,7 +17,7 @@
 
 ## Tools (ADR-0008 addendum)
 
-- `lefthook` and `gitleaks` are user-side tools of the generated project, not npm dependencies and not required by the kit itself. Kit CI installs both (Homebrew) so the module tests run; locally the tests that need them skip, in CI (`CI` set) a missing tool fails the run.
+- `lefthook` and `gitleaks` are user-side tools of the generated project, not npm dependencies and not required by the kit itself. Kit CI installs both so the module tests run; locally the tests that need them skip, in CI (`CI` set) a missing tool fails the run. On Linux, CI downloads pinned GitHub release assets (gitleaks 8.30.1, lefthook 2.2.2) and verifies their SHA-256 before extracting; on macOS it uses Homebrew, which is unpinned.
 
 ## Tests
 
