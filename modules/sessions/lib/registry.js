@@ -3,7 +3,7 @@
 // transcript content (doc 12 §4). Every path is checked before it is opened, symlinks are refused, and
 // nothing read from the database or from a project file is ever executed or opened.
 
-import { lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSqlite, migrate } from '../../../core/lib/db.js';
@@ -67,6 +67,7 @@ export function openRegistry(env) {
   const home = yawHome(env);
   if (!home) throw new RegistryError('no home directory for ~/.yaw/yaw.db (set HOME or YAW_HOME)');
   mkdirSync(home, { recursive: true, mode: 0o700 });
+  chmodSync(home, 0o700); // also when ~/.yaw existed already
   const file = registryFile(env);
   try {
     const st = lstatSync(file);
@@ -140,8 +141,11 @@ export function resumeCommand(agent, nativeId) {
 export const sessionId = (agent, native) => (AGENTS.includes(agent) && typeof native === 'string' && NATIVE_ID.test(native) ? `${agent}:${native}` : null);
 
 // Commits whose message carries `Agent-Session: <id>` (exact match), newest first, and the files they touch.
-export function commitsOf(root, id, env) {
-  const out = git(root, ['log', '--all', '--fixed-strings', `--grep=${TRAILER_KEY}: ${id}`, `--max-count=${MAX_COMMITS}`,
+// Bounded (runs on every Stop): only HEAD's history, only since the session started, at most 100 commits.
+// `known` (already linked commit refs) are not diffed again.
+export function commitsOf(root, id, env, { since, known = new Set() } = {}) {
+  const out = git(root, ['log', '--fixed-strings', `--grep=${TRAILER_KEY}: ${id}`, `--max-count=${MAX_COMMITS}`,
+    ...(since ? [`--since=${since}`] : []),
     `--format=%H%x1f%(trailers:key=${TRAILER_KEY},valueonly,separator=%x1f)%x1e`], env);
   if (out === null) return { commits: [], files: [] };
   const commits = [];
@@ -151,6 +155,7 @@ export function commitsOf(root, id, env) {
   }
   const files = new Set();
   for (const hash of commits) {
+    if (known.has(hash.slice(0, 12))) continue;
     const names = git(root, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', hash], env) ?? '';
     for (const name of names.split('\0')) {
       if (files.size >= MAX_FILES) break;
@@ -192,7 +197,9 @@ export function recordSession({ db, env, root, agent, native, transcript = null,
       title ? clip(clean(title), MAX_TITLE) : null, end ? 1 : 0);
   link(db, id, 'task', snap.refs);
   if (end) {
-    const found = commitsOf(project, id, env);
+    const started = db.prepare('SELECT started FROM sessions WHERE id = ?').get(id)?.started;
+    const known = new Set(db.prepare("SELECT ref FROM session_links WHERE session_id = ? AND kind = 'commit'").all(id).map((r) => r.ref));
+    const found = commitsOf(project, id, env, { since: started, known });
     link(db, id, 'commit', found.commits);
     link(db, id, 'file', found.files);
   }

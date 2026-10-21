@@ -101,7 +101,9 @@ function handoff(db, ctx, values) {
     id = `${values.agent}:handoff-${now.toISOString().replace(/\D/g, '').slice(0, 14)}`;
   }
   const [agent, native] = [id.slice(0, id.indexOf(':')), id.slice(id.indexOf(':') + 1)];
-  recordSession({ db, env, root, agent, native, now, end: true, title: values.title });
+  if (recordSession({ db, env, root, agent, native, now, end: true, title: values.title }) === null) {
+    throw new SessionsUsageError(`could not record session "${clean(id)}": the id has an unexpected form`);
+  }
   return [`session ${id} recorded${values.title ? `: ${clean(values.title)}` : ''}`];
 }
 

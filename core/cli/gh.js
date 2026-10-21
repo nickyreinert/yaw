@@ -17,8 +17,10 @@ export async function gh({ values, positionals, io }) {
   // The sessions module (ADR-0029) supplies the Agent-Session trailer for `commit`; github does not import it.
   let sessionTrailer;
   if (enabledModules(manifest).includes('sessions')) {
-    const reg = await import(pathToFileURL(join(io.kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
-    sessionTrailer = () => reg.sessionTrailer({ root: io.cwd, env: io.env, now: io.now });
+    try {
+      const reg = await import(pathToFileURL(join(io.kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
+      sessionTrailer = () => reg.sessionTrailer({ root: io.cwd, env: io.env, now: io.now });
+    } catch { /* a commit never fails over the registry */ }
   }
   try {
     return await lib.runGh({

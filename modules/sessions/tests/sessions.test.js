@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { loadModule } from '../../../core/render/kit.js';
@@ -271,6 +271,27 @@ test('commit message trailers: own paragraph, only well-formed lines', () => {
   assert.equal(commitMessage({ type: 'fix', subject: 'x', trailers: ['bad\nline: y', 'no separator'] }), 'fix: x');
 });
 
+test('commitsOf reads HEAD only and only since the session started', { skip: !hasTool('git') && 'git is not installed' }, () => {
+  const root = tmp('yaw-git-');
+  const env = ENV();
+  git(root, env, 'init', '--quiet', '-b', 'main');
+  const commit = (name, msg, date) => {
+    writeFileSync(join(root, name), name);
+    git(root, env, 'add', name);
+    const e = date ? { ...env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date } : env;
+    git(root, e, 'commit', '--quiet', '-m', msg);
+  };
+  commit('old', 'old\n\nAgent-Session: claude:abc', '2020-01-01T00:00:00Z');
+  git(root, env, 'switch', '--quiet', '-c', 'other');
+  commit('elsewhere', 'other\n\nAgent-Session: claude:abc');
+  git(root, env, 'switch', '--quiet', 'main');
+  commit('mine', 'mine\n\nAgent-Session: claude:abc');
+  const head = commitsOf(root, 'claude:abc', env, { since: '2025-01-01T00:00:00Z' });
+  assert.deepEqual(head.files, ['mine'], 'not the other branch, not before the session');
+  assert.equal(head.commits.length, 1);
+  assert.equal(commitsOf(root, 'claude:abc', env, { since: '2025-01-01T00:00:00Z', known: new Set(head.commits) }).files.length, 0, 'known commits are not diffed again');
+});
+
 test('commitsOf matches the trailer exactly, not a longer id that starts with it', { skip: !hasTool('git') && 'git is not installed' }, () => {
   const root = tmp('yaw-git-');
   const env = ENV();
@@ -421,6 +442,13 @@ test('path safety: a symlinked TASKS.md is never read, a symlinked yaw.db is ref
   assert.equal(existsSync(join(outside, 'planted.db')), false);
   const r = await start(root, { ...env, HOME: home });
   assert.deepEqual([r.code, r.stdout], [0, '']);
+});
+
+test('the registry directory is 0700 even when it existed already', () => {
+  const home = tmp('yaw-home3-');
+  mkdirSync(join(home, '.yaw'), { mode: 0o755 });
+  openRegistry({ HOME: home }).close();
+  assert.equal(statSync(join(home, '.yaw')).mode & 0o777, 0o700);
 });
 
 test('helpers: ids, branch tasks, resume commands, control characters', () => {
