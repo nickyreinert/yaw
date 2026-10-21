@@ -3,7 +3,8 @@
 import { MANIFEST } from '../render/files.js';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
 import { STRATEGIES } from '../render/reconcile.js';
-import { enabledModules, fileStates, planRemove, removeModule, requireManifest, updateProject } from '../render/project.js';
+import { addModule, enabledModules, fileStates, moduleQuestions, planAdd, planRemove, readAnswers, removeModule, renderProject, requireManifest, updateProject } from '../render/project.js';
+import { runInterview, whenMatches } from '../interview/engine.js';
 import { confirm } from './prompt.js';
 
 export class UsageError extends Error {
@@ -70,6 +71,49 @@ export async function update({ values, positionals, io }) {
     forget: new Set(values.forget ?? []),
   });
   io.stdout.write(`yaw update (kit ${before} -> ${result.manifest.kit})\n`);
+  printReport(io.stdout, result);
+  return result.conflicts.length > 0 ? 1 : 0;
+}
+
+// yaw add <module>: only this module's questions; a missing dependency is reported, not installed.
+export async function add({ values, positionals, io }) {
+  if (positionals.length !== 1) throw new UsageError('usage: yaw add <module> [--yes] [--strategy keep|take|merge]');
+  const [module] = positionals;
+  const strategy = parseStrategy(values.strategy);
+  const { enabled, definition } = planAdd({ root: io.cwd, kitRoot: io.kitRoot, module });
+  const interactive = !values.yes && io.prompter.interactive;
+  if (!values.yes && !io.prompter.interactive) throw new UsageError('no terminal for the questions: run again with --yes (defaults are used)');
+  const answersDoc = readAnswers(io.cwd);
+  const questions = moduleQuestions({ root: io.cwd, definition });
+  let newAnswers = {};
+  let defaulted = [];
+  if (questions.length > 0) {
+    if (interactive) {
+      io.stdout.write(`yaw add ${module}: ${questions.length} question${questions.length === 1 ? '' : 's'} (Enter takes the default, ? explains). Nothing is written until you confirm.\n`);
+      ({ answers: newAnswers, defaulted } = await runInterview({ questions, mode: answersDoc.mode, prompter: io.prompter, kitRoot: io.kitRoot, known: answersDoc.answers }));
+    } else {
+      for (const q of questions) {
+        if (!whenMatches(q.when, { ...answersDoc.answers, ...newAnswers })) continue;
+        newAnswers[q.id] = q.default;
+        defaulted.push(q.id);
+      }
+    }
+  }
+  io.stdout.write(`\nyaw add ${module}\n`);
+  for (const [id, value] of Object.entries(newAnswers)) {
+    io.stdout.write(`  answer ${id}: ${Array.isArray(value) ? value.join(', ') : String(value)}${defaulted.includes(id) ? '  (default)' : ''}\n`);
+  }
+  if (interactive) {
+    const manifest = requireManifest(io.cwd);
+    const { desired } = renderProject({ root: io.cwd, kitRoot: io.kitRoot, manifest, modules: [...enabled, module], answersDoc: { ...answersDoc, answers: { ...answersDoc.answers, ...newAnswers } } });
+    const known = new Set(manifest.files.map((f) => f.path));
+    for (const [p, d] of desired) if (!known.has(p)) io.stdout.write(`  new file: ${p}${d.managed === false ? '  (your code from the start)' : ''}\n`);
+    if (!(await confirm(io.prompter, `Add module ${module}?`))) {
+      io.stdout.write('cancelled; nothing was written\n');
+      return 1;
+    }
+  }
+  const result = await addModule({ root: io.cwd, kitRoot: io.kitRoot, module, newAnswers, strategy, interactive, prompter: io.prompter });
   printReport(io.stdout, result);
   return result.conflicts.length > 0 ? 1 : 0;
 }

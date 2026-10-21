@@ -2,7 +2,7 @@
 
 import { parseArgs } from 'node:util';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
-import { remove, status, update, UsageError } from './commands.js';
+import { add, remove, status, update, UsageError } from './commands.js';
 import { init } from './init.js';
 import { doctor } from './doctor.js';
 import { selfUninstall, selfUpdate } from './self.js';
@@ -24,7 +24,7 @@ export const COMMANDS = [
   { name: 'self-uninstall', args: '[--yes]', summary: 'remove the installed kit and the yaw link', options: { ...yes }, run: selfUninstall },
   { name: 'help', args: '[<command>]', summary: 'show this help', options: {} },
   { name: 'apply', step: 3, summary: 'apply .yaw/answers.yaml again' },
-  { name: 'add', step: 5, summary: 'add a module, asking only its questions' },
+  { name: 'add', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'add a module, asking only its questions', options: { ...yes, strategy: { type: 'string' } }, run: add },
   { name: 'hook', args: '<event> --agent claude|codex|copilot --module <module>', summary: 'hook entry point for coding agents (reads the payload on stdin; always exits 0)', options: {} },
   { name: 'sync', args: '--check', summary: 'check that agent adapter files match their source (fails on drift)', options: { check: { type: 'boolean' } }, run: sync },
   { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },

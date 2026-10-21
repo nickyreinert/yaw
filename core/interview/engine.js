@@ -128,9 +128,11 @@ function render(q, number, total) {
 }
 
 // questions: all questions of the enabled modules (base first). mode: quick | standard | full.
+// known: answers that already exist; only used to evaluate `when`, never returned.
 // -> { answers, defaulted: string[] }  (answers hold every question whose `when` holds, defaults included)
-export async function runInterview({ questions, mode, prompter, kitRoot }) {
+export async function runInterview({ questions, mode, prompter, kitRoot, known = {} }) {
   const answers = {};
+  const seen = () => ({ ...known, ...answers }); // `when` may refer to answers given earlier (yaw add)
   const defaulted = [];
   const asked = questions.filter((q) => asksIn(q.mode, mode));
   const askedIds = new Set(asked.map((q) => q.id));
@@ -141,7 +143,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot }) {
     const batch = batches[b];
     prompter.show(`\n${batch.title} (${b + 1}/${batches.length})\n`);
     for (const q of batch.questions) {
-      if (!whenMatches(q.when, answers)) continue;
+      if (!whenMatches(q.when, seen())) continue;
       number++;
       prompter.show(`${render(q, number, total)}\n`);
       for (;;) {
@@ -164,7 +166,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot }) {
   }
   // Questions this mode does not ask take their default and are listed as such.
   for (const q of questions) {
-    if (askedIds.has(q.id) || !whenMatches(q.when, answers)) continue;
+    if (askedIds.has(q.id) || !whenMatches(q.when, seen())) continue;
     answers[q.id] = q.default;
     defaulted.push(q.id);
   }

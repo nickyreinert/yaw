@@ -41,13 +41,13 @@ export function readJson(root, rel) {
 }
 
 // module.yaml text for a fixture module.
-export function moduleYaml({ name, depends = [], templates = [], agentsMd }) {
+export function moduleYaml({ name, depends = [], templates = [], agentsMd, questions = [] }) {
   const lines = [
     `name: ${name}`,
     `description: Fixture module ${name}.`,
     `depends: [${depends.join(', ')}]`,
     'default: { quick: true, standard: true, full: true }',
-    'questions: []',
+    `questions: ${JSON.stringify(questions)}`,
     'outputs:',
     `  templates: [${templates.map((t) => JSON.stringify(t)).join(', ')}]`,
   ];
@@ -57,12 +57,12 @@ export function moduleYaml({ name, depends = [], templates = [], agentsMd }) {
 }
 
 // A kit folder: package.json + modules/<name>/{module.yaml, templates/...}.
-// modules: { name: { depends, agentsMd, templates: { "path" or "path.tmpl": content } } }
+// modules: { name: { depends, agentsMd, questions, templates: { "path" or "path.tmpl": content } } }
 export function makeKit(root, { version = '1.0.0', modules }) {
   writeTree(root, { 'package.json': `${JSON.stringify({ name: 'yaw', version, type: 'module' })}\n` });
   for (const [name, m] of Object.entries(modules)) {
     const templates = Object.keys(m.templates ?? {}).map((t) => t.replace(/\.tmpl$/, ''));
-    writeTree(root, { [`modules/${name}/module.yaml`]: moduleYaml({ name, depends: m.depends, templates, agentsMd: m.agentsMd }) });
+    writeTree(root, { [`modules/${name}/module.yaml`]: moduleYaml({ name, depends: m.depends, templates, agentsMd: m.agentsMd, questions: m.questions }) });
     for (const [t, content] of Object.entries(m.templates ?? {})) writeTree(root, { [`modules/${name}/templates/${t}`]: content });
   }
   return root;

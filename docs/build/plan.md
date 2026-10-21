@@ -206,7 +206,7 @@ Status: **implemented, awaiting the user's ADR review and a green kit-ci run** (
 | Y-2.4 | CLI entry (`bin/yaw`), arg parsing, `--version`, help (**done**) | Feature | P0 | Y-2.2 | `parseArgs`-based; unknown command exits 1 with usage; phase-1 command list fixed (S2) |
 | Y-2.5 | Render engine + manifest writer (**done**) | Feature | P0 | Y-1.4, Y-1.6, Y-2.1 | Atomic writes; rejects paths escaping the project (traversal tests); every written file recorded with SHA-256 |
 | Y-2.6 | `yaw update` keep/take/merge (**done**) | Feature | P0 | Y-1.5, Y-2.5 | Unedited files updated silently; edited files show a diff and offer keep/take/merge; conflicts left marked and reported; non-interactive flag documented |
-| Y-2.7 | `yaw remove <module>` (**done**) | Feature | P0 | Y-2.5 | Deletes exactly the module's files/fragments after confirmation, unregisters its hooks, updates the manifest; test proves zero residue |
+| Y-2.7 | `yaw remove <module>` (**done**) | Feature | P0 | Y-2.5 | Deletes exactly the module's files/fragments after confirmation, unregisters its hooks, updates the manifest; removal deletes the module's files, fragments and hooks; the user's answers in answers.yaml are kept, and a re-add asks the module's questions again with previous answers as defaults (test proves it) |
 | Y-2.8 | `yaw self-update` + `self-uninstall` (**done**) | Feature | P1 | Y-2.3 | Shows the changelog and switches the tag; uninstall removes kit and shim only, prints what remains |
 | Y-2.9 | `yaw doctor` + `yaw status` (**done**) | Feature | P1 | Y-2.5 | Doctor checks kit version vs. manifest pin, manifest consistency, shim reachability, Node ≥ 22.13, `just --list`; status prints the module/file table |
 | Y-2.10 | Minimal `yaw init --answers --yes` (core only) (**done**) | Feature | P0 | Y-2.5 | Renders the `core` stub from an answers file; used by the Y-2 end-to-end test |
@@ -244,12 +244,12 @@ Status: **implemented, awaiting the user's ADR review (0009, 0020) and a green k
 
 ### Step 5 — Phase-1 modules
 
-Common AC for every row: installs, works for Claude + Codex (+ Copilot where the matrix says so), removable with zero residue, tests, correct manifest entries.
+Common AC for every row: installs, works for Claude + Codex (+ Copilot where the matrix says so), removable (removal deletes the module's files, fragments and hooks; the user's answers in answers.yaml are kept, and a re-add asks the module's questions again with previous answers as defaults), tests, correct manifest entries.
 
 | ID | Title | Type | Prio | Depends | Extra acceptance criteria |
 |---|---|---|---|---|---|
 | Y-5 | Step 5: phase-1 modules | Epic | P0 | Y-4 | All sub-issues done; Quick complete after Y-5.3 (BD5) |
-| Y-5.A | `yaw add <module>` | Feature | P0 | Y-2.5 | Asks only that module's questions; dependency violations reported, not auto-fixed |
+| Y-5.A | `yaw add <module>` (**done**, ADR-0023) | Feature | P0 | Y-2.5 | Asks only that module's questions; dependency violations reported, not auto-fixed |
 | Y-5.1 | `communication` + `standards` | Feature | P1 | Y-5.A, ADR-0013 | ≈ 6 lines rendered from the profile; Claude output style only when non-default; profile overlay ≤ 20 lines; team-mode rule per ADR-0013 |
 | Y-5.2 | `devenv` | Feature | P1 | Y-5.A | `just setup/dev`; `.env.example`; `.env*` git-ignored; Docker/devcontainer only when the profile advises it |
 | Y-5.3 | `tasks` (local / GitHub / both) | Feature | P0 | Y-1.11, ADR-0010 | Per BD4: local `TASKS.md` source with `T-NNN`; GitHub/team issues as source with generated read-only `TASKS.md`; Both `T-NNN` + issue link. `just task …` recipes per ADR-0010; Claude Stop hook enforces the resume point; sync one-way and idempotent (recorded `gh` fixtures) |
