@@ -28,7 +28,7 @@ function readLedger(root) {
   const text = readIf(root, TASKS_FILE);
   if (text === null) throw new LedgerError(`${TASKS_FILE} is missing; run: yaw update`);
   const ledger = parseTasks(text, { file: TASKS_FILE });
-  checkArchivePath(root, ledger.archive);
+  if (!ledger.readOnly) checkArchivePath(root, ledger.archive ?? ARCHIVE); // the default archive counts too
   return ledger;
 }
 

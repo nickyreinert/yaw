@@ -268,6 +268,22 @@ test('an archive reached through a symlink or under .git is rejected by done, ne
   assert.equal(existsSync(join(root, '.git', 'hooks', 'pre-commit')), false);
 });
 
+test('the default archive is checked too: no Done line and TASKS.archive.md a symlink', async () => {
+  const root = await project({ mode: 'both' });
+  const outside = tmp('yaw-outside-');
+  writeFileSync(join(outside, 't.md'), 'secret\n');
+  symlinkSync(join(outside, 't.md'), join(root, 'TASKS.archive.md'));
+  const text = LOCAL_LEDGER.replace('\n## Done → TASKS.archive.md\n', '');
+  writeFileSync(join(root, 'TASKS.md'), text);
+  for (const args of [['done', 'T-012'], ['new', 'x'], ['sync']]) {
+    const r = await task(root, args, { gh: () => assert.fail('gh must not be called') });
+    assert.equal(r.code, 1, args[0]);
+    assert.match(r.err, /symbolic link/);
+  }
+  assert.equal(read(root, 'TASKS.md'), text);
+  assert.equal(readFileSync(join(outside, 't.md'), 'utf8'), 'secret\n');
+});
+
 // ---------------------------------------------------------------- both: one-way, idempotent sync
 
 test('sync (both): creates, links, updates, closes; recorded gh output; the second run writes nothing', async () => {
