@@ -1,0 +1,42 @@
+# modules/decisions/module.yaml (Y-5.6, ADR-0028, ADR-0011): ADR + notice journal in .decisions/, local
+# recall (doc 04, doc 12 §1–2, governance blueprint D, E, F, K).
+name: decisions
+description: Decision journal in .decisions/ (ADRs and security / business-logic / privacy notices), local recall at task start, a user-visible recall note per prompt, and the ID and index check in just check.
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions: []
+outputs:
+  # taxonomy.json and the empty index are managed files; the records (ADR-*.md, NOTICE-*.md, details/) are
+  # user data and never touched by update or remove.
+  templates: [.decisions/taxonomy.json, .decisions/decisions.index.json, justfile, just/decisions.just]
+  # decisions-check runs with `just check` (through sync-check, ADR-0028).
+  gates: [decisions-check]
+  hooks:
+    # Comfort, not context: prompt-time context is model-visible on every turn (BUILD.md rule 5, ADR-0007).
+    - name: recall
+      event: UserPromptSubmit
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "UserPromptSubmit systemMessage (user-visible only)" }
+        codex: { support: native, via: "UserPromptSubmit systemMessage (user-visible only)" }
+        copilot: { support: none, note: "userPromptSubmitted output is dropped" }
+    # Model-visible, capped by BUILD.md rule 5: at most 5 critical decisions, ID and title, once per session.
+    - name: session-start-critical
+      event: SessionStart
+      kind: context
+      tokenCost: low
+      agents:
+        claude: { support: native, via: "SessionStart additionalContext (≤ 5 lines: ID + title)" }
+        codex: { support: native, via: "SessionStart additionalContext (≤ 5 lines: ID + title)" }
+        copilot: { support: none, note: "no SessionStart context from this module; AGENTS.md rule + just decisions recall" }
+agentsMd: |
+  - Decision retrieval: `just decisions recall "<the task in one line>"` (add `--path <file>` for files you will change); apply matching decisions, weigh notices, cite their IDs in your summary or say none applied.
+  - Record lasting choices as ADRs and unresolved security / business-logic / privacy risks as notices with `just decisions record ...` (`just decisions` lists the options); change a decision by recording a new one with `--supersedes`.
+  - `.decisions/*.md` are the truth; after editing one by hand run `just decisions rebuild`.
+agents:
+  claude:  { support: native, via: "critical decisions at SessionStart; AGENTS.md rule + just decisions recall; recall note per prompt" }
+  codex:   { support: native, via: "critical decisions at SessionStart; AGENTS.md rule + just decisions recall; recall note per prompt; hooks must be trusted via /hooks" }
+  copilot: { support: partial, via: "AGENTS.md rule + just decisions recall", note: "no prompt hook output (tier 2)" }
+tokenCost: low
+lastVerified: 2026-10-21

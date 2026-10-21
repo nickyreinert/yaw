@@ -96,12 +96,13 @@ The profile adds a stack overlay (`profiles/<p>/standards.md`, ≤ 20 lines: lin
 
 Technical spec: [reference/governance-blueprint.md](reference/governance-blueprint.md) sections D, E, F, K, with these changes:
 
-- Logic in kit `modules/decisions/lib/` (vendor-neutral), not under `.claude/`.
+- Logic in kit `modules/decisions/lib/` (vendor-neutral), not under `.claude/`; the retrieval engine (tokenizer, embedding, ranking) is shared in `core/lib/retrieval.js` with a Unicode-aware tokenizer (ADR-0011).
 - Notice kinds: `security`, `business-logic`, `privacy`.
 - Index fields added: `importance`, `status`, `supersedes`, `scope`, `reviewBy`, `embeddingModel`, `refs` (detail doc, spec, code symbol, issue, commit, session; see doc 12).
 - Short record is injected; optional detail doc in `.decisions/details/` is linked, not injected.
 - Single `embeddingText(entry)` recipe; `parseArgs` CLI; ID uniqueness check in `just check`.
-- Hooks: `UserPromptSubmit` recall, `SessionStart` (TASKS head + critical ADRs), optional path-aware `PreToolUse` on `Edit|Write`.
+- Hooks (ADR-0028, BUILD.md rule 5): `SessionStart` re-injects the critical decisions, capped at 5 lines of ID and title (no record bodies, nothing when none is critical; Claude and Codex). `UserPromptSubmit` recall is comfort only: a `systemMessage` naming matching records for the user. No `PreToolUse` hook; path-aware recall is `--path`.
+- Recall of full records: the agent runs `just decisions recall "<task>"` at task start (critical records always included). Copilot gets no `SessionStart` context from this module; for it the `AGENTS.md` rule and this command are the fallback.
 
 ### quality-code / security / performance / business-logic
 

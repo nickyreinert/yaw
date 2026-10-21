@@ -294,6 +294,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     ci: profileCi(kitRoot, profiles),
     // ADR-0010: the effective task mode (team forces github) as booleans, since templates have no comparisons.
     tasks: taskFlags(tasksMode(flat)),
+    // ADR-0028: gate recipes of the enabled modules (`outputs.gates`); `just check` runs them via sync-check.
+    gates: [...new Set(modules.flatMap((m) => (definitions?.get(m) ?? loadModule(kitRoot, m)).outputs?.gates ?? []))].sort(),
   };
 }
 

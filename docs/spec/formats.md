@@ -19,6 +19,9 @@ Schemas are the binding definition; this page is the readable overview. Check fi
 | `modules/security/guards.yaml`, `profiles/<p>/guards.yaml` | kit authors | YAML | `guards.schema.json` | `guards/security.yaml`, `guards/node-cli.yaml` |
 | normalised hook event | kit | JSON | `hook-event.schema.json` | `hook-event/*.json` |
 | `~/.yaw/yaw.db` | kit | SQLite | `core/lib/db.js` migrations | `test/db.test.js` |
+| `.decisions/ADR-*.md`, `NOTICE-*.md` | user / `yaw decisions record` | Markdown | parser in `modules/decisions/lib/journal.js` | `.decisions/` of this repository |
+| `.decisions/taxonomy.json` | user / `yaw decisions taxonomy` | JSON | parser in `modules/decisions/lib/journal.js` | `modules/decisions/templates/.decisions/taxonomy.json` |
+| `.decisions/decisions.index.json` | kit (`yaw decisions rebuild`) | JSON | derived from the records | `.decisions/decisions.index.json` |
 
 Schemas live in `core/schema/`, examples in `core/schema/examples/<schema>/`. Shared definitions (names, agent keys, facts, answers) are in `common.schema.json`. Conventions: ADR-0017.
 
@@ -82,3 +85,7 @@ Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against t
 ## Session registry (`~/.yaw/yaw.db`)
 
 Phase 1 has only `schema_migrations`, `sessions` and `session_links` (BD3). See `core/lib/db.js` and ADR-0018; fields follow doc 12 §4 (`tasks`, `decisions`, `commits`, `files` become `session_links` rows of that `kind`).
+
+## Decision journal (`.decisions/`)
+
+Records are Markdown (blueprint D4 plus the D2 fields): `# ADR-0007: Title`, metadata bullets (`Date`, `Category: C / S`, `Status` or for notices `Kind`, `Importance`, optional `Supersedes`, `Superseded by`, `Scope`, `Review by`, `Tags`), then `## Context`, `## Decision` + `## Consequences` (notices: `## Consideration`) and optional `## References` (`- detail|spec|code|issue|commit|session: value`). IDs `ADR-NNNN` / `NOTICE-NNNN`, in team mode `ADR-<issue>-<n>`. `taxonomy.json` is `{ version, categories: [{ name, subcategories: [{ name, keywords }] }] }`. The index (`version: 2`, `model: local-hash-ngram-v2`, `dimensions: 384`) is derived from the records and must equal `yaw decisions rebuild`. Details: ADR-0028, engine: ADR-0011.

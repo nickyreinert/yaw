@@ -16,6 +16,9 @@
     },
     "security": {
       "enabled": true
+    },
+    "decisions": {
+      "enabled": true
     }
   },
   "mcpServers": [],
@@ -23,9 +26,13 @@
     {
       "path": ".claude/settings.json",
       "module": "core",
-      "hash": "sha256:d1eab2cdfd558581be22868ae4d6c5c9d9dfd6a7038eb1a9b76f1d9d46aacc49",
+      "hash": "sha256:b01b90dd7d75cedae087287ae0065dd3e52f5277bf33c747a09e043646857545",
       "managed": true,
       "fragments": [
+        {
+          "module": "decisions",
+          "hash": "sha256:c4920facde38e4a5caa5b5bd24e6480740ddca867e78c78281f8c99dd1e6810f"
+        },
         {
           "module": "security",
           "hash": "sha256:a9a83820fb3934d78bfdd5b7bed2d2d6e35de5f7af835f0390cc698cb826b875"
@@ -35,14 +42,30 @@
     {
       "path": ".codex/hooks.json",
       "module": "core",
-      "hash": "sha256:90636c4b0f5de1a5d3c21285ec1ca56d154051a11b2d995b4273323c4332259b",
+      "hash": "sha256:701a308f6f5590085004e7db1fbd4a2f60f9700575e7bea87bcedc92fc500db1",
       "managed": true,
       "fragments": [
+        {
+          "module": "decisions",
+          "hash": "sha256:79d83adda491950c844a9f02f259830f4e3ee33689ad4cc74514004438e15c67"
+        },
         {
           "module": "security",
           "hash": "sha256:edcc2550031064c3df6164930d33bfcce2fe85e56416fc6defb10c4fc06cd17b"
         }
       ]
+    },
+    {
+      "path": ".decisions/decisions.index.json",
+      "module": "decisions",
+      "hash": "sha256:368a97bc10aa1148be14ef3e1a16677ec61eacfa365c19e4cf82ac672f9a87d6",
+      "managed": true
+    },
+    {
+      "path": ".decisions/taxonomy.json",
+      "module": "decisions",
+      "hash": "sha256:512cddb850558758cf99888643e4549f2010f6279f112e44bec1a0dff9e0f920",
+      "managed": true
     },
     {
       "path": ".gitignore",
@@ -71,9 +94,13 @@
     {
       "path": "AGENTS.md",
       "module": "core",
-      "hash": "sha256:4df84d11359d6412d7b2c025e3bfa0e3b4b38ac73dadc0f1359328da0cff714d",
+      "hash": "sha256:9bdd25164ebad2de9bd2412d55ce740b602c09ca43ca9895990cdf910e934223",
       "managed": true,
       "fragments": [
+        {
+          "module": "decisions",
+          "hash": "sha256:126a88156b3287a522c062d19d81f242bc354f084a8b454f73fa826b1f6e9db7"
+        },
         {
           "module": "security",
           "hash": "sha256:a2c57948947a88958e2860c98fedbfb40e05a636afa3b280a94a07b5102aed72"
@@ -87,17 +114,27 @@
       "managed": true
     },
     {
+      "path": "just/decisions.just",
+      "module": "decisions",
+      "hash": "sha256:fcc3ca511e13b0a2af273b1b9f3ced5aaa57fe1297e7c75b7d34db917e630213",
+      "managed": true
+    },
+    {
       "path": "just/node-cli.just",
       "module": "core",
-      "hash": "sha256:8a6e30e5c35873b83a31ff35a33ce5f63f8fa09dbaf21a285ca914a3a8fce4b5",
+      "hash": "sha256:366546203498d9b2d5a276483832b16758079485c2bfae4c371b82aefc96da01",
       "managed": true
     },
     {
       "path": "justfile",
       "module": "core",
-      "hash": "sha256:0972e19d75f404b25b55f5db79f88bf24f75afc1dc59d49c4e4657f1c9680e48",
+      "hash": "sha256:d99f88f0e8646cb724f489ed24deb455619bbf9a38e92d4e445847b78e7a4abe",
       "managed": true,
       "fragments": [
+        {
+          "module": "decisions",
+          "hash": "sha256:40cbf2f571d9cb4d1c4cee8ec81d09bb5c1b37930a9ea57100b5f46768721e4f"
+        },
         {
           "module": "node-cli",
           "hash": "sha256:780b9f7f882af30b8bb8dd3c79dd6c2eb235dc1f2059f9627cda19442db29e4b"
