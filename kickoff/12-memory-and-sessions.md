@@ -35,7 +35,10 @@ index entry ──file──▶ short record (ADR-0007.md: summary, context, dec
 ```
 
 - Code refs use path + symbol (stable) rather than line numbers (drift). `just check` validates that referenced paths exist and warns on dead refs.
-- The embedding is computed from summary + context + decision (the short record), not from the detail doc, to keep vectors focused.
+- The embedding is computed from title + short summary + category path (`Category / Subcategory`) of each record, not from the context, the decision text or the detail doc: small and precise vectors. The detail body is only shown on retrieval; a longer embedding can be added later if recall is poor (`embeddingModel` identifies the recipe; ADR-0028).
+- **Storage:** plain text (`.decisions/`) is the source; the embedded database `yaw.db` has a `decisions` table (one row per record, with the embedded fields and the project name) as the index for discovery. Every stored record comes with the fields needed for retrieval.
+- **Categories:** Architecture (Formats, Rendering, CLI), Agents (Hooks, Skills), Modules (Catalogue, Workflow), Memory (Decisions, Sessions), Security (Guards), Delivery (Platform), Governance (Scope, Repository), UI (Design); from `taxonomy.json`, UI added.
+- **Critical decisions:** the user chooses how many are injected at `SessionStart` (default 0). They are listed in the generated `.decisions/CRITICAL.md`, which the hook reads (Claude, Codex) and `AGENTS.md` references for agents without `SessionStart` support (Copilot); the decision text is never copied into `AGENTS.md`.
 - Reverse direction: code comments and `docs/spec/` may cite `ADR-0007`; the `scope` globs (path-aware recall) link records to files.
 
 ## 3. Global knowledge store
@@ -59,6 +62,7 @@ Goal: find the conversation behind a task, decision or commit later, and resume 
 ```json
 {
   "id": "claude:5f2c…",
+  "project": "my-app",
   "agent": "claude",
   "title": "Invite flow: signaling server + token expiry",
   "started": "2026-10-20T09:12:00Z",
@@ -74,6 +78,7 @@ Goal: find the conversation behind a task, decision or commit later, and resume 
 }
 ```
 
+- **Project name:** `yaw init` asks one question for the project name (default: the folder name) and stores it in the manifest. Every session row and every decision row carries it. `yaw sessions` and `yaw decisions` accept the filters `--project`, `--model` and `--session` (ADR-0028, ADR-0029; design only, not implemented yet).
 - **Title:** Claude Code supports this natively: `UserPromptSubmit` and `SessionStart` hooks can return `sessionTitle`, and receive the current custom `session_title`. YAW sets `T-012 invite flow` style titles automatically from the active task (only if no custom title exists); other agents get the title at `/handoff`. Editable via `yaw session rename`.
 - **Links:** tasks from the active `TASKS.md` entry / branch name; decisions from IDs cited in the session; commits from the git range between start and end HEAD; files from the diff.
 - **Commit trailer:** `just commit` adds `Agent-Session: claude:5f2c…` so `git log` leads back to the conversation (the project's latest session active within 4 h, or `YAW_SESSION`; ADR-0029).

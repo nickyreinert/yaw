@@ -38,7 +38,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
    - *Evaluation/metrics hooks* print nothing, return nothing, exit 0, detach, fail open. Test asserts empty stdout.
    - *Comfort hooks* may return a **synchronous** `systemMessage` / `terminalSequence` (user-visible only); never `additionalContext`, never from async hooks. Test asserts no `additionalContext`.
    - *Status line* scripts are exempt (rendered by the agent UI, not sent to the model).
-   - Only allowed model-visible output: `SessionStart` re-injection of the active task (doc 11), a few lines once per session, and — the only other allowed model-visible output — `SessionStart` re-injection of **at most 5 critical decisions**, one short line each (ID and title), no record bodies, nothing when none is critical (ADR-0028). Both are capped; nothing else is model-visible.
+   - Only allowed model-visible output: `SessionStart` re-injection of the active task (doc 11), a few lines once per session, and — the only other allowed model-visible output — `SessionStart` re-injection of critical decisions, one short line each (ID and title), no record bodies, nothing when none is critical; how many is the user's choice, default 0 (ADR-0028). The active task is capped by a few lines, the critical decisions by the user's number and the dispatcher's policy cap (ADR-0007); nothing else is model-visible.
 6. **Secrets never pass through the model.** No secret values in logs, fixtures, prompts or test snapshots.
 7. **Tests with every change.** `node --test`; adapter tests use recorded hook payloads as fixtures (`test/fixtures/<agent>/<event>.json`).
 8. **Scope discipline.** Build only what the step asks for. Ideas for later go into an issue labelled `later`.
