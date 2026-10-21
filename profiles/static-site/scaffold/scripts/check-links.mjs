@@ -1,17 +1,28 @@
 // Checks every local href/src/anchor in public/**/*.html. No network, no dependencies.
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 
 const root = realpathSync(resolve('public'));
-const pages = readdirSync(root, { recursive: true }).filter((f) => f.endsWith('.html')).map((f) => join(root, f));
+const problems = [];
+// Walk without following symlinks: a symlink (file or directory) is reported and never read.
+const pages = [];
+const walk = (dir) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isSymbolicLink()) problems.push(`${full.slice(root.length + 1)}: symlinks in public/ are not followed`);
+    else if (entry.isDirectory()) walk(full);
+    else if (entry.name.endsWith('.html')) pages.push(full);
+  }
+};
+walk(root);
 const safeDecode = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
 const ids = (file) => new Set([...readFileSync(file, 'utf8').matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
-const problems = [];
 
 for (const page of pages) {
   const name = page.slice(root.length + 1);
-  if (lstatSync(page).isSymbolicLink()) {
-    problems.push(`${name}: symlinked pages are not checked`);
+  const realPage = realpathSync(page);
+  if (!realPage.startsWith(root + sep)) {
+    problems.push(`${name}: page is outside public/`);
     continue;
   }
   const html = readFileSync(page, 'utf8');

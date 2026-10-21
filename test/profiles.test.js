@@ -177,9 +177,19 @@ test('static-site check-links: refuses targets outside public/ without reading t
 
   symlinkSync(join(cwd, 'outside', 'o.html'), join(root, 'public', 'link.html'));
   writeFileSync(join(root, 'public', 'index.html'), page('<a href="link.html">l</a>'));
-  assert.match(check().stderr, /link\.html: symlinked pages are not checked/);
+  assert.match(check().stderr, /link\.html: symlinks in public\/ are not followed/);
   assert.match(check().stderr, /index\.html: link "link\.html" points outside public\//);
   unlinkSync(join(root, 'public', 'link.html'));
+
+  // a symlinked directory pointing outside: reported, and its pages are never read (the outside page links to a missing file)
+  writeFileSync(join(cwd, 'outside', 'o.html'), page('<a href="SECRET-MARKER-missing.html">m</a>'));
+  symlinkSync(join(cwd, 'outside'), join(root, 'public', 'out_link'));
+  writeFileSync(join(root, 'public', 'index.html'), page('<p>ok</p>'));
+  const dirLink = check();
+  assert.notEqual(dirLink.status, 0);
+  assert.match(dirLink.stderr, /out_link: symlinks in public\/ are not followed/);
+  assert.doesNotMatch(dirLink.stderr, /SECRET-MARKER/, 'the outside page was not read');
+  unlinkSync(join(root, 'public', 'out_link'));
 
   writeFileSync(join(root, 'public', 'a b.html'), page('<h1 id="top">t</h1>'));
   writeFileSync(join(root, 'public', 'index.html'), page('<a href="a%20b.html?x=1#top">ok</a>'));
