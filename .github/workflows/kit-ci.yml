@@ -26,6 +26,10 @@ jobs:
           node-version: ${{ matrix.node }}
       - uses: extractions/setup-just@v2
       - uses: astral-sh/setup-uv@v5
+      - name: lefthook and gitleaks (git-hooks module tests, ADR-0026)
+        run: |
+          brew install lefthook gitleaks
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - run: node --version
       - run: just --version && uv --version
       - run: npm test

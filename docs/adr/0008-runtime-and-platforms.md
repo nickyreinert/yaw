@@ -34,6 +34,7 @@ BD11 fixed the outline: macOS and Linux for v0.1, Windows only via WSL, Node ≥
 |---|---|---|
 | `node --test` | local + CI | test runner (built in) |
 | `shellcheck` | CI (`kit-ci` job `shellcheck`); optional locally | every `*.sh` in the repo must pass with default settings |
+| `lefthook`, `gitleaks` | CI (`kit-ci` job `test`); optional locally | `git-hooks` module tests (ADR-0026); not kit runtime requirements |
 | GitHub Actions `actions/checkout@v4`, `actions/setup-node@v4` | CI | runners |
 
 No npm dev dependencies.
