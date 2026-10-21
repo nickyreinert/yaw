@@ -1,0 +1,17 @@
+# modules/devenv/module.yaml (Y-5.2, ADR-0025): one-command setup, env template, optional container files.
+name: devenv
+description: .env.example, git-ignored .env files, `just setup` creating .env from the example, and Dockerfile / compose.yaml / devcontainer.json only when the profile ships them.
+depends: [core]
+default: { quick: true, standard: true, full: true }
+questions: []
+outputs:
+  # .env.example and .gitignore always; the three container files only render when the profile has a devenv/ folder.
+  templates: [.env.example, .gitignore, Dockerfile, compose.yaml, .devcontainer/devcontainer.json]
+agentsMd: |
+  - Set up with `just setup`, run with `just dev`. `.env` is git-ignored; put new variable names (never values) in `.env.example` and ask the user for the values.
+agents:
+  claude:  { support: native, via: "AGENTS.md rule + .env.example" }
+  codex:   { support: native, via: "AGENTS.md rule + .env.example" }
+  copilot: { support: native, via: "AGENTS.md rule + .env.example" }
+tokenCost: low
+lastVerified: 2026-10-21

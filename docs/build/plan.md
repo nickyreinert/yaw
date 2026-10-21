@@ -251,7 +251,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-5 | Step 5: phase-1 modules | Epic | P0 | Y-4 | All sub-issues done; Quick complete after Y-5.3 (BD5) |
 | Y-5.A | `yaw add <module>` (**done**, ADR-0023) | Feature | P0 | Y-2.5 | Asks only that module's questions; dependency violations reported, not auto-fixed |
 | Y-5.1 | `communication` + `standards` (**done**, ADR-0013, ADR-0024) | Feature | P1 | Y-5.A, ADR-0013 | ≈ 6 lines rendered from the profile; Claude output style only when non-default; profile overlay ≤ 20 lines; team-mode rule per ADR-0013 |
-| Y-5.2 | `devenv` | Feature | P1 | Y-5.A | `just setup/dev`; `.env.example`; `.env*` git-ignored; Docker/devcontainer only when the profile advises it |
+| Y-5.2 | `devenv` (**done**, ADR-0025) | Feature | P1 | Y-5.A | `just setup/dev`; `.env.example`; `.env*` git-ignored; Docker/devcontainer only when the profile advises it |
 | Y-5.3 | `tasks` (local / GitHub / both) | Feature | P0 | Y-1.11, ADR-0010 | Per BD4: local `TASKS.md` source with `T-NNN`; GitHub/team issues as source with generated read-only `TASKS.md`; Both `T-NNN` + issue link. `just task …` recipes per ADR-0010; Claude Stop hook enforces the resume point; sync one-way and idempotent (recorded `gh` fixtures) |
 | Y-5.4 | `git-hooks` (lefthook, gitleaks) | Feature | P1 | Y-5.A | Format/lint-staged/gitleaks on commit; a planted fake secret is blocked (test) |
 | Y-5.5 | `github` + `ci` | Feature | P1 | Y-5.3 | Recipes per ADR-0010; guarded actions require authorisation; issue-type auto-detect with label fallback; `quality-gate.yml` installs the kit at the manifest tag (BD10) and runs `just check` |
