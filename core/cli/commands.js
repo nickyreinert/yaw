@@ -5,6 +5,8 @@ import { KIT_ROOT, kitVersion } from '../render/kit.js';
 import { STRATEGIES } from '../render/reconcile.js';
 import { addModule, enabledModules, fileStates, moduleQuestions, planAdd, planRemove, readAnswers, removeModule, renderProject, requireManifest, updateProject } from '../render/project.js';
 import { runInterview, whenMatches } from '../interview/engine.js';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { confirm } from './prompt.js';
 import { printToolHints } from './tool-hints.js';
 
@@ -148,7 +150,17 @@ export async function remove({ values, positionals, io }) {
     root: io.cwd, kitRoot: io.kitRoot, module, strategy, interactive: !values.yes && io.prompter.interactive, prompter: io.prompter,
   });
   printReport(io.stdout, result);
+  if (module === 'code-map') await dropMapCache(io);
   return result.conflicts.length > 0 ? 1 : 0;
+}
+
+// After `yaw remove code-map`: delete this worktree's index file (docs/code-map.md stays, it is yours).
+async function dropMapCache(io) {
+  try {
+    const lib = await import(pathToFileURL(join(io.kitRoot, 'modules', 'code-map', 'lib', 'cli.js')).href);
+    const info = lib.gitInfo(io.cwd);
+    if (info) lib.removeCache(io.env ?? process.env, info);
+  } catch { /* the index is disposable */ }
 }
 
 export async function status({ positionals, io }) {

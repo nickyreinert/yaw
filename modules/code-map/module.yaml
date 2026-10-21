@@ -1,0 +1,21 @@
+# modules/code-map/module.yaml (Y-5.11, ADR-0033): a maintained code map, a rebuildable local index, read-only checks.
+name: code-map
+description: Maintained docs/code-map.md (declared areas, generated sections, your explanations), a rebuildable index outside the project, and `yaw map update` / `check` / `show`; the check runs with `just check` and as a pre-commit job.
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions: []
+outputs:
+  templates: [just/code-map.just, justfile]
+  # docs/code-map.md is generated once from the project tree, then belongs to you (kept on remove).
+  starter: docs/code-map.md
+  # map-check runs with `just check` (through sync-check, ADR-0028).
+  gates: [map-check]
+# One line; the full wording is in docs/spec/agent-rules.md. No agent hook: nothing here can print, block or call a model.
+agentsMd: |
+  - Code map: read `docs/code-map.md` or `just map show <area>` first, then verify against the implementation, callers and tests and search wider when needed; after adding, moving or deleting directories run `just map update` and review the area descriptions.
+agents:
+  claude:  { support: native, via: "AGENTS.md rule + yaw map commands" }
+  codex:   { support: native, via: "AGENTS.md rule + yaw map commands" }
+  copilot: { support: native, via: "AGENTS.md rule + yaw map commands" }
+tokenCost: low
+lastVerified: 2026-10-21

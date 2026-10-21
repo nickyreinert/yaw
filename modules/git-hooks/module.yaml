@@ -7,8 +7,7 @@ questions: []
 outputs:
   templates: [lefthook.yml, just/git-hooks.just, justfile]
 agentsMd: |
-  - Git hooks (lefthook: `just fmt`, `just lint`, gitleaks) run on every commit; install them once with `just hooks-install`.
-  - If gitleaks blocks a commit, remove the secret from the staged files; never bypass with `--no-verify`.
+  - Git hooks (lefthook: `just fmt`, `just lint`, gitleaks) run on every commit; install once with `just hooks-install`. If gitleaks blocks a commit, remove the secret from the staged files; never `--no-verify`.
 agents:
   claude:  { support: native, via: "git pre-commit hook (lefthook) + AGENTS.md rule" }
   codex:   { support: native, via: "git pre-commit hook (lefthook) + AGENTS.md rule" }

@@ -16,3 +16,8 @@ pre-commit:
       stage_fixed: true
     - name: lint
       run: just lint
+<% if codeMapModule %>
+    # Cheap check on the working tree: the code map must match the project structure (code-map module, ADR-0033).
+    - name: code-map
+      run: just map-check
+<% end %>

@@ -10,6 +10,8 @@ import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
 import { AGENTS_MAX_LINES, compose, SHARED_FILES } from './compose.js';
 import { checkRelPath } from './files.js';
+import { excludedByName, listFiles, loadSecretRules } from '../../modules/code-map/lib/index.js';
+import { starterMap } from '../../modules/code-map/lib/map.js';
 import { HOOK_SHIM, hookParts, pathWanted, shimContent, skillFiles } from './agents.js';
 
 export const KIT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -311,6 +313,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], (flat['idea.team'] ?? 'solo') !== 'solo'),
     // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
     teamModule: modules.includes('team'),
+    // ADR-0033: git-hooks adds the code-map pre-commit job when the code-map module is installed.
+    codeMapModule: modules.includes('code-map'),
     // ADR-0028: gate recipes of the enabled modules (`outputs.gates`); `just check` runs them via sync-check.
     gates: [...new Set(modules.flatMap((m) => (definitions?.get(m) ?? loadModule(kitRoot, m)).outputs?.gates ?? []))].sort(),
   };
@@ -368,7 +372,7 @@ function walk(dir, prefix = '') {
 
 // Render the outputs of the given modules (and of the profile output from renderProfiles).
 // -> Map<path, { module, content: Buffer, fragments: [{ module, hash }], managed? }>
-export function renderModules({ kitRoot, modules, context, definitions, profileOutput }) {
+export function renderModules({ kitRoot, modules, context, definitions, profileOutput, root }) {
   const owned = new Map();
   const shared = new Map();
   const addPart = (path, part) => {
@@ -429,6 +433,19 @@ export function renderModules({ kitRoot, modules, context, definitions, profileO
     if (content === null) continue;
     if (path === 'AGENTS.md') checkAgentsBudget(content, parts);
     owned.set(path, { module: spec.owner, content: Buffer.from(content, 'utf8'), fragments });
+  }
+  // `outputs.starter`: generated once from the project tree plus the files of this render, then user-owned
+  // (managed: false, never rewritten). An existing file produces nothing, so update and remove leave it alone.
+  for (const [name, def] of defs) {
+    const path = def.outputs?.starter;
+    if (!path) continue;
+    checkRelPath(path);
+    if (owned.has(path)) throw new KitError(`${path} is written by "${owned.get(path).module}" and is also the starter of "${name}"`);
+    if (root && existsSync(join(root, path))) continue;
+    const secrets = loadSecretRules(kitRoot);
+    const known = root ? listFiles(root, { kitRoot }).files : [];
+    const files = [...new Set([...known, ...owned.keys(), path])].filter((f) => !excludedByName(f, { secrets })).sort();
+    owned.set(path, { module: name, content: Buffer.from(starterMap(files), 'utf8'), fragments: [], managed: false });
   }
   return owned;
 }

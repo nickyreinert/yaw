@@ -2,6 +2,7 @@
   "modules": [
     "core",
     "ci",
+    "code-map",
     "comfort",
     "communication",
     "decisions",
@@ -31,7 +32,9 @@
     ".yaw/github.yaml": "b2c55211052b5af3b28dde26dca1d347e8bb3fdcaa9a0e769dd99384781cb223",
     "CLAUDE.md": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
     "TASKS.md": "1f295ae6ac65bf7ef5dcb23b2c298df25711d0436d46288a59b5b1f4715a4f24",
+    "docs/code-map.md": "0604179ab7ab7e430deebb9b6e14d607ca335d7a985b852c83aca3be157a940e",
     "docs/standards.md": "5f6589fe24f1899a95b22e95e172cfb8d5a8261e55a6541a4e80a034950cd0f3",
+    "just/code-map.just": "7b48aaab62ad2736d81faed75e21a23c8f67ed7beb7efd8077ecdfd332b25283",
     "just/decisions.just": "fcc3ca511e13b0a2af273b1b9f3ced5aaa57fe1297e7c75b7d34db917e630213",
     "just/git-hooks.just": "fa963e72c775559a7acd27020c6eb35bbcbe411b10897add1cc788d51957162c",
     "just/github.just": "4c43d6ac1c40da810b3e3cf6f0cbfb7c860b215c1ddc7db6bfd3ab25b1e83b31",
@@ -39,8 +42,8 @@
     "just/sessions.just": "8d7e1ef2d7851e551716dafdd9fea44552cd86535d0ec96406f49de799442bff",
     "just/tasks.just": "60fa2744cc75d35129e5968f12780d76f7a1789e036ff14a802633225b46f73a",
     "just/team.just": "a32807f3bb471403f90d2062d2aab210ba076f16196ba4c15b91876dff0b598f",
-    "justfile": "e65b75a2a599f662896fbd6026a8f577d483f9b072efb237bb5eded0afe58f93",
-    "lefthook.yml": "f9b572d3441a4a85fd95d77dc8cb6f23481e369f7bee4cf58f731740c6c8b635",
+    "justfile": "38570c79bb6afea8c1f618d4738e9889161a853bc7dfafd419f3ba08ddb502f6",
+    "lefthook.yml": "610d639eab06ab9aaf889db1cf10b0ecd0fcdec27e4c2121d4232737ef54956c",
     "package.json": "d268be30708a84b6d6c369327815ed4db34165a199e6f9faa5bbe01ada2974e7",
     "src/index.js": "e85a0f616c34c6b88004e5f00a29d68d104f9d3ba2a47e9485f8314b0c92dd99",
     "test/index.test.js": "94c2fd4b92725630c610b1ff2cc3e354764456b86a55ab4e6525916504cc1bb2"
