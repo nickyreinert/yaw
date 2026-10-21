@@ -12,7 +12,11 @@ function install(home, src, args = [], extraEnv = {}) {
   return run('/bin/bash', [join(src, 'install.sh'), ...args], { env: cleanEnv(home, { YAW_REPO: src, ...extraEnv }), cwd: home });
 }
 
-const git = (cwd, args, env) => run('git', args, { cwd, env }).stdout.trim();
+const git = (cwd, args, env) => {
+  const r = run('git', args, { cwd, env });
+  if (r.status !== 0) throw new Error(`git ${args.join(' ')} exited ${r.status}: ${String(r.stderr).trim()}`);
+  return r.stdout.trim();
+};
 
 // Files outside .git (fetch rewrites FETCH_HEAD, which is not a change to the install).
 function snapshot(home) {

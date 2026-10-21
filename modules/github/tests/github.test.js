@@ -13,7 +13,7 @@ import { schemas } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, readAnswers, removeModule, updateProject } from '../../../core/render/project.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
-import { GUARDED } from '../lib/cli.js';
+import { GUARDED, VERBS } from '../lib/cli.js';
 import { branchName, checkIdForMode, parseTaskId, prBody, commitMessage, slugify, taskFromBranch } from '../lib/names.js';
 
 const MODULES = ['core', 'security', 'tasks', 'github'];
@@ -737,7 +737,7 @@ test('the Claude ask rules cover every guarded verb, however yaw is called', asy
     return re.test(cmd);
   });
   for (const verb of GUARDED) {
-    for (const cmd of [`yaw gh ${verb} --yes`, `yaw gh --yes ${verb}`, `node /home/u/.yaw/kit/bin/yaw gh ${verb} --yes`, `node ~/.yaw/kit/bin/yaw gh --yes ${verb}`]) {
+    for (const cmd of [`yaw gh ${verb} --yes`, `yaw gh --yes ${verb}`, `node /home/u/.yaw/kit/bin/yaw gh ${verb} --yes`, `node ~/.yaw/kit/bin/yaw gh --yes ${verb}`, `~/.local/bin/yaw gh ${verb} --yes`, `$HOME/.yaw/kit/bin/yaw gh --yes ${verb}`, `/Users/u/.local/bin/yaw gh ${verb}`]) {
       assert.ok(covered(cmd), cmd);
     }
   }
@@ -750,4 +750,10 @@ test('a label name that looks like a flag is passed after --', async () => {
   const gh = fakeGh();
   assert.equal((await yaw(root, ['labels', '--yes'], { gh, env })).code, 0);
   assert.deepEqual(gh.writes()[0].args, ['label', 'create', '--color', 'D73A4A', '--description', '', '--', '--force']);
+});
+
+test('GUARDED is the list of the authorise call sites in the code', () => {
+  const code = readFileSync(join(KIT_ROOT, 'modules', 'github', 'lib', 'cli.js'), 'utf8');
+  assert.equal((code.match(/await authorise\(/g) ?? []).length, GUARDED.length);
+  for (const verb of GUARDED) assert.ok(VERBS.includes(verb), verb);
 });
