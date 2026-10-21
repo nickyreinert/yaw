@@ -42,7 +42,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 6. **Secrets never pass through the model.** No secret values in logs, fixtures, prompts or test snapshots.
 7. **Tests with every change.** `node --test`; adapter tests use recorded hook payloads as fixtures (`test/fixtures/<agent>/<event>.json`).
 8. **Scope discipline.** Build only what the step asks for. Ideas for later go into an issue labelled `later`.
-9. **Dogfooding.** From step 3 on, this repo is set up and maintained with YAW itself.
+9. **Dogfooding.** From step 3 on, this repo is set up and maintained with YAW itself. Enabling a YAW feature on this source repository is a live integration test of that feature; record its setup and results separately from the reusable implementation for projects using YAW. For step 5.9, applying GitHub rulesets to `nickyreinert/yaw` tests the team-mode feature. The user has made the repository public; use it for that test. GitHub plan and visibility requirements belong in the feature's documentation, and an unavailable live test is a validation limitation rather than an implementation blocker.
 10. **Decide, don't ask.** The concept is closed. For implementation details the docs do not cover, pick the simplest option consistent with the docs, record it in an ADR, and list it in the step summary. Ask the user **only** if the choice changes scope, user-visible behaviour, security, or is hard to reverse. Max. 3 questions per step, each with a recommended answer. Check "Decisions after step 0" below first.
 
 ---
@@ -134,7 +134,99 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 | 5.8 | `comfort`: hygiene, status line, notifications | 11 | B, `medium` |
 | 5.9 | Team mode: issue-required hooks, lefthook, `pr-policy` CI check ("PR links an open issue"), rulesets, session-start sync | 14 | **A, `high`** |
 
+## Step 5.10 — Setup depth: Quick Start / Full Setup
+
+- Model / effort: Tier B, medium; selection/dependency review Tier A, high.
+- Added during step 5.9; completed steps remain complete.
+- Define two primary setup choices:
+  - Quick Start: essential development baseline for prototypes/MVPs.
+  - Full Setup: applicable tooling for maintained products.
+- Audit existing module and item defaults; explicitly assign which
+  hooks and skills each mode enables.
+- Ensure mode selection controls generated outputs, not just which
+  questions are shown.
+- Preserve existing Standard configurations.
+- Support gradual expansion through `yaw add <module>`, preserving
+  existing answers and edits.
+- Record the revised policy in an ADR and update conflicting docs.
+- Keep phase-2/3 features outside this step.
+- Done when: documented selection rules are implemented and tested;
+  Quick produces only its intended baseline, Full respects relevance
+  and dependencies, and existing configurations still work.
+
 - **Done when (each):** module installs, works for Claude + Codex (+ Copilot where the matrix says so), is removable, has tests, and its manifest entries are correct.
+
+## Step 5.11 — Code map and freshness checks
+
+- Model / effort: Tier B, medium; design and review Tier A, high.
+- New scope added during the build; completed steps remain complete.
+- Read: docs 04, 09, 10, 12; existing rendering, module removal,
+  Git-hook and CI contracts.
+- Implement a removable `code-map` module, independent of GitHub.
+
+### Navigation artifacts
+
+- Maintain a concise, version-controlled `docs/code-map.md`:
+  major subsystems, responsibilities, entry points, related tests,
+  important cross-subsystem relationships and links to relevant ADRs.
+- Separate generated sections from maintained explanations.
+  Automatic refresh must preserve maintained explanations.
+- Keep the detailed file index in an ignored, rebuildable local cache.
+  Do not inject the entire index into agent context.
+- Add a short AGENTS.md navigation rule: consult the map first,
+  inspect relevant implementation/callers/tests, and broaden search
+  when needed. Verify map guidance against current code.
+
+### Commands and freshness
+
+- `yaw map update`: refresh generated map sections and local index.
+- `yaw map check`: read-only validation; fail on stale generated
+  sections, broken references or uncovered source areas.
+- `yaw map show [area]`: ensure the local index is current, then
+  return a bounded overview of the requested area.
+- Detect additions, edits, renames and deletions, including
+  uncommitted and non-ignored untracked files.
+- Reconcile against the current working tree, including after branch
+  changes. Keep caches separate for different Git worktrees.
+- Use deterministic output, incremental refresh where practical,
+  atomic writes and safe handling of concurrent refreshes.
+- Exclude secrets, dependencies, generated outputs and the cache
+  itself. Never read secret files or follow links outside the project.
+
+### Existing workflow integration
+
+- Add `yaw map check` to `just check` when the module is enabled.
+- Reuse existing Git-hook infrastructure for validation when present.
+- Existing GitHub CI runs the same check on PR updates.
+- Checks report the repair command; they do not automatically stage,
+  commit or push map updates.
+- Structural changes require reviewing the maintained descriptions
+  in the same PR. Review may conclude no wording change is needed.
+- Distinguish mechanically verified freshness from semantic review:
+  passing checks cannot prove architectural explanations are correct.
+- Automatic agent hooks stay silent, invoke no LLM and follow the
+  existing token-free/fail-open rules. Explicit checks may fail.
+
+### Setup depth and scope
+
+- Quick: concise map, navigation rule and explicit update/check.
+- Full: same foundation, with existing Git-hook/CI integration
+  enabled where those modules are selected.
+- Step 7 exposes these choices consistently in CLI and browser.
+- Phase 1 indexes paths and declared subsystem relationships.
+  Language-aware symbol/dependency extraction is later scope.
+- An optional foreground `yaw map watch` is later scope. It may
+  refresh the local cache using debounced events, but freshness must
+  remain correct without it. No mandatory background daemon.
+
+### Acceptance
+
+- Tests cover stale maps, broken references, new/renamed/deleted
+  files, dirty working trees, branch/worktree changes, exclusions,
+  deterministic output and preservation of maintained explanations.
+- Works locally without GitHub and without a watcher.
+- Removal follows existing ownership and user-edit preservation rules.
+- Record the design in an ADR and update the build plan and module docs.
 
 ## Step 6 — Remaining profiles
 
@@ -148,6 +240,9 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 - **Model / effort:** Tier B, `medium`; server security review Tier A, `high`
 - **Read:** docs 02, 03 (all sections), 08
 - **Do:** complete CLI interview incl. agent multi-select (0.0), solo/team (1.5), presets, saved setups; browser form served on `127.0.0.1` with one-time token, no external assets, same answer schema as CLI.
+
+Present the setup depths defined in step 5.10 as the first choice in both CLI and browser setup; Quick uses a short interview with defaults, Full exposes the applicable configuration.
+
 - **Done when:** CLI and form produce identical answer files for the same choices (test); form server rejects requests without token and from non-local origins.
 
 ## Step 8 — Hardening review
