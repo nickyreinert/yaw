@@ -57,7 +57,7 @@ All via `gh` CLI, wrapped as `just gh-*` recipes; agents use these instead of ad
 | `gh-init` | Create repo (public/private), push, set default branch, labels, PR template | yes (creates remote) |
 | `gh-labels` | Create or update the labels of `.yaw/github.yaml` (never deletes; no `type:*` label where the repo has the native issue type) | yes |
 | `gh-issue <type> "title"` | Create an issue: native issue type if the repo has it, else the `type:*` label (doc 14 §1) | no |
-| `gh-protect` | Apply branch protection: required check name from CI, PR review count, no force-push; verifies afterwards | yes |
+| `gh-protect` | Apply branch protection: required check name from CI, PR review count, no force-push; verifies afterwards. `--verify` only compares (team mode adds `pr-policy`, ADR-0031) | yes (`--verify`: no) |
 | `branch <T-id> <slug>` | `feat/T-012-invite-flow` from up-to-date main | no |
 | `commit` | Conventional Commit with task ID footer; runs git hooks | no |
 | `pr` | Push branch, open/update PR with template filled (summary, checks run, ADR IDs, migration notes) | push yes (first time) |

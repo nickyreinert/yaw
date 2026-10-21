@@ -10,8 +10,15 @@ export async function task({ values, positionals, io }) {
   if (!enabledModules(manifest).includes('tasks')) throw new UsageError('the tasks module is not installed; run: yaw add tasks');
   const lib = await import(pathToFileURL(join(io.kitRoot, 'modules', 'tasks', 'lib', 'cli.js')).href);
   const [verb, ...args] = positionals;
+  const mode = manifest.modules.tasks.mode ?? 'local';
+  // Team mode (ADR-0031): `start #n` also switches to or creates the issue branch; tasks does not import team.
+  let startBranch;
+  if (mode === 'github' && enabledModules(manifest).includes('team')) {
+    const team = await import(pathToFileURL(join(io.kitRoot, 'modules', 'team', 'lib', 'cli.js')).href);
+    startBranch = (number, sub) => team.startBranch({ number, io: sub });
+  }
   try {
-    return await lib.runTask({ verb, args, values, mode: manifest.modules.tasks.mode ?? 'local', io: { ...io, root: io.cwd } });
+    return await lib.runTask({ verb, args, values, mode, io: { ...io, root: io.cwd, startBranch } });
   } catch (e) {
     if (e instanceof lib.TaskUsageError) throw new UsageError(`${e.message}\n${lib.USAGE}`);
     throw e;

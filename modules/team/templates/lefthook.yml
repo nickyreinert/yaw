@@ -1,0 +1,19 @@
+# Team mode (team module, ADR-0031): every commit names its issue; nobody pushes to the default branch.
+commit-msg:
+  jobs:
+    - name: issue-reference
+      run: |
+        msg="{1}"
+        # Messages git writes itself (merge, revert) and fixup/squash commits pass; the rest needs "#<n>".
+        if head -n 1 "$msg" | grep -Eq '^(Merge |Revert "|fixup! |squash! |amend! )'; then exit 0; fi
+        if grep -v '^#' "$msg" | grep -Eq '#[0-9]+'; then exit 0; fi
+        echo 'team mode: the commit message names no issue; add "Refs #<n>" (just commit adds it)' >&2
+        exit 1
+pre-push:
+  jobs:
+    # A script, not `run`: lefthook skips `run` jobs on pre-push when the push brings no new files
+    # (git push origin feat/34-x:main after the branch was pushed), a script always runs.
+    - name: no-push-to-default-branch
+      script: yaw-default-branch.sh
+      runner: sh
+      use_stdin: true

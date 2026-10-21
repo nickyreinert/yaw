@@ -42,17 +42,24 @@ Skills and recipes (agent-agnostic, `just gh-*`):
 
 ## 2. Enforcement: no change without issue, no PR without issue
 
-Defence in depth; only the last two layers are binding for every agent and every human.
+Defence in depth; the agent rules are guidance, the git hooks bind locally (they can be skipped with `--no-verify`), and `pr-policy` plus the ruleset bind every agent and every human.
 
 | Layer | Rule | Applies to |
 |---|---|---|
-| Agent hook (`PreToolUse` on edit tools, Codex `apply_patch`, Copilot `preToolUse`, Gemini `BeforeTool`, Pi `tool_call`, Hermes `pre_tool_call`) | Deny edits while on the default branch or on a branch without an issue number: *"Run `just task start <#>` first."* | agents |
-| Agent hook (`PreToolUse` on shell) | Deny `git commit` / `git push` to the default branch, `--force` to shared branches | agents |
+| Agent rules (`AGENTS.md`; guidance only, ADR-0031) | Work only on an issue branch: *"Run `just task start <#>` first."* No agent-side `PreToolUse` command guard in phase 1 (decided by the user); the binding layers are the next three | agents |
+| Agent rules (`AGENTS.md`; guidance only) | No `git commit` / `git push` to the default branch, no `--force`, no `--no-verify` | agents |
 | Git hooks (`lefthook`) | `commit-msg`: requires `#<n>` or `Refs #<n>`; `pre-push`: refuses pushing to the default branch | everyone locally |
 | CI required check `pr-policy` | PR links an issue (`closingIssuesReferences` non-empty), linked issue passes Definition of Ready, branch name matches, phase rules (section 4). Phase 1 enforces only "PR links an open issue"; the rest comes in phase 2 | everyone |
 | Branch protection / rulesets | PR required, N approvals, required checks (`quality-gate`, `pr-policy`), no force-push, optional linear history | everyone |
 
-`just gh-protect` applies and verifies the rulesets (guarded action, needs repo admin).
+`just gh-protect` applies and verifies the rulesets (guarded action, needs repo admin); `just gh-protect --verify` only compares the ruleset on GitHub with `.yaw/github.yaml` and needs no confirmation.
+
+Phase 1 (ADR-0031) builds these layers as the `team` module (preselected in Standard and Full for a team; depends on `tasks`, `github`, `git-hooks`):
+
+- **Security boundary (decided by the user, ADR-0031):** the GitHub ruleset (`just gh-protect`: pull request required, no force push, no deletion, no bypass actors) plus `pr-policy` plus lefthook. The agent-side rules in `AGENTS.md` are guidance only; there is no agent-side command guard and no edit lock.
+- `commit-msg` accepts `#<n>` anywhere outside comment lines and lets git's own merge and revert messages and `fixup!` / `squash!` commits pass. `pre-push` is a lefthook script (`.lefthook/pre-push/`), because lefthook skips `run` jobs on pre-push when no new files are pushed; creating the default branch (the first push of a new repository) is allowed.
+- `pr-policy` (`.github/workflows/pr-policy.yml`, job `pr-policy`, read-only token, no checkout, no third-party action) reads `closingIssuesReferences` and needs an open issue of the same repository; GitHub fills it only for pull requests into the default branch. `requiredChecks` in `.yaw/github.yaml` gains `pr-policy` while the module is installed.
+- `just task start <#>` assigns the issue and switches to its branch, or creates `<type>/<#>-<slug>` from the fresh default branch (`fix/` for `type:bug`). Project Status, worktree and session link stay later (issue #110).
 
 ## 3. Session start in a team
 
@@ -63,16 +70,16 @@ A `SessionStart` hook (or equivalent per agent) runs `yaw session-start`, which:
    - on default branch, clean, behind → `git pull --ff-only` automatically;
    - on a feature branch, behind its upstream → `git pull --ff-only` if possible;
    - default branch moved ahead of the feature branch → report "N commits behind main", suggest `just sync` (rebase or merge per team ADR); never automatic;
-   - dirty tree or diverged → no automatic action; a lock flag makes the edit guard deny edits until `just sync` resolves it.
+   - dirty tree or diverged → no automatic action; the user is told (information, not a lock: ADR-0031 has no agent-side guard, so phase 1 has no lock flag; `just sync` is not built in phase 1).
 3. Shows the user (zero tokens, `systemMessage` or terminal):
    - my open issues sorted by priority and iteration, with estimate and target date;
    - PRs waiting for my review; my PRs with failing checks or requested changes;
-   - current milestone/phase, days to the next gate, freeze status.
-4. Gives the model a compact version (≤ 10 lines, once per session, configurable off): active issue, branch status, phase rules.
+   - current milestone/phase, days to the next gate, freeze status (phase 2, with the launch plan; phase 1 shows each issue's milestone and due date, sorted by the `priority:` label, with the `estimate:` label; iteration and Project fields come later).
+4. Gives the model a compact version (once per session, configurable off with `team.session-context`): in phase 1 only the active issue (number, title, branch), one line, because BUILD.md rule 5 allows no other model-visible output; branch status and phase rules go to the user.
 
-`gh` results are cached for 5 minutes in `~/.yaw/cache/` to keep startup fast; the hook fails open when offline (shows "offline, last sync …").
+`gh` results are cached for 5 minutes in `~/.yaw/cache/` to keep startup fast; the hook fails open when offline (shows "offline, last sync …"). The fetch and the three `gh` reads have time limits so the hook ends within its 10-second timeout.
 
-Agent support: Claude `SessionStart` (runs in background, context reaches the first turn), Codex `SessionStart`, Copilot `sessionStart` (`additionalContext`), Gemini/Antigravity `SessionStart`, Pi `session_start` + `before_agent_start`, Hermes `on_session_start` + `pre_llm_call`. Fallback: `just start` as the documented first command.
+Agent support: Claude `SessionStart` (runs in background, context reaches the first turn), Codex `SessionStart`, Copilot `sessionStart` (`additionalContext` only: the active issue, no user message, so no sync either), Gemini/Antigravity `SessionStart`, Pi `session_start` + `before_agent_start`, Hermes `on_session_start` + `pre_llm_call`. Fallback: `just start` as the documented first command.
 
 ## 4. Launch plan and milestone strategy (phase 2)
 

@@ -4,7 +4,7 @@ A module is a folder in `modules/` with a `module.yaml`. It owns its questions, 
 
 ## 1. Catalogue and mode defaults
 
-Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; ADR-0009 adds it to BD5); **Standard** = Quick + `git-hooks`, `github`, `ci`, `decisions`, `security` (minimal), `sessions`, `comfort` (hygiene + status line); **Full** = Standard + the F questions and team-mode options. Modules in the table that are in none of these lists (`quality-code`, `performance`, `business-logic`, `ui-design`, `privacy`, `backup`, `environments`, `vendors`, `knowledge`, `dashboard`, `evaluation`, `remote`) are phase 2 or 3.
+Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; ADR-0009 adds it to BD5); **Standard** = Quick + `git-hooks`, `github`, `ci`, `decisions`, `security` (minimal), `sessions`, `comfort` (hygiene + status line), and `team` when the project is a team (ADR-0031); **Full** = Standard + the F questions and team-mode options. Modules in the table that are in none of these lists (`quality-code`, `performance`, `business-logic`, `ui-design`, `privacy`, `backup`, `environments`, `vendors`, `knowledge`, `dashboard`, `evaluation`, `remote`) are phase 2 or 3.
 
 | Module | Purpose | Quick | Standard | Full | Depends |
 |---|---|:-:|:-:|:-:|---|
@@ -28,6 +28,7 @@ Phase 1 (ADR-0009): **Quick** = `core`, `communication`, `standards`, `devenv`, 
 | `vendors` | Service catalogue, key onboarding, `.env` wiring | – | if needed | if needed | devenv |
 | `comfort` | Session hygiene, status line, notifications, cache reminder (doc 11; ADR-0030: personal settings in `~/.yaw/comfort.yaml`, cache reminder is phase 2) | – | hygiene + status line | asked | core |
 | `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | ✔ | tasks |
+| `team` | Team mode (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team | if team | tasks, github, git-hooks |
 | `knowledge` | Global knowledge store recall + `/remember` (doc 12) | – | if set up | if set up | decisions |
 | `dashboard` | Local UI, OTel receiver, metrics store (doc 13) | – | ✔ | ✔ | sessions |
 | `evaluation` | Session outcome classification, tier 1/2/3 (doc 13) | – | tier 1 | tier 1 | sessions |

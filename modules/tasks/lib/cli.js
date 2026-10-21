@@ -106,6 +106,8 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         gh(['issue', 'edit', String(n), '--add-assignee', '@me']);
         stdout.write(`#${n} assigned to you\n`);
         refresh();
+        // Team mode (ADR-0031): the issue branch, from the team module (io.startBranch is set only there).
+        if (io.startBranch) await io.startBranch(n, { ...io, gh });
         return 0;
       }
       case 'log': {

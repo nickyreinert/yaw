@@ -1,6 +1,6 @@
 // Shared-file composition (ADR-0004).
 //
-// A shared file is written by several modules. One owner module (always `core` in phase 1) renders
+// A shared file is written by several modules. One owner module (`core`; `git-hooks` for lefthook.yml) renders
 // the whole file from the parts of every enabled module: the owner's own template is the frame,
 // every other part sits in a block marked with its module name. Each non-owner module's part is
 // recorded as a fragment with its hash (manifest files[].fragments). Adding or removing a module
@@ -18,6 +18,8 @@ export const SHARED_FILES = {
   '.github/pull_request_template.md': { owner: 'core', style: 'markdown' },
   '.claude/settings.json': { owner: 'core', style: 'json' },
   '.codex/hooks.json': { owner: 'core', style: 'json' },
+  // git-hooks renders the frame (pre-commit); the team module adds commit-msg and pre-push as top-level keys (ADR-0031).
+  'lefthook.yml': { owner: 'git-hooks', style: 'lines' },
 };
 
 export class ComposeError extends Error {
