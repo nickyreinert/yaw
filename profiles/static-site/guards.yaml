@@ -1,0 +1,5 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: remote-deploy, pattern: "\\b(wrangler\\s+pages\\s+deploy|netlify\\s+deploy|vercel\\s+deploy|vercel\\s+--prod|rsync\\b.*\\w@\\S+:)", reason: Deploying the site to a remote host needs your approval. }
+  - { id: npm-publish, pattern: "\\bnpm\\s+publish\\b", reason: Publishing to the npm registry needs your approval. }

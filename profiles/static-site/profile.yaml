@@ -1,0 +1,11 @@
+# profiles/static-site/profile.yaml
+# Narrow on purpose: a public site on a web host. Language is not a signal (plain HTML has none).
+name: static-site
+summary: Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.
+suggestWhen:
+  public: [true]
+  runsOn: [self-hosted, serverless, edge]
+  hasUI: [true]
+defaults:
+  modules: { devenv: false, ui-design: true, backup: false }
+requires: [node>=22.13, just]

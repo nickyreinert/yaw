@@ -1,16 +1,17 @@
-// Profiles python-cli (Y-3.4) and node-cli (Y-3.5): parts, uniform verbs, and the smoke test per
+// Profiles python-cli (Y-3.4), node-cli (Y-3.5) and static-site (Y-6.1): parts, uniform verbs, and the smoke test per
 // examples/<profile>/ (init in a temp dir, then just setup && just check).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
 import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
+import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'python-cli'];
+const PROFILES = ['node-cli', 'python-cli', 'static-site'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -18,7 +19,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles python-cli and node-cli, and profile.yaml validates', () => {
+test('the kit has exactly the profiles node-cli, python-cli and static-site, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -148,4 +149,42 @@ test('smoke python-cli: yaw init, just setup && just check pass (needs uv and ne
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /1 passed/);
   assert.match(r.stdout, /verified: just setup and just check passed/);
+});
+
+test('static-site: suggested for a serverless/edge/self-hosted site, not for a local tool', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  assert.equal(suggestProfiles(profiles, { runsOn: 'serverless', hosted: true }).suggestion, 'static-site');
+  assert.equal(suggestProfiles(profiles, { language: 'javascript', runsOn: 'local' }).suggestion, 'node-cli');
+  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'local' }).suggestion, 'python-cli');
+});
+
+test('static-site: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('static-site', env, ['--skip-verify']);
+  for (const verb of ['screenshot', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'fmt', 'typecheck', 'build']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
+  assert.equal(deploy.status, 0);
+  assert.match(deploy.stdout, /deploy: not applicable/);
+});
+
+const staticSkip = (!haveJust && 'just is not installed') || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
+
+test('smoke static-site: yaw init, just setup && just check pass; broken pages fail the gate (needs npm and network)', { skip: staticSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('static-site', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /check-links: 1 page\(s\)/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'static-site');
+  const page = join(cwd, 'public', 'bad.html');
+  copyFileSync(join(fixtures, 'invalid.html'), page);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'invalid HTML fails just lint');
+  copyFileSync(join(fixtures, 'broken-link.html'), page);
+  const links = run('just', ['test'], { cwd });
+  assert.notEqual(links.status, 0, 'a broken link fails just test');
+  assert.match(links.stderr, /bad\.html: broken link "missing\.html"/);
 });

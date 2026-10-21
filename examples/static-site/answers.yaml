@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile static-site (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A landing page for my bakery.
+  idea.team: solo
+  arch.language: auto
+  arch.runs-on: serverless
+proposal:
+  status: confirmed
+  summary: static-site - Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.
+  profiles: [static-site]
+  modules: [core]
