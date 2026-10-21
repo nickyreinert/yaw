@@ -158,6 +158,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0032 | Setup depth: Quick and Full (Standard merged into Full, `standard` alias with unchanged output); mode controls generated output; Full gates `github` / `ci` by GitHub use; hooks and skills per mode; mode = starting depth, `yaw add` keeps it; 80-line `AGENTS.md` test for Full; question 1.3 → choice (step 7). Amends ADR-0009 | P6 (Y-5.10, B rule 10) | Step 5.10 | Written, Proposed (Y-5.10 ADR PR) |
 | 0033 | `code-map` module: maintained `docs/code-map.md` (front-matter declarations, marked generated sections, maintained text preserved, `managed: false`), out-of-tree per-worktree cache, `yaw map update` / `check` (read-only) / `show` (bounded), `map-check` gate, lefthook `pre-commit` job via the `git-hooks` frame, CI through `just check`, no agent hook, path safety, mechanical vs. semantic review. Extends ADR-0019 | Y-5.11 (B rule 10) | Step 5.11 | Written, Proposed (Y-5.11 ADR PR) |
 | 0034 | `static-site` profile: pinned linters (html-validate 10.0.0 for Node 22.13), `npm audit --omit=dev`, narrow `suggestWhen`, per-profile CI job | Y-6.1 (B rule 10) | Step 6 | Written, Proposed (Y-6.1 PR) |
+| 0035 | `python-web` profile: FastAPI scaffold without database, gate without Docker (ruff, bandit, pyright, pytest, pip-audit), language-only `suggestWhen`, per-profile CI job | Y-6.2 (B rule 10) | Step 6 | Written, Proposed (Y-6.2 PR) |
 
 ---
 
@@ -275,7 +276,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 |---|---|---|---|---|---|
 | Y-6 | Step 6: remaining profiles | Epic | P1 | Y-5 | All 9 profiles green in the CI matrix (`yaw init` + `just check`) |
 | Y-6.1 | `static-site` (#61, ADR-0034) | Feature | P1 | Y-3.4 | **done**: profile (html-validate, stylelint, local link check; Lighthouse budget and screenshot not included), fixtures in `test/profiles/static-site/`, smoke test in `test/profiles.test.js`, CI matrix job `profile` in `kit-ci.yml` |
-| Y-6.2 | `python-web` | Feature | P1 | Y-3.4 | same |
+| Y-6.2 | `python-web` (#62, ADR-0035) | Feature | P1 | Y-3.4 | **done**: FastAPI profile (ruff + bandit, pyright, pytest, pip-audit, Dockerfile; no database, alembic, compose or screenshot yet), fixtures in `test/profiles/python-web/`, smoke test in `test/profiles.test.js`, `python-web` in the CI matrix job `profile` |
 | Y-6.3 | `node-ts-vercel` | Feature | P1 | Y-3.4 | same |
 | Y-6.4 | `php-web` | Feature | P2 | Y-3.4 | same |
 | Y-6.5 | `wordpress-plugin` | Feature | P2 | Y-3.4 | same; `wp-env` in CI |

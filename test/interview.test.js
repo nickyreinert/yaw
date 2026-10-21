@@ -99,13 +99,13 @@ test('facts come only from answers that exist; auto leaves a fact unknown', () =
 
 test('suggestion: the unique best match; ties, contradictions and unknown facts give none', () => {
   const profiles = listProfiles(KIT_ROOT);
-  assert.deepEqual(profiles.map((p) => p.name), ['node-cli', 'python-cli', 'static-site']);
+  assert.deepEqual(profiles.map((p) => p.name), ['node-cli', 'python-cli', 'python-web', 'static-site']);
   const pick = (answers) => suggestProfiles(profiles, deriveFacts(answers)).suggestion;
   assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'local' }), 'node-cli');
   assert.equal(pick({ 'arch.language': 'typescript', 'arch.runs-on': 'auto' }), 'node-cli');
   assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'local' }), 'python-cli');
   assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'local' }), null, 'both match one fact: a tie');
-  assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
+  assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
   assert.equal(pick({}), null);
 });
 
