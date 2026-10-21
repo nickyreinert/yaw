@@ -1,6 +1,8 @@
 {
   "permissions": {
     "ask": [
+      "Bash(yaw gh:*)",
+      "Bash(node *yaw gh:*)",
       "Bash(just gh-init:*)",
       "Bash(just gh-labels:*)",
       "Bash(just gh-protect:*)",

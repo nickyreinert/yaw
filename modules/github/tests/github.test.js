@@ -13,6 +13,7 @@ import { schemas } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, readAnswers, removeModule, updateProject } from '../../../core/render/project.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
+import { GUARDED } from '../lib/cli.js';
 import { branchName, checkIdForMode, parseTaskId, prBody, commitMessage, slugify, taskFromBranch } from '../lib/names.js';
 
 const MODULES = ['core', 'security', 'tasks', 'github'];
@@ -301,8 +302,8 @@ test('labels: creates the missing ones, skips type labels that exist as native i
   assert.equal(third.code, 0, third.err);
   const writes = fallback.writes().map((c) => c.args.join(' '));
   assert.deepEqual(writes, [
-    'label create type:feature --color 1D76DB --description Feature',
-    'label edit type:bug --color D73A4A --description ',
+    'label create --color 1D76DB --description Feature -- type:feature',
+    'label edit --color D73A4A --description  -- type:bug',
   ]);
   assert.match(third.out, /1 created, 1 updated/);
 });
@@ -612,7 +613,7 @@ test('init: private by default, public only when asked, refuses an existing orig
   const r = await yaw(root, ['init', 'demo', '--owner', 'octo', '--yes'], { gh, env });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(gh.calls.find((c) => c.args[1] === 'create' && c.args[0] === 'repo').args, ['repo', 'create', 'octo/demo', '--private', '--source', '.', '--remote', 'origin', '--push']);
-  assert.ok(gh.calls.some((c) => c.args.join(' ').startsWith('label create type:feature')), 'labels follow');
+  assert.ok(gh.calls.some((c) => c.args.join(' ').endsWith('-- type:feature')), 'labels follow');
 
   const pub = fakeGh();
   const noPublic = await yaw(root, ['init', 'demo', '--public'], { gh: pub, env });
@@ -725,4 +726,28 @@ test('an edited github.yaml survives update and removal asks (keep)', async () =
   writeConfig(root, `${read(root, '.yaw/github.yaml')}# mine\n`);
   await updateProject({ root, kitRoot: KIT_ROOT, strategy: 'keep' });
   assert.match(read(root, '.yaw/github.yaml'), /# mine/);
+});
+
+test('the Claude ask rules cover every guarded verb, however yaw is called', async () => {
+  const ask = JSON.parse(read(await project(), '.claude/settings.json')).permissions.ask;
+  const covered = (cmd) => ask.some((r) => {
+    const m = /^Bash\((.*):\*\)$/.exec(r);
+    if (!m) return false;
+    const re = new RegExp(`^${m[1].replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}`);
+    return re.test(cmd);
+  });
+  for (const verb of GUARDED) {
+    for (const cmd of [`yaw gh ${verb} --yes`, `yaw gh --yes ${verb}`, `node /home/u/.yaw/kit/bin/yaw gh ${verb} --yes`, `node ~/.yaw/kit/bin/yaw gh --yes ${verb}`]) {
+      assert.ok(covered(cmd), cmd);
+    }
+  }
+  assert.ok(!covered('git status'));
+});
+
+test('a label name that looks like a flag is passed after --', async () => {
+  const { root, env } = await repo();
+  writeConfig(root, 'labels:\n  - { name: "--force", color: D73A4A }\n');
+  const gh = fakeGh();
+  assert.equal((await yaw(root, ['labels', '--yes'], { gh, env })).code, 0);
+  assert.deepEqual(gh.writes()[0].args, ['label', 'create', '--color', 'D73A4A', '--description', '', '--', '--force']);
 });

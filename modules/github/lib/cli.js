@@ -35,6 +35,8 @@ export const CONFIG = '.yaw/github.yaml';
 export const PR_TEMPLATE = '.github/pull_request_template.md';
 export const WORKFLOW = '.github/workflows/quality-gate.yml';
 export const RULESET = 'yaw-default-branch';
+// Verbs that change shared GitHub state (pr only on its first push); the Claude ask rules must cover each one.
+export const GUARDED = ['init', 'labels', 'protect', 'project-add', 'release', 'pr'];
 export const VERBS = ['init', 'labels', 'protect', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add', 'issue'];
 export const USAGE = [
   'usage: yaw gh init [name] [--owner o] [--public] [--yes]          create the repository (private by default), push, labels',
@@ -240,8 +242,8 @@ async function labels(c) {
       'labels are never deleted',
     ]);
   }
-  for (const l of create) gh(['label', 'create', l.name, '--color', l.color, '--description', l.description ?? '']);
-  for (const l of edit) gh(['label', 'edit', l.name, '--color', l.color, '--description', l.description ?? '']);
+  for (const l of create) gh(['label', 'create', '--color', l.color, '--description', l.description ?? '', '--', l.name]);
+  for (const l of edit) gh(['label', 'edit', '--color', l.color, '--description', l.description ?? '', '--', l.name]);
   stdout.write(`labels: ${create.length} created, ${edit.length} updated\n`);
   return 0;
 }
