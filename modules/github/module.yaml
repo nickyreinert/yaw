@@ -3,8 +3,8 @@ name: github
 description: Recipes for the GitHub side of a project (repo, labels, branch, commit, pull request, release, ruleset, project board, issues with native type or label), a PR template and .yaw/github.yaml; guarded actions need explicit authorisation.
 depends: [core]
 default: { quick: false, standard: true, full: true }
-# Relevance (ADR-0032): off when the user says they do not use GitHub; team projects always use it (facts.github).
-appliesTo: { github: true }
+# Relevance (ADR-0032): off when the user says they do not use GitHub; team projects always use it (facts.usesGitHub).
+appliesTo: { usesGitHub: true }
 questions:
   - id: tasks.use-github
     ref: "10.2"

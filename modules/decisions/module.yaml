@@ -31,7 +31,7 @@ outputs:
         codex: { support: native, via: "SessionStart additionalContext (≤ 5 lines: ID + title)" }
         copilot: { support: none, note: "no SessionStart context from this module; AGENTS.md rule + just decisions recall" }
 agentsMd: |
-  - Decision retrieval: `just decisions recall "<the task in one line>"` (add `--path <file>`); apply matching decisions and cite their IDs or say none applied. Record lasting choices and risks with `just decisions record ...` (`just decisions` lists options); `.decisions/*.md` are the truth, run `just decisions rebuild` after hand edits.
+  - Decision retrieval: `just decisions recall "<the task in one line>"` (add `--path <file>`); apply matching decisions and cite their IDs or say none applied. Record lasting choices and risks with `just decisions record ...` (`just decisions` lists options); change a decision by superseding it, never by editing; `.decisions/*.md` are the truth, run `just decisions rebuild` after hand edits.
 agents:
   claude:  { support: native, via: "critical decisions at SessionStart; AGENTS.md rule + just decisions recall; recall note per prompt" }
   codex:   { support: native, via: "critical decisions at SessionStart; AGENTS.md rule + just decisions recall; recall note per prompt; hooks must be trusted via /hooks" }

@@ -3,7 +3,7 @@ name: ci
 description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and a Dependabot config that keeps the pinned action versions current.
 depends: [github]
 default: { quick: false, standard: true, full: true }
-appliesTo: { github: true }
+appliesTo: { usesGitHub: true }
 questions: []
 outputs:
   templates: [.github/workflows/quality-gate.yml, .github/dependabot.yml]
