@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
@@ -151,11 +151,40 @@ test('smoke python-cli: yaw init, just setup && just check pass (needs uv and ne
   assert.match(r.stdout, /verified: just setup and just check passed/);
 });
 
-test('static-site: suggested for a serverless/edge/self-hosted site, not for a local tool', () => {
+test('static-site is never auto-suggested (empty suggestWhen); other profiles keep their suggestion', () => {
   const profiles = listProfiles(KIT_ROOT);
-  assert.equal(suggestProfiles(profiles, { runsOn: 'serverless', hosted: true }).suggestion, 'static-site');
+  for (const facts of [{ runsOn: 'serverless', hosted: true }, { language: 'python', runsOn: 'self-hosted', hosted: true }, { public: true, runsOn: 'edge' }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'static-site'), JSON.stringify(facts));
+  }
   assert.equal(suggestProfiles(profiles, { language: 'javascript', runsOn: 'local' }).suggestion, 'node-cli');
   assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'local' }).suggestion, 'python-cli');
+});
+
+test('static-site check-links: refuses targets outside public/ without reading them, strips queries, decodes paths', () => {
+  const cwd = tmp('yaw-links-');
+  const script = join(KIT_ROOT, 'profiles', 'static-site', 'scaffold', 'scripts', 'check-links.mjs');
+  const page = (body) => `<!DOCTYPE html><html lang="en"><head><title>t</title></head><body>${body}</body></html>`;
+  mkdirSync(join(cwd, 'site', 'public'), { recursive: true });
+  mkdirSync(join(cwd, 'outside'));
+  writeFileSync(join(cwd, 'outside', 'o.html'), page('<p id="nope">x</p>'));
+  const root = join(cwd, 'site');
+  const check = () => run(process.execPath, [script], { cwd: root });
+
+  writeFileSync(join(root, 'public', 'index.html'), page('<a href="../../outside/o.html#nope">o</a>'));
+  const out = check();
+  assert.notEqual(out.status, 0);
+  assert.match(out.stderr, /points outside public\//);
+
+  symlinkSync(join(cwd, 'outside', 'o.html'), join(root, 'public', 'link.html'));
+  writeFileSync(join(root, 'public', 'index.html'), page('<a href="link.html">l</a>'));
+  assert.match(check().stderr, /link\.html: symlinked pages are not checked/);
+  assert.match(check().stderr, /index\.html: link "link\.html" points outside public\//);
+  unlinkSync(join(root, 'public', 'link.html'));
+
+  writeFileSync(join(root, 'public', 'a b.html'), page('<h1 id="top">t</h1>'));
+  writeFileSync(join(root, 'public', 'index.html'), page('<a href="a%20b.html?x=1#top">ok</a>'));
+  const ok = check();
+  assert.equal(ok.status, 0, ok.stderr);
 });
 
 test('static-site: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
