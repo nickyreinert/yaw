@@ -1,0 +1,20 @@
+[
+  {
+    "body": "<!-- yaw:task T-012 -->\n\n**Brief:** Host creates 9-digit token, guest joins with token + name.\n\n_Mirrored from TASKS.md by yaw (one way). Edit the task there; changes here are overwritten._",
+    "number": 34,
+    "state": "OPEN",
+    "title": "Online invite flow"
+  },
+  {
+    "body": "<!-- yaw:task T-009 -->\n\n_Mirrored from TASKS.md by yaw (one way). Edit the task there; changes here are overwritten._",
+    "number": 30,
+    "state": "CLOSED",
+    "title": "Lobby screen"
+  },
+  {
+    "body": "Crash when the token is empty.",
+    "number": 40,
+    "state": "OPEN",
+    "title": "Bug: empty token crashes the host"
+  }
+]

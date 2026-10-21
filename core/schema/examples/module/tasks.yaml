@@ -21,11 +21,10 @@ outputs:
   hooks:
     - name: stop-resume-point
       event: Stop
-      kind: guard
-      tokenCost: low
+      kind: comfort
+      tokenCost: none
     - name: session-start-task
       event: SessionStart
-      matcher: clear
       kind: context
       tokenCost: low
   just: just/tasks.just
@@ -33,8 +32,8 @@ agentsMd: |
   - Start of session: read *Active* in `TASKS.md` and continue from the resume point.
   - On stop: append a journal line and update the resume point.
 agents:
-  claude:  { support: native, via: "Stop hook + SessionStart re-injection" }
-  codex:   { support: native, via: "Stop hook + SessionStart re-injection" }
+  claude:  { support: native, via: "Stop reminder + SessionStart re-injection" }
+  codex:   { support: native, via: "Stop reminder + SessionStart re-injection" }
   copilot: { support: partial, note: "resume point is an AGENTS.md rule (tier 2)" }
 tokenCost: low
 lastVerified: 2026-10-20

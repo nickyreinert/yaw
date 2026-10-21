@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { parseDocument, stringify } from '../lib/yaml.js';
 import { matchFacts } from '../interview/facts.js';
 import { formatError } from '../lib/schema.js';
+import { tasksMode } from '../lib/tasks.js';
 import { BASE_DIR, MANIFEST, hashContent, pruneEmptyDirs, readProjectFile, writeAtomic } from './files.js';
 import { compareVersions, hasModule, kitVersion, loadModule, renderModules, renderProfiles, schemas, templateContext, KIT_ROOT } from './kit.js';
 import { deleteManifest, readManifest, writeManifest } from './manifest.js';
@@ -46,6 +47,14 @@ function checkKitNotOlder(manifest, kitRoot) {
   }
 }
 
+// Manifest entry of an enabled module. `tasks` records the effective task mode (BD4, ADR-0010), which hooks
+// and `yaw task` read; it follows the answers on every update.
+function moduleEntry(name, existing, answers) {
+  const entry = { ...(existing ?? { enabled: true }) };
+  if (name === 'tasks') entry.mode = tasksMode(answers);
+  return entry;
+}
+
 // Render `modules` and reconcile the project with the result; writes files, bases and the manifest.
 // Used by update (same modules), remove (one fewer) and, later, add (one more).
 export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, ...options }) {
@@ -59,7 +68,8 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
   if (answers) result.files = result.files.map((f) => (f.path === ANSWERS ? { ...f, hash: hashContent(answers.text) } : f));
 
   const nextModules = {};
-  for (const m of modules) nextModules[m] = manifest.modules[m] ?? { enabled: true };
+  const answerMap = (answers?.doc ?? readAnswers(root)).answers;
+  for (const m of modules) nextModules[m] = moduleEntry(m, manifest.modules[m], answerMap);
   for (const [m, entry] of Object.entries(manifest.modules)) if (!entry.enabled && m !== removing) nextModules[m] = entry;
 
   if (modules.length === 0) {
@@ -168,7 +178,7 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
     preset: answersDoc.mode,
     agents,
     vendored: false,
-    modules: Object.fromEntries(modules.map((m) => [m, { enabled: true }])),
+    modules: Object.fromEntries(modules.map((m) => [m, moduleEntry(m, undefined, answersDoc.answers)])),
     mcpServers: [],
     files: [...result.files, answersEntry],
   });

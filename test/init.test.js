@@ -21,7 +21,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview for a local JavaScript tool.
-const INTERVIEW = ['', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', ''];
+const INTERVIEW = ['', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', ''];
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
@@ -47,12 +47,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core', 'communication', 'devenv', 'security', 'standards'],
+    modules: ['core', 'communication', 'devenv', 'security', 'standards', 'tasks'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + communication + standards + devenv + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
+  // Quick = core + communication + standards + devenv + tasks + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 13);
+  assert.equal(readManifest(dir).files.length, 15);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -65,7 +65,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', '', 'nope', '2', 'y']);
+  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '2', 'y']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
@@ -107,12 +107,12 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
-test('Quick footprint with security (ADR-0022): 14 files for Claude, 15 with Codex', async () => {
-  for (const [agents, count] of [['claude', 14], ['claude, codex', 15]]) {
+test('Quick footprint, complete after Y-5.3 (ADR-0009, ADR-0010): 16 files for Claude, 17 with Codex', async () => {
+  for (const [agents, count] of [['claude', 16], ['claude, codex', 17]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /modules: core, communication, devenv, security, standards/);
+    assert.match(r.out, /modules: core, communication, devenv, security, standards, tasks/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
     assert.equal(files.length, count, files.join(', '));
   }
@@ -148,10 +148,10 @@ test('an unknown profile and several profiles are refused with the choices', asy
 });
 
 test('modules the kit does not have yet are skipped with a note', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, tasks]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('modules: [core]', 'modules: [core, git-hooks]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /note: module "tasks" is not in this kit yet; skipped/);
+  assert.match(r.out, /note: module "git-hooks" is not in this kit yet; skipped/);
   assert.deepEqual(Object.keys(readManifest(r.cwd).modules), ['core']);
 });
 
