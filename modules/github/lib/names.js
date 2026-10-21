@@ -51,7 +51,8 @@ export function taskFromBranch(branch) {
 }
 
 // "<type>(<scope>): <subject>" plus the task footer ("Refs T-012" / "Refs #34"; doc 14 §2 commit-msg rule).
-export function commitMessage({ type, scope, subject, task }) {
+// trailers: extra "Key: value" lines (the sessions module's Agent-Session) in their own final paragraph.
+export function commitMessage({ type, scope, subject, task, trailers = [] }) {
   checkCommitType(type);
   if (scope !== undefined && !/^[a-z0-9][a-z0-9/-]{0,30}$/.test(scope)) throw new NameError(`invalid scope "${scope}" (lowercase letters, digits, - and /)`);
   const s = String(subject ?? '').trim();
@@ -59,7 +60,9 @@ export function commitMessage({ type, scope, subject, task }) {
   if (/[\u0000-\u001f\u007f]/.test(s)) throw new NameError('the commit subject must be one line without control characters');
   if (s.length > 100) throw new NameError(`the commit subject has ${s.length} characters; keep it under 100`);
   const head = `${type}${scope ? `(${scope})` : ''}: ${s}`;
-  return task ? `${head}\n\nRefs ${task.kind === 'issue' ? `#${task.id}` : task.id}` : head;
+  const message = task ? `${head}\n\nRefs ${task.kind === 'issue' ? `#${task.id}` : task.id}` : head;
+  const lines = trailers.filter((t) => typeof t === 'string' && /^[A-Za-z][A-Za-z-]*: [^\u0000-\u001f\u007f]+$/.test(t));
+  return lines.length > 0 ? `${message}\n\n${lines.join('\n')}` : message;
 }
 
 // Repository and owner names as GitHub accepts them.

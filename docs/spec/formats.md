@@ -84,7 +84,7 @@ Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against t
 
 ## Session registry (`~/.yaw/yaw.db`)
 
-Phase 1 has only `schema_migrations`, `sessions` and `session_links` (BD3). See `core/lib/db.js` and ADR-0018; fields follow doc 12 §4 (`tasks`, `decisions`, `commits`, `files` become `session_links` rows of that `kind`).
+Phase 1 has only `schema_migrations`, `sessions` and `session_links` (BD3). See `core/lib/db.js` and ADR-0018; fields follow doc 12 §4 (`tasks`, `decisions`, `commits`, `files` become `session_links` rows of that `kind`). The `sessions` module (ADR-0029) fills it: ids are `<agent>:<native id>`, `task` / `commit` / `file` links are written by its hooks, `Agent-Session: <id>` is the commit trailer, `resume` is informational (`yaw sessions resume` rebuilds the command).
 
 ## Decision journal (`.decisions/`)
 

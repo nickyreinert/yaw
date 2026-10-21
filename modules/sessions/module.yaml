@@ -1,0 +1,47 @@
+# modules/sessions/module.yaml (Y-5.7, ADR-0029): session registry in ~/.yaw/yaw.db, Agent-Session commit trailer,
+# /handoff skill (doc 12 §4, doc 11 §1, BD3).
+name: sessions
+description: Registry of agent sessions (title from the active task, tasks, commits, files) in ~/.yaw/yaw.db, an Agent-Session trailer on `just commit`, the /handoff skill, and `yaw sessions find / for / resume`.
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions: []
+outputs:
+  # .gitignore keeps .yaw/sessions/ (the opt-in export folder of doc 12) out of git; the registry itself is
+  # ~/.yaw/yaw.db, outside every repository.
+  templates: [.gitignore, justfile, just/sessions.just]
+  skills: [handoff]
+  hooks:
+    # Evaluation hooks: no output at all (BUILD.md rule 5, ADR-0007); they only write the registry.
+    - name: register
+      event: SessionStart
+      kind: evaluation
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "SessionStart, silent registry write" }
+        codex: { support: native, via: "SessionStart, silent registry write" }
+        copilot: { support: partial, via: "sessionStart, silent registry write", note: "payload fields confirmed by fixture only" }
+    - name: touch
+      event: Stop
+      kind: evaluation
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "Stop, silent registry write" }
+        codex: { support: native, via: "Stop, silent registry write" }
+        copilot: { support: partial, via: "agentStop, silent registry write", note: "verify with recorded fixtures" }
+    - name: end
+      event: SessionEnd
+      kind: evaluation
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "SessionEnd, silent registry write" }
+        codex: { support: none, note: "no SessionEnd event; the Stop hook stamps every turn" }
+        copilot: { support: none, note: "the Stop hook stamps every turn" }
+agentsMd: |
+  - Before `/clear` or a topic change run the `handoff` skill: it logs the resume point and records the session (`just sessions handoff`).
+  - `just commit` adds an `Agent-Session` trailer. To find the conversation behind a task, decision, commit or file: `just sessions for <T-012|ADR-0004|hash|path>`; by words: `just sessions find "<words>"`.
+agents:
+  claude:  { support: native, via: "SessionStart / Stop / SessionEnd registry hooks + /handoff skill + trailer" }
+  codex:   { support: native, via: "SessionStart / Stop registry hooks + /handoff skill + trailer; hooks must be trusted via /hooks" }
+  copilot: { support: partial, via: "/handoff skill + trailer; registry hooks run from .claude/settings.json", note: "hook payloads confirmed by fixtures only" }
+tokenCost: none
+lastVerified: 2026-10-21
