@@ -101,7 +101,8 @@ Technical spec: [reference/governance-blueprint.md](reference/governance-bluepri
 - Index fields added: `importance`, `status`, `supersedes`, `scope`, `reviewBy`, `embeddingModel`, `refs` (detail doc, spec, code symbol, issue, commit, session; see doc 12).
 - Short record is injected; optional detail doc in `.decisions/details/` is linked, not injected.
 - Single `embeddingText(entry)` recipe; `parseArgs` CLI; ID uniqueness check in `just check`.
-- Recall (ADR-0028, token-free per BD9): the agent runs `just decisions recall "<task>"` at task start (critical records always included, `--path` for path-aware recall); the `UserPromptSubmit` hook is comfort only, a `systemMessage` naming matching records for the user. No `SessionStart` or `PreToolUse` hook (both would be model-visible).
+- Hooks (ADR-0028, BUILD.md rule 5): `SessionStart` re-injects the critical decisions, capped at 5 lines of ID and title (no record bodies, nothing when none is critical; Claude and Codex). `UserPromptSubmit` recall is comfort only: a `systemMessage` naming matching records for the user. No `PreToolUse` hook; path-aware recall is `--path`.
+- Recall of full records: the agent runs `just decisions recall "<task>"` at task start (critical records always included). Copilot gets no `SessionStart` context from this module; for it the `AGENTS.md` rule and this command are the fallback.
 
 ### quality-code / security / performance / business-logic
 

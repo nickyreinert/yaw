@@ -151,7 +151,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0018 | Normalised hook event (no content) and session registry in `yaw.db` | H8, H10 | Step 1 | Proposed (PR #87) |
 | 0019 | Phase-1 CLI surface and step-2 command behaviour (flags, non-TTY rules, remove of edited files, minimal `init`, renderer details) | S2, S3 | Step 2 | Written, Proposed (PR #89) |
 | 0020 | `yaw init` vertical slice: profile files and ownership, scaffold, uniform verbs, suggestion, init pipeline, interview files, examples and CI | step 3 details (B rule 10) | Step 3 | Written, Proposed (Step 3 PR) |
-| 0028 | `decisions` module: record format, derived index, IDs, recall without model-visible hook output, gates in `just check`, path safety, migration of this repo | Y-5.6 details (B rule 10) | Step 5.6 | Written, Proposed (Y-5.6 PR) |
+| 0028 | `decisions` module: record format, derived index, IDs, capped critical decisions at SessionStart (BUILD.md rule 5) + agent-run recall, comfort prompt hook, gates in `just check`, path safety, migration of this repo | Y-5.6 details (B rule 10) | Step 5.6 | Written, Proposed (Y-5.6 PR) |
 
 ---
 

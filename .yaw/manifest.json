@@ -26,12 +26,12 @@
     {
       "path": ".claude/settings.json",
       "module": "core",
-      "hash": "sha256:51ac60295061924ac1faf251c8dacce24a8b1bf62740579404b97e453c6a2030",
+      "hash": "sha256:b01b90dd7d75cedae087287ae0065dd3e52f5277bf33c747a09e043646857545",
       "managed": true,
       "fragments": [
         {
           "module": "decisions",
-          "hash": "sha256:71dc601536d09eecca7907611e5943e8e4387871ddd37ef7741fe2e5684ebe37"
+          "hash": "sha256:c4920facde38e4a5caa5b5bd24e6480740ddca867e78c78281f8c99dd1e6810f"
         },
         {
           "module": "security",
@@ -42,12 +42,12 @@
     {
       "path": ".codex/hooks.json",
       "module": "core",
-      "hash": "sha256:36dfa931a17b172b4e2a734440b5b502a2a9fb96b3ae83e594602a9fb93ec6b9",
+      "hash": "sha256:701a308f6f5590085004e7db1fbd4a2f60f9700575e7bea87bcedc92fc500db1",
       "managed": true,
       "fragments": [
         {
           "module": "decisions",
-          "hash": "sha256:efb761c0f954104bb0962203e802cc2a0c7805794197c0ba84ef4277da240755"
+          "hash": "sha256:79d83adda491950c844a9f02f259830f4e3ee33689ad4cc74514004438e15c67"
         },
         {
           "module": "security",
