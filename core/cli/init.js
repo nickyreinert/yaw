@@ -37,6 +37,19 @@ async function chooseProfile({ prompter, profiles, suggestion }) {
   }
 }
 
+// Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full'
+async function chooseMode({ prompter }) {
+  prompter.show('\nSetup depth\n');
+  prompter.show('  1) quick - prototype or MVP: the essential baseline, short interview with defaults\n');
+  prompter.show('  2) full  - long-lived product: the tooling that applies to the project, all questions\n');
+  for (;;) {
+    const reply = (await prompter.ask('  Setup depth [quick] > ')).trim().toLowerCase();
+    if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
+    if (reply === '2' || reply === 'full') return 'full';
+    prompter.show('  choose quick or full\n');
+  }
+}
+
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
 function summaryAnswers(questions, given, defaulted) {
   const out = {};
@@ -127,11 +140,14 @@ export async function init({ values, positionals, io }) {
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
     io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default"). Nothing is written until you confirm.\n');
-    // Base questions plus the questions of the modules the mode preselects (ADR-0009: Quick asks the Q questions of its modules).
-    const questions = collectQuestions(kitRoot, selectModules({ kitRoot, mode: 'quick', facts: {} }));
-    const r = await runInterview({ questions, mode: 'quick', prompter: io.prompter, kitRoot });
+    const mode = await chooseMode({ prompter: io.prompter });
+    // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
+    // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
+    // not selected is hidden by its `when` (team.session-context needs idea.team = team).
+    const questions = collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } }));
+    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot });
     defaulted = new Set(r.defaulted);
-    answersDoc = { mode: 'quick', answers: r.answers };
+    answersDoc = { mode, answers: r.answers };
   }
 
   // profile and modules (rule-based, no LLM)

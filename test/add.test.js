@@ -65,7 +65,8 @@ test('--yes asks nothing and takes the defaults (listed as default)', async () =
   assert.equal(r.code, 0, r.stderr);
   assert.equal(r.prompter.asked.length, 0);
   assert.match(r.stdout, /answer quality\.level: low {2}\(default\)/);
-  assert.doesNotMatch(r.stdout, /quality\.detail/); // its `when` does not hold
+  assert.match(r.stdout, /not asked quality\.detail: applies only when quality\.level = high; the default is none {2}\(default\)/); // its `when` does not hold: listed, not dropped
+  assert.doesNotMatch(r.stdout, /answer quality\.detail/);
   assert.equal(read(root, 'extra/notes.md'), 'Level: low\n');
 });
 

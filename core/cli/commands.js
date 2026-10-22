@@ -103,6 +103,11 @@ export async function add({ values, positionals, io }) {
     }
   }
   io.stdout.write(`\nyaw add ${module}\n`);
+  // A question hidden by `when` (for example the team questions on a solo project) is listed, not dropped silently.
+  const seenAnswers = { ...answersDoc.answers, ...newAnswers };
+  for (const q of questions) {
+    if (!whenMatches(q.when, seenAnswers)) io.stdout.write(`  not asked ${q.id}: applies only when ${Object.entries(q.when).map(([k, v]) => `${k} = ${[].concat(v).join(' or ')}`).join(', ')}; the default is ${Array.isArray(q.default) ? q.default.join(', ') : String(q.default)}  (default)\n`);
+  }
   for (const [id, value] of Object.entries(newAnswers)) {
     io.stdout.write(`  answer ${id}: ${Array.isArray(value) ? value.join(', ') : String(value)}${defaulted.includes(id) ? '  (default)' : ''}\n`);
   }
