@@ -46,4 +46,6 @@ Pricing and free tiers change: every entry has `lastVerified`; the agent states 
 | Inventory | `docs/spec/secrets.md` lists names, purpose, environments, rotation note; never values |
 | Rotation | `just secret-rotate NAME` prints vendor steps and updates all environments in order |
 
+Saved setups (`~/.yaw/`, Y-7.2, ADR-0043): never hold secrets. A save is refused as a whole when an answer key contains a secret-type word (token, password, secret, apikey, credential) or a value matches the `secretValues` rules of `modules/security/guards.yaml` (token prefixes, private key blocks, JWT, bearer tokens, URL with password, `name=value` and `"name": "value"` for secret-like names, case-insensitive) or the `secretFiles` rules as a bare file name (`.env`). The message names key and rule, never the value, and the interview summary hides such a value. A secret typed into an answer is already in the project: `.yaw/answers.yaml`, `AGENTS.md` and `.yaw/base/AGENTS.md`; the message says so. Pattern rules miss bare random strings; secret entry is the secret flow below.
+
 The guided onboarding in the CLI lane uses a hidden input prompt; in the form lane, a password field posted only to the local server.

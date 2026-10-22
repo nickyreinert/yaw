@@ -16,6 +16,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/rule" }
     },
+    "secretValues": {
+      "description": "Secret values: pattern is matched against an answer value before the kit stores it in ~/.yaw (ADR-0043). Not used by the hooks.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    },
     "secretAllow": {
       "description": "File names that look like secret files but are not (e.g. .env.example); checked before secretFiles.",
       "type": "array",
@@ -38,6 +43,7 @@
       "properties": {
         "id": { "$ref": "common.schema.json#/$defs/name" },
         "pattern": { "type": "string", "minLength": 1 },
+        "flags": { "description": "Optional RegExp flags (secretValues rules use i).", "type": "string", "pattern": "^(?!.*(.).*\\1)[imsu]*$" },
         "reason": { "description": "One sentence shown to the agent when it is blocked.", "type": "string", "minLength": 1 }
       },
       "additionalProperties": false

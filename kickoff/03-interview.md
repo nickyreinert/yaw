@@ -10,6 +10,8 @@ Rules for the interviewer (CLI, form, or agent):
 
 ## 0. User profile (global, asked once, stored in `~/.yaw/user-profile.yaml`)
 
+Stored only after the opt-in at the end of the CLI interview (doc 02 §5, ADR-0043): the `user.*` answers of this table, merged into the file on every save.
+
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|
 | 0.0 | **Which coding agents should this setup support?** (first question after the setup depth, multi-select, per project; global default remembered) | **Claude Code** / Codex / Copilot / Gemini CLI (enterprise / API key) / Antigravity CLI / Pi / Hermes (phase 1: Claude Code, Codex, Copilot; others phase 3, shown as "not available yet" in the CLI) | Q | adapters, which customisation is generated, capability hints |

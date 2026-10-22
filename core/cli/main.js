@@ -17,6 +17,7 @@ import { map } from './map.js';
 import { sessions } from './sessions.js';
 import { hygiene, notify, statusline } from './comfort.js';
 import { sessionStart } from './team.js';
+import { presets } from './presets.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -46,7 +47,7 @@ export const COMMANDS = [
   { name: 'hygiene', args: '[status|on|off] [--all]', summary: 'session hygiene hints: show the state, switch them on or off (comfort module)', options: { all: { type: 'boolean' } }, run: hygiene },
   { name: 'notify', args: '[status|test|send] [--status done|input|failed] [--minutes N] [--summary text]', summary: 'notifications after long runs: show the channels, send a test or a message (comfort module)', options: { status: { type: 'string' }, minutes: { type: 'string' }, summary: { type: 'string' } }, run: notify },
   { name: 'statusline', args: '[--snippet]', summary: 'status line for Claude Code (reads its JSON on stdin; comfort module)', options: { snippet: { type: 'boolean' } }, run: statusline },
-  { name: 'presets', step: 7, summary: 'list, show and delete saved setups' },
+  { name: 'presets', args: 'list | show <name> | delete <name> [--yes]', summary: 'list, show and delete saved setups in ~/.yaw/presets/', options: { ...yes }, run: presets },
 ];
 
 export function usage() {

@@ -92,7 +92,7 @@ test('a dependency violation in proposal.modules is an error that names the miss
   const stderr = capture();
   const answers = writeAnswers(tmp('yaw-ans-'), 'mode: quick\nanswers:\n  user.agents: [claude]\nproposal:\n  status: confirmed\n  summary: s\n  profiles: [node-cli]\n  modules: [core, ci]\n');
   const cwd = tmp('yaw-proj-');
-  const code = await main(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd, kitRoot: KIT_ROOT, stdout, stderr, prompter: { ...scripted(), interactive: false } });
+  const code = await main(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd, env: { HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, stdout, stderr, prompter: { ...scripted(), interactive: false } });
   assert.equal(code, 1);
   assert.match(stderr.text(), /ci depends on github, which is not in the selected modules/);
 });
@@ -106,7 +106,7 @@ test('yaw add keeps the answers of earlier modules and takes the old answer as t
   const question = { id: 'quality.level', mode: 'Q', type: 'choice', label: 'Level?', choices: ['low', 'high'], default: 'low' };
   const kitRoot = makeKit(tmp('yaw-kit-'), { modules: { core: { templates: { 'AGENTS.md.tmpl': '# A\n' } }, extra: { depends: ['core'], questions: [question] } } });
   const root = tmp('yaw-proj-');
-  const yaw = async (args) => main(args, { cwd: root, kitRoot, stdout: capture(), stderr: capture(), prompter: { ...scripted(), interactive: false } });
+  const yaw = async (args) => main(args, { cwd: root, env: { HOME: tmp('yaw-home-') }, kitRoot, stdout: capture(), stderr: capture(), prompter: { ...scripted(), interactive: false } });
   const answers = writeAnswers(tmp('yaw-ans-'), 'mode: quick\nanswers:\n  user.agents: [claude]\n  quality.level: high\nproposal:\n  status: confirmed\n  summary: s\n  profiles: [node-cli]\n  modules: [core]\n');
   await initProject({ root, kitRoot, answersFile: answers });
   assert.equal(await yaw(['add', 'extra', '--yes']), 0);

@@ -22,6 +22,7 @@ import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { CODEX_HOOKS } from '../render/agents.js';
+import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose.
 async function chooseProfile({ prompter, profiles, suggestion }) {
@@ -69,15 +70,16 @@ function describeFacts(facts) {
   return parts.length > 0 ? parts.join(', ') : 'no facts known';
 }
 
-function printSummary(out, { mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
+function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
   out.write(`\nSummary (${mode} setup)\n`);
   out.write(`  profile: ${profile} (${how})\n`);
   out.write(`  modules: ${modules.join(', ')}\n`);
   for (const m of skippedModules) out.write(`  note: module "${m}" is not in this kit yet; skipped\n`);
   out.write('  answers:\n');
+  const hidden = new Set(secretFindings({ answers, kitRoot }).map((f) => f.key)); // a secret typed into an answer is not echoed (doc 08)
   const width = Math.max(...Object.keys(answers).map((k) => k.length));
   for (const [id, value] of Object.entries(answers)) {
-    const shown = Array.isArray(value) ? value.join(', ') : String(value);
+    const shown = hidden.has(id) ? '(hidden: looks like a secret)' : Array.isArray(value) ? value.join(', ') : String(value);
     out.write(`    ${id.padEnd(width)}  ${shown === '' ? '(empty)' : shown}${defaulted.has(id) ? '  (default)' : ''}\n`);
   }
   const paths = [...desired.keys(), ANSWERS, MANIFEST].sort();
@@ -113,6 +115,25 @@ export async function verifyProject({ root, io }) {
     }
   }
   return true;
+}
+
+// Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): every setup is asked, default no; a "no" writes nothing. No standing yes.
+async function offerSave({ io, root, answersDoc, kit }) {
+  const dir = userDir(io.env);
+  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). Each question is asked again the next time.\n`);
+  const preset = await confirm(io.prompter, `  Save this setup as a preset in ${dir}/presets/ and add a line (project path, date, kit version) to ${dir}/history.jsonl?`);
+  const profile = await confirm(io.prompter, `  Save your preferences (agents, expertise, language, autonomy, ...) in ${dir}/user-profile.yaml?`);
+  if (!preset && !profile) {
+    io.stdout.write('not saved; nothing was written to the user folder\n');
+    return;
+  }
+  try {
+    const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit, preset, profile });
+    if (r.saved) io.stdout.write(`saved${r.preset ? ` preset ${r.preset} (yaw presets list)` : ''}${r.preset && r.profile ? ' and' : ''}${r.profile ? ' user-profile.yaml' : ''} in ${r.dir}\n`);
+    else io.stdout.write(`not saved: ${r.findings.map((f) => `${f.key} (${f.rule})`).join(', ')} looks like a secret; saved setups never hold secrets. The value is already in this project: ${ANSWERS}, AGENTS.md and .yaw/base/AGENTS.md\n`);
+  } catch (e) {
+    io.stdout.write(`not saved: ${e.message}\n`);
+  }
 }
 
 export async function init({ values, positionals, io }) {
@@ -185,7 +206,7 @@ export async function init({ values, positionals, io }) {
 
   // confirm
   const { desired } = renderInit({ root, kitRoot, answersDoc, modules });
-  printSummary(io.stdout, { mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
+  printSummary(io.stdout, { kitRoot, mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
   if (!values.yes) {
     if (!(await confirm(io.prompter, '\nWrite these files?'))) {
       io.stdout.write('cancelled; nothing was written\n');
@@ -200,6 +221,9 @@ export async function init({ values, positionals, io }) {
   printToolHints(io.stdout, modules);
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
+
+  // save (opt-in, interview on a terminal only; never with --answers)
+  if (!fromFile && io.prompter.interactive) await offerSave({ io, root, answersDoc, kit: result.manifest.kit });
 
   // verify
   if (values['skip-verify']) {
