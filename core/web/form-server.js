@@ -38,29 +38,37 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
   let used = false;
   let idle;
   let closed;
-
-  const server = http.createServer((req, res) => {
+  let bound;
+  const resetIdle = () => {
     clearTimeout(idle);
     idle = setTimeout(() => close(), idleMs);
     idle.unref?.();
+  };
+
+  const server = http.createServer((req, res) => {
     const fail = (code, msg) => {
       res.writeHead(code, { 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
       res.end(`${msg}\n`);
     };
-    const bound = server.address().port;
+    let hostCount = 0;
+    for (let i = 0; i < req.rawHeaders.length; i += 2) if (req.rawHeaders[i].toLowerCase() === 'host') hostCount++;
+    if (hostCount !== 1) return fail(400, 'bad host');
     const hosts = [`127.0.0.1:${bound}`, `localhost:${bound}`];
     if (!hosts.includes(String(req.headers.host ?? '').toLowerCase())) return fail(421, 'wrong host');
     const origin = req.headers.origin;
     if (origin !== undefined && !hosts.some((h) => origin === `http://${h}`)) return fail(403, 'wrong origin');
 
-    const url = new URL(req.url, `http://127.0.0.1:${bound}`);
+    let url;
+    try { url = new URL(req.url, `http://127.0.0.1:${bound}`); } catch { return fail(400, 'bad request'); }
     if (req.method === 'GET' && url.pathname === '/' && url.searchParams.has('t')) {
       if (used || !same(url.searchParams.get('t'), startToken)) return fail(403, 'invalid token');
       used = true;
-      res.writeHead(303, { location: '/', 'set-cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/`, 'cache-control': 'no-store', 'content-security-policy': CSP });
+      resetIdle();
+      res.writeHead(303, { location: '/', 'set-cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/`, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' });
       return res.end();
     }
     if (!same(cookieOf(req, COOKIE), session)) return fail(403, 'missing or invalid token');
+    resetIdle(); // only an authenticated request keeps the server alive
     if (req.method === 'GET' || req.method === 'HEAD') {
       if (url.pathname !== '/') return fail(404, 'not found');
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
@@ -79,7 +87,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     server.once('error', reject);
     server.listen(port, '127.0.0.1', resolve);
   });
-  const bound = server.address().port;
+  bound = server.address().port;
 
   function close() {
     closed ??= new Promise((resolve) => {
@@ -90,8 +98,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     });
     return closed;
   }
-  idle = setTimeout(() => close(), idleMs);
-  idle.unref?.();
+  resetIdle();
   server.on('close', () => clearTimeout(idle));
   if (signals) process.once('SIGINT', close);
 

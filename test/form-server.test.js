@@ -52,6 +52,7 @@ test('form server: the start token works once', () => withServer(async (s) => {
 
 test('form server: a valid session gets the page with CSP and the cookie flags', () => withServer(async (s) => {
   const r = await fetch(s.url, { redirect: 'manual' });
+  assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
   const setCookie = r.headers.get('set-cookie');
   assert.match(setCookie, /HttpOnly/);
   assert.match(setCookie, /SameSite=Strict/);
@@ -99,14 +100,48 @@ test('form server: POST needs the CSRF header; GET never changes state', () => w
 test('form server: idle shutdown after the injected timeout, reset by requests', async () => {
   const s = await startFormServer({ signals: false, idleMs: 300 });
   const closed = new Promise((r) => s.server.once('close', r));
+  const { cookie } = await session(s);
   await new Promise((r) => setTimeout(r, 200));
-  await fetch(`${base(s)}/`); // resets the timer
+  await fetch(`${base(s)}/`, { headers: { cookie } }); // authenticated: resets the timer
   await new Promise((r) => setTimeout(r, 200));
   assert.ok(s.server.listening, 'still up 400 ms in, the request reset the timer');
   await closed;
   assert.equal(s.server.listening, false);
   assert.equal(IDLE_MS, 30 * 60 * 1000);
 });
+
+test('form server: refused requests do not extend the idle timer', async () => {
+  const s = await startFormServer({ signals: false, idleMs: 400 });
+  const closed = new Promise((r) => s.server.once('close', r));
+  const t0 = Date.now();
+  for (let i = 0; i < 4; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    if (!s.server.listening) break;
+    await raw(s.port, 'GET / HTTP/1.1\r\nHost: evil.example\r\nConnection: close\r\n\r\n');
+    await fetch(`${base(s)}/`).catch(() => {}); // no cookie
+  }
+  await closed;
+  assert.ok(Date.now() - t0 < 900, 'closed on the original deadline');
+});
+
+test('form server: malformed request targets get 400 and do not crash', () => withServer(async (s) => {
+  for (const target of ['//[', 'http://[']) {
+    const res = await raw(s.port, `GET ${target} HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nConnection: close\r\n\r\n`);
+    assert.match(res, /^HTTP\/1\.1 400/, target);
+    const alive = await raw(s.port, `GET / HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nConnection: close\r\n\r\n`);
+    assert.match(alive, /^HTTP\/1\.1 403/);
+  }
+}));
+
+test('form server: Origin null and duplicate Host are refused', () => withServer(async (s) => {
+  const { cookie } = await session(s);
+  const nul = await raw(s.port, `GET / HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nOrigin: null\r\nCookie: ${cookie}\r\nConnection: close\r\n\r\n`);
+  assert.match(nul, /^HTTP\/1\.1 403/);
+  for (const hosts of [[`evil.example`, `127.0.0.1:${s.port}`], [`127.0.0.1:${s.port}`, `evil.example`]]) {
+    const res = await raw(s.port, `GET / HTTP/1.1\r\nHost: ${hosts[0]}\r\nHost: ${hosts[1]}\r\nCookie: ${cookie}\r\nConnection: close\r\n\r\n`);
+    assert.doesNotMatch(res, /^HTTP\/1\.1 200/, hosts.join(' + '));
+  }
+}));
 
 test('form server: SIGINT stops the server', async () => {
   const code = `import { startFormServer } from ${JSON.stringify(new URL('../core/web/form-server.js', import.meta.url).href)};
