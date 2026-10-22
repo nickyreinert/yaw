@@ -80,6 +80,7 @@ test('top-level check runs the gate of each profile and fails when either one fa
   const ok = run('just', ['check'], { cwd, env });
   assert.equal(ok.status, 0, ok.stderr);
   for (const p of PROFILES) assert.match(ok.stdout, new RegExp(`gate ${p} ran in ${p}`));
+  assert.equal((ok.stdout.match(/^sync-check: /gm) ?? []).length, 1, 'sync-check runs once, at the root');
   for (const p of PROFILES) {
     writeFileSync(join(cwd, p, 'FAIL'), '');
     const bad = run('just', ['check'], { cwd, env });
@@ -95,7 +96,7 @@ test('smoke composed: yaw init verifies just setup && just check; a bad file in 
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /verified: just setup and just check passed/);
   assert.match(r.stdout, /check-links: 1 page\(s\), all local links resolve/, 'the static-site gate ran');
-  assert.match(r.stdout, /3 passed/, 'the cloudflare-workers gate ran');
+  assert.match(r.stdout, /Tests\s+3 passed \(3\)/, 'the cloudflare-workers gate ran');
 
   const siteBad = join(cwd, 'static-site', 'public', 'bad.html');
   copyFileSync(join(KIT_ROOT, 'test', 'profiles', 'static-site', 'invalid.html'), siteBad);
@@ -124,7 +125,7 @@ test('guards of both profiles stay active in the composed project: remote deploy
   assert.equal(secretRule(rules, 'cloudflare-workers/.dev.vars.example'), null);
 });
 
-test('removing one profile removes exactly its part (just module, mod line, gitignore block); the other keeps working flat', { skip: skipJust }, () => {
+test('removing one profile removes exactly its part (just module, mod line, gitignore block); the other is rendered flat and its code stays in its folder', { skip: skipJust }, () => {
   const { cwd, env } = initComposed(['--skip-verify']);
   const before = JSON.parse(read(cwd, '.yaw/manifest.json'));
   const mine = (m, p) => m.files.filter((f) => f.path === `just/${p}.just` || f.fragments?.some((x) => x.module === p));
@@ -149,4 +150,14 @@ test('removing one profile removes exactly its part (just module, mod line, giti
   const list = run('just', ['--list'], { cwd, env });
   assert.equal(list.status, 0, list.stderr);
   assert.doesNotMatch(list.stdout, /cloudflare-workers/);
+});
+
+test('yaw update refuses when answers and manifest list different profiles', () => {
+  const { cwd, env } = initComposed(['--skip-verify']);
+  const answers = read(cwd, '.yaw/answers.yaml');
+  writeFileSync(join(cwd, '.yaw/answers.yaml'), answers.replace('profiles: [static-site, cloudflare-workers]', 'profiles: [static-site]'));
+  const up = run(process.execPath, [YAW, 'update', '--yes'], { cwd, env });
+  assert.notEqual(up.status, 0);
+  assert.match(up.stderr, /profiles differ: .*\[static-site\].*\[static-site, cloudflare-workers\]/);
+  assert.match(read(cwd, 'justfile'), /^mod cloudflare-workers /m, 'nothing was changed');
 });
