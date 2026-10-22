@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile cloudflare-workers (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small edge API for my notes.
+  idea.team: solo
+  arch.language: typescript
+  arch.runs-on: serverless
+proposal:
+  status: confirmed
+  summary: cloudflare-workers - Cloudflare Worker in TypeScript; Wrangler (local only), tsc, ESLint, Vitest in the Workers runtime, npm audit.
+  profiles: [cloudflare-workers]
+  modules: [core]

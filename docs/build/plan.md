@@ -280,7 +280,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-6.3 | `node-ts-vercel` | Feature | P1 | Y-3.4 | same |
 | Y-6.4 | `php-web` (#64, ADR-0037) | Feature | P2 | Y-3.4 | **done**: plain PHP profile (php-cs-fixer, phpstan, PHPUnit, composer audit; no Laravel, database, compose, Pest or screenshot yet), fixtures in `test/profiles/php-web/`, smoke test in `test/profiles.test.js`, `php-web` in the CI matrix job `profile` |
 | Y-6.5 | `wordpress-plugin` (#65, ADR-0038) | Feature | P2 | Y-3.4 | **done**: WordPress plugin profile (PHPCS with WPCS, PHPStan with WP stubs, PHPUnit, composer audit; Plugin Check (by hand) and wp-env (`just dev`) are on demand, not in the gate; no Playwright screenshot or ZIP recipe yet), fixtures in `test/profiles/wordpress-plugin/`, smoke test in `test/profiles.test.js`, `wordpress-plugin` in the CI matrix job `profile` (no wp-env in CI: the gate needs no Docker) |
-| Y-6.6 | `cloudflare-workers` | Feature | P2 | Y-3.4 | same; no remote calls in CI |
+| Y-6.6 | `cloudflare-workers` (#66, ADR-0039) | Feature | P2 | Y-3.4 | **done**: Worker profile (Wrangler local only, tsc, ESLint, Vitest in the Workers runtime, npm audit; no `wrangler deploy --dry-run`, D1/R2/KV, local D1 migration or Playwright screenshot yet), fixtures in `test/profiles/cloudflare-workers/`, smoke test in `test/profiles.test.js`, `cloudflare-workers` in the CI matrix job `profile` (no Cloudflare account, token or remote call) |
 | Y-6.7 | `android-kotlin` | Feature | P2 | Y-3.4 | same; SDK cache; runner documented |
 | Y-6.8 | Multi-profile composition (namespaced verbs) | Feature | P2 | ADR-0004 | Two profiles combined (`static-site` + `cloudflare-workers`); top-level verbs call both |
 

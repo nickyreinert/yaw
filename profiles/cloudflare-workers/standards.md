@@ -1,0 +1,9 @@
+- TypeScript in strict mode; `just typecheck` (`wrangler types`, then `tsc --noEmit`) must pass. No `any` without a comment saying why.
+- Logic lives in plain functions in `src/` (`greeting.ts`); the Worker entry `src/index.ts` stays thin and calls them.
+- Tests use Vitest in the Workers runtime (`@cloudflare/vitest-plugin`), live in `tests/` as `*.spec.ts`, are deterministic and make no network calls.
+- Bindings (KV, R2, D1, secrets) are declared in `wrangler.jsonc`; run `just typecheck` after changing it. Never set `remote: true` on a binding.
+- Lint with ESLint (`just lint`); do not add a second linter or formatter without an ADR.
+- Dependencies are pinned exact versions; run `just audit` after changing them.
+- Secrets live in `.dev.vars` (local, git-ignored) or in Cloudflare; never read, hard-code, log or commit them. Use `wrangler secret` yourself, never the agent.
+- Only local Wrangler runs for the agent: `wrangler dev` (local), `wrangler types`, `wrangler check`, local `d1`/`kv`/`r2` with `--local`. `--remote`, `deploy`, `publish`, `secret`, `pages deploy` and `just deploy` are yours.
+- `just check` and CI make no remote calls and need no Cloudflare account or token.
