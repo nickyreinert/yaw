@@ -9,10 +9,11 @@ secretFiles:
   - { id: private-key, pattern: '\.(?:pem|key|p12|pfx|jks|keystore)$|^id_(?:rsa|dsa|ecdsa|ed25519)$', reason: Key files hold secrets. }
   - { id: credentials, pattern: '^(?:\.netrc|\.pgpass|\.pypirc|credentials|credentials\.json|secrets?\.(?:ya?ml|json|toml))$', reason: Credential files hold secrets. }
 secretValues:
-  - { id: private-key-block, pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----', reason: A private key is a secret. }
-  - { id: token-prefix, pattern: '\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|glpat-[A-Za-z0-9_-]{16,})', reason: The value has the shape of an API token. }
-  - { id: jwt, pattern: '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}', reason: The value has the shape of a JSON web token. }
-  - { id: url-credentials, pattern: '://[^/\s:@]+:[^/\s@]+@', reason: A URL with a user and password holds a secret. }
-  - { id: assignment, pattern: '(?:[Ss]ecret|SECRET|[Tt]oken|TOKEN|[Pp]assword|PASSWORD|passwd|[Aa]pi[_-]?[Kk]ey|API[_-]?KEY)\s*[=:]\s*\S{6,}', reason: The value assigns a secret (name = value). }
+  - { id: private-key-block, pattern: '-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----', reason: A private key is a secret. }
+  - { id: token-prefix, pattern: '(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|glpat-[A-Za-z0-9_-]{16,}|[sr]k_live_[A-Za-z0-9]{16,})|(?<![A-Za-z0-9])(?:sk-[A-Za-z0-9_-]{16,}|npm_[A-Za-z0-9]{30,}|hf_[A-Za-z0-9]{30,})', reason: The value has the shape of an API token. }
+  - { id: jwt, pattern: '(?<![A-Za-z0-9])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}', reason: The value has the shape of a JSON web token. }
+  - { id: bearer, pattern: '\bBearer\s+[A-Za-z0-9._~+/=-]{16,}', flags: i, reason: A bearer token is a secret. }
+  - { id: url-credentials, pattern: '://[^/\s:@]*:(?!\d+(?:[/?#\s]|$))[^\s@]+@', reason: A URL with a password holds a secret. }
+  - { id: assignment, pattern: '(?<![a-z])(?:secret|token|passw(?:or)?d|passphrase|pass|pwd|api[_-]?key|private[_-]?key|access[_-]?key)[a-z0-9_-]*["'']?\s*[=:]\s*["'']?[^\s"'']{6,}', flags: i, reason: The value assigns a secret (name = value). }
 secretAllow:
   - { id: dotenv-template, pattern: '^\.env\.(?:example|sample|template|dist|defaults)$' }

@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
@@ -32,9 +32,11 @@ function tree(root, prefix = '') {
 
 test('opt-in: the default is no; declining and non-interactive runs write nothing to ~/.yaw', async () => {
   const home = tmp('yaw-home-');
-  const declined = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', '']) });
+  const declinedP = scripted([...INTERVIEW, '', 'y', '', '']);
+  const declined = await yaw(['init', '--skip-verify'], { home, prompter: declinedP });
   assert.equal(declined.code, 0, declined.err);
-  assert.match(declined.out, /May the kit store your preferences and this setup in .*\.yaw\//);
+  assert.match(declinedP.asked.join('\n'), /Save this setup as a preset in .*\.yaw\/presets\/ and add a line \(project path, date, kit version\) to .*history\.jsonl\?/);
+  assert.match(declined.out, /Each question is asked again the next time/);
   assert.match(declined.out, /not saved; nothing was written to the user folder/);
   assert.deepEqual(readdirSync(home), []);
   // --answers (no interview) never asks and never writes
@@ -44,9 +46,9 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
   assert.deepEqual(readdirSync(home), []);
 });
 
-test('opt-in yes: profile, preset and history are written with restrictive modes; later runs do not ask again', async () => {
+test('opt-in yes: profile, preset and history are written with restrictive modes; every later setup asks again', async () => {
   const home = tmp('yaw-home-');
-  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y']) });
+  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y']) });
   assert.equal(r.code, 0, r.err);
   const dir = join(home, '.yaw');
   assert.equal(mode(dir), 0o700);
@@ -75,14 +77,37 @@ test('opt-in yes: profile, preset and history are written with restrictive modes
   assert.equal(lines[0].path, r.cwd);
   assert.equal(lines[0].preset, preset.name);
 
-  // standing yes: the second run is not asked and appends
-  const p2 = scripted([...INTERVIEW, '', 'y']);
-  const again = await yaw(['init', '--skip-verify'], { home, prompter: p2 });
+  // no standing yes: the second setup is asked again, a "no" to both writes nothing new
+  const againP = scripted([...INTERVIEW, '', 'y', '', '']);
+  const again = await yaw(['init', '--skip-verify'], { home, prompter: againP });
   assert.equal(again.code, 0, again.err);
-  assert.doesNotMatch(again.out, /May the kit store/);
+  assert.match(againP.asked.join('\n'), /Save this setup as a preset/);
+  assert.equal(readFileSync(join(dir, 'history.jsonl'), 'utf8').trim().split('\n').length, 1);
+  assert.equal(readdirSync(join(dir, 'presets')).length, 1);
+
+  // preset yes, profile no: the profile file stays as it was
+  const before = readFileSync(join(dir, 'user-profile.yaml'), 'utf8');
+  const third = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', '']) });
+  assert.equal(third.code, 0, third.err);
   assert.equal(readFileSync(join(dir, 'history.jsonl'), 'utf8').trim().split('\n').length, 2);
   assert.equal(readdirSync(join(dir, 'presets')).length, 2);
+  assert.equal(readFileSync(join(dir, 'user-profile.yaml'), 'utf8'), before);
   assert.equal(mode(join(dir, 'history.jsonl')), 0o600);
+});
+
+test('a broken user-profile.yaml is never overwritten; an unknown key only prints "not saved"', async () => {
+  for (const [text, message] of [['answers: [unclosed\n  : :\n', /fix or remove the file/], ['answers:\n  user.nonsense: 1\n', /not saved: .*invalid/]]) {
+    const home = tmp('yaw-home-');
+    mkdirSync(join(home, '.yaw'), { recursive: true });
+    writeFileSync(join(home, '.yaw/user-profile.yaml'), text);
+    const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y']) });
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, message);
+    assert.match(r.out, /not saved/);
+    assert.equal(readFileSync(join(home, '.yaw/user-profile.yaml'), 'utf8'), text, 'left untouched');
+    assert.deepEqual(readdirSync(join(home, '.yaw')), ['user-profile.yaml'], 'nothing else written');
+    assert.match(r.out, /verification skipped/, 'the run goes on');
+  }
 });
 
 test('yaw presets list / show / delete', async () => {
@@ -123,11 +148,33 @@ test('yaw presets list / show / delete', async () => {
 test('secrets: a secret-type key or a secret-looking value refuses the save; the canary appears nowhere', async () => {
   const env = { HOME: tmp('yaw-home-') };
   const base = { projectRoot: '/work/app', kit: '0.0.0', mode: 'quick', env, kitRoot: KIT_ROOT };
+  const A = 'idea.text';
+  const assign = (text) => [{ [A]: text }, A, 'assignment'];
   const bad = [
     [{ 'idea.text': `use ${CANARY} for deploys` }, 'idea.text', 'token-prefix'],
-    [{ 'idea.text': 'API_KEY=hunter2hunter2' }, 'idea.text', 'assignment'],
+    [{ 'idea.text': 'MY_KEY_ghp_CANARY0123456789abcdefghijklmnopqrst' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': '1ghp_CANARY0123456789abcdefghijklmnopqrst' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'sk_live_abcdefghijklmnop1234' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'rk_live_abcdefghijklmnop1234' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': `npm_${'a1'.repeat(18)}` }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': `hf_${'a1'.repeat(18)}` }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop' }, 'idea.text', 'jwt'],
     [{ 'idea.text': '-----BEGIN OPENSSH PRIVATE KEY-----' }, 'idea.text', 'private-key-block'],
+    [{ 'idea.text': '-----BEGIN PGP PRIVATE KEY BLOCK-----' }, 'idea.text', 'private-key-block'],
+    [{ 'idea.text': 'Authorization: Bearer abcdef0123456789xyz' }, 'idea.text', 'bearer'],
     [{ 'arch.db': 'postgres://admin:s3cretpw@db.example.com/app' }, 'arch.db', 'url-credentials'],
+    [{ 'arch.db': 'redis://:pw123@host:6379' }, 'arch.db', 'url-credentials'],
+    [{ 'arch.db': 'postgres://u:pa/ss@h/app' }, 'arch.db', 'url-credentials'],
+    assign('API_KEY=hunter2hunter2'),
+    assign('SECRET_KEY=hunter2hunter2'),
+    assign('AWS_SECRET_ACCESS_KEY=hunter2hunter2'),
+    assign('private_key=hunter2hunter2'),
+    assign('DB_PASS=hunter2hunter2'),
+    assign('pwd=hunter2hunter2'),
+    assign('passphrase=hunter2hunter2'),
+    assign('PassWord=hunter2hunter2'),
+    assign('"api_key": "hunter2hunter2"'),
+    assign('"password": "hunter2hunter2"'),
     [{ 'arch.notes': ['fine', '.env'] }, 'arch.notes', 'dotenv'],
     [{ 'vendors.api-token': 'x' }, 'vendors.api-token', 'secret-type key'],
   ];
@@ -138,18 +185,22 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
     assert.equal(r.saved, false);
   }
   assert.equal(existsSync(join(env.HOME, '.yaw')), false, 'nothing is written when a save is refused');
-  assert.deepEqual(secretFindings({ answers: { 'idea.text': 'A small tool for photos.', 'arch.runs-on': 'local' }, kitRoot: KIT_ROOT }), []);
+  for (const ok of ['A small tool for photos.', 'local', 'bypass: enabled by default', 'tokens: 12', 'see http://localhost:8080/path?mail=a@b.example', 'the task-runner skips it', 'password reset flow for users', 'Bearer of good news']) {
+    assert.deepEqual(secretFindings({ answers: { 'idea.text': ok }, kitRoot: KIT_ROOT }), [], ok);
+  }
 
   // end to end: the canary typed into the interview is not saved, not printed
   const home = tmp('yaw-home-');
   const interview = [...INTERVIEW];
   interview[5] = `Deploy with ${CANARY}`;
-  const prompter = scripted([...interview, '', 'y', 'y']);
+  const prompter = scripted([...interview, '', 'y', 'y', 'y']);
   const r = await yaw(['init', '--skip-verify'], { home, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /not saved: idea\.text \(token-prefix\) looks like a secret/);
   const everything = [r.out, r.err, ...prompter.shown, ...(existsSync(join(home, '.yaw')) ? tree(home).map((f) => (statSync(join(home, f)).isFile() ? readFileSync(join(home, f), 'utf8') : '')) : [])].join('\n');
   assert.doesNotMatch(everything, new RegExp(CANARY.slice(0, 20)));
+  assert.match(r.out, /The value is already in this project: \.yaw\/answers\.yaml, AGENTS\.md and \.yaw\/base\/AGENTS\.md/);
+  for (const f of ['.yaw/answers.yaml', 'AGENTS.md', '.yaw/base/AGENTS.md']) assert.match(readFileSync(join(r.cwd, f), 'utf8'), new RegExp(CANARY.slice(0, 20)), f);
   assert.match(r.out, /idea\.text +\(hidden: looks like a secret\)/);
   assert.equal(existsSync(join(home, '.yaw')), false);
 });

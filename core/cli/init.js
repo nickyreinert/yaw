@@ -22,7 +22,7 @@ import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { CODEX_HOOKS } from '../render/agents.js';
-import { hasOptedIn, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
+import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose.
 async function chooseProfile({ prompter, profiles, suggestion }) {
@@ -117,19 +117,23 @@ export async function verifyProject({ root, io }) {
   return true;
 }
 
-// Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): asked once, default no; a "no" writes nothing. Once the profile exists
-// the standing "yes" is used and the question is not repeated.
+// Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): every setup is asked, default no; a "no" writes nothing. No standing yes.
 async function offerSave({ io, root, answersDoc, kit }) {
-  if (!hasOptedIn(io.env)) {
-    io.stdout.write(`\nMay the kit store your preferences and this setup in ${userDir(io.env)}/ (answers only, never secrets)?\n`);
-    if (!(await confirm(io.prompter, '  Save'))) {
-      io.stdout.write('not saved; nothing was written to the user folder\n');
-      return;
-    }
+  const dir = userDir(io.env);
+  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). Each question is asked again the next time.\n`);
+  const preset = await confirm(io.prompter, `  Save this setup as a preset in ${dir}/presets/ and add a line (project path, date, kit version) to ${dir}/history.jsonl?`);
+  const profile = await confirm(io.prompter, `  Save your preferences (agents, expertise, language, autonomy, ...) in ${dir}/user-profile.yaml?`);
+  if (!preset && !profile) {
+    io.stdout.write('not saved; nothing was written to the user folder\n');
+    return;
   }
-  const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit });
-  if (r.saved) io.stdout.write(`saved the setup as preset ${r.preset} in ${r.dir} (yaw presets list)\n`);
-  else io.stdout.write(`not saved: ${r.findings.map((f) => `${f.key} (${f.rule})`).join(', ')} looks like a secret; saved setups never hold secrets\n`);
+  try {
+    const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit, preset, profile });
+    if (r.saved) io.stdout.write(`saved${r.preset ? ` preset ${r.preset} (yaw presets list)` : ''}${r.preset && r.profile ? ' and' : ''}${r.profile ? ' user-profile.yaml' : ''} in ${r.dir}\n`);
+    else io.stdout.write(`not saved: ${r.findings.map((f) => `${f.key} (${f.rule})`).join(', ')} looks like a secret; saved setups never hold secrets. The value is already in this project: ${ANSWERS}, AGENTS.md and .yaw/base/AGENTS.md\n`);
+  } catch (e) {
+    io.stdout.write(`not saved: ${e.message}\n`);
+  }
 }
 
 export async function init({ values, positionals, io }) {

@@ -19,11 +19,6 @@ const profileFile = (env) => join(userDir(env), 'user-profile.yaml');
 const presetsDir = (env) => join(userDir(env), 'presets');
 const presetFile = (env, name) => join(presetsDir(env), `${name}.yaml`);
 
-// Opt-in is answered "yes" once the profile file exists; a "no" writes nothing, so it is asked again.
-export function hasOptedIn(env) {
-  return existsSync(profileFile(env));
-}
-
 function dir(path) {
   mkdirSync(path, { recursive: true, mode: 0o700 });
   chmodSync(path, 0o700);
@@ -58,37 +53,49 @@ function check(file, name, doc) {
   if (errors.length > 0) throw new Error(`not saved, ${file} would be invalid: ${errors.map((e) => formatError(e, file)).join('; ')}`);
 }
 
-// Save the user profile, the setup as a preset and a history line. Writes nothing when an answer looks like a secret.
+// Save the setup as a preset with a history line (preset) and/or the user profile (profile); both are asked for separately.
+// Writes nothing when an answer looks like a secret; throws (nothing written) when the existing profile is unreadable or would become invalid.
 // -> { saved: true, preset, dir } | { saved: false, findings }
-export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now = new Date() }) {
+export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now = new Date(), preset: wantPreset = true, profile: wantProfile = true }) {
   const findings = secretFindings({ answers, kitRoot });
   if (findings.length > 0) return { saved: false, findings };
   const date = now.toISOString().slice(0, 10);
 
-  const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
-  let profile = {};
-  try {
-    profile = parse(readFileSync(profileFile(env), 'utf8'))?.answers ?? {};
-  } catch {
-    profile = {};
+  let profileDoc = null;
+  if (wantProfile) {
+    const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
+    let profile = {};
+    if (existsSync(profileFile(env))) {
+      try {
+        profile = parse(readFileSync(profileFile(env), 'utf8'))?.answers ?? {};
+      } catch {
+        throw new Error(`${profileFile(env)} cannot be read; fix or remove the file (it was left untouched)`);
+      }
+    }
+    for (const k of known) if (Object.hasOwn(answers, k)) profile[k] = answers[k];
+    profileDoc = { answers: profile };
+    check('user-profile.yaml', 'user-profile.schema.json', profileDoc);
   }
-  for (const k of known) if (Object.hasOwn(answers, k)) profile[k] = answers[k];
-  const profileDoc = { answers: profile };
-  check('user-profile.yaml', 'user-profile.schema.json', profileDoc);
 
-  let name = `${date}-${slug(basename(projectRoot))}`;
-  for (let n = 2; existsSync(presetFile(env, name)); n += 1) name = `${date}-${slug(basename(projectRoot))}-${n}`;
-  const presetDoc = { name, description: `Setup of ${basename(projectRoot)}.`, created: date, source: projectRoot, mode, answers };
-  check(`presets/${name}.yaml`, 'preset.schema.json', presetDoc);
+  let name = null;
+  let presetDoc = null;
+  if (wantPreset) {
+    name = `${date}-${slug(basename(projectRoot))}`;
+    for (let n = 2; existsSync(presetFile(env, name)); n += 1) name = `${date}-${slug(basename(projectRoot))}-${n}`;
+    presetDoc = { name, description: `Setup of ${basename(projectRoot)}.`, created: date, source: projectRoot, mode, answers };
+    check(`presets/${name}.yaml`, 'preset.schema.json', presetDoc);
+  }
 
   dir(userDir(env));
   dir(presetsDir(env));
-  write(profileFile(env), stringify(profileDoc));
-  write(presetFile(env, name), stringify(presetDoc));
-  const history = join(userDir(env), 'history.jsonl');
-  appendFileSync(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { mode: 0o600 });
-  chmodSync(history, 0o600);
-  return { saved: true, preset: name, dir: userDir(env) };
+  if (profileDoc) write(profileFile(env), stringify(profileDoc));
+  if (presetDoc) {
+    write(presetFile(env, name), stringify(presetDoc));
+    const history = join(userDir(env), 'history.jsonl');
+    appendFileSync(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { mode: 0o600 });
+    chmodSync(history, 0o600);
+  }
+  return { saved: true, preset: name, profile: Boolean(profileDoc), dir: userDir(env) };
 }
 
 // -> [{ name, description, created, mode }] sorted by name

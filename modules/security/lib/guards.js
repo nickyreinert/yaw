@@ -14,7 +14,7 @@ export function loadGuardFile(file) {
   return value;
 }
 
-const compile = (rules = [], source) => rules.map((r) => ({ ...r, source, re: new RegExp(r.pattern) }));
+const compile = (rules = [], source) => rules.map((r) => ({ ...r, source, re: new RegExp(r.pattern, r.flags) }));
 
 // -> { commands: [rule], secretFiles: [rule], secretAllow: [rule] } with compiled `re`
 export function loadRules({ kitRoot, profiles = [] }) {
