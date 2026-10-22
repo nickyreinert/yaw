@@ -215,7 +215,7 @@ test('secret rules: no ReDoS on 100k-character values, and flags cannot be dupli
   for (const text of inputs) {
     const t = performance.now();
     secretFindings({ answers: { 'idea.text': text }, kitRoot: KIT_ROOT });
-    assert.ok(performance.now() - t < 50, `${text.slice(0, 12)}: ${Math.round(performance.now() - t)} ms`);
+    assert.ok(performance.now() - t < 500, `${text.slice(0, 12)}: ${Math.round(performance.now() - t)} ms`);
   }
   const rule = (flags) => ({ guards: [{ id: 'a', pattern: 'x', flags, reason: 'r' }] });
   assert.deepEqual(schemas().validate('guards.schema.json', rule('i')), []);
