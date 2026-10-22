@@ -8,5 +8,11 @@ secretFiles:
   - { id: dotenv, pattern: '^\.env(?:[.*?\[].*)?$', reason: .env files hold secrets. }
   - { id: private-key, pattern: '\.(?:pem|key|p12|pfx|jks|keystore)$|^id_(?:rsa|dsa|ecdsa|ed25519)$', reason: Key files hold secrets. }
   - { id: credentials, pattern: '^(?:\.netrc|\.pgpass|\.pypirc|credentials|credentials\.json|secrets?\.(?:ya?ml|json|toml))$', reason: Credential files hold secrets. }
+secretValues:
+  - { id: private-key-block, pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----', reason: A private key is a secret. }
+  - { id: token-prefix, pattern: '\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|glpat-[A-Za-z0-9_-]{16,})', reason: The value has the shape of an API token. }
+  - { id: jwt, pattern: '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}', reason: The value has the shape of a JSON web token. }
+  - { id: url-credentials, pattern: '://[^/\s:@]+:[^/\s@]+@', reason: A URL with a user and password holds a secret. }
+  - { id: assignment, pattern: '(?:[Ss]ecret|SECRET|[Tt]oken|TOKEN|[Pp]assword|PASSWORD|passwd|[Aa]pi[_-]?[Kk]ey|API[_-]?KEY)\s*[=:]\s*\S{6,}', reason: The value assigns a secret (name = value). }
 secretAllow:
   - { id: dotenv-template, pattern: '^\.env\.(?:example|sample|template|dist|defaults)$' }

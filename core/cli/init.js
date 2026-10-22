@@ -22,6 +22,7 @@ import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { CODEX_HOOKS } from '../render/agents.js';
+import { hasOptedIn, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose.
 async function chooseProfile({ prompter, profiles, suggestion }) {
@@ -69,15 +70,16 @@ function describeFacts(facts) {
   return parts.length > 0 ? parts.join(', ') : 'no facts known';
 }
 
-function printSummary(out, { mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
+function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
   out.write(`\nSummary (${mode} setup)\n`);
   out.write(`  profile: ${profile} (${how})\n`);
   out.write(`  modules: ${modules.join(', ')}\n`);
   for (const m of skippedModules) out.write(`  note: module "${m}" is not in this kit yet; skipped\n`);
   out.write('  answers:\n');
+  const hidden = new Set(secretFindings({ answers, kitRoot }).map((f) => f.key)); // a secret typed into an answer is not echoed (doc 08)
   const width = Math.max(...Object.keys(answers).map((k) => k.length));
   for (const [id, value] of Object.entries(answers)) {
-    const shown = Array.isArray(value) ? value.join(', ') : String(value);
+    const shown = hidden.has(id) ? '(hidden: looks like a secret)' : Array.isArray(value) ? value.join(', ') : String(value);
     out.write(`    ${id.padEnd(width)}  ${shown === '' ? '(empty)' : shown}${defaulted.has(id) ? '  (default)' : ''}\n`);
   }
   const paths = [...desired.keys(), ANSWERS, MANIFEST].sort();
@@ -113,6 +115,21 @@ export async function verifyProject({ root, io }) {
     }
   }
   return true;
+}
+
+// Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): asked once, default no; a "no" writes nothing. Once the profile exists
+// the standing "yes" is used and the question is not repeated.
+async function offerSave({ io, root, answersDoc, kit }) {
+  if (!hasOptedIn(io.env)) {
+    io.stdout.write(`\nMay the kit store your preferences and this setup in ${userDir(io.env)}/ (answers only, never secrets)?\n`);
+    if (!(await confirm(io.prompter, '  Save'))) {
+      io.stdout.write('not saved; nothing was written to the user folder\n');
+      return;
+    }
+  }
+  const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit });
+  if (r.saved) io.stdout.write(`saved the setup as preset ${r.preset} in ${r.dir} (yaw presets list)\n`);
+  else io.stdout.write(`not saved: ${r.findings.map((f) => `${f.key} (${f.rule})`).join(', ')} looks like a secret; saved setups never hold secrets\n`);
 }
 
 export async function init({ values, positionals, io }) {
@@ -185,7 +202,7 @@ export async function init({ values, positionals, io }) {
 
   // confirm
   const { desired } = renderInit({ root, kitRoot, answersDoc, modules });
-  printSummary(io.stdout, { mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
+  printSummary(io.stdout, { kitRoot, mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
   if (!values.yes) {
     if (!(await confirm(io.prompter, '\nWrite these files?'))) {
       io.stdout.write('cancelled; nothing was written\n');
@@ -200,6 +217,9 @@ export async function init({ values, positionals, io }) {
   printToolHints(io.stdout, modules);
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
+
+  // save (opt-in, interview on a terminal only; never with --answers)
+  if (!fromFile && io.prompter.interactive) await offerSave({ io, root, answersDoc, kit: result.manifest.kit });
 
   // verify
   if (values['skip-verify']) {

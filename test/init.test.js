@@ -25,7 +25,7 @@ const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted([...INTERVIEW, '', 'y']);
+  const prompter = scripted([...INTERVIEW, '', 'y', '']);
   // look at the folder at the moment the confirmation is asked
   const ask = prompter.ask;
   const seen = [];
@@ -65,7 +65,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '6', 'y']);
+  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '6', 'y', '']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
