@@ -1,0 +1,24 @@
+{
+    "name": "app/app",
+    "description": "Plain PHP web app",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "3.95.27",
+        "phpstan/phpstan": "2.1.56",
+        "phpunit/phpunit": "11.5.57"
+    },
+    "autoload": {
+        "psr-4": { "App\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "Tests\\": "tests/" }
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

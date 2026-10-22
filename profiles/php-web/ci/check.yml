@@ -1,0 +1,12 @@
+# CI steps fragment: toolchain, then `just check` (same gate as local). No deploy, no credentials.
+# Actions are pinned by commit SHA (Y-5.5, ADR-0027); the comment names the version the SHA was verified for.
+steps:
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+  - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+    with:
+      php-version: "8.2"
+      tools: composer:v2
+      coverage: none
+  - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+  - run: just setup
+  - run: just check

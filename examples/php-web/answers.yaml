@@ -1,0 +1,14 @@
+# Input of the kit CI smoke test for profile php-web (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small PHP site for my notes.
+  idea.team: solo
+proposal:
+  status: confirmed
+  summary: php-web - Plain PHP web app; Composer, PHPStan, PHP-CS-Fixer, PHPUnit, composer audit.
+  profiles: [php-web]
+  modules: [core]

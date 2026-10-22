@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'node-ts-vercel', 'python-cli', 'python-web', 'static-site'];
+const PROFILES = ['node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -20,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles node-cli, node-ts-vercel, python-cli, python-web and static-site, and profile.yaml validates', () => {
+test('the kit has exactly the profiles node-cli, node-ts-vercel, php-web, python-cli, python-web and static-site, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -342,4 +342,61 @@ test('node-ts-vercel guards block every Vercel CLI form and the deploy recipe, n
     assert.ok(blocked(cmd), cmd);
   }
   for (const cmd of ['vercel --version', 'vercel -v', 'vercel --help', 'npx vercel@65.0.0 --version', 'cat vercel.json', 'npx vitest run', 'just check', 'just test', 'npm test', 'npx tsc --noEmit', 'npx eslint .', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('php-web is never suggested automatically (the user picks it)', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  for (const facts of [{}, { runsOn: 'self-hosted', hosted: true }, { language: 'python' }, { runsOn: 'self-hosted', hosted: true, public: true }, { runsOn: 'local', hosted: false }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'php-web'), JSON.stringify(facts));
+  }
+});
+
+test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('php-web', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+const phpSkip = (!haveJust && 'just is not installed') || (!hasTool('php') && 'php is not installed') || (!hasTool('composer') && 'composer is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (composer install needs the network)');
+
+test('smoke php-web: yaw init, just setup && just check pass; bad code fails the gate (needs php, composer and network)', { skip: phpSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('php-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /OK \(2 tests/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'php-web');
+  const bad = join(cwd, 'src', 'Bad.php');
+  copyFileSync(join(fixtures, 'lint_error.php'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+  copyFileSync(join(fixtures, 'type_error.php'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('php-web guards block migrations, remote hosts and registry pushes in every bypass form, not local work', () => {
+  const guards = parse(readFileSync(dir('php-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  const bad = [
+    'php artisan migrate', 'php artisan migrate --force', 'php artisan migrate:fresh --seed', 'php artisan migrate:rollback', 'php artisan db:wipe', 'php artisan db:seed',
+    'php artisan --env=production migrate', 'php artisan migrate --env=production', 'APP_ENV=production php artisan migrate --force', 'env APP_ENV=production php artisan migrate',
+    'php8.3 artisan migrate', './artisan migrate', 'php ./artisan migrate', 'vendor/bin/sail artisan migrate', 'sail artisan migrate', 'sudo php artisan migrate',
+    'docker compose exec app php artisan migrate', 'docker exec app php artisan migrate --force', 'bash -c "php artisan migrate"', "sh -c 'php artisan migrate --force'",
+    'cd app && php artisan migrate', 'true;php artisan migrate', 'echo x|php artisan migrate', '(php artisan migrate)', '$(php artisan migrate)', 'nohup php artisan migrate', 'time php artisan migrate',
+    'php artisan migrate --pretend && php artisan migrate', 'php artisan migrate --pretend; php artisan migrate --force', 'php artisan migrate:fresh',
+    'ssh me@host', 'ssh -p 22 host ls', 'sudo ssh host', 'env X=1 ssh host', 'scp a.zip me@host:/var/www', 'sftp me@host', 'ftp host', 'lftp -e "mirror -R" host', 'true;ssh host',
+    'rsync -av ./ me@host:/var/www/', 'rsync -av --delete public/ host:/var/www/', 'rsync -e ssh -av a/ b', 'rsync -av a/ host::module', 'rsync -av a/ rsync://host/module/', 'sudo rsync -av a/ me@host:/x', 'bash -c "rsync -av a/ me@host:/x"',
+    'DOCKER_HOST=ssh://me@host docker compose up', 'docker -H ssh://me@host ps', 'docker --host tcp://host:2375 ps', 'docker --context prod compose up', 'sudo docker -H x ps',
+    'docker push me/app', 'docker compose push', 'docker build --push -t me/app .', 'docker buildx build --push .', 'docker-compose push', 'sudo docker push me/app', 'true && docker push me/app',
+  ];
+  for (const cmd of bad) assert.ok(blocked(cmd), cmd);
+  const ok = [
+    'php artisan migrate --pretend', 'php artisan migrate:fresh --pretend', 'php artisan --env=local migrate --pretend', 'php artisan route:list', 'php artisan test', 'php artisan make:migration create_x_table',
+    'composer install', 'composer audit', 'composer require monolog/monolog', 'vendor/bin/phpunit', 'vendor/bin/phpstan analyse', 'vendor/bin/php-cs-fixer fix', 'php -S 127.0.0.1:8000 -t public',
+    'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker build -t app .', 'docker compose up', 'docker compose exec app composer install', 'just check', 'just test', 'git add composer.lock', 'cat database/migrations/x.php',
+  ];
+  for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
 });
