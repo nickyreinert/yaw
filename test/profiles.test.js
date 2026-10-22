@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
+const PROFILES = ['cloudflare-workers', 'node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -20,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
+test('the kit has exactly the profiles cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -461,4 +461,99 @@ test('wordpress-plugin guards block SVN writes, deploy scripts, remote wp-cli an
     'vendor/bin/phpcs', 'vendor/bin/phpcbf', 'vendor/bin/phpstan analyse', 'vendor/bin/phpunit', 'php -l my-plugin.php', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker compose up', 'git add composer.lock readme.txt', 'cat readme.txt',
   ];
   for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
+});
+
+test('cloudflare-workers is never suggested automatically (the user picks it)', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  for (const facts of [{}, { runsOn: 'serverless', hosted: true }, { language: 'typescript' }, { language: 'javascript' }, { language: 'typescript', runsOn: 'serverless', hosted: true }, { public: true }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'cloudflare-workers'), JSON.stringify(facts));
+  }
+});
+
+test('cloudflare-workers: the gate recipes make no remote call; scaffold dev dependencies are exact versions', () => {
+  const just = readFileSync(dir('cloudflare-workers', 'just', 'cloudflare-workers.just'), 'utf8');
+  const recipe = (name) => just.match(new RegExp(`^${name}[^\\n]*:[^\\n]*\\n((?:[ \\t]+[^\\n]*\\n?)*)`, 'm'))?.[1] ?? '';
+  for (const name of ['setup', 'lint', 'typecheck', 'test', 'audit']) {
+    const body = recipe(name);
+    assert.ok(body.length > 0, name);
+    assert.doesNotMatch(body, /wrangler\s+(deploy|publish|login|secret|pages|kv|r2|d1|tail)|--remote|--dry-run/, name);
+  }
+  assert.match(just, /^check: lint typecheck test audit sync-check$/m);
+  assert.match(just, /^export WRANGLER_SEND_METRICS := "false"$/m);
+  assert.match(recipe('dev'), /wrangler dev --local/);
+  const pkg = JSON.parse(readFileSync(dir('cloudflare-workers', 'scaffold', 'package.json'), 'utf8'));
+  for (const [name, version] of Object.entries(pkg.devDependencies)) assert.match(version, /^\d+\.\d+\.\d+$/, name);
+  const ci = readFileSync(dir('cloudflare-workers', 'ci', 'check.yml'), 'utf8');
+  assert.doesNotMatch(ci, /secrets\.|CLOUDFLARE_|wrangler/i);
+  assert.deepEqual(ci.match(/uses: \S+/g).every((u) => /@[0-9a-f]{40}$/.test(u.slice(6))), true);
+});
+
+test('cloudflare-workers: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('cloudflare-workers', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'fmt', 'build']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  // deploy refuses before it reaches Wrangler (a PATH without npx proves nothing is run)
+  const only = tmp('yaw-bin-');
+  for (const t of ['sh', 'just']) symlinkSync(execFileSync('which', [t], { encoding: 'utf8' }).trim(), join(only, t));
+  const bare = { PATH: only };
+  for (const [args, extra] of [[[], {}], [['prod'], {}], [['preview'], { YAW_CONFIRM_PROD: 'yes' }], [['prod'], { YAW_CONFIRM_PROD: 'no' }], [['prod'], { YAW_CONFIRM_PROD: 'yes', CI: 'true' }]]) {
+    const r = run('just', ['deploy', ...args], { cwd, env: cleanEnv(tmp('yaw-home-'), { ...bare, ...extra }) });
+    assert.notEqual(r.status, 0, `deploy ${args} ${JSON.stringify(extra)}`);
+    assert.match(r.stderr, /deploy: refused/);
+    assert.doesNotMatch(r.stdout + r.stderr, /wrangler/);
+  }
+});
+
+test('smoke cloudflare-workers: yaw init, just setup && just check pass without a Cloudflare account; bad code fails the gate (needs npm and network)', { skip: nodeTsSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('cloudflare-workers', { ...process.env, CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'cloudflare-workers');
+  const bad = join(cwd, 'src', 'bad.ts');
+  copyFileSync(join(fixtures, 'lint_error.ts'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
+  copyFileSync(join(fixtures, 'type_error.ts'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('cloudflare-workers guards block every remote or production Wrangler form, not local work', () => {
+  const guards = parse(readFileSync(dir('cloudflare-workers', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  const bad = [
+    'wrangler deploy', 'wrangler publish', 'wrangler deploy --dry-run', 'wrangler deploy --env production', 'wrangler --env production deploy', 'wrangler -c wrangler.jsonc deploy', 'wrangler  deploy', 'wrangler\tdeploy', 'wrangler "deploy"', 'wrangler rollback', 'wrangler delete', 'wrangler versions upload', 'wrangler versions deploy', 'wrangler triggers deploy',
+    'wrangler secret put API_KEY', 'wrangler secret delete API_KEY', 'wrangler secret bulk .env', 'wrangler secret list', 'wrangler login', 'wrangler whoami', 'wrangler tail', 'wrangler init', 'wrangler pages deploy dist', 'wrangler pages publish dist', 'wrangler pages dev dist',
+    'wrangler kv key put a b', 'wrangler kv key get a', 'wrangler kv namespace create X', 'wrangler kv key put a b --remote', 'wrangler r2 object put b/k --file x', 'wrangler r2 bucket create b', 'wrangler r2 object put b/k --file x --remote', 'wrangler d1 execute DB --command "SELECT 1"', 'wrangler d1 execute DB --remote --command "DROP TABLE x"', 'wrangler d1 execute DB --command x --remote', 'wrangler d1 migrations apply DB --remote', 'wrangler d1 migrations apply DB', 'wrangler d1 export DB --remote --output x.sql', 'wrangler d1 execute DB --local --remote', 'wrangler d1 execute DB --local=false',
+    'wrangler dev --remote', 'wrangler dev --env production --remote', 'wrangler dev --local --remote', 'wrangler dev --x-remote-bindings', 'wrangler dev -r', 'npx wrangler dev -r', 'wrangler dev --local -r', 'wrangler dev -r --local', 'npx wrangler dev --remote',
+    'npx wrangler deploy', 'npx -y wrangler deploy', 'npx --yes wrangler@latest deploy', 'npx wrangler@4.151.3 deploy', 'npx --no-install wrangler deploy', 'npx -p wrangler wrangler deploy', 'npm exec wrangler -- deploy', 'npm exec -- wrangler deploy', 'pnpm dlx wrangler deploy', 'pnpm exec wrangler deploy', 'pnpm wrangler deploy', 'yarn wrangler deploy', 'yarn dlx wrangler deploy', 'bunx wrangler deploy', 'bun x wrangler deploy', 'bun run wrangler deploy', 'bunx wrangler@latest secret put X',
+    './node_modules/.bin/wrangler deploy', 'node_modules/.bin/wrangler deploy', 'node node_modules/wrangler/bin/wrangler.js deploy', 'node ./node_modules/wrangler/wrangler-dist/cli.js deploy; wrangler deploy',
+    'CLOUDFLARE_API_TOKEN=abc wrangler deploy', 'CI=1 wrangler deploy', 'env CLOUDFLARE_ACCOUNT_ID=x wrangler deploy', 'env -i wrangler deploy', 'FOO=1 BAR=2 npx wrangler deploy', 'sudo wrangler deploy', 'sudo -u me npx wrangler deploy', 'nohup wrangler deploy', 'time wrangler deploy', 'xargs wrangler deploy', 'command wrangler deploy',
+    'bash -c "wrangler deploy"', "sh -c 'npx wrangler deploy'", 'bash -c "cd app && wrangler deploy"', 'zsh -c "wrangler secret put X"', 'bash -lc "pnpm dlx wrangler deploy"',
+    'cd app && wrangler deploy', 'true;wrangler deploy', 'echo x|wrangler deploy', 'npm test && wrangler deploy', 'wrangler types && wrangler deploy', 'wrangler dev; wrangler deploy', 'wrangler types || wrangler deploy', 'wrangler types\nwrangler deploy', 'wrangler types & wrangler deploy', '(wrangler deploy)', '$(wrangler deploy)', '`wrangler deploy`', 'echo $(npx wrangler secret put X)', 'wrangler types; npm install wrangler; wrangler deploy',
+    'npm run deploy', 'npm deploy', 'pnpm run deploy', 'pnpm deploy', 'yarn deploy', 'yarn run deploy', 'bun run deploy', 'npm run publish', 'just deploy', 'just deploy prod', 'YAW_CONFIRM_PROD=yes just deploy prod', 'just --justfile justfile deploy prod', 'YAW_CONFIRM_PROD=yes npx wrangler deploy', 'sudo just deploy prod',
+    'ssh me@host', 'scp a me@host:/x', 'sftp me@host',
+  ];
+  for (const cmd of bad) assert.ok(blocked(cmd), cmd);
+  const ok = [
+    'wrangler dev', 'wrangler dev --local', 'wrangler dev --port 8788', 'wrangler dev --env staging', 'wrangler types', 'wrangler types --check', 'wrangler check', 'wrangler check startup', 'wrangler docs', 'wrangler --version', 'wrangler -v', 'wrangler --help', 'wrangler -h', 'wrangler',
+    'wrangler d1 execute DB --local --command "SELECT 1"', 'wrangler d1 migrations apply DB --local', 'wrangler d1 execute DB --file schema.sql --local', 'wrangler kv key put a b --local', 'wrangler r2 object put b/k --file x --local',
+    'npx wrangler dev', 'npx wrangler types', 'npx wrangler check', 'npx wrangler@4.151.3 types', 'npx --no-install wrangler dev --local', 'pnpm exec wrangler types', 'pnpm dlx wrangler types', 'yarn wrangler types', 'bunx wrangler types', './node_modules/.bin/wrangler types', 'npx -y wrangler --version', 'CI=1 npx wrangler types', 'sudo wrangler types', 'bash -c "wrangler types"', 'cd app && wrangler dev', 'wrangler types && tsc --noEmit',
+    'npm run build', 'npm run test', 'npm test', 'npm run lint', 'npx tsc --noEmit', 'npx vitest run', 'npx eslint .', 'just check', 'just test', 'just dev', 'just typecheck',
+    'cat wrangler.jsonc', 'cat wrangler.toml', 'git add wrangler.jsonc', 'git diff wrangler.jsonc', 'vim wrangler.jsonc', 'ls node_modules/wrangler', 'cat node_modules/wrangler/package.json', 'cat node_modules/wrangler/bin/wrangler.js',
+    'npm install -D wrangler@4.151.3', 'npm install wrangler --save-dev', 'npm i -D wrangler --save-exact', 'pnpm add -D wrangler', 'yarn add -D wrangler', 'npm ls wrangler', 'npm view wrangler version', 'npm info wrangler', 'npm update wrangler', 'npm uninstall wrangler',
+    'ssh-keygen -l -f key.pub', 'git add package.json',
+  ];
+  for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
+});
+
+test('cloudflare-workers secretFiles: .dev.vars is a secret file, its template is not', async () => {
+  const { loadRules, secretRule } = await import('../modules/security/lib/guards.js');
+  const rules = loadRules({ kitRoot: KIT_ROOT, profiles: ['cloudflare-workers'] });
+  for (const f of ['.dev.vars', '.dev.vars.staging', 'sub/.dev.vars']) assert.ok(secretRule(rules, f), f);
+  for (const f of ['.dev.vars.example', 'wrangler.jsonc', 'dev.vars.md']) assert.equal(secretRule(rules, f), null, f);
 });

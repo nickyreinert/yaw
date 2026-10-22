@@ -1,0 +1,12 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+# Allow-list by exclusion: after the Wrangler CLI (also via npx, pnpm dlx/exec, yarn, bunx, name@version, node_modules/.bin, env prefixes, sudo, bash -c, chains) only dev, types, check, docs, --version and --help pass; d1, kv and r2 pass only with --local.
+guards:
+  - { id: wrangler-remote, pattern: "(?<![\\w.-])(?<!\\b(?:npm|pnpm|yarn|bun)[ \\t]+(?:i|install|add|remove|rm|uninstall|update|up|view|info|ls|list|why|outdated)\\b(?:[ \\t]+[^\\s;&|()]+)*[ \\t]+)wrangler(?:\\.m?js)?(?:@\\S+)?(?=\\s)\\s+(?!(?:dev|types|check|docs|--version|-v|--help|-h)(?=\\s|$|[;&|)\"'])|(?:kv|r2|d1)(?=[^;&|)\\n]*\\s--local(?=\\s|$|[;&|)\"'])))\\S", reason: The Wrangler CLI deploys; changes secrets and talks to your Cloudflare account; only you run it (local dev; types and check are allowed). }
+  - { id: wrangler-remote-flag, pattern: "(?<![\\w.-])wrangler(?:\\.m?js)?(?:@\\S+)?(?=\\s)[^;&|)\\n]*\\s(?:--[a-z-]*remote\\b|-r(?=\\s|$|[;&|)\"']))", reason: Remote mode (--remote and -r) reaches your Cloudflare account; only you run it. }
+  - { id: just-deploy, pattern: "\\bjust\\b.*\\bdeploy\\b|\\bYAW_CONFIRM_PROD\\b|\\b(?:npm|pnpm|yarn|bun)\\s+(?:run\\s+)?(?:deploy|publish)\\b", reason: Deploying to production needs you to run it. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp)\\s+\\S", reason: Reaching a remote host needs your approval. }
+secretFiles:
+  - { id: dev-vars, pattern: '^\.dev\.vars(?:\..+)?$', reason: .dev.vars holds local Worker secrets. }
+secretAllow:
+  - { id: dev-vars-template, pattern: '^\.dev\.vars\.(?:example|sample|template)$' }
