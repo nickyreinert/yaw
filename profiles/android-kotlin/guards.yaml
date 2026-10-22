@@ -3,10 +3,10 @@
 # Gradle: the wrapper, `gradle` and `gradlew.bat`, behind any path, env prefix, sudo, bash -c, chain or subshell, are matched by the tasks they name.
 guards:
   - id: gradle-publish
-    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*[\s:"''](?:publish|promote)\w*(?=\s|$|[;&|)"''`])'
+    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*[\s:"''](?:[Pp][Uu][Bb][Ll][Ii][Ss][Hh]|[Pp][Rr][Oo][Mm][Oo][Tt][Ee])\w*(?=\s|$|[;&|)<>"''`])'
     reason: Publishing (Maven, Play Store, any publish or promote task) needs your approval.
   - id: gradle-release
-    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*(?:[\s:"''](?:bundle(?:\w*Release)?|install\w*Release|sign\w+)(?=\s|$|[;&|)"''`]|:)|android\.injected\.signing|[\s"'']-P\w*(?:[Kk]eystore|[Ss]tore(?:File|Password)|[Kk]ey(?:Alias|Password|store))\w*[=\s])'
+    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*(?:[\s:"''](?:[Bb][Uu][Nn][Dd][Ll][Ee](?:\w*[Rr][Ee][Ll][Ee][Aa][Ss][Ee])?|[Ii][Nn][Ss][Tt][Aa][Ll][Ll]\w*[Rr][Ee][Ll][Ee][Aa][Ss][Ee]|[Ss][Ii][Gg][Nn]\w+)(?=\s|$|[;&|)<>"''`]|:)|android\.injected\.signing|[\s"'']-P\w*(?:[Kk]eystore|[Ss]tore(?:File|Password)|[Kk]ey(?:Alias|Password|store))\w*[=\s])'
     reason: A release bundle, a release install or signing needs your keystore and your approval.
   - id: signing-tools
     pattern: '(?<![\w.-])(?:apksigner|jarsigner)(?:\.jar|\.bat)?(?=\s|$|[;&|)"''`])|(?<![\w.-])keytool(?:\.exe)?(?=\s)\s+(?!-(?:help|printcert|version)(?:\s|$|[;&|)"''`]))\S'
