@@ -70,7 +70,7 @@ Severity: **C** = contradiction, **G** = gap, **A** = ambiguity. "Blocks" = firs
 | P4 | C | Step 3 builds lean with only `core`; other Quick modules come in 5.1–5.3. | B Steps 3, 5; D04 §1 | 3 | ✅ BD5 (no reordering) |
 | P5 | G | No Node profile for dogfooding. | B rule 9, Step 3; D05 §1 | 3 | ✅ BD7 (`node-cli`, built in Step 3) |
 | P6 | C | Phase-1 contents of Standard/Full undefined; `security`, `quality-code` etc. not in K phase 1. | K; D04 §1; B Steps 5, 9 | 3, 9 | ◐ `security` phase 1, `quality-code` phase 2 (BD6); Standard/Full phase-1 contents → ADR-0009, amended by ADR-0032 (Quick and Full only) |
-| P7 | C | Interview 0.1 has three expertise levels; D02 §4 defines two. | D02 §4; D03 0.1 | 7 | Open → Y-7.1 (ADR) |
+| P7 | C | Interview 0.1 has three expertise levels; D02 §4 defines two. | D02 §4; D03 0.1 | 7 | ✅ ADR-0042: keep three levels, doc 02 §4 gets a third column (Y-7.1) |
 | P8 | A | Where global answers live if `~/.yaw/` storage is declined. | D02 §5; D03 §0 | 3, 7 | Open → Y-7.2 (ADR) |
 | P9 | G | Quick has no `decisions`; where do APPLY's ADRs / provisional ADRs go? | D02 §1; D03 | 3 | Open → ADR-0009 |
 
@@ -160,6 +160,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0034 | `static-site` profile: pinned linters (html-validate 10.0.0 for Node 22.13), `npm audit --omit=dev`, narrow `suggestWhen`, per-profile CI job | Y-6.1 (B rule 10) | Step 6 | Written, Proposed (Y-6.1 PR) |
 | 0035 | `python-web` profile: FastAPI scaffold without database, gate without Docker (ruff, bandit, pyright, pytest, pip-audit), language-only `suggestWhen`, per-profile CI job | Y-6.2 (B rule 10) | Step 6 | Written, Proposed (Y-6.2 PR) |
 | 0041 | Profile composition: each profile a `just` mod in its own folder, root verbs call every profile | Y-6.8 (B rule 10) | Step 6 | Written, Proposed (Y-6.8 PR) |
+| 0042 | Interview expertise: three levels (layperson, intermediate, expert); doc 02 §4 gets a third column; behaviour per level in the CLI | P7 (Y-7.1, B rule 10) | Step 7 | Accepted (Y-7.1 PR) |
 
 ---
 
@@ -290,7 +291,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
 | Y-7 | Step 7: full interview and browser form | Epic | P1 | Y-5 | CLI and form produce identical answer files for the same choices; the form server rejects requests without the token and from non-local origins |
-| Y-7.1 | Full CLI interview (0.0 agents, 1.5 solo/team, presets, expertise levels) | Feature | P1 | Y-3.3 | Agent choice: Claude, Codex, Copilot (others greyed out "phase 3", BD8); all Q/S/F questions of phase-1 modules; expertise levels per P7 ADR |
+| Y-7.1 | Full CLI interview (0.0 agents, 1.5 solo/team, presets, expertise levels) (#70, ADR-0042) | Feature | P1 | Y-3.3 | **done**: setup depth (Quick / Full) is the first question; agent choice: Claude, Codex, Copilot (others "phase 3, not available yet", BD8); solo/team; all Q/S/F questions of the phase-1 modules for the depth, with the module set following the answers (team questions only for teams: `team.session-context` gets `when`); three expertise levels per ADR-0042 (layperson: help up front, F questions defaulted; expert: hints collapsed). Same `answers.yaml` schema, no new key. Tests in `test/interview-full.test.js`. Saved presets and `~/.yaw` are Y-7.2, secret entry Y-7.6 |
 | Y-7.2 | User profile + saved setups (`~/.yaw/`, opt-in) | Feature | P1 | Y-1.12 | Opt-in prompt; `yaw presets list/show/delete`; history.jsonl; saved setups never hold secrets |
 | Y-7.3 | Local form server | Feature | P1 | Y-2.4 | `127.0.0.1` only, random port, one-time token, Host/Origin checks (DNS rebinding), CSRF protection, 30-min idle shutdown, no external assets |
 | Y-7.4 | Form UI (single page, live summary, module toggles) | Feature | P1 | Y-7.3 | Keyboard navigation; help blocks per expertise; *Save draft / Save as preset / Show diff / Apply* with a streamed log |

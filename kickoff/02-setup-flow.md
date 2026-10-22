@@ -50,6 +50,7 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 ### CLI lane
 
 - Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).
+- The first question is the setup depth (Quick or Full; Enter takes Quick), then the questions of the chosen depth for the modules it can select. The module set follows the answers (team, GitHub): the questions of a module that is not selected stay hidden by their `when` (for example the team questions of a solo project). The agent question (0.0) lists Claude Code, Codex and Copilot as selectable and the other agents with "(phase 3, not available yet)", which is the terminal form of greyed out. The expertise level (0.1) changes what is shown from the next question on (section 4).
 - Non-interactive: `yaw init --answers answers.yaml --yes` (CI, repeat setups).
 
 ### Browser-form lane
@@ -64,16 +65,19 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 - Secret fields (doc 08) are written straight to `.env` / the OS keychain by the server; they never appear in `answers.yaml` nor in any LLM prompt.
 - Buttons: *Save draft*, *Save as preset*, *Show diff of files*, *Apply*. Apply streams the log of the `apply` step.
 
-## 4. Expert vs. layperson
+## 4. Expertise levels
 
-Asked first, stored globally (doc 03, section 0). It switches:
+Asked second, right after the agents (doc 03, 0.1), stored globally (doc 03, section 0). Three levels, `intermediate` is the default and applies until the question is answered (ADR-0042; the answers and the user profile have always held three values). It switches:
 
-| Aspect | Expert | Layperson |
-|---|---|---|
-| Help blocks | Collapsed | Expanded on first visit |
-| Wording | Technical terms | Plain language + one example |
-| Defaults | Shown, rarely explained | Explained in one sentence |
-| Questions | All of the chosen mode | Questions with safe defaults auto-answered and listed |
+| Aspect | Layperson | Intermediate | Expert |
+|---|---|---|---|
+| Help blocks | Shown before the question is asked (CLI); expanded on first visit (form) | On request (`?` in the CLI, collapsed in the form) | On request |
+| Hints | Shown | Shown | Collapsed behind `?` (CLI) |
+| Wording (form) | Plain language + one example | Plain language | Technical terms |
+| Defaults (form) | Explained in one sentence | Shown | Shown, rarely explained |
+| Questions | F questions take their default and are listed as "default" in the summary; Q and S are asked | All of the chosen mode | All of the chosen mode |
+
+The CLI implements help blocks, hints and questions (Y-7.1); the wording and defaults rows are the form's (Y-7.4).
 
 ## 5. Saved setups ("presets") in the user folder
 

@@ -12,8 +12,8 @@ Rules for the interviewer (CLI, form, or agent):
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|
-| 0.0 | **Which coding agents should this setup support?** (first screen, multi-select, per project; global default remembered) | **Claude Code** / Codex / Copilot / Gemini CLI (enterprise / API key) / Antigravity CLI / Pi / Hermes (phase 1: Claude Code, Codex, Copilot; others phase 3) | Q | adapters, which customisation is generated, capability hints |
-| 0.1 | Your experience with software development? | layperson / **intermediate** / expert | Q | help depth, wording |
+| 0.0 | **Which coding agents should this setup support?** (first screen, multi-select, per project; global default remembered) | **Claude Code** / Codex / Copilot / Gemini CLI (enterprise / API key) / Antigravity CLI / Pi / Hermes (phase 1: Claude Code, Codex, Copilot; others phase 3, shown as "not available yet" in the CLI) | Q | adapters, which customisation is generated, capability hints |
+| 0.1 | Your experience with software development? | layperson / **intermediate** / expert (ADR-0042, doc 02 §4) | Q | help depth, hints, wording, whether F questions are asked |
 | 0.2 | Language for chat with the agent? | **de** / en / … | Q | communication |
 | 0.3 | Answer length? | brief & on point / **balanced** / extensive | Q | communication |
 | 0.4 | Register? | plain words / **professional** / technical / scientific | S | communication |
@@ -36,7 +36,7 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 |---|---|---|---|
 | 1.1 | Describe the idea in a few sentences. (free text) | Q | proposal |
 | 1.2 | Who uses it? (me only / a known group / the public) | Q | privacy, security, scale |
-| 1.3 | Prototype, MVP, or long-lived product? | Q | mode (prototype, MVP → Quick; long-lived product → Full; ADR-0032, built in step 7), gate strictness |
+| 1.3 | Prototype, MVP, or long-lived product? | Q | mode (prototype, MVP → Quick; long-lived product → Full; ADR-0032). The CLI asks it as the first question, the setup depth, before the interview; the answer is `answers.yaml#mode`, not a question key (Y-7.1), gate strictness |
 | 1.4 | What does success look like in 3 and 12 months? What is out of scope? | F | ADRs, tasks |
 | 1.5 | Solo or team? Who approves changes? (solo / team / external reviewers) | Q | **team mode (doc 14)**, review policy, branch protection |
 | 1.6 | Budget envelope (hosting, AI, tools): free only / small monthly / flexible | S | vendors, hosting |

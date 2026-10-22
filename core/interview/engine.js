@@ -115,9 +115,10 @@ function helpText(q, kitRoot) {
   return parts.length > 0 ? parts.join('\n\n') : 'No further help for this question. Enter takes the default, skip lists it as "default".';
 }
 
-function render(q, number, total) {
+function render(q, number, total, expertise) {
   const lines = [`  ${number}/${total} ${q.label}`];
-  if (q.hint) lines.push(`      ${q.hint}`);
+  // Expert: hints are collapsed behind "?" (doc 02 section 4).
+  if (q.hint && expertise !== 'expert') lines.push(`      ${q.hint}`);
   if (q.choices) {
     q.choices.forEach((c, i) => {
       const note = available(c) ? '' : ` (phase ${c.phase}, not available yet)`;
@@ -126,6 +127,13 @@ function render(q, number, total) {
   }
   return lines.join('\n');
 }
+
+// Expertise levels (ADR-0042). The level comes from the answer to user.expertise (or `known`), intermediate until then.
+//   layperson     help text of a question is shown before it is asked; F questions take their default (listed as such)
+//   intermediate  help on request ("?"); every question of the mode is asked
+//   expert        like intermediate, hints collapsed behind "?"
+export const EXPERTISE_LEVELS = ['layperson', 'intermediate', 'expert'];
+const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expertise']) ? answers['user.expertise'] : 'intermediate');
 
 // questions: all questions of the enabled modules (base first). mode: quick | standard | full.
 // known: answers that already exist; only used to evaluate `when`, never returned.
@@ -144,8 +152,15 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     prompter.show(`\n${batch.title} (${b + 1}/${batches.length})\n`);
     for (const q of batch.questions) {
       if (!whenMatches(q.when, seen())) continue;
+      const expertise = expertiseOf(seen());
+      if (expertise === 'layperson' && q.mode === 'F') {
+        answers[q.id] = q.default;
+        defaulted.push(q.id);
+        continue;
+      }
       number++;
-      prompter.show(`${render(q, number, total)}\n`);
+      prompter.show(`${render(q, number, total, expertise)}\n`);
+      if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
       for (;;) {
         const reply = await prompter.ask(`      [${formatDefault(q)}] (? help, skip) > `);
         const r = parseReply(q, reply);

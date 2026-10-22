@@ -10,6 +10,7 @@ questions:
   - id: team.session-context
     mode: F
     type: boolean
+    when: { idea.team: team }
     label: Tell the agent the active issue at session start?
     hint: One line (issue number and title of the current branch); off saves those tokens.
     default: true
