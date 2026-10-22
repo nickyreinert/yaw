@@ -15,6 +15,7 @@ const ANSWERS = join(KIT_ROOT, 'examples', 'composed', 'answers.yaml');
 const PROFILES = ['static-site', 'cloudflare-workers'];
 const skipJust = !hasTool('just') && 'just is not installed';
 const skipNet = skipJust || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
+const plain = (text) => text.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
 const read = (cwd, rel) => readFileSync(join(cwd, rel), 'utf8');
 
 function initComposed(extra = []) {
@@ -94,9 +95,10 @@ test('smoke composed: yaw init verifies just setup && just check; a bad file in 
   const cwd = tmp('yaw-compose-');
   const r = run(process.execPath, [YAW, 'init', '--answers', ANSWERS, '--yes'], { cwd, env: { ...process.env, CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' } });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /verified: just setup and just check passed/);
-  assert.match(r.stdout, /check-links: 1 page\(s\), all local links resolve/, 'the static-site gate ran');
-  assert.match(r.stdout, /Tests\s+3 passed \(3\)/, 'the cloudflare-workers gate ran');
+  const out = plain(r.stdout);
+  assert.match(out, /verified: just setup and just check passed/);
+  assert.match(out, /check-links: 1 page\(s\), all local links resolve/, 'the static-site gate ran');
+  assert.match(out, /Tests\s+3 passed \(3\)/, 'the cloudflare-workers gate ran');
 
   const siteBad = join(cwd, 'static-site', 'public', 'bad.html');
   copyFileSync(join(KIT_ROOT, 'test', 'profiles', 'static-site', 'invalid.html'), siteBad);
