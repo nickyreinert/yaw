@@ -1,0 +1,9 @@
+# profiles/wordpress-plugin/profile.yaml
+# Never auto-suggested (ADR-0038): the interview has no WordPress or PHP fact, so no fact is narrow enough; the user picks it from the list.
+# The gate runs without Docker; wp-env (just dev) and Plugin Check (by hand in wp-env) are on demand.
+name: wordpress-plugin
+summary: WordPress plugin; Composer, PHPCS with WPCS, PHPStan with WP stubs, PHPUnit, composer audit, wp-env.
+suggestWhen: {}
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [php>=8.2, composer, just]
