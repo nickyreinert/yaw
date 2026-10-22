@@ -386,7 +386,7 @@ test('php-web guards block migrations, remote hosts and registry pushes in every
     'php8.3 artisan migrate', './artisan migrate', 'php ./artisan migrate', 'vendor/bin/sail artisan migrate', 'sail artisan migrate', 'sudo php artisan migrate',
     'docker compose exec app php artisan migrate', 'docker exec app php artisan migrate --force', 'bash -c "php artisan migrate"', "sh -c 'php artisan migrate --force'",
     'cd app && php artisan migrate', 'true;php artisan migrate', 'echo x|php artisan migrate', '(php artisan migrate)', '$(php artisan migrate)', 'nohup php artisan migrate', 'time php artisan migrate',
-    'php artisan migrate --pretend && php artisan migrate', 'php artisan migrate --pretend; php artisan migrate --force', 'php artisan migrate:fresh',
+    'php artisan migrate --pretend && php artisan migrate', 'php artisan migrate --pretend; php artisan migrate --force', 'php artisan migrate:fresh', 'php artisan migrate --force # --pretend', 'php artisan migrate --pretend\nphp artisan migrate --force',
     'ssh me@host', 'ssh -p 22 host ls', 'sudo ssh host', 'env X=1 ssh host', 'scp a.zip me@host:/var/www', 'sftp me@host', 'ftp host', 'lftp -e "mirror -R" host', 'true;ssh host',
     'rsync -av ./ me@host:/var/www/', 'rsync -av --delete public/ host:/var/www/', 'rsync -e ssh -av a/ b', 'rsync -av a/ host::module', 'rsync -av a/ rsync://host/module/', 'sudo rsync -av a/ me@host:/x', 'bash -c "rsync -av a/ me@host:/x"',
     'DOCKER_HOST=ssh://me@host docker compose up', 'docker -H ssh://me@host ps', 'docker --host tcp://host:2375 ps', 'docker --context prod compose up', 'sudo docker -H x ps',

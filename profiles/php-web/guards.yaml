@@ -2,7 +2,7 @@
 # pattern is a regular expression matched against the command line.
 guards:
   # Any artisan migrate/db:wipe call (php, ./artisan, sail, docker exec, --env=production, APP_ENV=...), except a --pretend dry run.
-  - { id: artisan-migrate, pattern: "\\bartisan\\b(?=[^;&|)]*(\\bmigrate\\b|\\bdb:(wipe|seed)\\b))(?![^;&|)]*--pretend)", reason: Running migrations (production or not) needs your approval; only --pretend is allowed. }
+  - { id: artisan-migrate, pattern: "\\bartisan\\b(?=[^;&|)]*(\\bmigrate\\b|\\bdb:(wipe|seed)\\b))(?![^;&|)#\\n]*--pretend)", reason: Running migrations (production or not) needs your approval; only --pretend is allowed. }
   - { id: remote-host, pattern: "\\b(ssh|scp|sftp|ftp|lftp)\\s+\\S|\\brsync\\b.*\\s[^\\s/.][^\\s/]*:\\S|\\bDOCKER_HOST=", reason: Reaching a remote host (production) needs your approval. }
   - { id: remote-docker, pattern: "\\bdocker\\s+(-H|--host\\b|--context\\b)", reason: Running Docker against a remote host needs your approval. }
   - { id: docker-push, pattern: "\\bdocker(-compose)?\\b.*(\\bpush\\b|--push)", reason: Pushing an image to a registry needs your approval. }
