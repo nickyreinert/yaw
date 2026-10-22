@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
 import { saveSetup, secretFindings } from '../core/lib/user-store.js';
+import { schemas } from '../core/render/kit.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
@@ -154,6 +155,10 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
     [{ 'idea.text': `use ${CANARY} for deploys` }, 'idea.text', 'token-prefix'],
     [{ 'idea.text': 'MY_KEY_ghp_CANARY0123456789abcdefghijklmnopqrst' }, 'idea.text', 'token-prefix'],
     [{ 'idea.text': '1ghp_CANARY0123456789abcdefghijklmnopqrst' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'hf_abcdefghijklmnopqrstuvwxyz' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'sk-proj-abcdefghijklmnop1234' }, 'idea.text', 'token-prefix'],
+    [{ 'idea.text': 'Authorization: Bearer abcdef.123456' }, 'idea.text', 'bearer'],
     [{ 'idea.text': 'sk_live_abcdefghijklmnop1234' }, 'idea.text', 'token-prefix'],
     [{ 'idea.text': 'rk_live_abcdefghijklmnop1234' }, 'idea.text', 'token-prefix'],
     [{ 'idea.text': `npm_${'a1'.repeat(18)}` }, 'idea.text', 'token-prefix'],
@@ -185,7 +190,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
     assert.equal(r.saved, false);
   }
   assert.equal(existsSync(join(env.HOME, '.yaw')), false, 'nothing is written when a save is refused');
-  for (const ok of ['A small tool for photos.', 'local', 'bypass: enabled by default', 'tokens: 12', 'see http://localhost:8080/path?mail=a@b.example', 'the task-runner skips it', 'password reset flow for users', 'Bearer of good news']) {
+  for (const ok of ['A small tool for photos.', 'local', 'bypass: enabled by default', 'tokens: 12', 'see http://localhost:8080/path?mail=a@b.example', 'the task-runner skips it', 'password reset flow for users', 'Bearer of good news', 'sk-learn-compatible-pipelines']) {
     assert.deepEqual(secretFindings({ answers: { 'idea.text': ok }, kitRoot: KIT_ROOT }), [], ok);
   }
 
@@ -203,4 +208,17 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   for (const f of ['.yaw/answers.yaml', 'AGENTS.md', '.yaw/base/AGENTS.md']) assert.match(readFileSync(join(r.cwd, f), 'utf8'), new RegExp(CANARY.slice(0, 20)), f);
   assert.match(r.out, /idea\.text +\(hidden: looks like a secret\)/);
   assert.equal(existsSync(join(home, '.yaw')), false);
+});
+
+test('secret rules: no ReDoS on 100k-character values, and flags cannot be duplicated', () => {
+  const inputs = ["://".repeat(33333), 'token_'.repeat(16666), 'sk-'.repeat(33333), 'Bearer '.repeat(14285), 'token='.repeat(16666), ':'.repeat(100000), 'a'.repeat(100000)];
+  for (const text of inputs) {
+    const t = performance.now();
+    secretFindings({ answers: { 'idea.text': text }, kitRoot: KIT_ROOT });
+    assert.ok(performance.now() - t < 50, `${text.slice(0, 12)}: ${Math.round(performance.now() - t)} ms`);
+  }
+  const rule = (flags) => ({ guards: [{ id: 'a', pattern: 'x', flags, reason: 'r' }] });
+  assert.deepEqual(schemas().validate('guards.schema.json', rule('i')), []);
+  assert.deepEqual(schemas().validate('guards.schema.json', rule('im')), []);
+  assert.notDeepEqual(schemas().validate('guards.schema.json', rule('ii')), []);
 });

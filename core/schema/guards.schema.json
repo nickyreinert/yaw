@@ -43,7 +43,7 @@
       "properties": {
         "id": { "$ref": "common.schema.json#/$defs/name" },
         "pattern": { "type": "string", "minLength": 1 },
-        "flags": { "description": "Optional RegExp flags (secretValues rules use i).", "type": "string", "pattern": "^[imsu]*$" },
+        "flags": { "description": "Optional RegExp flags (secretValues rules use i).", "type": "string", "pattern": "^(?!.*(.).*\\1)[imsu]*$" },
         "reason": { "description": "One sentence shown to the agent when it is blocked.", "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
