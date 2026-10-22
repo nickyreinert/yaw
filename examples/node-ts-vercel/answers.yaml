@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile node-ts-vercel (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small API for my notes.
+  idea.team: solo
+  arch.language: typescript
+  arch.runs-on: serverless
+proposal:
+  status: confirmed
+  summary: node-ts-vercel - TypeScript app with serverless functions for Vercel; tsc, ESLint, Vitest, npm audit.
+  profiles: [node-ts-vercel]
+  modules: [core]

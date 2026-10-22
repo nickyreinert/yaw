@@ -1,0 +1,8 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  # Any Vercel CLI call (deploy, bare `vercel` = deploy, env, pull, promote, rollback, link, remove, token options; also via npx, pnpm dlx, bunx, name@version) except --version and --help.
+  - { id: vercel-cli, pattern: "\\bvercel(@\\S+)?(?=\\s|$|[;&|)])(?!\\s+(--version|-v|--help|-h)\\s*($|[;&|)]))", reason: The Vercel CLI deploys and changes env; only you run it. }
+  - { id: just-deploy, pattern: "\\bjust\\b.*\\bdeploy\\b|\\bYAW_CONFIRM_PROD\\b", reason: Deploying to production needs you to run it. }
+  - { id: npm-publish, pattern: "\\b(npm|pnpm|yarn)\\s+publish\\b", reason: Publishing to the npm registry needs your approval. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp)\\s+\\S", reason: Reaching a remote host needs your approval. }
