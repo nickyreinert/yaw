@@ -1,0 +1,8 @@
+- TypeScript in strict mode; `just typecheck` (`tsc --noEmit`) must pass. No `any` without a comment saying why.
+- Logic lives in plain functions in `src/`; serverless functions in `api/` stay thin and call them.
+- Tests use Vitest, live in `tests/` as `*.spec.ts`, are deterministic and make no network calls.
+- Lint with ESLint (`just lint`); do not add a second linter or formatter without an ADR.
+- Dependencies are pinned exact versions; run `just audit` after changing them.
+- Settings and secrets come from environment variables (`.env` is local only); never hard-code, log or commit them.
+- `vercel.json` holds platform configuration only; changing routes, headers or env needs a reason in the PR.
+- Deploying (`vercel`, `just deploy`), env changes and promotions are remote: only the user runs them, never CI or the agent.

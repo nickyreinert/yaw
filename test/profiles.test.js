@@ -5,13 +5,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
 import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'python-cli', 'python-web', 'static-site'];
+const PROFILES = ['node-cli', 'node-ts-vercel', 'python-cli', 'python-web', 'static-site'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -19,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles node-cli, python-cli, python-web and static-site, and profile.yaml validates', () => {
+test('the kit has exactly the profiles node-cli, node-ts-vercel, python-cli, python-web and static-site, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -288,4 +289,57 @@ test('python-web guards block publishing and remote forms, not local work', () =
     assert.ok(blocked(cmd), cmd);
   }
   for (const cmd of ['docker build -t app .', 'docker compose up', 'alembic upgrade head', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'uv run pytest']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('node-ts-vercel is never suggested automatically (the user picks it); node-cli keeps its suggestion', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  for (const facts of [{}, { runsOn: 'serverless', hosted: true }, { language: 'typescript' }, { language: 'typescript', runsOn: 'serverless', hosted: true }, { language: 'typescript', runsOn: 'self-hosted', hosted: true }, { public: true }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'node-ts-vercel'), JSON.stringify(facts));
+  }
+  assert.equal(suggestProfiles(profiles, { language: 'typescript', runsOn: 'local', hosted: false }).suggestion, 'node-cli');
+});
+
+test('node-ts-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('node-ts-vercel', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'dev', 'fmt', 'build']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  // deploy refuses before it reaches the Vercel CLI (a PATH without npx proves nothing is run)
+  const only = tmp('yaw-bin-');
+  for (const t of ['sh', 'just']) symlinkSync(execFileSync('which', [t], { encoding: 'utf8' }).trim(), join(only, t));
+  const bare = { PATH: only };
+  for (const [args, extra] of [[[], {}], [['prod'], {}], [['preview'], { YAW_CONFIRM_PROD: 'yes' }], [['prod'], { YAW_CONFIRM_PROD: 'no' }], [['prod'], { YAW_CONFIRM_PROD: 'yes', CI: 'true' }]]) {
+    const r = run('just', ['deploy', ...args], { cwd, env: cleanEnv(tmp('yaw-home-'), { ...bare, ...extra }) });
+    assert.notEqual(r.status, 0, `deploy ${args} ${JSON.stringify(extra)}`);
+    assert.match(r.stderr, /deploy: refused/);
+    assert.doesNotMatch(r.stdout + r.stderr, /vercel@/);
+  }
+});
+
+const nodeTsSkip = (!haveJust && 'just is not installed') || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
+
+test('smoke node-ts-vercel: yaw init, just setup && just check pass; bad code fails the gate (needs npm and network)', { skip: nodeTsSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('node-ts-vercel', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'node-ts-vercel');
+  const bad = join(cwd, 'src', 'bad.ts');
+  copyFileSync(join(fixtures, 'lint_error.ts'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
+  copyFileSync(join(fixtures, 'type_error.ts'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('node-ts-vercel guards block every Vercel CLI form and the deploy recipe, not local work', () => {
+  const guards = parse(readFileSync(dir('node-ts-vercel', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['vercel', 'vercel --prod', 'vercel deploy', 'vercel deploy --prod', 'vercel --token abc deploy', 'vercel -y', 'vercel env add KEY', 'vercel env pull', 'vercel pull', 'vercel promote x', 'vercel rollback', 'vercel link', 'vercel remove app', 'vercel dev', 'vercel --version --prod', 'vc --prod', 'vc', 'npx vc deploy', 'VERCEL_TOKEN=abc vercel --prod', 'CI=1 vercel deploy', 'env -i vercel deploy', 'npx vercel --prod', 'npx -y vercel@latest deploy', 'npx --yes vercel@65.0.0 deploy --prod', 'pnpm dlx vercel deploy', 'pnpm exec vercel deploy', 'npm exec vercel -- deploy', 'bunx vercel deploy', 'yarn dlx vercel deploy', 'npx --package=vercel -- vercel deploy', 'cd app && vercel --prod', 'true;vercel deploy', 'echo x|vercel deploy', '(vercel deploy)', 'sudo vercel deploy', './node_modules/.bin/vercel --prod', 'just deploy prod', 'YAW_CONFIRM_PROD=yes just deploy prod', 'just --justfile justfile deploy prod', 'just -f x deploy', 'YAW_CONFIRM_PROD=yes npx vercel', 'npm publish', 'pnpm publish', 'ssh me@host']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['vercel --version', 'vercel -v', 'vercel --help', 'npx vercel@65.0.0 --version', 'cat vercel.json', 'npx vitest run', 'just check', 'just test', 'npm test', 'npx tsc --noEmit', 'npx eslint .', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
 });
