@@ -12,7 +12,7 @@ Rules for the interviewer (CLI, form, or agent):
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|
-| 0.0 | **Which coding agents should this setup support?** (first screen, multi-select, per project; global default remembered) | **Claude Code** / Codex / Copilot / Gemini CLI (enterprise / API key) / Antigravity CLI / Pi / Hermes (phase 1: Claude Code, Codex, Copilot; others phase 3, shown as "not available yet" in the CLI) | Q | adapters, which customisation is generated, capability hints |
+| 0.0 | **Which coding agents should this setup support?** (first question after the setup depth, multi-select, per project; global default remembered) | **Claude Code** / Codex / Copilot / Gemini CLI (enterprise / API key) / Antigravity CLI / Pi / Hermes (phase 1: Claude Code, Codex, Copilot; others phase 3, shown as "not available yet" in the CLI) | Q | adapters, which customisation is generated, capability hints |
 | 0.1 | Your experience with software development? | layperson / **intermediate** / expert (ADR-0042, doc 02 §4) | Q | help depth, hints, wording, whether F questions are asked |
 | 0.2 | Language for chat with the agent? | **de** / en / … | Q | communication |
 | 0.3 | Answer length? | brief & on point / **balanced** / extensive | Q | communication |

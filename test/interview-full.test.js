@@ -21,7 +21,10 @@ function byLabel(replies) {
     if (/Write these files\?/.test(question)) return 'y';
     if (/Setup depth \[/.test(question)) return left.get('depth') ?? '';
     if (/Profile/.test(question)) return left.get('profile') ?? '';
-    for (const [label, reply] of left) if (label !== 'depth' && label !== 'profile' && screen.includes(label)) return reply;
+    for (const [label, reply] of left) {
+      if (label === 'depth' || label === 'profile' || !screen.includes(label)) continue;
+      return Array.isArray(reply) ? (reply.length > 1 ? reply.shift() : reply[0]) : reply;
+    }
     return '';
   };
   return p;
@@ -131,11 +134,32 @@ test('agents: each of Claude, Codex and Copilot is selectable alone and together
   }
 });
 
-test('agents: the others are shown as phase 3 and cannot be picked', async () => {
-  const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': 'gemini' });
+test('agents: the others are shown as phase 3, are refused, and the interview finishes with a valid agent', async () => {
+  const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': ['gemini', 'codex'] });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(r.doc.answers['user.agents'], ['codex']);
   const shown = r.prompter.shown.join('');
   for (const a of ['gemini', 'antigravity', 'pi', 'hermes']) assert.match(shown, new RegExp(`\\) ${a} .*\\(phase 3, not available yet\\)`));
   assert.match(shown, /"Gemini CLI \(enterprise \/ API key\)" is not available yet/);
+});
+
+test('expertise: a layperson is still asked the Q and S questions', async () => {
+  const r = await init({ depth: 'full', ...IDEA, 'Your experience with software': 'layperson', 'Answer length': '', 'Language for chat': 'en', 'Register': 'plain-words' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.doc.answers['user.language'], 'en', 'Q question answered');
+  const shown = r.prompter.shown.join('');
+  for (const label of ['Language for chat', 'Use GitHub for the repo', 'Which comfort features', 'Task tracking']) assert.match(shown, new RegExp(label));
+  assert.ok(!r.out.includes('user.language  en  (default)'));
+});
+
+test('yaw add team on a solo project lists the question it does not ask as a default', async () => {
+  const r = await init({ depth: 'full', ...IDEA });
+  const stdout = capture();
+  const stderr = capture();
+  const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
+  // Adding team to a solo Full project can exceed the AGENTS.md budget (exit 1 after the answers are listed); the listing is what is tested.
+  assert.ok(code === 0 || /AGENTS.md would have/.test(stderr.text()), stderr.text());
+  assert.match(stdout.text(), /not asked team\.session-context: applies only when idea\.team = team; the default is true {2}\(default\)/);
 });
 
 test('expertise: each level is recorded; the level changes how the interview is shown', async () => {

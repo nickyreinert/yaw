@@ -67,7 +67,7 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 
 ## 4. Expertise levels
 
-Asked second, right after the agents (doc 03, 0.1), stored globally (doc 03, section 0). Three levels, `intermediate` is the default and applies until the question is answered (ADR-0042; the answers and the user profile have always held three values). It switches:
+Asked after the setup depth and the agents (doc 03, 0.1), stored globally (doc 03, section 0). Three levels, `intermediate` is the default and applies until the question is answered (ADR-0042; the answers and the user profile have always held three values). It switches:
 
 | Aspect | Layperson | Intermediate | Expert |
 |---|---|---|---|

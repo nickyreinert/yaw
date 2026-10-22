@@ -160,7 +160,7 @@ YAW's own ADRs lived in `docs/adr/` until Step 5.6; since Y-5.6 they are short r
 | 0034 | `static-site` profile: pinned linters (html-validate 10.0.0 for Node 22.13), `npm audit --omit=dev`, narrow `suggestWhen`, per-profile CI job | Y-6.1 (B rule 10) | Step 6 | Written, Proposed (Y-6.1 PR) |
 | 0035 | `python-web` profile: FastAPI scaffold without database, gate without Docker (ruff, bandit, pyright, pytest, pip-audit), language-only `suggestWhen`, per-profile CI job | Y-6.2 (B rule 10) | Step 6 | Written, Proposed (Y-6.2 PR) |
 | 0041 | Profile composition: each profile a `just` mod in its own folder, root verbs call every profile | Y-6.8 (B rule 10) | Step 6 | Written, Proposed (Y-6.8 PR) |
-| 0042 | Interview expertise: three levels (layperson, intermediate, expert); doc 02 §4 gets a third column; behaviour per level in the CLI | P7 (Y-7.1, B rule 10) | Step 7 | Accepted (Y-7.1 PR) |
+| 0042 | Interview expertise: three levels (layperson, intermediate, expert); doc 02 §4 gets a third column; behaviour per level in the CLI | P7 (Y-7.1, B rule 10) | Step 7 | Written, Proposed (Y-7.1 PR) |
 
 ---
 
