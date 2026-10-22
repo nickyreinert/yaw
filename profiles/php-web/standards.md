@@ -1,0 +1,9 @@
+- PHP >= 8.2 with `declare(strict_types=1);` in every file and types on all parameters and returns; `phpstan` must pass (`just typecheck`).
+- Code in `src/` (namespace `App`), tests in `tests/` (namespace `Tests`); `public/index.php` stays a thin front controller that calls into `src/`.
+- Manage dependencies with Composer (`composer require`, `composer install`); commit `composer.lock`; never edit `vendor/`.
+- Format with `php-cs-fixer` (`just fmt`; `just lint` only checks); do not add a second formatter.
+- Tests use PHPUnit, live in `tests/`, are deterministic and make no network calls.
+- Escape output (`htmlspecialchars`), use prepared statements for SQL, never `eval` or `unserialize` on input.
+- Secrets and settings come from environment variables (`.env` is local only); never hard-code them or log them.
+- Keep dependencies few; run `just audit` (`composer audit`) after changing them.
+- `rsync`/SFTP to a host and `artisan migrate` (other than `--pretend`) need the user's approval; `just deploy` does nothing yet.

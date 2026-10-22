@@ -1,0 +1,9 @@
+# profiles/php-web/profile.yaml
+# Never auto-suggested (ADR-0037): the interview has no PHP language choice, so no fact is narrow enough; the user picks it from the list.
+# Profile options (Laravel, MariaDB, doc 05 §2) come with the full interview (step 7); the scaffold is plain PHP without a database.
+name: php-web
+summary: Plain PHP web app; Composer, PHPStan, PHP-CS-Fixer, PHPUnit, composer audit.
+suggestWhen: {}
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [php>=8.2, composer, just]

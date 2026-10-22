@@ -65,11 +65,11 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '3', 'y']);
+  const prompter = scripted(['', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '4', 'y']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
-  assert.match(prompter.shown.join(''), /choose one of: node-cli, node-ts-vercel, python-cli, python-web, static-site/);
+  assert.match(prompter.shown.join(''), /choose one of: node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site/);
   assert.match(r.out, /profile: python-cli \(chosen by you\)/);
   assert.ok(existsSync(join(dir, 'pyproject.toml')));
 });
@@ -141,7 +141,7 @@ test('answers without a proposal and without a clear match are refused before an
 test('an unknown profile and several profiles are refused with the choices', async () => {
   const body = (profiles) => `mode: quick\nanswers:\n  user.agents: [claude]\nproposal:\n  status: confirmed\n  summary: x\n  profiles: [${profiles}]\n  modules: [core]\n`;
   const unknown = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('go-cli')), '--yes', '--skip-verify']);
-  assert.match(unknown.err, /profile "go-cli" does not exist in this kit \(available: node-cli, node-ts-vercel, python-cli, python-web, static-site\)/);
+  assert.match(unknown.err, /profile "go-cli" does not exist in this kit \(available: node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site\)/);
   const several = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('node-cli, python-cli')), '--yes', '--skip-verify']);
   assert.match(several.err, /several profiles \(node-cli, python-cli\) come with composition/);
   assert.deepEqual(readdirSync(several.cwd), []);
