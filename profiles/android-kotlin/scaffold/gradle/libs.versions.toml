@@ -1,0 +1,22 @@
+[versions]
+agp = "9.4.1"
+kotlin = "2.4.21"
+ktlintPlugin = "14.2.0"
+ktlintEngine = "1.8.0"
+detekt = "1.23.8"
+junit = "4.13.2"
+compose-bom = "2026.06.01"
+activity-compose = "1.13.0"
+
+[libraries]
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+junit = { module = "junit:junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintPlugin" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

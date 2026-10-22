@@ -1,0 +1,14 @@
+# Input of the kit CI smoke test for profile android-kotlin (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small Android app for my notes.
+  idea.team: solo
+proposal:
+  status: confirmed
+  summary: android-kotlin - Android app in Kotlin with Compose; Gradle, ktlint, detekt, Android Lint, JUnit.
+  profiles: [android-kotlin]
+  modules: [core]

@@ -1,4 +1,4 @@
-// Profiles python-cli (Y-3.4), node-cli (Y-3.5) and static-site (Y-6.1) and python-web (Y-6.2): parts, uniform verbs, and the smoke test per
+// Profiles (android-kotlin: Y-6.7) python-cli (Y-3.4), node-cli (Y-3.5) and static-site (Y-6.1) and python-web (Y-6.2): parts, uniform verbs, and the smoke test per
 // examples/<profile>/ (init in a temp dir, then just setup && just check).
 
 import { test } from 'node:test';
@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['cloudflare-workers', 'node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -20,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
+test('the kit has exactly the profiles android-kotlin, cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -556,4 +556,144 @@ test('cloudflare-workers secretFiles: .dev.vars is a secret file, its template i
   const rules = loadRules({ kitRoot: KIT_ROOT, profiles: ['cloudflare-workers'] });
   for (const f of ['.dev.vars', '.dev.vars.staging', 'sub/.dev.vars']) assert.ok(secretRule(rules, f), f);
   for (const f of ['.dev.vars.example', 'wrangler.jsonc', 'dev.vars.md']) assert.equal(secretRule(rules, f), null, f);
+});
+
+test('android-kotlin is never suggested automatically (the user picks it)', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  for (const facts of [{}, { language: 'typescript' }, { language: 'javascript' }, { language: 'python' }, { runsOn: 'local', hosted: false }, { runsOn: 'serverless', hosted: true, public: true }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'android-kotlin'), JSON.stringify(facts));
+  }
+});
+
+test('android-kotlin: gate recipes need no emulator, device, keystore or store; versions are exact; the wrapper is pinned by checksum', () => {
+  const just = readFileSync(dir('android-kotlin', 'just', 'android-kotlin.just'), 'utf8');
+  const recipe = (name) => just.match(new RegExp(`^${name}[^\\n]*:[^\\n]*\\n((?:[ \\t]+[^\\n]*\\n?)*)`, 'm'))?.[1] ?? '';
+  for (const name of ['setup', 'fmt', 'lint', 'typecheck', 'test', 'build']) {
+    const body = recipe(name);
+    assert.ok(body.length > 0 || name === 'setup', name);
+    assert.doesNotMatch(body, /publish|promote|bundle\w*Release|install\w*Release|assembleRelease|sign|keystore|keytool|fastlane|gcloud|\bbq\b|\badb\b|emulator|connectedAndroidTest|connected\w*Test/i, name);
+  }
+  assert.match(just, /^check: lint typecheck test sync-check$/m);
+  assert.match(recipe('lint'), /ktlintCheck detekt lintDebug/);
+  assert.match(recipe('test'), /testDebugUnitTest/);
+  assert.match(recipe('build'), /assembleDebug/);
+  const toml = readFileSync(dir('android-kotlin', 'scaffold', 'gradle', 'libs.versions.toml'), 'utf8');
+  const versions = [...toml.matchAll(/^([\w-]+) = "([^"]*)"$/gm)];
+  assert.ok(versions.length >= 8);
+  for (const [, name, version] of versions) assert.match(version, /^\d+(\.\d+)+$/, name);
+  const props = readFileSync(dir('android-kotlin', 'scaffold', 'gradle', 'wrapper', 'gradle-wrapper.properties'), 'utf8');
+  assert.match(props, /^distributionSha256Sum=[0-9a-f]{64}$/m);
+  assert.match(props, /^distributionUrl=https\\:\/\/services\.gradle\.org\/distributions\/gradle-\d+\.\d+(\.\d+)?-bin\.zip$/m);
+  for (const f of readdirSync(dir('android-kotlin', 'scaffold'), { recursive: true, withFileTypes: true }).filter((e) => e.isFile() && /\.(kts?|xml|toml|properties|yml)$/.test(e.name))) {
+    assert.doesNotMatch(readFileSync(join(f.parentPath, f.name), 'utf8'), /signingConfig|storeFile|storePassword|keyPassword|keyAlias|\.jks|\.keystore/, f.name);
+  }
+  const ci = readFileSync(dir('android-kotlin', 'ci', 'check.yml'), 'utf8').replace(/^\s*#.*$/gm, '');
+  assert.doesNotMatch(ci, /secrets\.|keystore|KEYSTORE|signing|play|PLAY|fastlane/i);
+  assert.deepEqual(ci.match(/uses: \S+/g).every((u) => /@[0-9a-f]{40}$/.test(u.slice(6))), true);
+  assert.match(ci, /sdkmanager|setup-android/);
+  assert.match(ci, /actions\/cache@/);
+});
+
+test('android-kotlin: verbs that do not apply print a note and exit 0; deploy refuses in CI and publishes nothing', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('android-kotlin', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  const ci = run('just', ['deploy', 'prod'], { cwd, env: { ...env, CI: 'true' } });
+  assert.notEqual(ci.status, 0);
+  assert.match(ci.stderr, /deploy: refused/);
+});
+
+test('android-kotlin: a symlinked or missing Gradle wrapper is refused before anything runs', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('android-kotlin', env, ['--skip-verify']);
+  // a fake gradlew would leave a marker if it ran
+  const elsewhere = tmp('yaw-elsewhere-');
+  writeFileSync(join(elsewhere, 'gradlew'), `#!/bin/sh\ntouch '${join(elsewhere, 'ran')}'\n`, { mode: 0o755 });
+  for (const [rel, target] of [['gradlew', join(elsewhere, 'gradlew')], ['gradle/wrapper/gradle-wrapper.jar', join(elsewhere, 'gradlew')], ['gradle/wrapper/gradle-wrapper.properties', join(elsewhere, 'gradlew')]]) {
+    const file = join(cwd, rel);
+    const saved = readFileSync(file);
+    unlinkSync(file);
+    symlinkSync(target, file);
+    for (const verb of ['setup', 'lint', 'test', 'build']) {
+      const r = run('just', [verb], { cwd, env });
+      assert.notEqual(r.status, 0, `${verb} with a symlinked ${rel}`);
+      assert.match(r.stderr, /missing or a symbolic link/, rel);
+    }
+    unlinkSync(file);
+    writeFileSync(file, saved);
+  }
+  assert.equal(existsSync(join(elsewhere, 'ran')), false, 'the linked script never ran');
+  // a symlinked folder
+  const folder = join(cwd, 'gradle');
+  const moved = join(elsewhere, 'gradle');
+  execFileSync('mv', [folder, moved]);
+  symlinkSync(moved, folder);
+  const r = run('just', ['lint'], { cwd, env });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /gradle: missing or a symbolic link/);
+  unlinkSync(folder);
+  execFileSync('mv', [moved, folder]);
+  unlinkSync(join(cwd, 'gradlew'));
+  assert.match(run('just', ['test'], { cwd, env }).stderr, /gradlew: missing or a symbolic link/);
+});
+
+const androidSdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+const androidSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (!(androidSdk && existsSync(androidSdk)) && 'ANDROID_HOME (the Android SDK) is not set') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
+
+test('smoke android-kotlin: yaw init, just setup && just check pass without a keystore or store account; bad code fails the gate (needs JDK 17+, the Android SDK and network)', { skip: androidSkip, timeout: 900000 }, () => {
+  const { cwd, r } = initExample('android-kotlin', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /BUILD SUCCESSFUL/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'app', 'build', 'test-results', 'testDebugUnitTest')), 'the unit tests ran');
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'android-kotlin');
+  const bad = join(cwd, 'app', 'src', 'main', 'kotlin', 'com', 'example', 'app', 'Bad.kt');
+  copyFileSync(join(fixtures, 'lint_error.kt'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'a style violation fails just lint');
+  copyFileSync(join(fixtures, 'type_error.kt'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('android-kotlin guards block publishing, signing, Fastlane, Google Cloud and release installs in every bypass form, not local work', () => {
+  const guards = parse(readFileSync(dir('android-kotlin', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  const bad = [
+    './gradlew publish', './gradlew publishToMavenLocal', './gradlew publishReleasePublication', './gradlew :app:publishReleaseBundle', './gradlew app:publishRelease', './gradlew :lib:publishAllPublicationsToMavenRepository', './gradlew test publish', './gradlew --no-daemon publish', './gradlew -p app publish', './gradlew promoteReleaseArtifact', './gradlew publish --info', './gradlew "publish"', "./gradlew 'publishToSonatype'",
+    'gradlew publish', 'gradle publish', 'gradlew.bat publish', '../gradlew publish', '/abs/path/gradlew publish', 'sh gradlew publish', 'bash ./gradlew publish', 'sh ./gradlew :app:publishReleaseBundle', 'sudo ./gradlew publish', 'env ./gradlew publish', 'JAVA_HOME=/x ./gradlew publish', 'FOO=1 BAR=2 ./gradlew publish', 'nohup ./gradlew publish', 'time ./gradlew publish', 'xargs ./gradlew publish', 'command ./gradlew publish',
+    'bash -c "./gradlew publish"', "sh -c './gradlew publish'", 'bash -c "cd app && ./gradlew publish"', 'bash -lc "./gradlew bundleRelease"', 'cd app && ./gradlew publish', 'true;./gradlew publish', 'echo x|./gradlew publish', './gradlew test && ./gradlew publish', './gradlew test; ./gradlew publish', './gradlew assembleDebug || ./gradlew publish', '(./gradlew publish)', '$(./gradlew publish)', '`./gradlew publish`', './gradlew test\n./gradlew publish', './gradlew test & ./gradlew publish',
+    './gradlew bundleRelease', './gradlew bundle', './gradlew :app:bundle', './gradlew :app:bundleRelease', './gradlew bundleStagingRelease', './gradlew app:bundleProdRelease', './gradlew clean bundleRelease', './gradlew bundleRelease -Pandroid.injected.signing.store.file=/x/release.jks', './gradlew assembleRelease -Pandroid.injected.signing.store.file=/x/release.jks', './gradlew assembleRelease -Pandroid.injected.signing.key.alias=k', './gradlew assembleRelease -PkeystorePassword=x', './gradlew assembleRelease -PstoreFile=/x', './gradlew assembleRelease -Pkeystore=/x/release.jks', './gradlew assembleRelease -PkeyAlias=a -PkeyPassword=b',
+    './gradlew signingReport', './gradlew :app:signReleaseBundle', './gradlew signRelease', './gradlew installRelease', './gradlew :app:installRelease', './gradlew installStagingRelease', 'sh gradlew installRelease', 'bash -c "gradle bundleRelease"',
+    'apksigner sign --ks release.jks app.apk', 'apksigner verify app.apk', '$ANDROID_HOME/build-tools/36.0.0/apksigner sign app.apk', '~/Library/Android/sdk/build-tools/36.0.0/apksigner sign --ks k.jks app.apk', 'java -jar apksigner.jar sign app.apk', 'sudo apksigner sign x.apk', 'env X=1 apksigner sign x.apk', 'bash -c "apksigner sign x.apk"', 'cd out && apksigner sign x.apk', 'true;apksigner sign x',
+    'jarsigner -keystore release.jks app.aab alias', 'jarsigner -verify app.aab', '/usr/bin/jarsigner -keystore k.jks a.jar k', 'sudo jarsigner a.jar k', 'bash -c "jarsigner a.aab k"', 'cd out && jarsigner x',
+    'keytool -genkey -v -keystore release.jks -alias upload', 'keytool -genkeypair -keystore release.jks', 'keytool -list -keystore release.jks', 'keytool -importkeystore -srckeystore a.jks -destkeystore b.jks', 'keytool -storepasswd -keystore release.jks', 'keytool -exportcert -keystore release.jks -alias upload', 'keytool -keystore release.jks -list', '/usr/bin/keytool -genkey -keystore x.jks', 'sudo keytool -genkey -keystore x', 'keytool -delete -alias upload -keystore release.jks', 'bash -c "keytool -genkey -keystore x.jks"', 'cd keys && keytool -genkeypair', '$JAVA_HOME/bin/keytool -genkey -keystore x.jks',
+    'fastlane supply --aab app.aab', 'fastlane deliver', 'fastlane supply', 'fastlane upload_to_play_store', 'fastlane android deploy', 'fastlane android beta', 'fastlane beta', 'fastlane release', 'fastlane', 'bundle exec fastlane supply', 'bundle exec fastlane android deploy', 'bundle exec fastlane', 'bundle exec fastlane lanes', 'bundler exec fastlane beta', 'sudo fastlane beta', 'FASTLANE_SKIP_UPDATE_CHECK=1 fastlane beta', 'env X=1 fastlane beta', 'nohup fastlane beta', 'time bundle exec fastlane beta', './bin/fastlane beta', '~/.rbenv/shims/fastlane beta', 'rbenv exec fastlane beta', 'gem exec fastlane beta',
+    'supply --aab app.aab', 'deliver', 'sudo supply --track production', 'cd app && supply --aab x', 'true;deliver', 'bash -c "fastlane beta"', "sh -c 'fastlane supply'", 'bash -lc "bundle exec fastlane x"', 'cd android && fastlane beta', 'true && fastlane beta', '(fastlane beta)', '$(fastlane beta)', 'echo x | fastlane beta', 'fastlane --verbose beta',
+    'gcloud auth login', 'gcloud app deploy', 'gcloud storage cp a gs://b', 'gcloud firebase test android run', 'gcloud config list', 'sudo gcloud auth login', 'env X=1 gcloud projects list', 'bash -c "gcloud projects list"', 'cd x && gcloud auth login', 'true;gcloud auth login', '/usr/local/bin/gcloud auth login', '$HOME/google-cloud-sdk/bin/gcloud app deploy', 'gcloud   auth login',
+    'bq query "SELECT 1"', 'bq ls', 'bq load ds.t file.csv', 'sudo bq ls', 'bash -c "bq ls"', 'cd x && bq ls', 'true;bq ls', 'gcloud --project p auth login', 'bq --project_id=p ls',
+    'adb install app-release.apk', 'adb install -r app/build/outputs/apk/release/app-release.apk', 'adb -s emulator-5554 install app-release.apk', 'adb -s R5 install -r -d app/build/outputs/apk/release/app-release-unsigned.apk', 'adb install-multiple base-release.apk split-release.apk', 'adb -d install app-prodRelease.apk', 'adb install out/Release/app.apk', 'adb install-multi-package a-release.apk b-release.apk', 'sudo adb install app-release.apk', 'env ANDROID_SERIAL=x adb install app-release.apk', 'cd out && adb install app-release.apk', 'bash -c "adb install app-release.apk"', '$ANDROID_HOME/platform-tools/adb install app-release.apk', 'true;adb install app-release.apk', 'adb  install app-release.aab',
+  ];
+  for (const cmd of bad) assert.ok(blocked(cmd), cmd);
+  const ok = [
+    './gradlew test', './gradlew lint', './gradlew assembleDebug', './gradlew testDebugUnitTest', './gradlew lintDebug', './gradlew ktlintCheck detekt lintDebug', './gradlew ktlintFormat', './gradlew compileDebugKotlin', './gradlew installDebug', './gradlew clean', './gradlew build', './gradlew check', './gradlew tasks', './gradlew tasks --all', './gradlew dependencies', './gradlew :app:testDebugUnitTest', './gradlew --version', './gradlew --stop', './gradlew bundleDebug', './gradlew :app:bundleDebug', './gradlew assembleRelease', './gradlew :app:assembleRelease', './gradlew wrapper --gradle-version 9.8.2', './gradlew test --tests "com.example.*"', './gradlew -p app test', './gradlew --no-daemon test',
+    'gradlew test', 'gradle test', 'sh gradlew assembleDebug', 'bash ./gradlew test', 'sudo ./gradlew test', 'JAVA_HOME=/x ./gradlew lint', 'bash -c "./gradlew test"', 'cd app && ./gradlew test', 'just check', 'just test', 'just build', 'just dev', 'just lint',
+    'cat gradle.properties', 'cat gradle/libs.versions.toml', 'git add gradle/wrapper/gradle-wrapper.jar', 'ls gradle', 'cat app/build.gradle.kts', 'grep -rn publish app/src', 'echo publish', 'cat gradlew', 'git diff gradlew', 'vim build.gradle.kts', 'cat app/src/main/AndroidManifest.xml',
+    'ls build-tools/36.0.0', 'cat apksigner.md', 'git add docs/jarsigner.md', 'ls build-tools/36.0.0/apksigner.md',
+    'keytool -help', 'keytool -printcert -file x.crt', 'keytool -version', 'keytool', 'cat keytool.md',
+    'fastlane --version', 'fastlane -v', 'fastlane --help', 'fastlane lanes', 'fastlane actions', 'fastlane action supply', 'fastlane env', 'cat fastlane/Fastfile', 'ls fastlane', 'git add fastlane/Fastfile', 'cd fastlane && ls', 'git commit -m "supply chain notes"', 'git commit -m "deliver the feature"', 'echo "fastlane beta"', 'echo deliver', 'grep -rn supply app', 'vim fastlane/Appfile', 'cat Gemfile', 'bundle install', 'bundle exec rake test', 'bundle exec rubocop',
+    'gcloud --version', 'gcloud --help', 'gcloud help', 'gcloud version', 'gcloud', 'cat .gcloudignore', 'git add .gcloudignore', 'echo bq', 'ls bq', 'cat docs/gcloud.md', 'npm test',
+    'adb install app-debug.apk', 'adb install -r app/build/outputs/apk/debug/app-debug.apk', 'adb -s emulator-5554 install -r app-debug.apk', 'adb devices', 'adb logcat', 'adb shell screencap -p /sdcard/s.png', 'adb pull /sdcard/s.png', 'adb exec-out screencap -p > s.png', 'adb uninstall com.example.app', 'adb push release-notes.txt /sdcard/', 'adb shell am start -n com.example.app/.MainActivity', 'adb --version', 'cat release-notes.md', 'git add app-release-notes.md', 'adb install app.apk',
+  ];
+  for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
+});
+
+test('android-kotlin secretFiles: keystores and keystore.properties are secret files, other files are not', async () => {
+  const { loadRules, secretRule } = await import('../modules/security/lib/guards.js');
+  const rules = loadRules({ kitRoot: KIT_ROOT, profiles: ['android-kotlin'] });
+  for (const f of ['release.jks', 'app/upload.keystore', 'debug.keystore', 'keys/my-key.jks', 'keystore.properties', 'app/keystore.properties']) assert.ok(secretRule(rules, f), f);
+  for (const f of ['build.gradle.kts', 'gradle.properties', 'local.properties', 'keystore.properties.md', 'jks.md', 'app/src/main/AndroidManifest.xml', 'docs/keystore.md']) assert.equal(secretRule(rules, f), null, f);
 });

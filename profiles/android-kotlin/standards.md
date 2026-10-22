@@ -1,0 +1,9 @@
+- Kotlin with Jetpack Compose; one `app` module, code in `app/src/main/kotlin/`, JVM unit tests (JUnit 4) in `app/src/test/kotlin/`; keep logic in plain functions and `@Composable`s thin.
+- `just check` runs ktlint, detekt, Android Lint, the compile and the unit tests; it needs the Android SDK (`ANDROID_HOME`) and JDK 17+, no emulator and no device.
+- Use the Gradle wrapper (`./gradlew`) only, never a system Gradle; dependency and plugin versions live in `gradle/libs.versions.toml` as exact versions.
+- Format with ktlint (`just fmt`; `just lint` only checks); do not add a second formatter. `.editorconfig` and `config/detekt/detekt.yml` hold the rules.
+- Tests are deterministic and make no network calls; UI and emulator tests are not part of the gate.
+- Build with `just build` (debug APK); `just dev` installs the debug build on a running emulator or device.
+- Release builds, signing and publishing are yours: never create, read or commit a keystore, `keystore.properties` or Play credentials, and never add a `signingConfig` with a path or password.
+- The agent runs `./gradlew` tasks such as `test`, `lint`, `assembleDebug`; `publish*`, `bundle*Release`, `install*Release`, signing tools, Fastlane, `gcloud` and `bq` need you.
+- Install only debug builds with `adb`; a release build on a device needs your approval.

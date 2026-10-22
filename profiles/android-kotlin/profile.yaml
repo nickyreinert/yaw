@@ -1,0 +1,9 @@
+# profiles/android-kotlin/profile.yaml
+# Never auto-suggested (ADR-0040): the interview has no Android or Kotlin fact (language choices are python, javascript, typescript, auto), so no fact is narrow enough; the user picks it from the list.
+# The emulator, Paparazzi / Maestro screenshots and the device verbs of the remote dev loop (doc 11 §4) come later; the scaffold is one Compose activity with a JVM unit test.
+name: android-kotlin
+summary: Android app in Kotlin with Compose; Gradle, ktlint, detekt, Android Lint, JUnit.
+suggestWhen: {}
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [jdk>=17, android-sdk, just]

@@ -1,0 +1,4 @@
+# Added to detekt's defaults (buildUponDefaultConfig): Composable functions are named like types.
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
