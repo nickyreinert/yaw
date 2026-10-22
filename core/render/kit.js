@@ -284,6 +284,9 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     proposal: answersDoc.proposal ?? null,
     agents: flat['user.agents'] ?? [],
     profiles,
+    // ADR-0041: several profiles are namespaced; the frame of the justfile defines the uniform verbs.
+    composed: profiles.length > 1,
+    composedVerbs: composedVerbs(profiles),
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
     stack,
@@ -320,8 +323,36 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   };
 }
 
+// ADR-0041: with several profiles each profile is a `just` module (`just <profile>::<verb>`) that runs in its
+// own folder `<profile>/`; the root justfile defines the uniform verbs, each calling that verb of every profile.
+// dev and preview start servers that never end, so they only name the namespaced verbs.
+const PLAIN_VERBS = ['setup', 'fmt', 'lint', 'typecheck', 'test', 'build', 'screenshot', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore'];
+
+export function composedVerbs(profiles) {
+  if (profiles.length < 2) return '';
+  const all = (verb) => profiles.map((p) => `${p}::${verb}`).join(' ');
+  const serves = (verb) => `${verb}:\n    @echo "${verb}: ${profiles.length} profiles, each runs a server; start them in separate terminals: ${profiles.map((p) => `just ${p}::${verb}`).join(', ')}"`;
+  return [
+    `# Composed profiles (ADR-0041): each verb runs the verb of ${profiles.join(' and ')}; just <profile>::<verb> runs one.`,
+    ...PLAIN_VERBS.map((v) => `${v}: ${all(v)}`),
+    `check: ${all('check')} sync-check`,
+    serves('dev'),
+    serves('preview'),
+    `deploy env='': ${profiles.map((p) => `(${p}::deploy env)`).join(' ')}`,
+  ].join('\n');
+}
+
+// A profile's just file as a `just` module in <profile>/ (ADR-0041): recipes run in the profile's folder, and
+// the profile's check no longer depends on sync-check, which the root justfile runs once.
+function composedJust(name, text) {
+  const gate = /^(check: .*?) sync-check$/m;
+  if (!gate.test(text)) throw new KitError(`profiles/${name}/just/${name}.just: "check" must end with sync-check to be composed`);
+  return `# Composed (ADR-0041): runs in ${name}/.\nset working-directory := '../${name}'\n${text.replace(gate, '$1')}`;
+}
+
 // Files of the given profiles (ADR-0004: owned by core; profiles are not modules).
 //   just/<p>.just   <- profiles/<p>/just/<p>.just          (plus `import` in the justfile)
+// With several profiles (ADR-0041) the plus is `mod <p> 'just/<p>.just'` and the scaffold goes to <p>/.
 //   .gitignore part <- profiles/<p>/gitignore
 //   scaffold        <- profiles/<p>/scaffold/**            (user-owned code, written once; `scaffold` is a
 //                      function rel -> boolean (file exists); one existing file skips the whole scaffold)
@@ -332,6 +363,7 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null }) {
   const parts = [];
   const files = new Map();
   const missing = [];
+  const composed = profiles.length > 1;
   for (const name of profiles) {
     if (!hasProfile(kitRoot, name)) {
       missing.push(name);
@@ -340,18 +372,20 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null }) {
     const dir = profileDir(kitRoot, name);
     const justFile = join(dir, 'just', `${name}.just`);
     if (existsSync(justFile)) {
-      files.set(`just/${name}.just`, { module: 'core', content: readFileSync(justFile), fragments: [], managed: true });
-      parts.push({ path: 'justfile', module: name, kind: 'part', content: `import 'just/${name}.just'\n` });
+      const text = readFileSync(justFile, 'utf8');
+      files.set(`just/${name}.just`, { module: 'core', content: composed ? Buffer.from(composedJust(name, text), 'utf8') : Buffer.from(text, 'utf8'), fragments: [], managed: true });
+      parts.push({ path: 'justfile', module: name, kind: 'part', content: `${composed ? 'mod' : 'import'} ${composed ? `${name} ` : ''}'just/${name}.just'\n` });
     }
     const ignore = join(dir, 'gitignore');
     if (existsSync(ignore)) parts.push({ path: '.gitignore', module: name, kind: 'part', content: readFileSync(ignore) });
     if (scaffold) {
       const rels = walk(join(dir, 'scaffold'));
-      if (!rels.some((rel) => scaffold(rel))) {
+      const target = (rel) => (composed ? `${name}/${rel}` : rel);
+      if (!rels.some((rel) => scaffold(target(rel)))) {
         for (const rel of rels) {
-          checkRelPath(rel);
-          if (files.has(rel)) throw new KitError(`profiles write ${rel} twice`);
-          files.set(rel, { module: 'core', content: readFileSync(join(dir, 'scaffold', rel)), fragments: [], managed: false });
+          checkRelPath(target(rel));
+          if (files.has(target(rel))) throw new KitError(`profiles write ${target(rel)} twice`);
+          files.set(target(rel), { module: 'core', content: readFileSync(join(dir, 'scaffold', rel)), fragments: [], managed: false });
         }
       }
     }

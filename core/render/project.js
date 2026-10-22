@@ -86,6 +86,11 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
 export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules, answersDoc = readAnswers(root) }) {
   const available = modules.filter((m) => hasModule(kitRoot, m));
   const missing = modules.filter((m) => !available.includes(m));
+  // Profile files come from the manifest, the stack overlay, CI steps and the justfile frame from the answers (ADR-0041): they must agree.
+  const fromAnswers = answersDoc.proposal?.profiles;
+  if (fromAnswers && JSON.stringify(fromAnswers) !== JSON.stringify(manifest.profiles)) {
+    throw new ProjectError(`profiles differ: ${ANSWERS} proposal.profiles is [${fromAnswers.join(', ')}], ${MANIFEST} profiles is [${manifest.profiles.join(', ')}]; make both lists the same`);
+  }
   const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
   // Profile files belong to core: they go away with it (the scaffold is user code and stays).
@@ -141,7 +146,6 @@ export function checkDependencies({ kitRoot = KIT_ROOT, modules }) {
 export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   for (const m of modules) if (!hasModule(kitRoot, m)) throw new ProjectError(`module "${m}" does not exist in this kit`);
   const profiles = answersDoc.proposal.profiles;
-  if (profiles.length > 1) throw new ProjectError(`several profiles (${profiles.join(', ')}) come with composition (Y-6.8); choose one`);
   const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules, definitions });
   const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null });
