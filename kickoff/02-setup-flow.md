@@ -57,7 +57,8 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 
 `yaw init --web` starts a local server and opens the browser. The same server later serves the dashboard (`yaw ui`, doc 13).
 
-- Binds to `127.0.0.1` only, random port, one-time token in the URL, shuts down after apply or 30 min idle. No external assets (works offline, no tracking).
+- Binds to `127.0.0.1` only, random port, shuts down after apply or 30 min idle (timer reset by every request; Ctrl+C also stops it). No external assets (works offline, no tracking; `Content-Security-Policy: default-src 'self'`).
+- Token (Y-7.3, ADR-0044): the URL carries a one-time start token; the first request with it is answered with a redirect to `/` and an HttpOnly, SameSite=Strict session cookie, and the token is dead. Requests without the cookie are refused. Host must be `127.0.0.1:<port>` or `localhost:<port>` and a present Origin must match (DNS rebinding). Every POST also needs the header `X-YAW-Token` (the page gets the value embedded); GET never changes state. The server logs nothing and writes no file until the apply path (Y-7.5).
 - Single page, left sidebar = sections with completion state, right = **live summary** (profile, modules, files to be generated, est. footprint).
 - Modules as toggle cards; unchecking a module hides its questions immediately.
 - Each question: label, one-line hint, collapsible "Why this matters" and "Example" blocks (layperson), keyboard-first navigation (expert).
