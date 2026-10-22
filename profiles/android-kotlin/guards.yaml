@@ -1,0 +1,29 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+# Gradle: the wrapper, `gradle` and `gradlew.bat`, behind any path, env prefix, sudo, bash -c, chain or subshell, are matched by the tasks they name.
+guards:
+  - id: gradle-publish
+    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*[\s:"''](?:[Pp][Uu][Bb][Ll][Ii][Ss][Hh]|[Pp][Rr][Oo][Mm][Oo][Tt][Ee])\w*(?=\s|$|[;&|)<>"''`])'
+    reason: Publishing (Maven, Play Store, any publish or promote task) needs your approval.
+  - id: gradle-release
+    pattern: '(?<![\w.-])(?:[^\s;&|()"`''=]*/)?gradlew?(?:\.bat)?(?=\s)[^;&|)\n]*(?:[\s:"''](?:[Bb][Uu][Nn][Dd][Ll][Ee](?:\w*[Rr][Ee][Ll][Ee][Aa][Ss][Ee])?|[Ii][Nn][Ss][Tt][Aa][Ll][Ll]\w*[Rr][Ee][Ll][Ee][Aa][Ss][Ee]|[Ss][Ii][Gg][Nn]\w+)(?=\s|$|[;&|)<>"''`]|:)|android\.injected\.signing|[\s"'']-P\w*(?:[Kk]eystore|[Ss]tore(?:File|Password)|[Kk]ey(?:Alias|Password|store))\w*[=\s])'
+    reason: A release bundle, a release install or signing needs your keystore and your approval.
+  - id: signing-tools
+    pattern: '(?<![\w.-])(?:apksigner|jarsigner)(?:\.jar|\.bat)?(?=\s|$|[;&|)"''`])|(?<![\w.-])keytool(?:\.exe)?(?=\s)\s+(?!-(?:help|printcert|version)(?:\s|$|[;&|)"''`]))\S'
+    reason: Signing and keystore tools touch your keystore; only you run them.
+  - id: fastlane
+    pattern: '(?:^|[;&|(`\n]|\$\(|-\w*c\s+["''])\s*(?:(?:[A-Za-z_]\w*=\S*|sudo(?:\s+-\S+)*|env|nohup|time|command|exec|xargs|bundle\s+exec|bundler\s+exec|rbenv\s+exec|gem\s+exec)\s+)*(?:(?:[\w./~-]*/)?fastlane(?=\s|$|[;&|)"''`])(?!\s+(?:--version|-v|--help|-h|lanes|actions|action|env)(?:\s|$|[;&|)"''`]))|(?:[\w./~-]*/)?(?:supply|deliver)(?=\s|$|[;&|)"''`]))|(?<![\w.-])bundle\s+exec\s+fastlane(?=\s|$|[;&|)"''`])'
+    reason: Fastlane uploads to the Play Console (supply, deliver, upload); only you run it.
+  - id: cloud-cli
+    pattern: '(?<![\w.-])(?:gcloud|bq)(?=\s)\s+(?!(?:--version|--help|-h|version|help)(?:\s|$|[;&|)"''`]))\S'
+    reason: Google Cloud calls (gcloud, bq) reach your cloud account; only you run them.
+  - id: adb-release-install
+    pattern: '(?<![\w.-])adb(?=\s)[^;&|)\n]*\sinstall(?:-multiple|-multi-package)?(?=\s)[^;&|)\n]*[Rr]elease'
+    reason: Installing a release build on a device needs your approval; install debug builds only.
+secretFiles:
+  - id: keystore
+    pattern: '\.(?:jks|keystore)$'
+    reason: Keystores hold the signing keys of your app.
+  - id: keystore-properties
+    pattern: '^keystore\.properties$'
+    reason: keystore.properties holds keystore passwords.
