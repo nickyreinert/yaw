@@ -1,0 +1,10 @@
+- PHP >= 8.2 with `declare(strict_types=1);` in every file and types on all parameters and returns; `phpstan` (with WordPress stubs) must pass (`just typecheck`).
+- Follow the WordPress Coding Standards (`just lint` = phpcs; `just fmt` = phpcbf); do not add a second formatter.
+- Plugin header and `readme.txt` stay in sync (name, version, `Stable tag`, text domain, `Requires at least`/`Requires PHP`); all strings use the plugin text domain.
+- First line of every PHP file that runs inside WordPress: `if ( ! defined( 'ABSPATH' ) ) { exit; }`; logic lives in `src/` (namespace `MyPlugin`) so PHPUnit tests it without WordPress.
+- Sanitize input (`sanitize_text_field`, `absint`), escape output late (`esc_html`, `esc_attr`, `esc_url`), verify nonces and capabilities, use `$wpdb->prepare()` for SQL.
+- Prefix every global (functions, hooks, options, post meta) with `my_plugin_`; rename it when you rename the plugin.
+- Dependencies via Composer; commit `composer.lock`; never edit `vendor/`; run `just audit` after changing them.
+- Tests use PHPUnit in `tests/`, are deterministic and make no network calls; `just dev` (wp-env, Docker) and Plugin Check (`wp plugin check` in wp-env) are for you to run when needed.
+- Secrets and settings come from environment variables or WordPress options; never hard-code or log them.
+- A release to the WordPress.org SVN (`svn commit`, deploy scripts), `rsync`/`ssh` to a host and wp-cli against a remote site need the user; `just deploy` does nothing.

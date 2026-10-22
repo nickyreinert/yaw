@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<ruleset name="plugin">
+    <description>WordPress Coding Standards for this plugin.</description>
+    <file>my-plugin.php</file>
+    <file>src</file>
+    <file>tests</file>
+    <arg name="extensions" value="php"/>
+    <arg value="ps"/>
+
+    <rule ref="WordPress"/>
+    <config name="minimum_wp_version" value="6.4"/>
+
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="my-plugin"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- PSR-4 file and method names (src/Greeting.php, testGreetsByName) instead of class-*.php. -->
+    <rule ref="WordPress.Files.FileName">
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+        <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+    </rule>
+    <rule ref="WordPress.NamingConventions.ValidFunctionName">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="Squiz.Commenting">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+</ruleset>

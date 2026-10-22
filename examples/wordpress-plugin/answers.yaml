@@ -1,0 +1,14 @@
+# Input of the kit CI smoke test for profile wordpress-plugin (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small WordPress plugin for my site.
+  idea.team: solo
+proposal:
+  status: confirmed
+  summary: wordpress-plugin - WordPress plugin; Composer, PHPCS with WPCS, PHPStan with WP stubs, PHPUnit, composer audit, wp-env.
+  profiles: [wordpress-plugin]
+  modules: [core]

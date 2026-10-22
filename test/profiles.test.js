@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { suggestProfiles } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site'];
+const PROFILES = ['node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -20,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles node-cli, node-ts-vercel, php-web, python-cli, python-web and static-site, and profile.yaml validates', () => {
+test('the kit has exactly the profiles node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -397,6 +397,68 @@ test('php-web guards block migrations, remote hosts and registry pushes in every
     'php artisan migrate --pretend', 'php artisan migrate:fresh --pretend', 'php artisan --env=local migrate --pretend', 'php artisan route:list', 'php artisan test', 'php artisan make:migration create_x_table',
     'composer install', 'composer audit', 'composer require monolog/monolog', 'vendor/bin/phpunit', 'vendor/bin/phpstan analyse', 'vendor/bin/php-cs-fixer fix', 'php -S 127.0.0.1:8000 -t public',
     'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker build -t app .', 'docker compose up', 'docker compose exec app composer install', 'just check', 'just test', 'git add composer.lock', 'cat database/migrations/x.php',
+  ];
+  for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
+});
+
+test('wordpress-plugin is never suggested automatically (the user picks it)', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  for (const facts of [{}, { runsOn: 'self-hosted', hosted: true }, { language: 'python' }, { language: 'javascript' }, { runsOn: 'self-hosted', hosted: true, public: true }, { runsOn: 'local', hosted: false }]) {
+    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'wordpress-plugin'), JSON.stringify(facts));
+  }
+});
+
+test('wordpress-plugin: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('wordpress-plugin', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+test('smoke wordpress-plugin: yaw init, just setup && just check pass; bad code fails the gate (needs php, composer and network)', { skip: phpSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('wordpress-plugin', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /OK \(2 tests/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'wordpress-plugin');
+  const bad = join(cwd, 'src', 'Bad.php');
+  copyFileSync(join(fixtures, 'lint_error.php'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'code that breaks the WordPress standard fails just lint');
+  copyFileSync(join(fixtures, 'type_error.php'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('wordpress-plugin guards block SVN writes, deploy scripts, remote wp-cli and remote hosts in every bypass form, not local work', () => {
+  const guards = parse(readFileSync(dir('wordpress-plugin', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  const bad = [
+    // SVN writes
+    'svn commit -m "Release 1.0"', 'svn ci -m x', 'svn import . https://plugins.svn.wordpress.org/my-plugin -m x', 'svn --username me --password x commit -m x', 'svn -m x ci', 'svn --non-interactive --trust-server-cert commit',
+    'cd trunk && svn commit', 'svn add . && svn commit -m x', 'true;svn ci', 'echo x|svn commit', '(svn commit -m x)', '$(svn commit -m x)', 'sudo svn commit', 'env SVN_EDITOR=true svn ci', 'SVN_EDITOR=true svn commit',
+    'bash -c "svn commit -m x"', "sh -c 'svn ci -m x'", 'nohup svn commit -m x', 'time svn commit', 'xargs svn commit', '/usr/bin/svn commit', 'command svn commit', 'svn lock trunk/a.php', 'svn propset svn:ignore x .', 'svn patch x.diff',
+    'svn copy https://plugins.svn.wordpress.org/my-plugin/trunk https://plugins.svn.wordpress.org/my-plugin/tags/1.0 -m tag', 'svn cp trunk https://plugins.svn.wordpress.org/my-plugin/tags/1.0', 'svn rm https://plugins.svn.wordpress.org/my-plugin/tags/1.0 -m x', 'svn mkdir svn://host/repo/tags -m x', 'svn mv https://h/a https://h/b',
+    'svnmucc -m x put a.php https://h/trunk/a.php', 'git svn dcommit', 'sudo git svn dcommit',
+    // deploy / release scripts and task runner targets
+    'deploy.sh', './deploy.sh', 'bash deploy.sh', 'sh deploy.sh', 'bash -x ./bin/deploy.sh', 'sudo ./scripts/deploy.sh', 'sudo bash scripts/deploy.sh', 'env X=1 ./deploy.sh', 'X=1 ./deploy.sh', 'bash -c "./deploy.sh"', "sh -c './bin/deploy.sh --prod'",
+    'cd app && ./deploy.sh', 'true;./deploy.sh', 'echo x|bash deploy.sh', '(./deploy.sh)', '$(./deploy.sh)', 'nohup ./deploy.sh', 'time bash deploy.sh', 'source deploy.sh', '. ./deploy.sh', 'python3 deploy.py', 'node scripts/deploy.js', 'php deploy.php', 'bash release.sh', './publish.sh', 'bash deploy-prod.sh', 'bash scripts/deploy_to_svn.sh',
+    'npm run deploy', 'npm run release', 'npm run publish', 'npm publish', 'pnpm deploy', 'yarn deploy', 'yarn run release', 'bun run deploy', 'npx deploy', 'composer deploy', 'composer run-script deploy', 'composer run release', 'make deploy', 'make release', 'just deploy', 'just deploy prod', 'just --justfile justfile deploy', 'sudo make deploy', 'true && make deploy', 'bash -c "npm run deploy"', 'CI=1 npm run deploy',
+    // wp-cli against another site or destructive database commands
+    'wp @prod plugin update --all', 'wp @staging db export', 'wp --ssh=me@host plugin list', 'wp plugin list --ssh=me@host', 'wp --ssh=docker:wp plugin list', 'wp --http=https://example.com plugin list', 'wp db reset --yes', 'wp db drop --yes', 'wp db import dump.sql', 'wp db clean --yes', 'wp db repair',
+    'sudo -u www-data wp @prod cache flush', 'bash -c "wp @prod core update"', "sh -c 'wp db reset --yes'", 'env WP_CLI_PACKAGES_DIR=x wp @prod plugin list', 'cd site && wp @prod plugin list', 'true;wp db reset', 'echo x|wp db import', '(wp db reset --yes)', 'npx wp-env run cli wp db reset --yes', 'npx @wordpress/env run cli wp db import dump.sql', 'wp-env run cli wp @prod plugin list',
+    // remote hosts
+    'ssh me@host', 'ssh -p 22 host ls', 'sudo ssh host', 'env X=1 ssh host', 'scp my-plugin.zip me@host:/var/www', 'sftp me@host', 'ftp host', 'lftp -e "mirror -R" host', 'true;ssh host',
+    'rsync -av ./ me@host:/var/www/wp-content/plugins/my-plugin/', 'rsync -av --delete src/ host:/var/www/', 'rsync -e ssh -av a/ b', 'rsync -av a/ host::module', 'rsync -av a/ rsync://host/module/', 'sudo rsync -av a/ me@host:/x', 'bash -c "rsync -av a/ me@host:/x"',
+  ];
+  for (const cmd of bad) assert.ok(blocked(cmd), cmd);
+  const ok = [
+    'svn status', 'svn st --no-ignore', 'svn update', 'svn up', 'svn checkout https://plugins.svn.wordpress.org/my-plugin', 'svn co https://plugins.svn.wordpress.org/my-plugin svn', 'svn diff', 'svn log -l 5', 'svn info', 'svn add .', 'svn add --force trunk/*', 'svn list https://plugins.svn.wordpress.org/my-plugin', 'svn export trunk /tmp/x', 'svn --version', 'svn copy trunk tags/1.0', 'svn status | grep commit', 'git svn info',
+    'cat deploy.sh', 'git add deploy.sh', 'vim deploy.sh', 'shellcheck deploy.sh', 'node --test deploy.test.js', 'cat scripts/release.sh', 'ls bin/', 'npm test', 'npm run test', 'npm install', 'npm run build', 'composer install', 'composer audit', 'composer require monolog/monolog', 'composer run-script test', 'composer deployment-notes', 'npm install deploy-tools', 'make test', 'just check', 'just test', 'just lint', 'just dev',
+    'wp plugin list', 'wp db export dump.sql', 'wp db check', 'wp db query "SELECT 1"', 'wp option get siteurl', 'wp user create bob bob@example.com', 'wp-env start', 'npx @wordpress/env@12.0.0 start', 'npx wp-env run cli wp plugin list', 'npx @wordpress/env run cli wp plugin check my-plugin', 'wp-env clean',
+    'vendor/bin/phpcs', 'vendor/bin/phpcbf', 'vendor/bin/phpstan analyse', 'vendor/bin/phpunit', 'php -l my-plugin.php', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker compose up', 'git add composer.lock readme.txt', 'cat readme.txt',
   ];
   for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
 });
