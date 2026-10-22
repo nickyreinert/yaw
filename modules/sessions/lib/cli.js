@@ -53,10 +53,10 @@ function find(db, ctx, args) {
 }
 
 // What kind of reference is this? -> { kind, ref }
-function parseRef(raw) {
+export function parseRef(raw) {
   const t = String(raw ?? '').trim();
   if (/^t-\d{1,6}$/i.test(t)) return { kind: 'task', ref: t.toUpperCase() };
-  if (/^#?\d{1,9}$/.test(t) && Number(t.replace('#', '')) > 0) return { kind: 'task', ref: `#${Number(t.replace('#', ''))}` };
+  if (/^(#\d{1,9}|\d{1,6})$/.test(t) && Number(t.replace('#', '')) > 0) return { kind: 'task', ref: `#${Number(t.replace('#', ''))}` };
   if (/^(adr|notice)-\d+(-\d+)?$/i.test(t)) return { kind: 'decision', ref: t.toUpperCase() };
   if (/^[0-9a-f]{7,64}$/i.test(t)) return { kind: 'commit', ref: t.toLowerCase() };
   try {

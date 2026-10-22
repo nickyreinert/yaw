@@ -15,6 +15,7 @@ import { declaredAgent, fixture, hook, listFixtures, shim } from '../../../test/
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { branchTask, clean, commitsOf, currentSession, openRegistry, tightenHome, readRegular, resumeCommand, sessionId, withRegistry } from '../lib/registry.js';
 import { commitMessage } from '../../github/lib/names.js';
+import { parseRef } from '../lib/cli.js';
 
 const MODULES = ['core', 'tasks', 'github', 'sessions'];
 const LEDGER = `# Tasks
@@ -241,6 +242,12 @@ test('just commit adds the Agent-Session trailer; Stop links the commit and its 
   assert.match((await yaw(root, ['for', 'join.txt'], env)).out, new RegExp(id));
   assert.match((await yaw(root, ['find', 'invite flow'], env)).out, new RegExp(id));
   assert.equal((await yaw(root, ['for', 'T-999'], env)).out, 'no matching session\n');
+});
+
+test('parseRef: an all-digit short hash is a commit, #N and short bare numbers are issues', () => {
+  assert.deepEqual(parseRef('12345678'), { kind: 'commit', ref: '12345678' });
+  assert.deepEqual(parseRef('#123'), { kind: 'task', ref: '#123' });
+  assert.deepEqual(parseRef('123'), { kind: 'task', ref: '#123' });
 });
 
 test('without a current session (or past 4 h) a commit simply carries no trailer; YAW_SESSION overrides', { skip: !hasTool('git') && 'git is not installed' }, async () => {
