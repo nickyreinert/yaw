@@ -157,8 +157,9 @@ test('yaw add team on a solo project lists the question it does not ask as a def
   const stdout = capture();
   const stderr = capture();
   const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
-  // Adding team to a solo Full project can exceed the AGENTS.md budget (exit 1 after the answers are listed); the listing is what is tested.
-  assert.ok(code === 0 || /AGENTS.md would have/.test(stderr.text()), stderr.text());
+  // Known limit (issue #156): adding team to a solo Full project exceeds the 80-line AGENTS.md budget (86 lines).
+  assert.equal(code, 1);
+  assert.match(stderr.text(), /AGENTS\.md would have 86 lines, the budget is 80/);
   assert.match(stdout.text(), /not asked team\.session-context: applies only when idea\.team = team; the default is true {2}\(default\)/);
 });
 
