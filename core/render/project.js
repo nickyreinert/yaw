@@ -141,7 +141,6 @@ export function checkDependencies({ kitRoot = KIT_ROOT, modules }) {
 export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   for (const m of modules) if (!hasModule(kitRoot, m)) throw new ProjectError(`module "${m}" does not exist in this kit`);
   const profiles = answersDoc.proposal.profiles;
-  if (profiles.length > 1) throw new ProjectError(`several profiles (${profiles.join(', ')}) come with composition (Y-6.8); choose one`);
   const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules, definitions });
   const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null });

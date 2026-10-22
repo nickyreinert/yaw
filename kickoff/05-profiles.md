@@ -60,7 +60,7 @@ requires: [docker, just, uv]
 
 - Profiles define **verbs and checks**, not application architecture. The architecture comes from the proposal and is recorded as ADRs.
 - `options` cover common forks (framework, DB); they are offered with the full interview (step 7), step 3 renders the defaults (ADR-0020). Anything else: the agent adapts the generated files and records an ADR; the manifest marks those files `managed: false`.
-- Combining profiles: each brings its own `just` fragment under a namespace (`just api::test`); the top-level verbs call all of them.
+- Combining profiles (ADR-0041): with two or more profiles each is a `just` module named after the profile (`just static-site::build`, `just cloudflare-workers::deploy prod`), its scaffold and recipes live in `<profile>/`, and the root `justfile` defines the uniform verbs, each calling that verb of every profile (`just check` fails when the gate of any profile fails; `sync-check` runs once at the root). `dev` and `preview` only list the namespaced commands, because each starts a server. Guards, standards and CI steps of all profiles apply. List the profiles in `proposal.profiles` (`examples/composed/` combines `static-site` and `cloudflare-workers`). No command changes the profile list yet: edit `proposal.profiles` in `.yaw/answers.yaml` and `profiles` in `.yaw/manifest.json`, then `yaw update`; this removes exactly the dropped profile's `just` module, `mod` line and `.gitignore` block, and its folder stays as your code.
 - Existing repos (retrofit): `yaw init --detect` inspects lockfiles/manifests to suggest profiles and skips `scaffold/`.
 
 ## 4. Adding a profile

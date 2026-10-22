@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for two composed profiles (ADR-0041): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A landing page for my bakery.
+  idea.team: solo
+  arch.language: typescript
+  arch.runs-on: serverless
+proposal:
+  status: confirmed
+  summary: static-site + cloudflare-workers - a static front end with a Worker API.
+  profiles: [static-site, cloudflare-workers]
+  modules: [core, standards, security]
