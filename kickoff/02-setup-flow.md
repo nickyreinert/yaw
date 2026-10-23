@@ -47,6 +47,8 @@ Quick is a baseline, not a limit: `yaw add <module>` later adds a module and ask
 
 Both lanes render the same question schema (`interview/base.yaml` + `modules/*/module.yaml#questions`), so they cannot drift.
 
+Before either lane starts, the target folder is checked (#168): the home folder and the file-system root are refused unless `--force` is given; a non-empty folder without `.git` or `.yaw` (the `--answers` file does not count) needs a confirmation, which `--yes` gives with a warning on stderr. Without a terminal, the browser lane refuses such a folder unless forced.
+
 ### CLI lane
 
 - Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).

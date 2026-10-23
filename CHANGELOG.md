@@ -14,6 +14,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Fixed
 
+- `yaw init` and `yaw web` refuse the home folder and the file-system root unless `--force` is given, and ask before writing into a non-empty folder that is not a Git repository or YAW project, such as a folder of projects (#168).
 - Codex hook entries have readable labels (`YAW security: guard-secret-read, guard-destructive`) and init reminds the user to trust them with `/hooks` (#176).
 - `CLAUDE.md` is only written when Claude Code is a selected agent; Codex and Copilot read `AGENTS.md` (#169).
 - The generated `.gitignore` ignores machine-local YAW files: the web-form draft `.yaw/draft.yaml`, and `.claude/settings.local.json` when Claude is selected (#170).

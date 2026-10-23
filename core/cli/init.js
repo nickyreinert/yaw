@@ -23,6 +23,7 @@ import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { printNextSteps } from './next-steps.js';
+import { guardFolder } from './folder-guard.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
@@ -143,6 +144,11 @@ async function offerSave({ io, root, answersDoc, kit }) {
   }
 }
 
+function cancelled(io) {
+  io.stdout.write('cancelled; nothing was written\n');
+  return 1;
+}
+
 export async function init({ values, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   const root = io.cwd;
@@ -150,12 +156,14 @@ export async function init({ values, positionals, io }) {
   if (values.web) {
     if (values.answers || values.yes) throw new UsageError('--web cannot be combined with --answers or --yes; confirm in the browser');
     if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
+    if (!(await guardFolder({ root, io, force: values.force }))) return cancelled(io);
     return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject });
   }
   const fromFile = Boolean(values.answers);
   if (!fromFile && !io.prompter.interactive) throw new UsageError('no terminal for the interview: run yaw init --answers <file> --yes');
   if (fromFile && !values.yes && !io.prompter.interactive) throw new UsageError('confirmation needed: run again with --yes');
   if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
+  if (!(await guardFolder({ root, io, force: values.force, yes: values.yes, ignore: fromFile ? [values.answers] : [] }))) return cancelled(io);
 
   const profiles = listProfiles(kitRoot);
   let answersDoc;

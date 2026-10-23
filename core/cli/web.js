@@ -6,11 +6,16 @@ import { startDashboard } from '../web/dashboard.js';
 import { initWeb, openBrowser, writeLauncher } from '../web/init.js';
 import { UsageError } from './commands.js';
 import { verifyProject } from './init.js';
+import { guardFolder } from './folder-guard.js';
 
-export async function web({ positionals, io }) {
+export async function web({ values = {}, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   if (!readManifest(io.cwd)) {
     io.stdout.write('No YAW setup in this folder yet, so yaw web opens the setup form (same as yaw init --web).\n');
+    if (!(await guardFolder({ root: io.cwd, io, force: values.force }))) {
+      io.stdout.write('cancelled; nothing was written\n');
+      return 1;
+    }
     return initWeb({ io, verify: verifyProject });
   }
   let finish;

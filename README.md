@@ -61,6 +61,8 @@ yaw init
 
 Answer the interview, review the proposed files and confirm to apply them. YAW suggests a project profile and offers **Quick** or **Full** setup. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
 
+Run `yaw init` inside the project folder. YAW refuses your home folder and the file-system root, and asks before writing into a non-empty folder that is not yet a Git repository or YAW project (for example a folder that holds several projects); `--force` overrides both checks.
+
 If you enter new secret values, YAW writes them only to a new mode-0600 `.env` file and skips automatic project verification. Review the project's `justfile` recipes before running them manually; project-controlled recipes could read `.env`. An existing `.env` is not read or overwritten.
 
 For a local browser form instead of terminal questions, run `yaw init --web`. The form is served locally and still requires an explicit confirmation before writing files.

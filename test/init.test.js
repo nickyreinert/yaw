@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { readManifest } from '../core/render/manifest.js';
@@ -208,4 +208,38 @@ test('init ends with next steps: agent start, Codex hook trust, data locations, 
   const claude = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify']);
   assert.match(claude.out, /Start Claude Code in this folder; it reads AGENTS\.md \(through CLAUDE\.md\)\./);
   assert.doesNotMatch(claude.out, /run \/hooks/);
+});
+
+test('init refuses the home folder unless forced and asks before writing into a folder of projects (#168)', async () => {
+  const home = tmp('yaw-home-');
+  const env = { PATH: NODE_ONLY, HOME: home };
+  const refused = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify'], { cwd: home, env });
+  assert.equal(refused.code, 1);
+  assert.match(refused.err, /refusing to set up YAW in your home folder .*or pass --force/);
+  assert.deepEqual(readdirSync(home), []);
+  const forced = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify', '--force'], { cwd: home, env });
+  assert.equal(forced.code, 0, forced.err);
+  assert.match(forced.err, /warning: setting up YAW in your home folder/);
+
+  const parent = tmp('yaw-parent-');
+  for (const p of ['app-a', 'app-b']) mkdirSync(join(parent, p, '.git'), { recursive: true });
+  writeFileSync(join(parent, 'notes.txt'), 'x');
+  const prompter = scripted(['n']);
+  const declined = await yaw(['init'], { cwd: parent, prompter });
+  assert.equal(declined.code, 1);
+  assert.match(declined.out, /not empty \(3 entries, 2 of them Git repositories\)[\s\S]*folder of projects[\s\S]*cancelled; nothing was written/);
+  assert.deepEqual(readdirSync(parent).sort(), ['app-a', 'app-b', 'notes.txt']);
+  const noTty = await yaw(['init', '--web'], { cwd: parent });
+  assert.equal(noTty.code, 1);
+  assert.match(noTty.err, /run again with --force/);
+  const yes = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify'], { cwd: parent });
+  assert.equal(yes.code, 0, yes.err);
+  assert.match(yes.err, /warning: This folder is not empty/);
+
+  const repo = tmp('yaw-repo-');
+  mkdirSync(join(repo, '.git'));
+  writeFileSync(join(repo, 'index.js'), '');
+  const quiet = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify'], { cwd: repo });
+  assert.equal(quiet.code, 0, quiet.err);
+  assert.doesNotMatch(quiet.err, /not empty/);
 });
