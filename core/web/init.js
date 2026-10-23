@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createFormModel, assertSafe, FormError } from './form-model.js';
 import { startFormServer } from './form-server.js';
 import { initProject } from '../render/project.js';
@@ -75,9 +78,19 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   };
 }
 
-function openBrowser(url, env) {
-  const [command, args] = process.platform === 'darwin' ? ['open', [url]] :
-    process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]] : ['xdg-open', [url]];
+// The start token must never appear in argv (other local users can read process arguments): the browser opens a
+// private launcher file (0600 in a 0700 folder) that redirects to the tokenized URL. The file is removed on close.
+export function writeLauncher(url) {
+  const dir = mkdtempSync(join(tmpdir(), 'yaw-web-'));
+  const file = join(dir, 'open.html');
+  const safe = url.replace(/[^A-Za-z0-9:/?=.]/g, '');
+  writeFileSync(file, `<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url=${safe}"><title>YAW setup</title>\n`, { mode: 0o600 });
+  return { file, remove: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+function openBrowser(target, env) {
+  const [command, args] = process.platform === 'darwin' ? ['open', [target]] :
+    process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', target]] : ['xdg-open', [target]];
   return new Promise((resolve) => {
     const child = spawn(command, args, { env, stdio: 'ignore' });
     child.once('error', () => resolve(false));
@@ -99,9 +112,15 @@ export async function initWeb({ io, skipVerify, verify }) {
     };
     return apply(...args);
   };
-  const server = await startFormServer({ api, onClose: () => finish(exitCode) });
+  let launcher;
+  const server = await startFormServer({ api, onClose: () => { launcher?.remove(); finish(exitCode); } });
   io.stdout.write(`YAW setup (local only). Open this one-time link:\n${server.url}\nNothing is written until Save draft, Save as preset, or Apply. Ctrl+C stops the server.\n`);
-  const opened = await (io.openBrowser ?? openBrowser)(server.url, io.env);
+  let opened;
+  if (io.openBrowser) opened = await io.openBrowser(server.url, io.env);
+  else {
+    launcher = writeLauncher(server.url);
+    opened = await openBrowser(launcher.file, io.env);
+  }
   if (!opened) io.stdout.write('Browser could not be opened automatically; open the link above manually.\n');
   return done;
 }

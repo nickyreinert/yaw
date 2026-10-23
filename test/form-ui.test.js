@@ -4,7 +4,7 @@ import http from 'node:http';
 import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startFormServer, MAX_JSON_BYTES } from '../core/web/form-server.js';
-import { createFormApi, DRAFT } from '../core/web/init.js';
+import { createFormApi, DRAFT, writeLauncher } from '../core/web/init.js';
 import { createFormModel, fullFileDiff } from '../core/web/form-model.js';
 import { defaultModules, effectiveAnswers, toggleModules, visibleQuestions, installDialogCancellation } from '../core/web/assets/ui-state.js';
 import { deriveFacts } from '../core/interview/facts.js';
@@ -450,4 +450,18 @@ test('CLI: --web verifies via just setup and just check; invalid combinations fa
   const err = capture();
   assert.equal(await main(['init', '--web'], { cwd: f.root, stdout: capture(), stderr: err, prompter: { interactive: false } }), 1);
   assert.match(err.text(), /already exists/);
+});
+
+test('launcher: the start token reaches the browser through a private file, never argv (Y-7.7)', () => {
+  const url = 'http://127.0.0.1:4321/?t=abc123';
+  const l = writeLauncher(url);
+  assert.ok(!l.file.includes('abc123'), 'the path given to open/xdg-open carries no token');
+  assert.equal(statSync(l.file).mode & 0o777, 0o600);
+  assert.equal(statSync(join(l.file, '..')).mode & 0o777, 0o700);
+  assert.match(readFileSync(l.file, 'utf8'), /http-equiv="refresh" content="0;url=http:\/\/127\.0\.0\.1:4321\/\?t=abc123"/);
+  const hostile = writeLauncher('http://x/?t=1"><script>');
+  assert.match(readFileSync(hostile.file, 'utf8'), /content="0;url=http:\/\/x\/\?t=1script">/, 'quotes and tags cannot break out');
+  hostile.remove();
+  l.remove();
+  assert.throws(() => statSync(l.file));
 });
