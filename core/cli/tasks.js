@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { enabledModules, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
-import { createPrompter, confirm } from './prompt.js';
+import { terminalConfirmer } from './prompt.js';
 
 export async function task({ values, positionals, io }) {
   const manifest = requireManifest(io.cwd);
@@ -17,8 +17,7 @@ export async function task({ values, positionals, io }) {
   let prepareWorkflow;
   if (mode !== 'local' && enabledModules(manifest).includes('github')) {
     const github = await import(pathToFileURL(join(io.kitRoot, 'modules', 'github', 'lib', 'cli.js')).href);
-    const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-    const confirmer = io.confirm ?? (tty ? (q) => confirm(createPrompter(), q) : undefined);
+    const confirmer = terminalConfirmer(io);
     prepareWorkflow = (options) => github.prepareTaskWorkflow({
       ...options, root: io.cwd, io: { ...io, confirm: confirmer },
     });

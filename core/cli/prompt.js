@@ -70,3 +70,16 @@ export async function confirm(prompter, question) {
   const a = (await prompter.ask(`${question} [y/N] `)).trim().toLowerCase();
   return a === 'y' || a === 'yes';
 }
+
+export function terminalConfirmer(io) {
+  if (io.confirm) return io.confirm;
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return undefined;
+  return async (question) => {
+    const prompter = createPrompter();
+    try {
+      return await confirm(prompter, question);
+    } finally {
+      prompter.close();
+    }
+  };
+}

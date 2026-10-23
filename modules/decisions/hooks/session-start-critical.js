@@ -11,7 +11,7 @@ const MAX_TITLE = 100;
 
 // The index is hand-editable: one line per decision, no control characters, clipped.
 const line = (s) => {
-  const t = String(s ?? '').replace(/[\s\u0000-\u001f\u007f-\u009f]+/g, ' ').trim();
+  const t = String(s ?? '').replace(/\p{Cf}/gu, '').replace(/[\s\u0000-\u001f\u007f-\u009f]+/g, ' ').trim();
   const length = [...t].length;
   const chars = [...t].slice(0, MAX_TITLE);
   while ([...JSON.stringify(chars.join('') + (chars.length < length ? '…' : ''))].length > MAX_TITLE) chars.pop();

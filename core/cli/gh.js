@@ -2,7 +2,7 @@
 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createPrompter, confirm } from './prompt.js';
+import { terminalConfirmer } from './prompt.js';
 import { enabledModules, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 
@@ -12,8 +12,7 @@ export async function gh({ values, positionals, io }) {
   const lib = await import(pathToFileURL(join(io.kitRoot, 'modules', 'github', 'lib', 'cli.js')).href);
   const [verb, ...args] = positionals;
   // A typed "y" only counts on a real terminal; without one there is no confirmer and guarded verbs refuse (ADR-0027).
-  const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-  const confirmer = io.confirm ?? (tty ? (q) => confirm(createPrompter(), q) : undefined);
+  const confirmer = terminalConfirmer(io);
   // The sessions module (ADR-0029) supplies the Agent-Session trailer for `commit`; github does not import it.
   let sessionTrailer;
   if (enabledModules(manifest).includes('sessions')) {

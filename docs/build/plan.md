@@ -43,6 +43,10 @@ Validation: `YAW_TEST_OFFLINE=1 YAW_KIT="$PWD" just check` passed on Node 22.21.
 
 Subsequent #123/#110 follow-up: the user retained zero-dependency Node and explicitly left unavoidable SQLite pathname/ACL/same-user limitations open. Session mitigations were committed as `d39d749` (40/40 focused tests; full offline check 709 passed, 13 skipped). #110's generated forms/skills, guarded task automation and dependency configuration pass the full offline check: **718 passed, 13 skipped, 0 failed**, schema examples **27/27**, decisions **49 records**. The user separately authorized GitHub issue reads and closures only; no pushes, release changes, live workflow mutations or CI runs are authorized. The local `v0.1.0` tag remains unchanged.
 
+Reading the full ticket bodies before closure found two remaining acceptance details: #119 also requested removing bidirectional/zero-width title controls, and #124 also requested a direct relative-path refusal in `tightenHome` and removing its duplicate assertion. Both are now covered. #113 now has a real local PTY regression (synthetic GitHub CLI only), which also exposed and fixed a leaked confirmation reader shared by guarded GitHub and task commands. Existing #131 tests cover all three requirements, including the detached sender's HOME working directory. Tickets requiring the unrun Node 24/hosted matrix or Linux release smoke test are not treated as fully verified.
+
+Final local validation after these acceptance follow-ups: offline `just check` **719 passed, 13 skipped, 0 failed** (732 tests); the PTY test actually ran and passed. Schema validation is **27/27**, decisions **49 records**, adapter sync passes. Shellcheck and the deferred platform/runtime matrix remain unverified.
+
 ---
 
 ## 0. Binding decisions (from BUILD.md)

@@ -19,6 +19,8 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 - Code-map cache reads and session ledger reads use no-follow file descriptors; session IDs and resume paths reject or sanitize terminal controls, and relative registry homes are refused before permission changes.
 - Session ledger reads also verify file identity after opening, directory permission changes use validated descriptors, and registry initialization rejects unsafe homes, writable ancestry and linked SQLite sidecars. SQLite's pathname-open race remains an explicit limitation (#123); these checks are not same-user process isolation.
 - Critical decision references quote titles as data and exclude retired statuses case-insensitively.
+- Critical decision titles remove invisible format/bidirectional controls. The session directory permission helper also rejects relative paths directly.
+- Guarded terminal confirmations close their readline interface after answering, so completed commands do not hang; a real local PTY test documents the known non-human-authentication boundary.
 - GitHub task journals accept only repository-owner comments; generated task views use a root-anchored ignore and retain it when released on removal.
 - GitHub permission prompts cover raw API variants, issue creation and Project additions; ruleset application requires remote checks to have reported, and private-kit CI failures give an actionable diagnostic.
 

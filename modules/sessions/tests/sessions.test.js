@@ -481,6 +481,7 @@ test('the registry directory is 0700 even when it existed already', () => {
 });
 
 test('relative registry homes are refused before directory creation or chmod', () => {
+  assert.equal(tightenHome('.yaw', true), false, 'the permission helper itself also refuses relative paths');
   for (const env of [{ YAW_HOME: '.yaw' }, { HOME: 'relative-home' }, {}]) {
     assert.throws(() => openRegistry(env), /absolute path/);
   }
@@ -626,7 +627,6 @@ test('0700 never follows a link, never touches a foreign or user-chosen director
   mkdirSync(join(base, 'h'));
   symlinkSync(target, join(base, 'h', '.yaw'));
   assert.equal(tightenHome(`${join(base, 'h', '.yaw')}//`, true), false);
-  assert.equal(statSync(target).mode & 0o777, 0o755, 'the link target is untouched');
   assert.equal(statSync(target).mode & 0o777, 0o755, 'the link target is untouched');
   assert.equal(tightenHome(join(base, 'plain'), true), false, 'an existing directory not named .yaw (YAW_HOME=$HOME) is left alone');
   assert.equal(statSync(join(base, 'plain')).mode & 0o777, 0o755);

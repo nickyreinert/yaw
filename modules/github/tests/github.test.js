@@ -7,6 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { main } from '../../../core/cli/main.js';
 import { parse } from '../../../core/lib/yaml.js';
 import { schemas } from '../../../core/render/kit.js';
@@ -283,6 +285,45 @@ test('the real CLI without a terminal refuses a guarded verb and changes nothing
   assert.equal(git('tag', '--list'), '');
   const piped = run(process.execPath, [join(KIT_ROOT, 'bin', 'yaw'), 'gh', 'release', '0.1.0'], { cwd: root, env, input: 'y\n' });
   assert.match(String(piped.stderr), /a person must run it in a terminal/);
+});
+
+test('a program can type y through a real PTY: confirmation is not human authentication', {
+  skip: process.platform === 'win32' || !hasTool('python3') ? 'requires POSIX and Python 3 for the test-only PTY bridge' : false,
+  timeout: 20000,
+}, async (t) => {
+  const root = await project();
+  const entry = join(tmp('yaw-pty-'), 'entry.mjs');
+  writeConfig(root, 'labels:\n  - { name: "type:bug", color: D73A4A }\n');
+  writeFileSync(entry, `import { main } from ${JSON.stringify(pathToFileURL(join(KIT_ROOT, 'core/cli/main.js')).href)};
+const fakeGh = ${fakeGh.toString()};
+const gh = fakeGh();
+console.log('PTY=' + Boolean(process.stdin.isTTY && process.stdout.isTTY));
+const code = await main(['gh', 'labels'], { cwd: ${JSON.stringify(root)}, gh });
+console.log('SYNTHETIC_WRITES=' + gh.writes().length);
+process.exitCode = code;
+`);
+  const child = spawn('python3', ['-c', 'import os, pty, sys; sys.exit(os.waitstatus_to_exitcode(pty.spawn(sys.argv[1:])))', process.execPath, entry], {
+    cwd: root, env: ENV(), stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  t.after(() => { if (child.exitCode === null) child.kill(); });
+  let output = '';
+  let answered = false;
+  const collect = (chunk) => {
+    output += chunk;
+    if (!answered && output.includes('Go ahead?')) {
+      answered = true;
+      child.stdin.write('y\n');
+    }
+  };
+  child.stdout.on('data', collect);
+  child.stderr.on('data', collect);
+  await new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', (code) => code === 0 ? resolve() : reject(new Error(`PTY process exited ${code}: ${output}`)));
+  });
+  assert.equal(answered, true, output);
+  assert.match(output, /PTY=true/);
+  assert.match(output, /SYNTHETIC_WRITES=1/);
 });
 
 test('release and the first push of pr are guarded too', async () => {
