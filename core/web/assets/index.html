@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="yaw-csrf" content="YAW_CSRF">
+  <title>YAW setup</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#setup-depth">Skip to setup</a>
+  <header><h1>YAW setup</h1><p>Offline, local, inspectable. Nothing is written until you explicitly save or apply. Do not enter secrets.</p></header>
+  <p id="status" role="status" aria-live="polite">Loading local questionnaire…</p>
+  <p id="error" role="alert" hidden></p>
+  <div class="layout">
+    <nav aria-label="Setup sections"><h2>Sections</h2><ul id="sections"></ul></nav>
+    <main id="main">
+      <form id="setup">
+        <fieldset id="setup-depth" tabindex="-1">
+          <legend>1. Choose setup depth</legend>
+          <label><input type="radio" name="mode" value="quick" checked> Quick — prototype or MVP; short interview, safe defaults</label>
+          <label><input type="radio" name="mode" value="full"> Full — long-lived product; all applicable configuration</label>
+        </fieldset>
+        <section id="start" aria-labelledby="start-title">
+          <h2 id="start-title">2. Start from</h2>
+          <label for="prefill">New setup or saved answers</label>
+          <select id="prefill"><option value="new">New setup</option></select>
+          <button id="load" type="button">Load selected setup</button>
+          <p>Loading only prefills editable answers. It never grants permission to save again. Previous-project snapshots appear as presets.</p>
+        </section>
+        <div id="questions"></div>
+        <section id="stack" aria-labelledby="stack-title">
+          <h2 id="stack-title">Stack profile</h2>
+          <label for="profile">Profile (or use the suggestion from your answers)</label>
+          <select id="profile"><option value="">Suggest from answers</option></select>
+        </section>
+        <section id="module-section" aria-labelledby="module-title">
+          <h2 id="module-title">Modules</h2>
+          <p>Enabling a module enables its dependencies. Disabling one also disables modules that depend on it. Core is required. Questions disappear immediately.</p>
+          <button id="reset-modules" type="button">Use mode defaults</button>
+          <div id="modules"></div>
+        </section>
+        <section id="confirm" aria-labelledby="confirm-title">
+          <h2 id="confirm-title">Review and confirm</h2>
+          <p id="verify-note"></p>
+          <div class="actions">
+            <button type="button" id="draft" disabled>Save draft</button>
+            <button type="button" id="preset" disabled>Save as preset…</button>
+            <button type="button" id="diff" disabled>Show diff of files</button>
+            <button type="button" id="apply" disabled>Apply…</button>
+          </div>
+        </section>
+      </form>
+      <section id="diff-panel" hidden aria-labelledby="diff-title"><h2 id="diff-title" tabindex="-1">File diff</h2><pre id="diff-output"></pre></section>
+      <section id="log-panel" hidden aria-labelledby="log-title"><h2 id="log-title" tabindex="-1">Apply log</h2><pre id="log" role="log" aria-live="polite"></pre></section>
+    </main>
+    <aside aria-labelledby="summary-title"><h2 id="summary-title">Live summary</h2><div id="summary" aria-live="polite"></div></aside>
+  </div>
+  <dialog id="save-dialog" aria-labelledby="save-title">
+    <form method="dialog">
+      <h2 id="save-title">Save this setup?</h2>
+      <p>Writes answers only to your user folder (~/.yaw/presets/) and adds a history entry. No secrets. This permission is only for this save.</p>
+      <label><input id="save-consent" type="checkbox"> I explicitly agree to save this preset and history entry.</label>
+      <label><input id="save-profile" type="checkbox"> Also save my user preferences to ~/.yaw/user-profile.yaml.</label>
+      <button value="cancel">Cancel</button><button id="save-confirm" value="save">Save this time</button>
+    </form>
+  </dialog>
+  <dialog id="apply-dialog" aria-labelledby="apply-title">
+    <form method="dialog">
+      <h2 id="apply-title">Apply these files?</h2>
+      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. Review the summary and diff first. It does not save a preset or user profile.</p>
+      <button value="cancel">Cancel</button><button value="apply">Apply now</button>
+    </form>
+  </dialog>
+  <noscript>This local form needs JavaScript. Alternatively run yaw init in a terminal.</noscript>
+</body>
+</html>

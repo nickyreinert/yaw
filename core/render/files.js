@@ -93,7 +93,7 @@ export function writeAtomic(root, rel, content, options) {
   resolveInside(root, rel, options); // re-check after creating directories
   const tmp = join(dirname(target), `.${basename(target)}.yaw-${process.pid}-${randomBytes(4).toString('hex')}`);
   try {
-    writeFileSync(tmp, content, { flag: 'wx' });
+    writeFileSync(tmp, content, { flag: 'wx', mode: options?.mode ?? 0o666 });
     renameSync(tmp, target);
   } catch (e) {
     try { unlinkSync(tmp); } catch { /* already gone */ }

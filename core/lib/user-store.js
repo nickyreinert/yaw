@@ -126,6 +126,15 @@ export function readPreset(env, name) {
   return readFileSync(existingPreset(env, name), 'utf8');
 }
 
+// Reading preferences is not consent to save them again.
+export function readUserProfile(env) {
+  const file = profileFile(env);
+  if (!existsSync(file)) return null;
+  const doc = parse(readFileSync(file, 'utf8'));
+  check('user-profile.yaml', 'user-profile.schema.json', doc);
+  return doc;
+}
+
 export function deletePreset(env, name) {
   rmSync(existingPreset(env, name));
 }

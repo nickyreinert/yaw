@@ -62,7 +62,10 @@ test('form server: a valid session gets the page with CSP and the cookie flags',
   const html = await ok.text();
   assert.match(html, /YAW setup/);
   assert.doesNotMatch(html, /https?:\/\/(?!127\.0\.0\.1)/);
-  assert.doesNotMatch(html, /\b(src|href)=/);
+  const assets = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(assets.includes('/app.js') && assets.includes('/app.css'));
+  assert.ok(assets.every((path) => path.startsWith('/') && !path.startsWith('//') || path.startsWith('#')));
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/);
 }));
 
 test('form server: a foreign Host header is refused', () => withServer(async (s) => {

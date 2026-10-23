@@ -23,6 +23,7 @@ import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
+import { initWeb } from '../web/init.js';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose.
 async function chooseProfile({ prompter, profiles, suggestion }) {
@@ -140,6 +141,11 @@ export async function init({ values, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   const root = io.cwd;
   const kitRoot = io.kitRoot;
+  if (values.web) {
+    if (values.answers || values.yes) throw new UsageError('--web cannot be combined with --answers or --yes; confirm in the browser');
+    if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
+    return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject });
+  }
   const fromFile = Boolean(values.answers);
   if (!fromFile && !io.prompter.interactive) throw new UsageError('no terminal for the interview: run yaw init --answers <file> --yes');
   if (fromFile && !values.yes && !io.prompter.interactive) throw new UsageError('confirmation needed: run again with --yes');
