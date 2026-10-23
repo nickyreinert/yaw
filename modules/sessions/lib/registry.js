@@ -1,10 +1,10 @@
 // Session registry (Y-5.7, ADR-0029): the sessions / session_links tables of ~/.yaw/yaw.db (BD3, ADR-0018),
 // written by the module's hooks and read by `yaw sessions`. Metadata and paths only: no prompt text, no
-// transcript content (doc 12 §4). Every path is checked before it is opened, symlinks are refused, and
-// nothing read from the database or from a project file is ever executed or opened.
+// transcript content (doc 12 §4). Descriptor checks mitigate path swaps; SQLite still opens by pathname
+// (see ADR-0029's filesystem boundary). Registry values are never executed.
 
-import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from 'node:fs';
-import { basename, isAbsolute, join } from 'node:path';
+import { closeSync, constants, existsSync, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSqlite, migrate } from '../../../core/lib/db.js';
 import { parseTasks } from '../../../core/lib/tasks.js';
@@ -24,6 +24,7 @@ const MAX_FILES = 50;
 const MAX_COMMITS = 100;
 const MAX_LEDGER_BYTES = 1024 * 1024;
 const GIT_TIMEOUT_MS = 5000;
+const sameFile = (a, b) => a.dev === b.dev && a.ino === b.ino;
 
 // Control characters (terminal escapes) never reach the screen or a stored title.
 export const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -31,23 +32,25 @@ const clip = (s, n) => ([...s].length > n ? `${[...s].slice(0, n - 1).join('')}�
 
 // ------------------------------------------------------------------------------------------ file access
 
-// Read a project file only if every component is a real directory / regular file (no symlink anywhere).
+// Check relative components, then bind the read to the checked file's device/inode.
 // -> text, or null when it is missing, unsafe, or too large. Never throws.
 export function readRegular(root, rel, { open = openSync } = {}) {
   let fd;
   try {
     checkRelPath(rel);
     let cur = root;
+    let expected;
     const parts = rel.split('/');
     for (let i = 0; i < parts.length; i += 1) {
       cur = join(cur, parts[i]);
       const st = lstatSync(cur);
       if (st.isSymbolicLink()) return null;
       if (i < parts.length - 1 ? !st.isDirectory() : !st.isFile() || st.size > MAX_LEDGER_BYTES) return null;
+      expected = st;
     }
     fd = open(cur, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const st = fstatSync(fd);
-    if (!st.isFile() || st.size > MAX_LEDGER_BYTES) return null;
+    if (!st.isFile() || st.size > MAX_LEDGER_BYTES || !sameFile(expected, st)) return null;
     return readFileSync(fd, 'utf8');
   } catch {
     return null;
@@ -64,7 +67,7 @@ export function realRoot(root) {
   }
 }
 
-// ~/.yaw/yaw.db (or $YAW_HOME): the file itself must be a regular file, not a link somebody planted.
+// ~/.yaw/yaw.db (or $YAW_HOME).
 export function registryFile(env) {
   return join(yawHome(env), 'yaw.db');
 }
@@ -72,39 +75,113 @@ export function registryFile(env) {
 // 0700 for the registry directory: when it was just created, or when it is a real directory (not a link) named
 // .yaw that we own. Never follows a link, never touches a directory the user pointed YAW_HOME at (YAW_HOME=$HOME),
 // never throws.
-export function tightenHome(home, existed, uid = process.getuid?.()) {
+export function tightenHome(home, existed, uid = process.getuid?.(), { open = openSync } = {}) {
+  let fd;
   try {
     home = home.replace(/\/+$/, '') || '/'; // a trailing slash would make lstat follow a link
     const st = lstatSync(home);
     if (st.isSymbolicLink() || !st.isDirectory() || st.uid !== uid) return false;
     if (existed && basename(home) !== '.yaw') return false;
-    chmodSync(home, 0o700);
+    fd = open(home, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    const actual = fstatSync(fd);
+    if (!actual.isDirectory() || !sameFile(st, actual) || actual.uid !== uid) return false;
+    fchmodSync(fd, 0o700);
     return true;
   } catch {
     return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
-export function openRegistry(env) {
-  const home = yawHome(env);
-  if (!isAbsolute(home)) throw new RegistryError('HOME or YAW_HOME must be an absolute path for the session registry');
+// Mode bits cannot attest ACLs or isolate another process running as the same user.
+function trustedAncestry(directory, uid) {
+  let cur = realpathSync(directory);
+  for (;;) {
+    const st = lstatSync(cur);
+    const sticky = (st.mode & 0o1000) !== 0;
+    if (!st.isDirectory() || ![0, uid].includes(st.uid) || ((st.mode & 0o022) !== 0 && !sticky)) {
+      throw new RegistryError(`${cur}: registry ancestry must be owned by you or root and not writable by others (except sticky directories)`);
+    }
+    const parent = dirname(cur);
+    if (cur === parent) return;
+    cur = parent;
+  }
+}
+
+function checkRegistryEntry(file, uid, { missing = false } = {}) {
+  try {
+    const st = lstatSync(file);
+    if (!st.isFile() || st.uid !== uid || st.nlink !== 1 || (st.mode & 0o022) !== 0) {
+      throw new RegistryError(`${file} must be an owner-controlled regular file, not a link or shared writable file`);
+    }
+    return st;
+  } catch (e) {
+    if (missing && e.code === 'ENOENT') return null;
+    if (e instanceof RegistryError) throw e;
+    throw new RegistryError(`${file} cannot be checked (${e.code})`);
+  }
+}
+
+export function openRegistry(env, { open = openSync, database } = {}) {
+  const configured = yawHome(env);
+  if (!isAbsolute(configured)) throw new RegistryError('HOME or YAW_HOME must be an absolute path for the session registry');
+  const home = resolve(configured);
+  const uid = process.getuid?.();
+  if (uid === undefined) throw new RegistryError('the session registry requires POSIX ownership checks');
+  let ancestor = home;
+  while (!existsSync(ancestor)) ancestor = dirname(ancestor);
+  trustedAncestry(ancestor, uid);
   const existed = existsSync(home);
   mkdirSync(home, { recursive: true, mode: 0o700 });
   tightenHome(home, existed);
-  const file = registryFile(env);
-  try {
-    const st = lstatSync(file);
-    if (st.isSymbolicLink() || !st.isFile()) throw new RegistryError(`${file} must be a regular file, not a link`);
-  } catch (e) {
-    if (e instanceof RegistryError) throw e;
-    if (e.code !== 'ENOENT') throw new RegistryError(`${file} cannot be checked (${e.code})`);
+  const homeStat = lstatSync(home);
+  if (!homeStat.isDirectory() || homeStat.uid !== uid || (homeStat.mode & 0o077) !== 0) {
+    throw new RegistryError(`${home} must be a private directory owned by you; choose a private YAW_HOME (mode 0700)`);
   }
-  const { DatabaseSync } = loadSqlite();
-  const db = new DatabaseSync(file);
-  db.exec('PRAGMA busy_timeout = 3000'); // several sessions (hooks) write the same file
-  db.exec('PRAGMA foreign_keys = ON');
-  migrate(db);
-  return db;
+  trustedAncestry(home, uid);
+  const file = join(home, 'yaw.db');
+  const sidecars = ['-journal', '-wal', '-shm'].map((suffix) => `${file}${suffix}`);
+  const checkSidecars = () => {
+    for (const sidecar of sidecars) checkRegistryEntry(sidecar, uid, { missing: true });
+  };
+  let expected = checkRegistryEntry(file, uid, { missing: true });
+  let fd;
+  let db;
+  try {
+    const flags = constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK;
+    try {
+      fd = open(file, flags | (expected ? 0 : constants.O_CREAT | constants.O_EXCL), 0o600);
+    } catch (e) {
+      if (expected || e.code !== 'EEXIST') throw e;
+      // Another hook may have created the registry after our missing-file check.
+      expected = checkRegistryEntry(file, uid);
+      fd = open(file, flags);
+    }
+    const actual = fstatSync(fd);
+    if (!actual.isFile() || actual.uid !== uid || actual.nlink !== 1 || (expected && !sameFile(expected, actual))) {
+      throw new RegistryError(`${file} changed while opening the registry`);
+    }
+    fchmodSync(fd, 0o600);
+    checkSidecars();
+    const { DatabaseSync } = loadSqlite();
+    db = database ? database(file) : new DatabaseSync(file);
+    // Detect persistent replacements before schema writes; this is not an atomic SQLite open.
+    if (!sameFile(actual, checkRegistryEntry(file, uid)) || !sameFile(homeStat, lstatSync(home))) {
+      throw new RegistryError(`${file} changed while opening SQLite`);
+    }
+    checkSidecars();
+    db.exec('PRAGMA busy_timeout = 3000'); // several sessions (hooks) write the same file
+    db.exec('PRAGMA foreign_keys = ON');
+    migrate(db);
+    return db;
+  } catch (e) {
+    db?.close();
+    if (e instanceof RegistryError) throw e;
+    throw new RegistryError(`${file} could not be opened (${e.code ?? e.message})`);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 export function withRegistry(env, fn) {

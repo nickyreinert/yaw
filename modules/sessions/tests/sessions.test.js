@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, openSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, mkdirSync, openSync, renameSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { loadModule } from '../../../core/render/kit.js';
@@ -497,6 +497,122 @@ test('readRegular refuses a file swapped for a symlink between the check and ope
     return openSync(path, flags);
   } });
   assert.equal(text, null);
+});
+
+test('readRegular binds reads to the checked inode, including parent and root swaps', () => {
+  for (const swap of ['file', 'parent', 'root']) {
+    const base = tmp('yaw-ledger-swap-');
+    const root = join(base, 'project');
+    const outside = join(base, 'outside');
+    mkdirSync(join(root, 'docs'), { recursive: true });
+    mkdirSync(join(outside, 'docs'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'TASKS.md'), LEDGER);
+    writeFileSync(join(outside, 'docs', 'TASKS.md'), 'outside ledger');
+    const result = readRegular(root, 'docs/TASKS.md', { open: (path, flags) => {
+      if (swap === 'file') {
+        renameSync(path, `${path}.original`);
+        writeFileSync(path, 'replacement ledger');
+      } else {
+        const replaced = swap === 'root' ? root : join(root, 'docs');
+        renameSync(replaced, `${replaced}.original`);
+        symlinkSync(swap === 'root' ? outside : join(outside, 'docs'), replaced);
+      }
+      return openSync(path, flags);
+    } });
+    assert.equal(result, null, swap);
+  }
+});
+
+test('tightenHome does not chmod a replacement directory or a swapped parent target', () => {
+  for (const swap of ['directory', 'parent']) {
+    const base = tmp('yaw-chmod-swap-');
+    const parent = join(base, 'parent');
+    const outside = join(base, 'outside');
+    mkdirSync(join(parent, '.yaw'), { recursive: true, mode: 0o755 });
+    mkdirSync(join(outside, '.yaw'), { recursive: true, mode: 0o755 });
+    const home = join(parent, '.yaw');
+    const result = tightenHome(home, true, process.getuid(), { open: (path, flags) => {
+      if (swap === 'directory') {
+        renameSync(home, `${home}.original`);
+        mkdirSync(home, { mode: 0o755 });
+      } else {
+        renameSync(parent, `${parent}.original`);
+        symlinkSync(outside, parent);
+      }
+      return openSync(path, flags);
+    } });
+    assert.equal(result, false, swap);
+    assert.equal(statSync(home).mode & 0o777, 0o755, 'replacement permissions unchanged');
+  }
+});
+
+test('registry refuses unsafe homes, writable ancestry, and linked or writable SQLite sidecars', () => {
+  const base = tmp('yaw-registry-safety-');
+  const publicHome = join(base, 'public');
+  mkdirSync(publicHome, { mode: 0o755 });
+  assert.throws(() => openRegistry({ YAW_HOME: publicHome }), /private directory/);
+  assert.equal(statSync(publicHome).mode & 0o777, 0o755, 'custom permissions unchanged');
+  assert.equal(existsSync(join(publicHome, 'yaw.db')), false);
+  symlinkSync(publicHome, join(base, 'linked'));
+  assert.throws(() => openRegistry({ YAW_HOME: join(base, 'linked') }), /private directory/);
+
+  const shared = join(base, 'shared');
+  mkdirSync(shared);
+  chmodSync(shared, 0o777);
+  assert.throws(() => openRegistry({ YAW_HOME: join(shared, '.yaw') }), /ancestry/);
+  assert.equal(existsSync(join(shared, '.yaw')), false, 'refusal precedes mkdir');
+
+  for (const suffix of ['-journal', '-wal', '-shm']) {
+    const home = tmp('yaw-sidecar-');
+    const target = join(base, `outside${suffix}`);
+    writeFileSync(target, 'untouched');
+    symlinkSync(target, join(home, `yaw.db${suffix}`));
+    assert.throws(() => openRegistry({ YAW_HOME: home }), /regular file/);
+    assert.equal(read(base, `outside${suffix}`), 'untouched');
+  }
+  const home = tmp('yaw-shared-db-');
+  writeFileSync(join(home, 'yaw.db'), '');
+  chmodSync(join(home, 'yaw.db'), 0o666);
+  assert.throws(() => openRegistry({ YAW_HOME: home }), /shared writable file/);
+  unlinkSync(join(home, 'yaw.db'));
+  const target = join(base, 'linked.db');
+  writeFileSync(target, '');
+  linkSync(target, join(home, 'yaw.db'));
+  assert.throws(() => openRegistry({ YAW_HOME: home }), /regular file/);
+});
+
+test('registry detects file replacements before chmod and persistent SQLite-open swaps before migration', () => {
+  const home = tmp('yaw-db-open-swap-');
+  const file = join(home, 'yaw.db');
+  writeFileSync(file, '');
+  assert.throws(() => openRegistry({ YAW_HOME: home }, { open: (path, flags) => {
+    renameSync(file, `${file}.original`);
+    writeFileSync(file, '', { mode: 0o644 });
+    return openSync(path, flags);
+  } }), /changed while opening the registry/);
+  assert.equal(statSync(file).mode & 0o777, 0o644, 'replacement is not chmodded');
+
+  let closed = false;
+  let executed = false;
+  assert.throws(() => openRegistry({ YAW_HOME: home }, { database: () => {
+    renameSync(file, `${file}.replaced`);
+    writeFileSync(file, '');
+    return { close: () => { closed = true; }, exec: () => { executed = true; } };
+  } }), /changed while opening SQLite/);
+  assert.equal(closed, true, 'SQLite handle is closed on validation failure');
+  assert.equal(executed, false, 'no schema or session writes after a detected swap');
+});
+
+test('concurrent creation is rechecked and registry permissions are private', () => {
+  const home = tmp('yaw-db-create-race-');
+  let calls = 0;
+  const db = openRegistry({ YAW_HOME: home }, { open: (path, flags, mode) => {
+    if (calls++ === 0) writeFileSync(path, '', { mode: 0o600 });
+    return openSync(path, flags, mode);
+  } });
+  db.close();
+  assert.equal(calls, 2);
+  assert.equal(statSync(join(home, 'yaw.db')).mode & 0o777, 0o600);
 });
 
 test('0700 never follows a link, never touches a foreign or user-chosen directory, never throws', () => {
