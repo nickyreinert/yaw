@@ -29,7 +29,7 @@ GitHub-native building blocks, all via `gh` (and `gh api` GraphQL where the CLI 
 Generated files:
 
 - `.github/ISSUE_TEMPLATE/{feature,bug,chore,spike,epic}.yml` (issue forms with required priority, estimate, acceptance criteria; layperson help text).
-- `.yaw/github.yaml`: project number, field IDs, option IDs (resolved once by `yaw gh setup`, so recipes need no lookups).
+- `.yaw/github.yaml`: optional project number and explicit epic-to-milestone mappings. Recipes resolve live field/option IDs during read-only preflight; there is no `yaw gh setup` command.
 
 Skills and recipes (agent-agnostic, `just gh-*`):
 
@@ -38,7 +38,7 @@ Skills and recipes (agent-agnostic, `just gh-*`):
 | `issue-create` | Interview-style issue creation: type, title, user story, acceptance criteria, priority, estimate, milestone, parent epic; adds to Project with fields |
 | `issue-triage` | Lists issues failing the Definition of Ready and proposes fixes (estimate, priority, milestone) for confirmation |
 | `epic-plan` | Breaks an epic into sub-issues with estimates; checks sum against the milestone's remaining capacity |
-| `just task start <#>` | Assign me, Status → In progress, branch from fresh origin, optional worktree, session link |
+| `just task start <#>` | Assign me, guarded configured Status → In progress, branch from fresh origin; worktree and session link remain later |
 | `just pr` | Push, open draft PR with `Closes #<n>`, template filled (checks, ADR IDs, migrations) |
 | `just task done` | Status → In review; after merge the Project automation moves it to Done |
 
@@ -54,14 +54,14 @@ Defence in depth; the agent rules are guidance, the git hooks bind locally (they
 | CI required check `pr-policy` | PR links an issue (`closingIssuesReferences` non-empty), linked issue passes Definition of Ready, branch name matches, phase rules (section 4). Phase 1 enforces only "PR links an open issue"; the rest comes in phase 2 | everyone |
 | Branch protection / rulesets | PR required, N approvals, required checks (`quality-gate`, `pr-policy`), no force-push, optional linear history | everyone |
 
-`just gh-protect` applies and verifies the rulesets (guarded action, needs repo admin); `just gh-protect --verify` only compares the ruleset on GitHub with `.yaw/github.yaml` and needs no confirmation.
+`just gh-protect` applies and verifies the rulesets (guarded action, needs repo admin); `just gh-protect --verify` only compares the ruleset on GitHub with `.yaw/github.yaml` and needs no confirmation. Configured task Project updates and epic milestone synchronization are also guarded; a non-interactive call refuses before shared-state changes.
 
 Phase 1 (ADR-0031) builds these layers as the `team` module (preselected in Full for a team, ADR-0032; depends on `tasks`, `github`, `git-hooks`):
 
 - **Security boundary (decided by the user, ADR-0031):** the GitHub ruleset (`just gh-protect`: pull request required, no force push, no deletion, no bypass actors) plus `pr-policy` plus lefthook. The agent-side rules in `AGENTS.md` are guidance only; there is no agent-side command guard and no edit lock.
 - `commit-msg` accepts `#<n>` anywhere outside comment lines and lets git's own merge and revert messages and `fixup!` / `squash!` commits pass. `pre-push` is a lefthook script (`.lefthook/pre-push/`), because lefthook skips `run` jobs on pre-push when no new files are pushed; creating the default branch (the first push of a new repository) is allowed.
 - `pr-policy` (`.github/workflows/pr-policy.yml`, job `pr-policy`, read-only token, no checkout, no third-party action) reads `closingIssuesReferences` and needs an open issue of the same repository; GitHub fills it only for pull requests into the default branch. `requiredChecks` in `.yaw/github.yaml` gains `pr-policy` while the module is installed.
-- `just task start <#>` assigns the issue and switches to its branch, or creates `<type>/<#>-<slug>` from the fresh default branch (`fix/` for `type:bug`). Project Status, worktree and session link stay later (issue #110).
+- `just task start <#>` assigns the issue and switches to its branch, or creates `<type>/<#>-<slug>` from the fresh default branch (`fix/` for `type:bug`). With `project.number` configured, it first asks for guarded confirmation and then sets Status to In progress after branch creation succeeds; `done` sets In review. Worktree and session links remain later.
 
 ## 3. Session start in a team
 

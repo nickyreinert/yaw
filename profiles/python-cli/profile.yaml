@@ -9,3 +9,4 @@ suggestWhen:
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [just, uv]
+dependencyEcosystems: [pip]

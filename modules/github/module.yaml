@@ -1,13 +1,14 @@
 # modules/github/module.yaml (Y-5.5, ADR-0027): GitHub scripts as `just` recipes (doc 10 §3).
 name: github
-description: Recipes for the GitHub side of a project (repo, labels, branch, commit, pull request, release, ruleset, project board, issues with native type or label), a PR template and .yaw/github.yaml; guarded actions need explicit authorisation.
+description: GitHub recipes, issue forms and planning skills, a PR template and .yaw/github.yaml; configured task Project and epic milestone updates need guarded confirmation.
 depends: [core]
 default: { quick: false, standard: true, full: true }
 # Off when the user does not use GitHub, including teams with a local Git remote.
 appliesTo: { usesGitHub: true }
 questions: []
 outputs:
-  templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, just/github.just, justfile]
+  templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, .github/ISSUE_TEMPLATE/feature.yml, .github/ISSUE_TEMPLATE/bug.yml, .github/ISSUE_TEMPLATE/chore.yml, .github/ISSUE_TEMPLATE/spike.yml, .github/ISSUE_TEMPLATE/epic.yml, just/github.just, justfile]
+  skills: [issue-create, issue-triage, epic-plan]
 agentsMd: |
   - Git and GitHub work goes through `just branch`, `commit`, `pr`, `pr-status`, `gh-issue`; guarded recipes (`gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release`, first push) run only when the user types `y`, so ask the user and never work around it. There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
 agents:

@@ -1,6 +1,7 @@
 # profiles/static-site/profile.yaml
 # Never auto-suggested (ADR-0034): no narrow fact exists yet, the user picks it from the list.
 name: static-site
+dependencyEcosystems: [npm]
 summary: Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.
 suggestWhen: {}
 defaults:

@@ -1,0 +1,47 @@
+name: Feature
+description: Propose something the project should do.
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      description: Who needs this, what should they be able to do, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes that tell us the work is complete.
+      placeholder: "- [ ] A user can..."
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: P0 blocks release; P1 needed; P2 desirable; P3 may wait.
+      options: [P0, P1, P2, P3]
+    validations:
+      required: true
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      description: Relative size, not a promise of delivery time.
+      options: [XS, S, M, L, XL]
+    validations:
+      required: true
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Name the target release or phase; use Unscheduled if not agreed.
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: Parent epic
+      description: Optional issue number; link the native sub-issue relationship after creation.

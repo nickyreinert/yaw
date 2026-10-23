@@ -85,7 +85,7 @@ test('a team setup without GitHub preserves and can push to a local bare remote'
   assert.equal(git(remote, 'rev-parse', 'main'), git(root, 'rev-parse', 'HEAD'));
 });
 
-test('Quick and Full register exactly the expected hook modules and handoff skills for every agent', () => {
+test('Quick and Full register exactly the expected hook modules and skills for every agent', () => {
   for (const agent of ['claude', 'codex', 'copilot']) {
     for (const mode of ['quick', 'full']) {
       const doc = answersFor('node-cli', { mode });
@@ -97,7 +97,9 @@ test('Quick and Full register exactly the expected hook modules and handoff skil
       const expected = mode === 'quick' ? ['security', 'tasks'] : agent === 'copilot' ? ['security', 'sessions', 'tasks'] : ['comfort', 'decisions', 'security', 'sessions', 'tasks'];
       assert.deepEqual(actual, expected, `${agent}/${mode}`);
       const skills = [...desired.keys()].filter((p) => p.endsWith('/SKILL.md'));
-      assert.deepEqual(skills.sort(), mode === 'quick' ? [] : (agent === 'claude' ? ['.claude/skills/handoff/SKILL.md', '.agents/skills/handoff/SKILL.md'].sort() : ['.agents/skills/handoff/SKILL.md']));
+      const names = ['epic-plan', 'handoff', 'issue-create', 'issue-triage'];
+      const directories = agent === 'claude' ? ['.agents', '.claude'] : ['.agents'];
+      assert.deepEqual(skills.sort(), mode === 'quick' ? [] : directories.flatMap((dir) => names.map((name) => `${dir}/skills/${name}/SKILL.md`)).sort());
     }
   }
 });

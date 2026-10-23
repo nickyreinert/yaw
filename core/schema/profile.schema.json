@@ -50,6 +50,12 @@
       "type": "array",
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(>=[0-9]+(\\.[0-9]+)*)?$" },
       "uniqueItems": true
+    },
+    "dependencyEcosystems": {
+      "description": "Dependabot ecosystems for dependencies in this profile's scaffold, including development/test dependencies; omit for dependency-free profiles.",
+      "type": "array",
+      "items": { "enum": ["npm", "pip", "composer", "gradle"] },
+      "uniqueItems": true
     }
   },
   "additionalProperties": false

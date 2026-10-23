@@ -166,7 +166,7 @@ test('renders the recipes, the PR template, github.yaml and the ask rules; manif
   assert.match(tree['AGENTS.md'], /There is no recipe to merge, force-push, delete a branch or change repo visibility/);
   const settings = JSON.parse(tree['.claude/settings.json']);
   assert.ok(settings.permissions.deny.includes('Read(**/.env)'), 'the security rules stay');
-  for (const rule of ['Bash(just gh-protect:*)', 'Bash(gh pr merge:*)', 'Bash(gh repo edit:*)', 'Bash(just release:*)', 'Bash(just pr:*)', 'Bash(gh api:*)', 'Bash(gh issue create:*)', 'Bash(gh project item-add:*)']) {
+  for (const rule of ['Bash(just gh-protect:*)', 'Bash(gh pr merge:*)', 'Bash(gh repo edit:*)', 'Bash(just release:*)', 'Bash(just pr:*)', 'Bash(gh api:*)', 'Bash(gh issue create:*)', 'Bash(gh project item-add:*)', 'Bash(gh project item-edit:*)']) {
     assert.ok(settings.permissions.ask.includes(rule), rule);
   }
   const manifest = readManifest(root);
@@ -655,7 +655,7 @@ test('project-add: adds the issue and sets the Status option', async () => {
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /#9 is on project 3 \(Status: in progress\)/);
   const names = gh.calls.map((c) => c.args.slice(0, 2).join(' '));
-  assert.deepEqual(names.filter((n) => n.startsWith('project')), ['project item-add', 'project view', 'project field-list', 'project item-edit']);
+  assert.deepEqual(names.filter((n) => n.startsWith('project')), ['project view', 'project field-list', 'project item-add', 'project item-edit']);
   const edit = gh.calls.find((c) => c.args[1] === 'item-edit').args;
   assert.deepEqual(edit.slice(2), ['--id', 'PVTI_item', '--project-id', 'PVT_project', '--field-id', 'PVTSSF_status', '--single-select-option-id', 'o2']);
   assert.match((await yaw(root, ['project-add', '9', '--status', 'Nope', '--yes'], { gh: fakeGh(), env })).err, /no Status option "Nope"/);
@@ -811,8 +811,8 @@ test('a label name that looks like a flag is passed after --', async () => {
   assert.deepEqual(gh.writes()[0].args, ['label', 'create', '--color', 'D73A4A', '--description', '', '--', '--force']);
 });
 
-test('GUARDED is the list of the authorise call sites in the code', () => {
+test('guarded GitHub verbs and the configured task workflow all require authorisation', () => {
   const code = readFileSync(join(KIT_ROOT, 'modules', 'github', 'lib', 'cli.js'), 'utf8');
-  assert.equal((code.match(/await authorise\(/g) ?? []).length, GUARDED.length);
+  assert.equal((code.match(/await authorise\(/g) ?? []).length, GUARDED.length + 1, 'one additional call site guards configured task workflows');
   for (const verb of GUARDED) assert.ok(VERBS.includes(verb), verb);
 });

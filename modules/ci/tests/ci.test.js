@@ -98,6 +98,34 @@ test('dependabot keeps the pinned actions current', async () => {
   assert.equal(doc.updates[0].directory, '/');
 });
 
+test('dependabot covers each profile dependency ecosystem and kit actions are SHA-pinned', async () => {
+  const ecosystems = {
+    'node-cli': [], 'python-cli': ['pip'], 'python-web': ['pip'], 'static-site': ['npm'],
+    'node-ts-vercel': ['npm'], 'cloudflare-workers': ['npm'], 'php-web': ['composer'],
+    'wordpress-plugin': ['composer'], 'android-kotlin': ['gradle'],
+  };
+  for (const [profile, expected] of Object.entries(ecosystems)) {
+    const root = await project(profile);
+    const doc = parse(read(root, '.github/dependabot.yml'));
+    assert.deepEqual(doc.updates.map((u) => u['package-ecosystem']), ['github-actions', ...expected], profile);
+    for (const update of doc.updates) {
+      assert.equal(update.directory, '/');
+      assert.equal(update.schedule.interval, 'weekly');
+    }
+  }
+  const workflow = parse(readFileSync(join(KIT_ROOT, '.github/workflows/kit-ci.yml'), 'utf8'));
+  for (const action of allUses(workflow)) assert.match(action, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);
+});
+
+test('composed profiles update dependencies in their namespaced directories', async () => {
+  const root = tmp('yaw-ci-composed-');
+  const text = `mode: full\nanswers:\n  user.agents: [claude]\n  idea.text: Full stack\nproposal:\n  status: confirmed\n  summary: Test full stack\n  profiles: [python-web, node-ts-vercel]\n  modules: [core, github, ci]\n`;
+  await initProject({ root, modules: MODULES, answersFile: writeAnswers(tmp('yaw-ans-'), text) });
+  const doc = parse(read(root, '.github/dependabot.yml'));
+  assert.deepEqual(doc.updates.map((u) => [u['package-ecosystem'], u.directory]),
+    [['github-actions', '/'], ['pip', '/python-web'], ['npm', '/node-ts-vercel']]);
+});
+
 // The kit-install step, run as GitHub would run it, against a local kit repository tagged with the manifest's kit version.
 async function installStep(root) {
   const doc = parse(read(root, WORKFLOW));

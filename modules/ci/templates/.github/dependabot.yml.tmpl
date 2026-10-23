@@ -1,0 +1,13 @@
+# Keeps SHA-pinned actions and profile dependencies current (ci module, ADR-0027).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+<% each dependencyUpdates as update %>
+  - package-ecosystem: <%= update.ecosystem %>
+    directory: <%= update.directory %>
+    schedule:
+      interval: weekly
+<% end %>

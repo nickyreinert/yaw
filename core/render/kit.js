@@ -316,6 +316,10 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     devenv: profileDevenv(kitRoot, profiles),
     // ADR-0027: toolchain steps for the ci module.
     ci: profileCi(kitRoot, profiles),
+    dependencyUpdates: profiles.flatMap((name) => (hasProfile(kitRoot, name)
+      ? (loadProfile(kitRoot, name).dependencyEcosystems ?? []).map((ecosystem) => ({
+        ecosystem, directory: profiles.length > 1 ? `/${name}` : '/',
+      })) : [])),
     // Explicit GitHub team enforcement also overrides a solo project's local task default.
     tasks: taskFlags(tasksMode(flat, { teamModule: modules.includes('team') })),
     // ADR-0030: the comfort features the user picked. Only the status line is a committed setting, and it is

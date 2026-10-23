@@ -1,0 +1,46 @@
+name: Epic
+description: Describe a larger outcome delivered through linked sub-issues.
+labels: ["type:epic"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome and scope
+      description: Who benefits, what is included, and what is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List the observable outcomes for the epic as a whole.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: P0 blocks release; P1 needed; P2 desirable; P3 may wait.
+      options: [P0, P1, P2, P3]
+    validations:
+      required: true
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      description: Initial relative size; refine using the linked sub-issues.
+      options: [XS, S, M, L, XL]
+    validations:
+      required: true
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Target release or phase; configure its epic mapping in .yaw/github.yaml after creation.
+    validations:
+      required: true
+  - type: textarea
+    id: children
+    attributes:
+      label: Sub-issues
+      description: Proposed work breakdown. Use native sub-issue links after creation, not just a checklist.

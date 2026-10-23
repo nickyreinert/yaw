@@ -43,6 +43,20 @@
       },
       "additionalProperties": false
     },
+    "epics": {
+      "description": "Explicit epic issue to milestone mapping. task sync proposes guarded writes for the epic and its direct sub-issues only.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue", "milestone"],
+        "properties": {
+          "issue": { "type": "integer", "minimum": 1 },
+          "milestone": { "type": "string", "minLength": 1, "pattern": "^[^\\u0000-\\u001f\\u007f]+$" }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
     "rules": {
       "type": "object",
       "properties": {

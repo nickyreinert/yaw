@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { enabledModules, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
+import { createPrompter, confirm } from './prompt.js';
 
 export async function task({ values, positionals, io }) {
   const manifest = requireManifest(io.cwd);
@@ -13,12 +14,21 @@ export async function task({ values, positionals, io }) {
   const mode = manifest.modules.tasks.mode ?? 'local';
   // Team mode (ADR-0031): `start #n` also switches to or creates the issue branch; tasks does not import team.
   let startBranch;
+  let prepareWorkflow;
+  if (mode !== 'local' && enabledModules(manifest).includes('github')) {
+    const github = await import(pathToFileURL(join(io.kitRoot, 'modules', 'github', 'lib', 'cli.js')).href);
+    const tty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const confirmer = io.confirm ?? (tty ? (q) => confirm(createPrompter(), q) : undefined);
+    prepareWorkflow = (options) => github.prepareTaskWorkflow({
+      ...options, root: io.cwd, io: { ...io, confirm: confirmer },
+    });
+  }
   if (mode === 'github' && enabledModules(manifest).includes('team')) {
     const team = await import(pathToFileURL(join(io.kitRoot, 'modules', 'team', 'lib', 'cli.js')).href);
     startBranch = (number, sub) => team.startBranch({ number, io: sub });
   }
   try {
-    return await lib.runTask({ verb, args, values, mode, io: { ...io, root: io.cwd, startBranch } });
+    return await lib.runTask({ verb, args, values, mode, io: { ...io, root: io.cwd, startBranch, prepareWorkflow } });
   } catch (e) {
     if (e instanceof lib.TaskUsageError) throw new UsageError(`${e.message}\n${lib.USAGE}`);
     throw e;

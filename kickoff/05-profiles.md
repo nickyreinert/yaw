@@ -54,7 +54,10 @@ defaults:
   modules: { backup: true, environments: true, ui-design: auto }
   budgets: { apiP95ms: 300 }
 requires: [docker, just, uv]
+dependencyEcosystems: [pip]
 ```
+
+`dependencyEcosystems` is optional profile metadata for the CI module's Dependabot config. Declare `npm`, `pip`, `composer` or `gradle` when the scaffold has runtime or development dependencies; omit it for dependency-free profiles. Composed projects place these entries in each profile's own directory. Metadata changes do not install dependencies or scan user manifests.
 
 ## 3. Flexibility rules
 

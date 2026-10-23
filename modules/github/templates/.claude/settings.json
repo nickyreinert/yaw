@@ -20,6 +20,7 @@
       "Bash(gh release create:*)",
       "Bash(gh issue create:*)",
       "Bash(gh project item-add:*)",
+      "Bash(gh project item-edit:*)",
       "Bash(gh api:*)"
     ]
   }

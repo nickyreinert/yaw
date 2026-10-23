@@ -4,6 +4,12 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- GitHub issue forms for feature, bug, chore, spike and epic, plus issue-create, issue-triage and epic-plan skills for the selected agents.
+- Optional, guarded Project Status updates on GitHub task start/done and explicit epic-to-milestone mappings synchronized by task sync. Existing local-only workflows stay offline.
+- Profile-aware Dependabot ecosystems, including namespaced composed profiles; dependency-free profiles retain only action updates.
+
 ### Fixed
 
 - GitHub is optional for team and external-reviewer setups, including projects with a local bare Git remote. CLI and browser selection stay identical.
@@ -19,6 +25,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ### Changed
 
 - Prepared the macOS/Node 22.13 and 24 hosted test matrix for the deferred November run. No hosted CI has been executed for these changes.
+- Pinned the remaining kit workflow actions to the full SHAs already used in its profile matrix.
 
 ## [0.1.0] - 2026-10-23
 

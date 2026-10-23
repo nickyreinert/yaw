@@ -18,6 +18,7 @@ export const USAGE = [
   '       yaw task done <id>',
   '       yaw task new "title"',
   'ids: T-012 (local, both) or #41 (github)',
+  'Configured Project Status (github start/done) and epic milestones (sync) require user-terminal confirmation.',
 ].join('\n');
 
 export class TaskUsageError extends Error {}
@@ -84,6 +85,8 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
   if (mode === 'github') {
     switch (verb) {
       case 'sync': {
+        const apply = await io.prepareWorkflow?.({ verb, gh });
+        apply?.();
         const view = fetchView(gh);
         writeLedger(root, view);
         stdout.write(`${TASKS_FILE}: ${view.active.length} active, ${view.backlog.length} in the backlog\n`);
@@ -103,11 +106,13 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
       case 'start': {
         need(1, 'issue number');
         const n = issueNumber(args[0]);
+        const apply = await io.prepareWorkflow?.({ verb, number: n, gh });
         gh(['issue', 'edit', String(n), '--add-assignee', '@me']);
         stdout.write(`#${n} assigned to you\n`);
         refresh();
         // Team mode (ADR-0031): the issue branch, from the team module (io.startBranch is set only there).
         if (io.startBranch) await io.startBranch(n, { ...io, gh });
+        apply?.();
         return 0;
       }
       case 'log': {
@@ -123,7 +128,9 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
       case 'done': {
         need(1, 'issue number');
         const n = issueNumber(args[0]);
+        const apply = await io.prepareWorkflow?.({ verb, number: n, gh });
         gh(['issue', 'comment', String(n), '--body', journalComment('ready for review', { now })]);
+        apply?.();
         stdout.write(`#${n}: marked ready for review; the pull request closes it\n`);
         refresh();
         return 0;
@@ -144,8 +151,10 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
   if (verb === 'sync') {
     if (mode !== 'both') throw new LedgerError('sync mirrors tasks to GitHub issues; this project tracks tasks locally only');
     const ledger = readLedger(root, mode);
+    const apply = await io.prepareWorkflow?.({ verb, gh });
     const result = syncBoth({ ledger, archive: readIf(root, ledger.archive ?? ARCHIVE) ?? '', gh });
     if (result.actions.some((a) => a.kind === 'created' || a.kind === 'linked')) writeLedger(root, result.ledger);
+    apply?.();
     for (const w of result.warnings) stderr.write(`task: ${w}\n`);
     if (result.actions.length === 0) stdout.write('sync: nothing to do, issues are up to date\n');
     for (const a of result.actions) stdout.write(`sync: ${a.kind} ${a.id} -> #${a.issue}\n`);

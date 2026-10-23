@@ -1,6 +1,6 @@
 # modules/ci/module.yaml (Y-5.5, ADR-0027): the CI workflow of doc 10 §4.
 name: ci
-description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and a Dependabot config that keeps the pinned action versions current.
+description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and Dependabot for pinned actions and profile dependency ecosystems.
 depends: [github]
 default: { quick: false, standard: true, full: true }
 appliesTo: { usesGitHub: true }

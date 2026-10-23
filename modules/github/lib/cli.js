@@ -22,6 +22,7 @@ import {
   ISSUE_TYPES, NameError, SLUG, branchName, checkCommitType, checkIdForMode, checkRepoName, checkSemver,
   commitMessage, parseTaskId, prBody, taskFromBranch,
 } from './names.js';
+import { planEpicMilestones, planProjectStatus, repository } from './workflow.js';
 
 export { GhError, NameError };
 export class GhUsageError extends Error {
@@ -111,6 +112,28 @@ async function authorise(io, title, plan) {
   }
   if (await io.confirm('Go ahead?')) return;
   throw new GhUsageError('not authorised; nothing was changed');
+}
+
+export async function prepareTaskWorkflow({ root, verb, number, gh, io }) {
+  const config = loadConfig(root).value;
+  const projectUpdate = ['start', 'done'].includes(verb) && config.project;
+  const epicSync = verb === 'sync' && config.epics?.length;
+  if (!projectUpdate && !epicSync) return undefined;
+  const repo = repository(gh);
+  const operations = projectUpdate
+    ? [planProjectStatus({ gh, repo, project: config.project, issue: number, status: verb === 'start' ? 'In progress' : 'In review' })]
+    : planEpicMilestones({ gh, repo, epics: config.epics });
+  if (operations.length === 0) return undefined;
+  await authorise(io, `task ${verb} changes shared GitHub state:`, operations.map((op) => op.description));
+  return () => {
+    for (const operation of operations) {
+      try {
+        operation.apply();
+      } catch (e) {
+        throw new GhError(`${operation.description} failed (${e.message}); earlier operations may have succeeded; rerun after checking GitHub`);
+      }
+    }
+  };
 }
 
 export function defaultBranch(git, config) {
@@ -512,19 +535,15 @@ async function projectAdd(c) {
   const status = values.status;
   if (status !== undefined && !/^[\w .-]{1,40}$/.test(status)) throw new GhUsageError(`"${status}" is not a valid status`);
   const { slug, owner } = repoInfo(gh);
+  const update = status === undefined ? undefined : planProjectStatus({
+    gh, repo: { slug, owner }, project: { number }, issue: task.number, status,
+  });
   await authorise(c.io, `gh project-add changes project ${number} of ${owner}:`, [
     `add ${slug}#${task.id} to the project`,
     ...(status ? [`set Status to "${status}"`] : []),
   ]);
-  const item = json(gh(['project', 'item-add', String(number), '--owner', owner, '--url', `https://github.com/${slug}/issues/${task.id}`, '--format', 'json']), 'item-add');
-  if (status !== undefined) {
-    const project = json(gh(['project', 'view', String(number), '--owner', owner, '--format', 'json']), 'project view');
-    const fields = json(gh(['project', 'field-list', String(number), '--owner', owner, '--format', 'json']), 'field-list').fields ?? [];
-    const field = fields.find((f) => f.name === 'Status');
-    const option = field?.options?.find((o) => o.name.toLowerCase() === status.toLowerCase());
-    if (!field || !option) throw new GhUsageError(`the project has no Status option "${status}" (found: ${(field?.options ?? []).map((o) => o.name).join(', ') || 'no Status field'})`);
-    gh(['project', 'item-edit', '--id', item.id, '--project-id', project.id, '--field-id', field.id, '--single-select-option-id', option.id]);
-  }
+  if (update) update.apply();
+  else gh(['project', 'item-add', String(number), '--owner', owner, '--url', `https://github.com/${slug}/issues/${task.id}`, '--format', 'json']);
   stdout.write(`#${task.id} is on project ${number}${status ? ` (Status: ${status})` : ''}\n`);
   return 0;
 }

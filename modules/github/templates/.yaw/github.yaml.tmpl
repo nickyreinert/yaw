@@ -1,6 +1,11 @@
 # .yaw/github.yaml (github module, ADR-0027). Labels and rules are yours to edit; `yaw update` asks before it
 # touches an edited file. The repository, its default branch and its issue types are read from GitHub when a
 # recipe needs them, so they are not stored here.
+# Optional Project updates for GitHub task start/done (guarded, requires project scope):
+# project: { number: 1 }
+# Optional guarded task sync: each epic and its direct sub-issues get the named milestone.
+# epics:
+#   - { issue: 42, milestone: "v0.2.0" }
 labels:
   - { name: "type:feature", color: "1D76DB", description: Feature }
   - { name: "type:bug", color: "D73A4A", description: Bug }

@@ -1,0 +1,41 @@
+name: Spike
+description: Time-box an investigation, experiment or review.
+labels: ["type:spike"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question and time box
+      description: What uncertainty should be resolved, and when should the investigation stop?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Name the evidence, decision or report that must result.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: P0 blocks release; P1 needed; P2 desirable; P3 may wait.
+      options: [P0, P1, P2, P3]
+    validations:
+      required: true
+  - type: dropdown
+    id: estimate
+    attributes:
+      label: Estimate
+      description: Relative size, not a promise of delivery time.
+      options: [XS, S, M, L, XL]
+    validations:
+      required: true
+  - type: input
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Target release or phase; use Unscheduled if not agreed.
+    validations:
+      required: true

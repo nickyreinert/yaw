@@ -12,7 +12,7 @@ IDs: local only `T-NNN`; GitHub only and GitHub-backed team mode use issue numbe
 
 Version management (releases, tags, changelog) is independent of the task mode.
 
-**Teams using GitHub force "GitHub only"**; `TASKS.md` becomes a generated read-only view of *my* open issues for the session start. Teams answering no to GitHub instead keep a local ledger, including when their Git remote is a repository in another folder (ADR-0047). Advanced Project fields and milestone synchronization remain later work (#110).
+**Teams using GitHub force "GitHub only"**; `TASKS.md` becomes a generated read-only view of *my* open issues for the session start. Teams answering no to GitHub instead keep a local ledger, including when their Git remote is a repository in another folder (ADR-0047). With `project.number` configured, GitHub-mode `start` and `done` propose guarded Status updates to In progress and In review. Explicit `epics` mappings enable guarded milestone synchronization during `task sync` in GitHub and both modes. Without these settings there are no new remote calls. Local and both-mode `start`/`done` remain local-only.
 
 Only `yaw:journal` comments authored by the repository owner are imported into the generated journal and resume point; a matching marker from another or missing author is not trusted. Organizational repositories do not treat ordinary members as the repository owner. The generated view is ignored as `/TASKS.md`, not every nested ledger; an edited view retained on module removal keeps that ignore as user-owned configuration.
 
@@ -75,6 +75,20 @@ Guarded = needs explicit authorisation: the plan is printed, then a person types
 - One workflow `quality-gate.yml`: checkout → toolchain from profile `ci/check.yml` → `just check`. Job name is the contract with branch protection.
 - Least-privilege `permissions`, concurrency cancel, timeout.
 - Optional: PR check that the description cites ADR/notice IDs or "no matching record" (when decisions module is on).
-- Dependabot config: `github-actions` (the actions are pinned by SHA); per profile ecosystem later (ADR-0027).
+- Dependabot config: `github-actions` plus each profile's declared `dependencyEcosystems` (`npm`, `pip`, `composer`, `gradle`), including development dependencies. Dependency-free `node-cli` adds no package ecosystem. Composed profiles use their profile subdirectory, not `/`. If a profile gains dependencies, update its metadata; existing custom manifests are not automatically scanned or installed.
+
+### Optional task workflow configuration
+
+```yaml
+project: { number: 1 }
+epics:
+  - { issue: 42, milestone: "v0.2.0" }
+```
+
+`just task start #42` / `done #42` resolve the configured Project's actual Status options before making any changes. They preview the update and require a user typing `y` in a terminal; refusal also prevents the associated assignment/comment. `done` means In review, not issue closure. Project automation after merge remains user-configured; missing options or insufficient token scope are reported, not ignored.
+
+`just task sync` previews missing milestone creation and assignments for explicitly mapped epics and their direct native sub-issues. It accepts a native Epic type or `type:epic`, paginates milestone/child reads, refuses cross-repository children and conflicting mappings, and skips unchanged assignments. Titles are not inferred, nested descendants are not traversed, and no new release date is invented. Existing milestone assignments may be replaced only as shown in the confirmation plan. Partial API failures are explicit; rerun after checking what succeeded. No hooks perform these writes.
+
+The forms require planning answers in the issue body. GitHub does not turn dropdown answers into labels, assign the named milestone or set Project fields automatically; the `issue-create` and `issue-triage` skills guide those confirmed updates.
 - Job `secret-scan`: gitleaks over the history, binary pinned and SHA-256 verified (ADR-0027).
 - The kit is installed at the tag in `.yaw/manifest.json` before `just setup` (BD10).
