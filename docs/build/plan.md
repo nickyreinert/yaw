@@ -386,6 +386,10 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | Y-9.2 | CHANGELOG | Chore | P1 | – | **done locally**: `CHANGELOG.md` records the v0.1.0 additions and security behavior in Keep-a-Changelog format. |
 | Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | **verified locally**: tagged `install.sh` via `curl file://` in clean Linux Node 22/24 containers, then `yaw --version`, Quick `yaw init` and `just check`; native macOS fresh-HOME install also passed. No macOS container or hosted workflow was used. |
 
+### Post-v0.1 usability tickets (P0)
+
+User-reported setup usability items #162–#176, fixed and closed locally on `fix/local-backlog`, not pushed: init can continue in the browser form (#162), clearer terminal prompts (#163), more languages and run targets (#164, #165), init says why GitHub task tracking is not offered (#166), next steps after setup (#167), a warning before writing into a non-empty or home/root folder (#168), only the chosen agents' files (#169), YAW-local files in `.gitignore` (#170), the idea goes into README (#171), `yaw web` (#172), kickoff guidance (#173), `yaw sessions import` (#174), TASKS.md rules with model tier and effort (#175), and Codex hook trust and names (#176). Last full check: 764 passed, 0 failed, 4 skipped.
+
 ### Not in phase 1 (label `later`)
 
 - Phase 2: `quality-code` reviewer, `yaw.db` evaluation tables + tier-1 evaluation, `release-plan.yaml` + launch plan + phase gating in `pr-policy`, ui-design, privacy, backup, knowledge, cache reminder, dashboard + OTel receiver.
