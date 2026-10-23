@@ -178,6 +178,11 @@ function summary(preview) {
   root.append(element('p', `Modules: ${preview.modules.join(', ')}`));
   root.append(element('p', `${preview.files.length} files; approximately ${preview.footprint.bytes.toLocaleString()} bytes + ${preview.footprint.baseCopies} base copies.`));
   root.append(element('p', preview.footprint.note));
+  if (preview.secrets.names.length) {
+    root.append(element('p', preview.secrets.existingFile
+      ? `${preview.secrets.names.length} local secret name(s) found in .env.example; existing .env will not be read or changed.`
+      : `${preview.secrets.names.length} local secret name(s) found in .env.example; values are optional and saved only to .env.`));
+  }
   const files = element('details'); files.open = true;
   files.append(element('summary', 'Files to be generated'));
   const ul = element('ul');
@@ -187,6 +192,27 @@ function summary(preview) {
   const list = element('ul');
   for (const [id, value] of Object.entries(preview.answers)) list.append(element('li', `${id}: ${shownValue(value) || '(empty)'}${preview.defaulted.includes(id) ? ' (default)' : ''}`));
   answers.append(list); root.append(answers);
+}
+function applySecretFields() {
+  const container = $('secret-fields'); container.replaceChildren();
+  const { names, existingFile } = lastPreview.secrets;
+  if (!names.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  container.append(element('h3', 'Optional local secrets'));
+  container.append(element('p', existingFile
+    ? 'An existing .env is preserved without being read or modified. These values will not be saved.'
+    : 'Values are sent only to this local server, written directly to .env with private permissions, and never added to answers or logs. Leave a field blank to skip it.'));
+  if (existingFile) return;
+  for (const name of names) {
+    const id = `secret-${name}`;
+    container.append(element('label', name, { for: id }));
+    container.append(element('input', undefined, {
+      type: 'password', id, name, autocomplete: 'new-password', autocapitalize: 'off', spellcheck: 'false',
+    }));
+  }
 }
 function update() {
   revision++;
@@ -227,9 +253,12 @@ async function apply() {
   $('setup').inert = true;
   $('log-panel').hidden = false; $('log').textContent = ''; $('log-title').focus();
   status('Applying… keep this page open for the log.');
+  let secretValues = Object.fromEntries([...$('secret-fields').querySelectorAll('input[type=password]')]
+    .map((input) => [input.name, input.value]).filter(([, value]) => value !== ''));
+  for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
   let completed = false, started = false;
   try {
-    const response = await request('apply');
+    const response = await request('apply', { ...state, secrets: secretValues });
     started = true;
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = '';
@@ -253,6 +282,7 @@ async function apply() {
     if (!completed) throw new Error('Apply did not report completion. Inspect the project and terminal; do not assume it succeeded.');
   } catch (e) { error(e.message); status(started ? 'Apply did not complete successfully. Inspect the project before retrying.' : 'Apply was rejected before it started. Fix the error and review again.'); }
   finally {
+    secretValues = null;
     if (started) status(`${$('status').textContent} The local server closes after apply; restart yaw init only if the project is still uninitialized.`);
     else {
       busy = false; $('setup').inert = false; actions(Boolean(lastPreview));
@@ -303,10 +333,14 @@ async function start() {
     $('save-consent').checked = $('save-profile').checked = false;
   });
   $('apply').addEventListener('click', () => {
+    applySecretFields();
     $('apply-dialog').returnValue = '';
     $('apply-dialog').showModal();
   });
-  $('apply-dialog').addEventListener('close', () => { if ($('apply-dialog').returnValue === 'apply') apply(); });
+  $('apply-dialog').addEventListener('close', () => {
+    if ($('apply-dialog').returnValue === 'apply') apply();
+    else $('secret-fields').replaceChildren();
+  });
   update();
 }
 start().catch((e) => { actions(false); error(e.message); status('The form could not start. Nothing was written.'); });

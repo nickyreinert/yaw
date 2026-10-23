@@ -63,7 +63,7 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 - Modules as toggle cards; unchecking a module hides its questions immediately.
 - Each question: label, one-line hint, collapsible "Why this matters" and "Example" blocks (layperson), keyboard-first navigation (expert).
 - Design direction picker renders real preview cards (doc 06).
-- Secret fields (doc 08) are reserved for Y-7.6. The Y-7.4 form accepts no secrets: `secretFindings` rejects secret-like answers before preview, diff, saving or apply, without echoing their values. It never reads existing secret files for the diff.
+- Secret entry (Y-7.6, ADR-0045) is separate from setup answers: the CLI uses hidden terminal input and the form uses password fields in the Apply confirmation. Values are written only to a new mode-0600 `.env`; existing `.env` files are never read or overwritten. Secret-like answers are still rejected before preview, diff, saving or apply, without echoing their values. The diff never reads existing secret files.
 - Buttons: *Save draft*, *Save as preset*, *Show diff of files*, *Apply*. Apply streams the log of the `apply` step.
 
 Y-7.4 implementation:
@@ -75,6 +75,7 @@ Y-7.4 implementation:
 - *Save as preset* asks for consent on every save (unchecked initially); saving the user profile is a separate unchecked option. Apply never saves either automatically.
 - The live summary renders the real output plan: profile, modules, answer/default table, file paths and estimated rendered bytes excluding base copies and manifest. Existing module outputs are marked "kept unchanged", matching noninteractive init reconciliation; *Show diff* shows only actual text changes (including canonical answers), without scratch files or secret-file reads. Manifest/base copies are identified as apply-time bookkeeping. Module-selection answers such as the GitHub opt-out remain in saved answers even when they disable their owning module.
 - Apply requires a separate confirmation, writes via `initProject`, then runs the CLI's `just setup && just check`. `yaw init --web --skip-verify` explicitly disables verification. The NDJSON log distinguishes verification failure from success; files remain on disk after a failure. The server stops after the completed stream, and idle shutdown is suspended while apply runs.
+- Secret fields are offered only for names in the effective `.env.example`, remain outside browser setup state, and are sent only in the confirmed Apply request. Values are single-line, limited to 8192 characters, and never enter answers, drafts, presets, history, logs or responses. Empty fields are skipped; if `.env` already exists, it is left untouched and the values are not saved.
 - JSON POST bodies are limited to 256 KiB; answer text is limited to 8192 characters. Invalid input gets explicit errors. `--web` cannot be combined with `--answers` or `--yes`; the browser provides the confirmation. If the OS cannot open a browser, open the printed link manually.
 
 ## 4. Expertise levels

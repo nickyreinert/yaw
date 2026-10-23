@@ -207,6 +207,36 @@ test('web API: secret-like answers never echo, save, render or apply', async (t)
   assert.ok(!f.errors.text().includes(secret));
 });
 
+test('web API: entered secrets go only to a private .env, never answers, logs or responses', async (t) => {
+  const f = await serverFixture(t);
+  const canary = 'YAW_SECRET_CANARY_9f3a "quoted" $punctuation';
+  writeFileSync(join(f.root, '.env.example'), 'API_KEY=\nDATABASE_URL=\n');
+  const response = await f.post('apply', { ...setup(), secrets: { API_KEY: canary } });
+  const stream = await response.text();
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(stream, /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
+  assert.match(stream, /Saved 1 secret value/);
+  const answers = readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8');
+  assert.doesNotMatch(answers, /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
+  assert.equal(readFileSync(join(f.root, '.env'), 'utf8'), `API_KEY=${JSON.stringify(canary)}\nDATABASE_URL=\n`);
+  assert.equal(statSync(join(f.root, '.env')).mode & 0o777, 0o600);
+  assert.doesNotMatch(f.errors.text(), /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
+  assert.deepEqual(readTree(f.home), {});
+});
+
+test('web API: existing .env is never read, overwritten or returned', async (t) => {
+  const f = await serverFixture(t);
+  const existing = 'API_KEY=EXISTING_TEST_CANARY\n';
+  writeFileSync(join(f.root, '.env'), existing, { mode: 0o600 });
+  writeFileSync(join(f.root, '.env.example'), 'API_KEY=\n');
+  const response = await f.post('apply', { ...setup(), secrets: { API_KEY: 'NEW_TEST_CANARY' } });
+  const stream = await response.text();
+  assert.equal(response.status, 200);
+  assert.match(stream, /Existing \.env was preserved/);
+  assert.doesNotMatch(stream, /EXISTING_TEST_CANARY|NEW_TEST_CANARY/);
+  assert.equal(readFileSync(join(f.root, '.env'), 'utf8'), existing);
+});
+
 test('web API: diff does not echo a secret already in a generated non-secret file', async (t) => {
   const f = await serverFixture(t);
   const secret = 'ghp_' + 'c'.repeat(36);

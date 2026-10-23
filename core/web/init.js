@@ -9,6 +9,7 @@ import { readManifest } from '../render/manifest.js';
 import { writeAtomic } from '../render/files.js';
 import { kitVersion } from '../render/kit.js';
 import { saveSetup } from '../lib/user-store.js';
+import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 
 export const DRAFT = '.yaw/draft.yaml';
@@ -22,7 +23,15 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     bootstrap: () => ({ ...model.bootstrap(), skipVerify }),
     prepareApply(input) {
       ensureNew();
-      return model.normalize(input);
+      if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
+      const { secrets, ...setup } = input;
+      const prepared = model.normalize(setup);
+      try {
+        prepared.secretValues = validateSecretValues(secrets, model.secretCatalog(prepared).names);
+      } catch (e) {
+        throw new FormError(e.message);
+      }
+      return prepared;
     },
     async action(name, input) {
       if (name === 'prefill') {
@@ -66,6 +75,9 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       const result = await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });
       printReport(output, result);
       emit({ type: 'log', text: 'Wrote .yaw/answers.yaml and .yaw/manifest.json\n' });
+      const saved = writeEnvSecrets(root, model.secretCatalog(prepared).names, prepared.secretValues);
+      if (saved.preserved) emit({ type: 'log', text: 'Existing .env was preserved; submitted secret values were not saved.\n' });
+      else if (saved.written) emit({ type: 'log', text: `Saved ${saved.written} secret value(s) to .env (mode 0600).\n` });
       let ok = true;
       if (skipVerify) emit({ type: 'log', text: 'Verification explicitly skipped (--skip-verify); run: just setup && just check\n' });
       else ok = await verify({ root, io: { env, stdout: output, stderr: output } });

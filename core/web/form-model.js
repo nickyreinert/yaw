@@ -9,6 +9,7 @@ import { checkDependencies, parseAnswers, renderInit, selectModules, ANSWERS, Pr
 import { MANIFEST, readProjectFile, resolveInside } from '../render/files.js';
 import { parse, stringify } from '../lib/yaml.js';
 import { secretFindings, listPresets, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
+import { envFileExists, envNames } from '../lib/env-secrets.js';
 import { loadCapabilities } from '../cli/agents.js';
 
 export class FormError extends Error {
@@ -108,6 +109,12 @@ export function createFormModel({ root, kitRoot, env }) {
     return { doc, text, defaulted, modules, profile, suggestion, selected, answerQuestions };
   }
 
+  function secretCatalog(result, rendered = null) {
+    const { desired } = rendered ?? renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
+    const example = readProjectFile(root, '.env.example') ?? desired.get('.env.example')?.content;
+    return { names: envNames(example?.toString('utf8') ?? ''), existingFile: envFileExists(root) };
+  }
+
   function preview(input, diff = false) {
     const result = normalize(input);
     const { desired } = renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
@@ -125,6 +132,7 @@ export function createFormModel({ root, kitRoot, env }) {
     const output = {
       mode: result.doc.mode, profile: result.profile, suggestion: result.suggestion ?? null,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, visible, files,
+      secrets: secretCatalog(result, { desired }),
       footprint: {
         bytes: files.reduce((n, f) => n + (f.bytes ?? 0), 0),
         baseCopies: [...desired.values()].filter((d) => d.managed !== false).length,
@@ -198,7 +206,7 @@ export function createFormModel({ root, kitRoot, env }) {
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
     };
   }
-  return { bootstrap, normalize, preview, prefill, definitions };
+  return { bootstrap, normalize, preview, prefill, definitions, secretCatalog };
 }
 
 // A valid unified diff with whole-file context, deliberately in memory (no scratch files).

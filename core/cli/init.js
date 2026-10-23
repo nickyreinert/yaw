@@ -10,11 +10,12 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { stringify } from '../lib/yaml.js';
+import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
 import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
-import { MANIFEST } from '../render/files.js';
+import { MANIFEST, readProjectFile } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
 import { ANSWERS, ProjectError, initProject, parseAnswers, checkDependencies, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
@@ -227,6 +228,20 @@ export async function init({ values, positionals, io }) {
   printToolHints(io.stdout, modules);
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
+
+  const secretNames = envNames(readProjectFile(root, '.env.example')?.toString('utf8') ?? '');
+  if (io.prompter.interactive && secretNames.length > 0) {
+    if (envFileExists(root)) {
+      io.stdout.write('Existing .env was preserved; YAW does not read or overwrite secret files.\n');
+    } else if (typeof io.prompter.askSecret === 'function') {
+      io.stdout.write('\nOptional local secrets. Values are hidden and written only to .env (mode 0600); press Enter to skip a value.\n');
+      const secretValues = {};
+      for (const name of secretNames) secretValues[name] = await io.prompter.askSecret(`  ${name} > `);
+      const saved = writeEnvSecrets(root, secretNames, secretValues);
+      if (saved.written) io.stdout.write(`  saved ${saved.written} secret value(s) to .env\n`);
+      else io.stdout.write('  no secret values saved\n');
+    } else throw new ProjectError('secret variables are available but this terminal cannot provide hidden input; use an interactive terminal');
+  }
 
   // save (opt-in, interview on a terminal only; never with --answers)
   if (!fromFile && io.prompter.interactive) await offerSave({ io, root, answersDoc, kit: result.manifest.kit });
