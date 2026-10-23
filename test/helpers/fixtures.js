@@ -129,7 +129,7 @@ export function run(cmd, args, options = {}) {
 
 // Copy this working tree (tracked and untracked, minus ignored files) into a fresh git repo
 // and tag it, so install.sh can clone it like the real kit repo.
-export function makeKitRepo(dir, { env, tag = 'v0.0.0' } = {}) {
+export function makeKitRepo(dir, { env, tag = 'v0.1.0' } = {}) {
   const ls = run('git', ['ls-files', '-co', '--exclude-standard', '-z'], { cwd: KIT_ROOT });
   for (const rel of ls.stdout.split('\0').filter(Boolean)) {
     const src = join(KIT_ROOT, rel);

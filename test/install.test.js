@@ -35,18 +35,18 @@ test('install.sh: clone, link, PATH hint; a second run is a no-op', () => {
   const src = makeKitRepo(tmp('yaw-src-'), { env: cleanEnv(home) });
   const first = install(home, src);
   assert.equal(first.status, 0, first.stderr);
-  assert.match(first.stdout, /^yaw 0\.0\.0: cloned .*\/\.yaw\/kit, checked out v0\.0\.0 \(channel: tag\)$/m);
+  assert.match(first.stdout, /^yaw 0\.1\.0: cloned .*\/\.yaw\/kit, checked out v0\.1\.0 \(channel: tag\)$/m);
   assert.match(first.stdout, /^linked .*\/\.local\/bin\/yaw -> .*\/\.yaw\/kit\/bin\/yaw$/m);
   assert.match(first.stdout, /export PATH="\$HOME\/\.local\/bin:\$PATH"/);
   assert.match(first.stdout, /uninstall: yaw self-uninstall/);
   const before = snapshot(home);
-  assert.equal(before.head, git(src, ['rev-parse', 'v0.0.0^{commit}']));
+  assert.equal(before.head, git(src, ['rev-parse', 'v0.1.0^{commit}']));
   assert.equal(before.channel, 'tag');
   assert.ok(lstatSync(join(home, '.local', 'bin', 'yaw')).isSymbolicLink());
 
   const second = install(home, src);
   assert.equal(second.status, 0, second.stderr);
-  assert.match(second.stdout, /fetched .*, already at v0\.0\.0 \(channel: tag\)/);
+  assert.match(second.stdout, /fetched .*, already at v0\.1\.0 \(channel: tag\)/);
   assert.match(second.stdout, /link already in place/);
   assert.deepEqual(snapshot(home), before);
 
@@ -62,9 +62,9 @@ test('install.sh: --channel main, --tag, and the channel is kept on re-runs', ()
   assert.equal(snapshot(home).channel, 'main');
   const again = install(home, src);
   assert.match(again.stdout, /already at origin\/main \(channel: main\)/);
-  const tagged = install(home, src, ['--tag', '0.0.0']);
+  const tagged = install(home, src, ['--tag', '0.1.0']);
   assert.equal(tagged.status, 0, tagged.stderr);
-  assert.match(tagged.stdout, /v0\.0\.0 \(channel: tag\)/);
+  assert.match(tagged.stdout, /v0\.1\.0 \(channel: tag\)/);
   assert.equal(snapshot(home).channel, 'tag');
 });
 
@@ -117,7 +117,7 @@ test('install -> init (core only) -> update -> remove, then self-update and self
   const project = tmp('yaw-proj-');
   const yaw = (args, cwd = project) => run('yaw', args, { cwd, env: pathEnv });
 
-  assert.equal(yaw(['--version']).stdout, 'yaw 0.0.0\n');
+  assert.equal(yaw(['--version']).stdout, 'yaw 0.1.0\n');
   const answers = writeAnswers(tmp('yaw-ans-'));
   const init = yaw(['init', '--answers', answers, '--yes', '--skip-verify']);
   assert.equal(init.status, 0, init.stderr);
@@ -132,7 +132,7 @@ test('install -> init (core only) -> update -> remove, then self-update and self
   assert.equal(doctor.status, 0, doctor.stdout);
   assert.match(doctor.stdout, /^ok {4}yaw on PATH -> /m);
   assert.match(doctor.stdout, /\(channel: tag\)/);
-  assert.match(doctor.stdout, /^ok {4}project pinned to kit 0\.0\.0 = installed kit$/m);
+  assert.match(doctor.stdout, /^ok {4}project pinned to kit 0\.1\.0 = installed kit$/m);
 
   const remove = yaw(['remove', 'core', '--yes']);
   assert.equal(remove.status, 0, remove.stderr);
@@ -141,21 +141,21 @@ test('install -> init (core only) -> update -> remove, then self-update and self
 
   // self-update: a new tag with a changelog entry in the kit repo
   const pkg = JSON.parse(readTree(src)['package.json']);
-  writeFileSync(join(src, 'package.json'), `${JSON.stringify({ ...pkg, version: '0.0.1' }, null, 2)}\n`);
-  writeFileSync(join(src, 'CHANGELOG.md'), '# Changelog\n\n## 0.0.1\n\n- Test release.\n');
+  writeFileSync(join(src, 'package.json'), `${JSON.stringify({ ...pkg, version: '0.1.1' }, null, 2)}\n`);
+  writeFileSync(join(src, 'CHANGELOG.md'), '# Changelog\n\n## 0.1.1\n\n- Test release.\n');
   git(src, ['add', '-A'], env);
-  git(src, ['commit', '--quiet', '-m', 'release 0.0.1'], env);
-  git(src, ['tag', 'v0.0.1'], env);
+  git(src, ['commit', '--quiet', '-m', 'release 0.1.1'], env);
+  git(src, ['tag', 'v0.1.1'], env);
   const up = yaw(['self-update'], home);
   assert.equal(up.status, 0, up.stderr);
-  assert.match(up.stdout, /changes 0\.0\.0 -> 0\.0\.1 \(v0\.0\.1\):/);
+  assert.match(up.stdout, /changes 0\.1\.0 -> 0\.1\.1 \(v0\.1\.1\):/);
   assert.match(up.stdout, /- Test release\./);
-  assert.match(up.stdout, /switched kit 0\.0\.0 -> 0\.0\.1/);
-  assert.equal(yaw(['--version']).stdout, 'yaw 0.0.1\n');
-  assert.match(yaw(['self-update'], home).stdout, /kit 0\.0\.1 is up to date \(v0\.0\.1\)/);
-  const back = yaw(['self-update', '--tag', '0.0.0'], home);
+  assert.match(up.stdout, /switched kit 0\.1\.0 -> 0\.1\.1/);
+  assert.equal(yaw(['--version']).stdout, 'yaw 0.1.1\n');
+  assert.match(yaw(['self-update'], home).stdout, /kit 0\.1\.1 is up to date \(v0\.1\.1\)/);
+  const back = yaw(['self-update', '--tag', '0.1.0'], home);
   assert.equal(back.status, 0, back.stderr);
-  assert.equal(yaw(['--version']).stdout, 'yaw 0.0.0\n');
+  assert.equal(yaw(['--version']).stdout, 'yaw 0.1.0\n');
 
   // a development checkout is never touched by self-update / self-uninstall
   const dev = run(process.execPath, [join(KIT_ROOT, 'bin', 'yaw'), 'self-update'], { env: pathEnv });

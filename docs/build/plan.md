@@ -331,8 +331,8 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
 | Y-9 | Step 9: release v0.1.0 | Epic | P0 | Y-8 | Tag `v0.1.0` exists; install from the tag verified |
-| Y-9.1 | README (install, read-then-run variant, SHA256, quick start, Quick vs. Full, macOS/Linux/WSL, Node ≥ 22.13) | Chore | P0 | Y-3.1 | Matches the actual phase-1 preset contents |
-| Y-9.2 | CHANGELOG | Chore | P1 | – | Keep-a-Changelog style for 0.1.0 |
+| Y-9.1 | README (install, read-then-run variant, SHA256, quick start, Quick vs. Full, macOS/Linux/WSL, Node ≥ 22.13) | Chore | P0 | Y-3.1 | **done locally**: README documents supported runtimes, install and inspect-before-run commands with the installer SHA-256, Quick/Full module contents, setup, secret-handling, and maintenance commands. Digest verified against `install.sh`; matches `kickoff/04-modules.md`. |
+| Y-9.2 | CHANGELOG | Chore | P1 | – | **done locally**: `CHANGELOG.md` records the v0.1.0 additions and security behavior in Keep-a-Changelog format. |
 | Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | `curl … install.sh \| bash` from the tag in clean macOS-like and Linux containers: `yaw --version`, `yaw init` Quick, `just check` green |
 
 ### Not in phase 1 (label `later`)
