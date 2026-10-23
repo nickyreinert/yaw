@@ -131,6 +131,8 @@ function render(q, number, total, expertise) {
   const lines = [`  ${number}/${total} ${q.label}`];
   // Expert: hints are collapsed behind "?" (doc 02 section 4).
   if (q.hint && expertise !== 'expert') lines.push(`      ${q.hint}`);
+  // A runtime status (e.g. the GitHub check, #166) is always shown.
+  if (q.status) lines.push(`      ${q.status}`);
   if (q.choices) {
     q.choices.forEach((c, i) => {
       const note = available(c) ? '' : ` (phase ${c.phase}, not available yet)`;

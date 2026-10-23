@@ -15,6 +15,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Fixed
 
+- "Use GitHub for the repo?" shows a GitHub check in the terminal and the form (gh not installed, not logged in or unreachable, no GitHub remote). After "no", the task-mode question no longer offers GitHub choices that would be ignored; init says tasks are local because GitHub is off (#166).
 - `yaw init` and `yaw web` refuse the home folder and the file-system root unless `--force` is given, and ask before writing into a non-empty folder that is not a Git repository or YAW project, such as a folder of projects (#168).
 - Codex hook entries have readable labels (`YAW security: guard-secret-read, guard-destructive`) and init reminds the user to trust them with `/hooks` (#176).
 - `CLAUDE.md` is only written when Claude Code is a selected agent; Codex and Copilot read `AGENTS.md` (#169).

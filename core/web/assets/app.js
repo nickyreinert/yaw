@@ -88,7 +88,8 @@ function buildQuestions() {
     const hint = element('p', q.hint ?? '', { class: 'hint', id: `${id}-hint` });
     if (!q.hint) hint.hidden = true;
     node.append(hint);
-    inputs.forEach((i) => i.setAttribute('aria-describedby', `${id}-hint ${id}-default`));
+    if (q.status) node.append(element('p', q.status, { class: 'hint status', id: `${id}-status` }));
+    inputs.forEach((i) => i.setAttribute('aria-describedby', `${id}-hint ${q.status ? `${id}-status ` : ''}${id}-default`));
     const defaults = element('p', `Default: ${shownValue(q.default) || '(empty)'}`, { class: 'default', id: `${id}-default` });
     node.append(defaults);
     const why = element('details'); why.append(element('summary', 'Why this matters'), element('div', q.helpText || q.hint || 'This answer shapes the generated project rules. You can keep the documented default.', { class: 'help' }));

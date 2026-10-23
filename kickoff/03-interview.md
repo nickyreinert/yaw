@@ -127,7 +127,7 @@ The proposal shows: chosen profile(s), shape (monolith, static + API, …), data
 | # | Question | Mode |
 |---|---|---|
 | 10.1 | Task tracking: **local only** / GitHub only / both (local-first) | Q |
-| 10.2 | Use GitHub for the repo? Asked for every setup; "no" keeps tasks local and excludes GitHub-specific modules even for teams with a remote in another local folder (ADR-0047). Creating a GitHub repo remains a separate guarded recipe. | Q |
+| 10.2 | Use GitHub for the repo? Asked for every setup; "no" keeps tasks local and excludes GitHub-specific modules even for teams with a remote in another local folder (ADR-0047). Creating a GitHub repo remains a separate guarded recipe. Both lanes show a GitHub check next to the question (gh missing, not logged in or unreachable, no GitHub remote); after "no" the task-mode question 10.1 is hidden and init states that tasks are local (#166). | Q |
 | 10.3 | Branch model: trunk + short branches (default) / git-flow | F |
 | 10.4 | Use milestones/epics and a GitHub Project board? | S |
 

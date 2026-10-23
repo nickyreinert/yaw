@@ -24,6 +24,7 @@ import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { printNextSteps } from './next-steps.js';
 import { guardFolder } from './folder-guard.js';
+import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
@@ -185,8 +186,11 @@ export async function init({ values, positionals, io }) {
     // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
     // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
     // not selected is hidden by its `when` (team.session-context needs idea.team = team).
-    const questions = collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } }));
+    const questions = withGitHubHint(collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } })), githubStatus({ root, env: io.env }));
     const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot });
+    if (r.answers['tasks.use-github'] === false && questions.some((q) => q.id === 'tasks.mode')) {
+      io.prompter.show('      Task tracking: local (TASKS.md), because GitHub is off for this project.\n');
+    }
     defaulted = new Set(r.defaulted);
     answersDoc = { mode, answers: r.answers };
   }

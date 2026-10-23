@@ -11,7 +11,8 @@ questions:
     label: Use GitHub for the repo?
     hint: No keeps Git local (including a remote in another folder), uses local tasks and skips GitHub-specific modules.
     default: true
-  # GitHub teams use issues; teams without GitHub use the local ledger.
+  # GitHub teams use issues; teams without GitHub use the local ledger. Without GitHub the mode is local (#166),
+  # so the question is hidden and init says why.
   - id: tasks.mode
     ref: "10.1"
     mode: Q
@@ -19,7 +20,7 @@ questions:
     label: Task tracking
     hint: Where tasks live; local works without GitHub.
     help: task-modes
-    when: { idea.team: solo }
+    when: { idea.team: solo, tasks.use-github: true }
     choices:
       - { value: local, label: Local only (TASKS.md) }
       - { value: github, label: GitHub only (issues) }

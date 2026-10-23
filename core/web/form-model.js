@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { asksIn, whenMatches, parseReply, validAnswer } from '../interview/engine.js';
+import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
@@ -184,7 +185,7 @@ export function createFormModel({ root, kitRoot, env }) {
       kit: kitVersion(kitRoot),
       profiles: profiles.map(({ name, summary }) => ({ name, summary })),
       modules: definitions.map(({ name, description, depends, default: defaults, appliesTo }) => ({ name, description, depends: depends ?? [], defaults, appliesTo })),
-      questions: questions.map((q) => {
+      questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
         let help = '';
         if (q.help) {
           const file = join(kitRoot, 'interview', 'help', `${q.help}.md`);
