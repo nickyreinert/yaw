@@ -79,9 +79,18 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       if (saved.preserved) emit({ type: 'log', text: 'Existing .env was preserved; submitted secret values were not saved.\n' });
       else if (saved.written) emit({ type: 'log', text: `Saved ${saved.written} secret value(s) to .env (mode 0600).\n` });
       let ok = true;
-      if (skipVerify) emit({ type: 'log', text: 'Verification explicitly skipped (--skip-verify); run: just setup && just check\n' });
-      else ok = await verify({ root, io: { env, stdout: output, stderr: output } });
-      emit({ type: 'done', ok, message: ok ? (skipVerify ? 'Applied; verification skipped.' : 'Applied and verified.') : 'Files applied, but verification failed. Fix the reported problem and run just setup && just check.' });
+      let message;
+      if (skipVerify) {
+        emit({ type: 'log', text: 'Verification explicitly skipped (--skip-verify); run: just setup && just check\n' });
+        message = 'Applied; verification skipped.';
+      } else if (saved.written) {
+        emit({ type: 'log', text: 'Verification skipped because new secrets were saved; review the project recipes before running: just setup && just check\n' });
+        message = 'Applied with secrets; verification skipped. Review the project recipes before running just setup and just check.';
+      } else {
+        ok = await verify({ root, io: { env, stdout: output, stderr: output } });
+        message = ok ? 'Applied and verified.' : 'Files applied, but verification failed. Fix the reported problem and run just setup && just check.';
+      }
+      emit({ type: 'done', ok, message });
     },
     failed(error) {
       // The browser gets no untrusted exception text (which could contain answer values).

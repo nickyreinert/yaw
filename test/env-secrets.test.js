@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { envFileExists, envNames, validateSecretValues, writeEnvSecrets } from '../core/lib/env-secrets.js';
 import { createPrompter } from '../core/cli/prompt.js';
 import { main } from '../core/cli/main.js';
-import { capture, KIT_ROOT, scripted, tmp } from './helpers/fixtures.js';
+import { capture, fakeJust, KIT_ROOT, scripted, tmp } from './helpers/fixtures.js';
 import { PassThrough } from 'node:stream';
 
 test('env secret names come only from assignments and never include template values', () => {
@@ -66,7 +66,8 @@ test('CLI secret entry uses hidden input and keeps values out of answers, logs a
   }
   cpSync(join(KIT_ROOT, 'package.json'), join(kitRoot, 'package.json'));
   writeFileSync(join(kitRoot, 'profiles/node-cli/env.example'), 'API_KEY=\n');
-  const root = tmp('yaw-secret-cli-'), home = tmp('yaw-secret-home-');
+  const root = tmp('yaw-secret-cli-'), home = tmp('yaw-secret-home-'), bin = tmp('yaw-secret-bin-');
+  const log = fakeJust(bin);
   const stdout = capture(), stderr = capture(), prompter = scripted(['y']);
   const answersFile = join(root, 'answers.yaml');
   writeFileSync(answersFile, readFileSync(join(KIT_ROOT, 'examples/node-cli/answers.yaml'), 'utf8')
@@ -76,10 +77,12 @@ test('CLI secret entry uses hidden input and keeps values out of answers, logs a
     prompter.asked.push(question);
     return canary;
   };
-  const code = await main(['init', '--answers', answersFile, '--skip-verify'], {
-    stdout, stderr, cwd: root, env: { HOME: home, PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':') }, kitRoot, prompter,
+  const code = await main(['init', '--answers', answersFile], {
+    stdout, stderr, cwd: root, env: { HOME: home, PATH: [bin, dirname(process.execPath), '/usr/bin', '/bin'].join(':') }, kitRoot, prompter,
   });
   assert.equal(code, 0, stderr.text());
+  assert.match(stdout.text(), /verification skipped because new secrets were saved/);
+  assert.equal(existsSync(log), false, 'project-controlled verification recipes were not started');
   assert.equal(readFileSync(join(root, '.env'), 'utf8'), `API_KEY=${JSON.stringify(canary)}\n`);
   assert.equal(statSync(join(root, '.env')).mode & 0o777, 0o600);
   assert.doesNotMatch(stdout.text() + stderr.text(), /CLI_SECRET_CANARY_81cf/);

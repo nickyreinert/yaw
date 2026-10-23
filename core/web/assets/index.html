@@ -69,7 +69,7 @@
   <dialog id="apply-dialog" aria-labelledby="apply-title">
     <form method="dialog">
       <h2 id="apply-title">Apply these files?</h2>
-      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. Review the summary and diff first. It does not save a preset or user profile.</p>
+      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. If any new secret value is saved, automatic verification is skipped because project recipes could read .env; review those recipes before running them. This does not save a preset or user profile.</p>
       <div id="secret-fields" hidden></div>
       <button value="cancel">Cancel</button><button value="apply">Apply now</button>
     </form>

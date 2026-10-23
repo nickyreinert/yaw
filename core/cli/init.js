@@ -230,6 +230,7 @@ export async function init({ values, positionals, io }) {
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 
   const secretNames = envNames(readProjectFile(root, '.env.example')?.toString('utf8') ?? '');
+  let savedSecrets = false;
   if (io.prompter.interactive && secretNames.length > 0) {
     if (envFileExists(root)) {
       io.stdout.write('Existing .env was preserved; YAW does not read or overwrite secret files.\n');
@@ -238,7 +239,8 @@ export async function init({ values, positionals, io }) {
       const secretValues = {};
       for (const name of secretNames) secretValues[name] = await io.prompter.askSecret(`  ${name} > `);
       const saved = writeEnvSecrets(root, secretNames, secretValues);
-      if (saved.written) io.stdout.write(`  saved ${saved.written} secret value(s) to .env\n`);
+      savedSecrets = saved.written > 0;
+      if (savedSecrets) io.stdout.write(`  saved ${saved.written} secret value(s) to .env\n`);
       else io.stdout.write('  no secret values saved\n');
     } else throw new ProjectError('secret variables are available but this terminal cannot provide hidden input; use an interactive terminal');
   }
@@ -249,6 +251,10 @@ export async function init({ values, positionals, io }) {
   // verify
   if (values['skip-verify']) {
     io.stdout.write('verification skipped (--skip-verify); run: just setup && just check\n');
+    return 0;
+  }
+  if (savedSecrets) {
+    io.stdout.write('verification skipped because new secrets were saved; review the project recipes before running: just setup && just check\n');
     return 0;
   }
   const ok = await verifyProject({ root, io });

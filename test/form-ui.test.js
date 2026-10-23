@@ -207,8 +207,9 @@ test('web API: secret-like answers never echo, save, render or apply', async (t)
   assert.ok(!f.errors.text().includes(secret));
 });
 
-test('web API: entered secrets go only to a private .env, never answers, logs or responses', async (t) => {
-  const f = await serverFixture(t);
+test('web API: entered secrets go only to a private .env, never answers, logs or responses, and skip recipes', async (t) => {
+  let verifyCalls = 0;
+  const f = await serverFixture(t, { skipVerify: false, verify: async () => { verifyCalls++; return true; } });
   const canary = 'YAW_SECRET_CANARY_9f3a "quoted" $punctuation';
   writeFileSync(join(f.root, '.env.example'), 'API_KEY=\nDATABASE_URL=\n');
   const response = await f.post('apply', { ...setup(), secrets: { API_KEY: canary } });
@@ -216,6 +217,8 @@ test('web API: entered secrets go only to a private .env, never answers, logs or
   assert.equal(response.status, 200);
   assert.doesNotMatch(stream, /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
   assert.match(stream, /Saved 1 secret value/);
+  assert.match(stream, /Verification skipped because new secrets were saved/);
+  assert.equal(verifyCalls, 0, 'project-controlled verification recipes were not run');
   const answers = readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8');
   assert.doesNotMatch(answers, /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
   assert.equal(readFileSync(join(f.root, '.env'), 'utf8'), `API_KEY=${JSON.stringify(canary)}\nDATABASE_URL=\n`);
