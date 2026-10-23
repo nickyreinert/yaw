@@ -322,7 +322,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 |---|---|---|---|---|---|
 | Y-8 | Step 8: hardening review (fresh session) | Epic | P0 | Y-7 | Findings fixed or filed with priority |
 | Y-8.1 | Security review: hook shell quoting, render path traversal, token handling, secret leakage, CSRF/DNS rebinding | Spike | P0 | – | **reviewed and fixed locally**: one HIGH finding (verification recipes could read newly saved `.env`) mitigated by ADR-0046; focused tests passed 38/38, offline `just check` passed 679 with 13 skipped and 0 failures, schema validation passed 27/27. No remote issue created while GitHub is deferred. |
-| Y-8.2 | Token-free audit of all hooks | Chore | P0 | – | Every hook classified per BD9 / ADR-0007; tests prove it |
+| Y-8.2 | Token-free audit of all hooks | Chore | P0 | – | **audited locally**: all registered runtime hooks comply with ADR-0007; dispatcher enforces output filtering, silence and exit-0 behavior. Existing tests cover category/event declarations, output constraints, failure paths and noisy-handler suppression. Offline `just check` passed 679, skipped 13, failed 0. No policy defects found; no GitHub operations. |
 | Y-8.3 | Removal test of every module | Chore | P0 | – | Add + remove each module → tree equals the pre-add state |
 | Y-8.4 | `yaw doctor` coverage | Chore | P1 | – | Doctor detects each failure mode the review lists |
 
