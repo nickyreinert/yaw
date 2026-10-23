@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startFormServer, MAX_JSON_BYTES } from '../core/web/form-server.js';
 import { createFormApi, DRAFT } from '../core/web/init.js';
@@ -441,7 +441,7 @@ test('CLI: --web verifies via just setup and just check; invalid combinations fa
   });
   await browserWork;
   assert.equal(code, 0);
-  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [`${f.root} setup`, `${f.root} check`]);
+  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [`${realpathSync(f.root)} setup`, `${realpathSync(f.root)} check`]);
   for (const args of [['--web', '--answers', 'answers.yaml'], ['--web', '--yes']]) {
     const err = capture();
     assert.equal(await main(['init', ...args], { cwd: f.root, stdout: capture(), stderr: err, prompter: { interactive: false } }), 1);
