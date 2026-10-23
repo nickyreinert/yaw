@@ -13,10 +13,9 @@ export function deriveFacts(answers = {}) {
     facts.hosted = runsOn !== 'local';
   }
   if (typeof answers['idea.audience'] === 'string') facts.public = answers['idea.audience'] === 'public';
-  if (typeof answers['idea.team'] === 'string') facts.team = answers['idea.team'] === 'team';
-  // GitHub is used unless the user says otherwise; a team project always uses it (ADR-0032).
-  if (facts.team === true) facts.usesGitHub = true;
-  else if (typeof answers['tasks.use-github'] === 'boolean') facts.usesGitHub = answers['tasks.use-github'];
+  if (typeof answers['idea.team'] === 'string') facts.team = ['team', 'external-reviewers'].includes(answers['idea.team']);
+  if (typeof answers['tasks.use-github'] === 'boolean') facts.usesGitHub = answers['tasks.use-github'];
+  else if (facts.team === true) facts.usesGitHub = true;
   return facts;
 }
 

@@ -1,7 +1,7 @@
 // Read-only collection/preview shared by the HTTP actions. No project writes here.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { asksIn, whenMatches, parseReply } from '../interview/engine.js';
+import { asksIn, whenMatches, parseReply, validAnswer } from '../interview/engine.js';
 import { deriveFacts } from '../interview/facts.js';
 import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
@@ -20,8 +20,6 @@ export class FormError extends Error {
 }
 
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const valueOf = (c) => typeof c === 'object' ? c.value : c;
-const available = (c) => !(typeof c === 'object' && c.phase > 1);
 
 export function assertSafe(answers, kitRoot) {
   if (!object(answers)) throw new FormError('answers must be an object');
@@ -45,13 +43,7 @@ export function createFormModel({ root, kitRoot, env }) {
     for (const [id, value] of Object.entries(given)) {
       const q = byId.get(id);
       if (!q) throw new FormError('Unknown answer key');
-      let valid = false;
-      if (q.type === 'text') valid = typeof value === 'string' && value.length <= 8192;
-      if (q.type === 'boolean') valid = typeof value === 'boolean';
-      if (q.type === 'number') valid = typeof value === 'number' && Number.isFinite(value);
-      if (q.type === 'choice') valid = q.choices.some((c) => available(c) && valueOf(c) === value);
-      if (q.type === 'multi') valid = Array.isArray(value) && value.length <= q.choices.length &&
-        new Set(value).size === value.length && value.every((v) => q.choices.some((c) => available(c) && valueOf(c) === v));
+      const valid = validAnswer(q, value) && !(q.type === 'text' && value.length > 8192);
       if (!valid) throw new FormError(`Invalid answer for ${q.id}`);
       // Use the interview parser too, without returning its input-echoing error messages.
       if (q.type !== 'text' && !(q.type === 'multi' && value.length === 0)) {

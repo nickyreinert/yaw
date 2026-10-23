@@ -21,7 +21,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', ''];
+const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', '', ''];
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
@@ -36,7 +36,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
-  assert.match(r.out, /profile: node-cli \(suggested from language=javascript, runsOn=local, hosted=false, team=false\)/);
+  assert.match(r.out, /profile: node-cli \(suggested from language=javascript, runsOn=local, hosted=false, team=false, usesGitHub=true\)/);
   assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(default\)$/m, '"skip" is listed as default');
   assert.doesNotMatch(r.out, /user\.language +en +\(default\)/);
   assert.match(r.out, /verification skipped/);
@@ -65,7 +65,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', 'nope', '6', 'y', '', '']);
+  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', '', 'nope', '6', 'y', '', '']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);

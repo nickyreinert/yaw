@@ -70,7 +70,8 @@ test('team mode (ADR-0013): the personal profile is not committed', async () => 
     assert.equal(section(agentsMd, 'communication'), undefined);
     assert.doesNotMatch(agentsMd, /Keep answers short/);
     assert.equal(existsSync(join(root, '.claude')), false);
-    assert.match(agentsMd, /Chat in "de"/); // the project-level language rule stays (core)
+    assert.doesNotMatch(agentsMd, /Chat in "de"|Ask before risky/);
+    assert.match(agentsMd, /agree on chat language and autonomy per contributor/);
     const files = readdirSync(root, { recursive: true }).join('\n');
     assert.doesNotMatch(files, /output-styles/);
     assert.equal(readManifest(root).modules.communication.enabled, true);

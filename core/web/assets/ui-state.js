@@ -36,7 +36,7 @@ export function visibleQuestions(questions, given, mode, modules) {
 }
 export function defaultModules(definitions, questions, given, mode) {
   const a = effectiveAnswers(questions, given, mode);
-  const facts = { team: a['idea.team'] === 'team', usesGitHub: a['idea.team'] === 'team' || a['tasks.use-github'] !== false };
+  const facts = { team: ['team', 'external-reviewers'].includes(a['idea.team']), usesGitHub: a['tasks.use-github'] !== false };
   if (a['arch.language'] && a['arch.language'] !== 'auto') facts.language = a['arch.language'];
   if (a['arch.runs-on'] && a['arch.runs-on'] !== 'auto') {
     facts.runsOn = a['arch.runs-on'];

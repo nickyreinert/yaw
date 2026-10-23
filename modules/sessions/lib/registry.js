@@ -3,8 +3,8 @@
 // transcript content (doc 12 ยง4). Every path is checked before it is opened, symlinks are refused, and
 // nothing read from the database or from a project file is ever executed or opened.
 
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, isAbsolute, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadSqlite, migrate } from '../../../core/lib/db.js';
 import { parseTasks } from '../../../core/lib/tasks.js';
@@ -33,7 +33,8 @@ const clip = (s, n) => ([...s].length > n ? `${[...s].slice(0, n - 1).join('')}โ
 
 // Read a project file only if every component is a real directory / regular file (no symlink anywhere).
 // -> text, or null when it is missing, unsafe, or too large. Never throws.
-export function readRegular(root, rel) {
+export function readRegular(root, rel, { open = openSync } = {}) {
+  let fd;
   try {
     checkRelPath(rel);
     let cur = root;
@@ -44,9 +45,14 @@ export function readRegular(root, rel) {
       if (st.isSymbolicLink()) return null;
       if (i < parts.length - 1 ? !st.isDirectory() : !st.isFile() || st.size > MAX_LEDGER_BYTES) return null;
     }
-    return readFileSync(cur, 'utf8');
+    fd = open(cur, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.size > MAX_LEDGER_BYTES) return null;
+    return readFileSync(fd, 'utf8');
   } catch {
     return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
@@ -81,7 +87,7 @@ export function tightenHome(home, existed, uid = process.getuid?.()) {
 
 export function openRegistry(env) {
   const home = yawHome(env);
-  if (!home) throw new RegistryError('no home directory for ~/.yaw/yaw.db (set HOME or YAW_HOME)');
+  if (!isAbsolute(home)) throw new RegistryError('HOME or YAW_HOME must be an absolute path for the session registry');
   const existed = existsSync(home);
   mkdirSync(home, { recursive: true, mode: 0o700 });
   tightenHome(home, existed);
@@ -234,6 +240,7 @@ export function currentSession({ db, root, env, now = new Date() }) {
   if (typeof forced === 'string' && forced !== '') return SESSION_ID.test(forced) ? forced : null;
   const row = db.prepare('SELECT id, COALESCE(ended, started) AS last FROM sessions WHERE project = ? ORDER BY last DESC LIMIT 1').get(realRoot(root));
   if (!row) return null;
+  if (!SESSION_ID.test(row.id)) throw new RegistryError('this registry row looks damaged; not printing its session id');
   return now.getTime() - Date.parse(row.last) <= ACTIVE_WINDOW_MS ? row.id : null;
 }
 

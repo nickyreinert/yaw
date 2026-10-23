@@ -54,6 +54,18 @@ const choiceValue = (c) => (typeof c === 'object' ? c.value : c);
 const choiceLabel = (c) => (typeof c === 'object' && c.label ? c.label : String(choiceValue(c)));
 const available = (c) => !(typeof c === 'object' && c.phase && c.phase > 1);
 
+export function validAnswer(q, value) {
+  const allowed = (v) => (q.choices ?? []).some((c) => available(c) && choiceValue(c) === v);
+  switch (q.type) {
+    case 'text': return typeof value === 'string';
+    case 'boolean': return typeof value === 'boolean';
+    case 'number': return typeof value === 'number' && Number.isFinite(value);
+    case 'choice': return allowed(value);
+    case 'multi': return Array.isArray(value) && new Set(value).size === value.length && value.every(allowed);
+    default: return false;
+  }
+}
+
 function formatDefault(q) {
   const d = q.default;
   if (Array.isArray(d)) return d.join(', ');

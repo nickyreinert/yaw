@@ -96,7 +96,7 @@ test('adding then removing every real kit module returns to the exact pre-add tr
     await initProject({
       root,
       kitRoot: KIT_ROOT,
-      answersFile: join(KIT_ROOT, 'examples/node-cli/answers.yaml'),
+      answersFile: writeAnswers(tmp('yaw-ans-'), read(KIT_ROOT, 'examples/node-cli/answers.yaml').replace('modules: [core]', `modules: [${baselineModules.join(', ')}]`)),
       modules: baselineModules,
     });
     if (loadModule(KIT_ROOT, module).outputs?.starter) {

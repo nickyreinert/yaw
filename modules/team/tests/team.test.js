@@ -295,6 +295,8 @@ const fakeApi = ({ rulesets = [] } = {}) => {
     calls.push({ args, input: opts.input });
     if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'octo/demo', visibility: 'PRIVATE' });
     const path = args.find((a) => a.startsWith('repos/'));
+    if (path.endsWith('/check-runs')) return 'quality-gate\nsecret-scan\npr-policy\n';
+    if (path.endsWith('/statuses')) return '';
     if (path.endsWith('/rulesets')) return JSON.stringify(rulesets);
     return JSON.stringify(rulesets.find((r) => r.id === Number(path.split('/').pop())));
   };

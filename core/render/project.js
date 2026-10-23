@@ -49,10 +49,36 @@ function checkKitNotOlder(manifest, kitRoot) {
 
 // Manifest entry of an enabled module. `tasks` records the effective task mode (BD4, ADR-0010), which hooks
 // and `yaw task` read; it follows the answers on every update.
-function moduleEntry(name, existing, answers) {
+function moduleEntry(name, existing, answers, modules) {
   const entry = { ...(existing ?? { enabled: true }) };
-  if (name === 'tasks') entry.mode = tasksMode(answers);
+  if (name === 'tasks') entry.mode = tasksMode(answers, { teamModule: modules.includes('team') });
   return entry;
+}
+
+function syncProposalModules(root, modules, answers) {
+  const doc = answers?.doc ?? readAnswers(root);
+  const before = doc.proposal?.modules;
+  if (before?.length === modules.length && before.every((m) => modules.includes(m))) return answers;
+  if (!doc.proposal) return answers;
+  const next = { ...doc, proposal: { ...doc.proposal, modules } };
+  const text = answers?.text ?? readProjectFile(root, ANSWERS).toString('utf8');
+  const { lines } = parseDocument(text);
+  const start = lines.get('/proposal/modules');
+  const rows = text.split('\n');
+  // Keep comments and formatting outside the changed list; inline proposal objects use the normal writer.
+  if (start && /^\s*(modules|"modules"|'modules')\s*:/.test(rows[start - 1])) {
+    const following = [...lines].filter(([p, n]) => n > start && !p.startsWith('/proposal/modules/')).map(([, n]) => n - 1);
+    let end = Math.min(rows.length, ...following);
+    while (end > start && /^\s*(#.*)?$/.test(rows[end - 1])) end--;
+    const prefix = rows[start - 1].match(/^\s*(?:modules|"modules"|'modules')\s*:/)[0];
+    const comment = rows[start - 1].match(/\s+#.*$/)?.[0] ?? '';
+    rows.splice(start - 1, end - start + 1, `${prefix} [${modules.join(', ')}]${comment}`);
+    const patched = rows.join('\n');
+    const parsed = parseAnswers(patched);
+    if (JSON.stringify(parsed) !== JSON.stringify(next)) throw new ProjectError(`cannot safely update proposal.modules in ${ANSWERS}`);
+    return { text: patched, doc: next };
+  }
+  return { text: stringify(next), doc: next };
 }
 
 // Render `modules` and reconcile the project with the result; writes files, bases and the manifest.
@@ -60,16 +86,25 @@ function moduleEntry(name, existing, answers) {
 export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, ...options }) {
   const manifest = requireManifest(root);
   checkKitNotOlder(manifest, kitRoot);
+  answers = syncProposalModules(root, modules, answers);
   const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules, answersDoc: answers?.doc });
   const version = kitVersion(kitRoot);
   // New answers (yaw add) are written only after the render succeeded; the answers entry gets the new hash.
   if (answers) writeAtomic(root, ANSWERS, answers.text);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
+  if (removing === 'tasks' && manifest.modules.tasks?.mode === 'github' &&
+    result.report.some((r) => r.path === 'TASKS.md' && r.action === 'released')) {
+    const ignore = readProjectFile(root, '.gitignore')?.toString('utf8') ?? '';
+    if (!ignore.split(/\r?\n/).some((line) => ['/TASKS.md', 'TASKS.md'].includes(line.trim()))) {
+      writeAtomic(root, '.gitignore', `${ignore}${ignore && !ignore.endsWith('\n') ? '\n' : ''}/TASKS.md\n`);
+      result.report.push({ path: '.gitignore', action: 'kept', reason: 'ignore retained for the released GitHub task view' });
+    }
+  }
   if (answers) result.files = result.files.map((f) => (f.path === ANSWERS ? { ...f, hash: hashContent(answers.text) } : f));
 
   const nextModules = {};
   const answerMap = (answers?.doc ?? readAnswers(root)).answers;
-  for (const m of modules) nextModules[m] = moduleEntry(m, manifest.modules[m], answerMap);
+  for (const m of modules) nextModules[m] = moduleEntry(m, manifest.modules[m], answerMap, modules);
   for (const [m, entry] of Object.entries(manifest.modules)) if (!entry.enabled && m !== removing) nextModules[m] = entry;
 
   if (modules.length === 0) {
@@ -192,7 +227,7 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
     preset: answersDoc.mode,
     agents,
     vendored: false,
-    modules: Object.fromEntries(modules.map((m) => [m, moduleEntry(m, undefined, answersDoc.answers)])),
+    modules: Object.fromEntries(modules.map((m) => [m, moduleEntry(m, undefined, answersDoc.answers, modules)])),
     mcpServers: [],
     files: [...result.files, answersEntry],
   });

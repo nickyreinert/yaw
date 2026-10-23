@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { stringify } from '../lib/yaml.js';
 import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js';
 import { deriveFacts } from '../interview/facts.js';
-import { runInterview } from '../interview/engine.js';
+import { runInterview, whenMatches } from '../interview/engine.js';
 import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -56,14 +56,18 @@ async function chooseMode({ prompter }) {
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
 function summaryAnswers(questions, given, defaulted) {
   const out = {};
+  const effective = Object.fromEntries(questions.map((q) => [q.id, q.default]));
+  Object.assign(effective, given);
+  const hidden = new Set(questions.filter((q) => !whenMatches(q.when, effective)).map((q) => q.id));
   for (const q of questions) {
+    if (hidden.has(q.id)) continue;
     if (Object.hasOwn(given, q.id)) out[q.id] = given[q.id];
     else {
       out[q.id] = q.default;
       defaulted.add(q.id);
     }
   }
-  for (const [id, value] of Object.entries(given)) if (!Object.hasOwn(out, id)) out[id] = value;
+  for (const [id, value] of Object.entries(given)) if (!Object.hasOwn(out, id) && !hidden.has(id)) out[id] = value;
   return out;
 }
 

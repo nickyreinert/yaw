@@ -17,8 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-latest is paused: too slow on GitHub. Re-enable macOS before the v0.1 release (issue #116).
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         node: ['22.13', '24']
     steps:
       - uses: actions/checkout@v4

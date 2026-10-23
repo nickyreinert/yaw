@@ -2,14 +2,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { constants, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { readManifest } from '../../../core/render/manifest.js';
 import { initProject } from '../../../core/render/project.js';
 import { loadModule } from '../../../core/render/kit.js';
 import { main } from '../../../core/cli/main.js';
-import { cacheFile, diffIndex, gitInfo, hashFile, listFiles, refresh } from '../lib/index.js';
+import { cacheFile, diffIndex, gitInfo, hashFile, listFiles, readCache, refresh } from '../lib/index.js';
 import { MapFormatError, parseMap, updateText } from '../lib/map.js';
 import { runMap } from '../lib/cli.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, scripted, tmp, writeAnswers, writeTree } from '../../../test/helpers/fixtures.js';
@@ -43,6 +43,25 @@ async function project({ modules = ['core', 'code-map'], files = SOURCES, git = 
 const mapText = (root) => read(root, 'docs/code-map.md');
 const cacheDir = (env) => join(env.YAW_HOME, 'cache', 'code-map');
 const cacheFiles = (env) => (existsSync(cacheDir(env)) ? readdirSync(cacheDir(env)).filter((f) => f.endsWith('.json')) : []);
+
+test('readCache refuses symlinks and non-regular files before reading', async () => {
+  const { root, env, yaw } = await project();
+  assert.equal((await yaw('map', 'update')).code, 0);
+  const info = gitInfo(root);
+  const file = cacheFile(env, info);
+  const cached = readCache(file, info);
+  assert.ok(cached);
+  const link = join(tmp('yaw-cache-link-'), 'cache.json');
+  symlinkSync(file, link);
+  assert.equal(readCache(link, info), null);
+  assert.equal(readCache(join(file, '..'), info), null);
+  let flags;
+  assert.deepEqual(readCache(file, info, { open: (path, options) => {
+    flags = options;
+    return openSync(path, options);
+  } }), cached);
+  assert.ok(flags & constants.O_NOFOLLOW);
+});
 
 test('the module renders its files, the gate, one AGENTS.md line and the user-owned starter map', async () => {
   const { root } = await project();

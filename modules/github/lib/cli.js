@@ -331,6 +331,27 @@ async function protect(c) {
     stdout.write(`protect: ruleset "${RULESET}" on ${slug} matches ${CONFIG}\n`);
     return 0;
   }
+  const seen = new Set();
+  const readChecks = (ref) => {
+    for (const [endpoint, query] of [['check-runs', '.check_runs[].name'], ['statuses', '.[].context']]) {
+      const names = gh(['api', `repos/${slug}/commits/${ref}/${endpoint}`, '--paginate', '--jq', query]);
+      for (const name of names.split('\n').filter(Boolean)) seen.add(name);
+    }
+  };
+  // HEAD on the server must exist; local workflow files alone do not prove that CI has ever reported.
+  readChecks('HEAD');
+  if (checks.some((name) => !seen.has(name))) {
+    const prs = json(gh(['pr', 'list', '--state', 'all', '--limit', '10', '--json', 'headRefOid']), 'recent pull requests');
+    for (const sha of new Set(prs.map((pr) => pr.headRefOid))) {
+      if (!/^[0-9a-f]{40,64}$/i.test(sha ?? '')) throw new GhError('gh returned an invalid pull request commit');
+      readChecks(sha);
+      if (checks.every((name) => seen.has(name))) break;
+    }
+  }
+  const missingChecks = checks.filter((name) => !seen.has(name));
+  if (missingChecks.length) {
+    throw new GhUsageError(`required checks have not reported on the remote default branch or the 10 latest pull requests: ${missingChecks.join(', ')}. Push the initial commit and run CI (including a first PR for PR-only checks), then run just gh-protect again; no ruleset was changed`);
+  }
   await authorise(c.io, `gh protect ${existing ? 'updates' : 'creates'} the ruleset "${RULESET}" on ${slug}:`, [
     'applies to the default branch; nobody bypasses it',
     'pull request required' + (approvals > 0 ? `, ${approvals} approval(s)` : ', no approvals'),
@@ -539,4 +560,3 @@ function issue(c) {
   stdout.write(`${url} (${native ? `issue type ${typeName(type)}` : `label type:${type}`})\n`);
   return 0;
 }
-

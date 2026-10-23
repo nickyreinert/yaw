@@ -1,6 +1,8 @@
 # 14 — Team Mode
 
-Activated by interview question 1.5 = team. Team mode changes defaults and turns several conventions into **enforced rules**. Solo projects are unaffected.
+Activated by interview question 1.5 = team or external reviewers. Shared project instructions omit personal preferences. With GitHub enabled, Full selects the `team` enforcement module and applies the rules below. With GitHub disabled, teams use local tasks and normal Git (including a bare remote in another folder); no GitHub issue/PR enforcement or hosted files are installed, and existing remotes are unchanged (ADR-0047). Solo projects are unaffected unless the team enforcement module is explicitly added.
+
+Explicitly adding the `team` module to a solo project also enables GitHub task tracking and shared instructions, regardless of the earlier task-mode default. YAW warns before confirmation that existing local tasks are not migrated; review and migrate that user-owned ledger before running `yaw task sync`.
 
 | Topic | Solo | Team |
 |---|---|---|

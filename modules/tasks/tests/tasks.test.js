@@ -13,7 +13,7 @@ import { addModule, initProject, moduleQuestions, readAnswers, removeModule } fr
 import { declaredAgent, fixture, hook } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { archiveText, doneTask, localDate, logTask, newTask, nextLocalId, startTask } from '../lib/ledger.js';
-import { syncBoth, viewFromIssues } from '../lib/github.js';
+import { journalFromComments, syncBoth, viewFromIssues } from '../lib/github.js';
 
 const GH = join(import.meta.dirname, 'fixtures', 'gh');
 const recorded = (name) => readFileSync(join(GH, name), 'utf8');
@@ -39,6 +39,7 @@ function fakeGh({ seed = recorded('issues-all.json') } = {}) {
     calls.push(args);
     const [group, verb] = args;
     const flag = (name) => args[args.indexOf(name) + 1];
+    if (group === 'repo' && verb === 'view') return JSON.stringify({ owner: { login: 'demo-dev' } });
     assert.equal(group, 'issue', args.join(' '));
     if (verb === 'list') {
       if (args.includes('--assignee')) return recorded('issues-mine.json');
@@ -56,7 +57,7 @@ function fakeGh({ seed = recorded('issues-all.json') } = {}) {
     if (verb === 'reopen' && issue) issue.state = 'OPEN';
     return '';
   };
-  const writes = () => calls.filter((c) => c[1] !== 'list');
+  const writes = () => calls.filter((c) => c[1] !== 'list' && c[1] !== 'view');
   return { gh, calls, issues, writes };
 }
 
@@ -144,7 +145,7 @@ test('install: AGENTS.md rules, justfile import, hooks in Claude and Codex setti
 test('install: github mode has its own rules and git-ignores the per-person view', async () => {
   const root = await project({ mode: 'github' });
   assert.match(read(root, 'AGENTS.md'), /read-only view of GitHub issues/);
-  assert.match(read(root, '.gitignore'), /# yaw:tasks\nTASKS\.md\n# \/yaw:tasks/);
+  assert.match(read(root, '.gitignore'), /# yaw:tasks\n\/TASKS\.md\n# \/yaw:tasks/);
   assert.doesNotMatch(read(root, 'AGENTS.md'), /mirrors tasks/);
   assert.match(read(root, 'TASKS.md'), /Read-only: change the issues/);
 });
@@ -370,7 +371,7 @@ test('sync: a gh failure is a plain message and leaves TASKS.md alone', async ()
 // ---------------------------------------------------------------- github: issues are the source
 
 test('github view: my issues are Active (status label, journal comments), others are the Backlog by priority', () => {
-  const view = viewFromIssues({ mine: JSON.parse(recorded('issues-mine.json')), open: JSON.parse(recorded('issues-open.json')) });
+  const view = viewFromIssues({ mine: JSON.parse(recorded('issues-mine.json')), open: JSON.parse(recorded('issues-open.json')), owner: 'demo-dev' });
   assert.deepEqual(view.active[0], {
     id: '#41',
     title: 'Guest join screen',
@@ -382,6 +383,17 @@ test('github view: my issues are Active (status label, journal comments), others
       { date: '2026-10-20', text: 'join form and validation done' },
       { date: '2026-10-21', text: 'PR #52 opened' },
     ],
+  });
+
+  test('journal comments require a matching repository owner, not just a marker', () => {
+    const comment = { body: '<!-- yaw:journal -->\n2026-10-21 work\n\nResume point: next' };
+    const comments = [
+      { ...comment, author: { login: 'outsider' } },
+      { ...comment, author: { login: 'DEMO-DEV' } },
+      comment,
+    ];
+    assert.equal(journalFromComments(comments, 'demo-dev').length, 1);
+    assert.deepEqual(journalFromComments(comments), []);
   });
   assert.deepEqual(view.active[1], { id: '#45', title: 'Invite expiry', status: 'in progress' });
   assert.deepEqual(view.backlog, [
@@ -433,7 +445,7 @@ test('yaw task (github): offline list falls back to the last view; a failed refr
   assert.match(list.err, /using the last TASKS\.md \(gh issue list failed: network\)/);
   assert.match(list.out, /#41 Guest join screen/);
   let writes = 0;
-  const flaky = (args) => (args[1] === 'list' ? offline() : (writes++, ''));
+  const flaky = (args) => (['list', 'view'].includes(args[1]) ? offline() : (writes++, ''));
   const log = await task(root, ['log', '#41', 'x'], { gh: flaky });
   assert.equal(log.code, 0);
   assert.equal(writes, 1);
@@ -446,7 +458,7 @@ test('team mode forces github even when the answer says local', async () => {
   const r = await task(root, ['sync'], { gh: fakeGh().gh });
   assert.equal(r.code, 0, r.err);
   assert.equal(parseTasks(read(root, 'TASKS.md')).readOnly, true);
-  assert.deepEqual(moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') }).map((q) => q.id), ['tasks.mode']);
+  assert.deepEqual(moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') }).map((q) => q.id), ['tasks.use-github', 'tasks.mode']);
 });
 
 // ---------------------------------------------------------------- hooks
@@ -555,7 +567,7 @@ test('remove: zero residue, answers kept, re-add asks the question again with th
     assert.equal(readAnswers(root).answers['tasks.mode'], mode, 'answers.yaml keeps the answer');
 
     const asked = moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') });
-    assert.deepEqual(asked.map((q) => [q.id, q.default]), [['tasks.mode', mode]]);
+    assert.deepEqual(asked.map((q) => [q.id, q.default]), [['tasks.use-github', true], ['tasks.mode', mode]]);
     await addModule({ root, module: 'tasks' });
     assert.deepEqual(readTree(root), before);
   }
@@ -568,6 +580,18 @@ test('remove: a ledger with real tasks is kept (user data), the rest goes', asyn
   assert.equal(existsSync(join(root, 'TASKS.md')), true);
   assert.equal(read(root, 'TASKS.md'), LOCAL_LEDGER);
   assert.ok(!readManifest(root).files.some((f) => f.path === 'TASKS.md'));
+});
+
+test('a released GitHub view stays ignored, without ignoring nested task ledgers', async () => {
+  const root = await project({ mode: 'github' });
+  const env = cleanEnv(tmp('yaw-home-'));
+  assert.equal(run('git', ['init', '--quiet'], { cwd: root, env }).status, 0);
+  await task(root, ['sync'], { gh: fakeGh().gh });
+  await removeModule({ root, module: 'tasks' });
+  assert.ok(existsSync(join(root, 'TASKS.md')));
+  assert.equal(run('git', ['check-ignore', '--quiet', 'TASKS.md'], { cwd: root, env }).status, 0);
+  assert.equal(run('git', ['check-ignore', '--quiet', 'nested/TASKS.md'], { cwd: root, env }).status, 1);
+  assert.match(read(root, '.gitignore'), /^\/TASKS\.md$/m);
 });
 
 test('hook state stays outside the project', async () => {

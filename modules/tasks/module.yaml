@@ -4,7 +4,14 @@ description: Task ledger in TASKS.md (local), GitHub issues with a generated rea
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions:
-  # Team mode (doc 14) forces GitHub only, so the question is not asked there (ADR-0010).
+  - id: tasks.use-github
+    ref: "10.2"
+    mode: Q
+    type: boolean
+    label: Use GitHub for the repo?
+    hint: No keeps Git local (including a remote in another folder), uses local tasks and skips GitHub-specific modules.
+    default: true
+  # GitHub teams use issues; teams without GitHub use the local ledger.
   - id: tasks.mode
     ref: "10.1"
     mode: Q

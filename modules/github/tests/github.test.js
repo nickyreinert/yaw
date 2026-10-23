@@ -52,7 +52,7 @@ async function repo(options = {}) {
 }
 
 // gh stand-in: records every call, answers the reads, and keeps what the tests need to see.
-function fakeGh({ native = [], labels = [], rulesets = [], prs = [], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false } = {}) {
+function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['quality-gate', 'secret-scan', 'pr-policy', 'lint'], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false } = {}) {
   const calls = [];
   const state = { rulesets: [...rulesets] };
   const gh = (args, opts = {}) => {
@@ -68,6 +68,8 @@ function fakeGh({ native = [], labels = [], rulesets = [], prs = [], repoView = 
     if (args[0] === 'api') {
       const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
       const path = args.find((a) => a.startsWith('repos/'));
+      if (path.endsWith('/check-runs')) return checks.join('\n');
+      if (path.endsWith('/statuses')) return '';
       if (path.endsWith('/rulesets') && method === 'GET') return JSON.stringify(state.rulesets);
       if (path.endsWith('/rulesets') && method === 'POST') {
         const body = JSON.parse(opts.input);
@@ -164,7 +166,7 @@ test('renders the recipes, the PR template, github.yaml and the ask rules; manif
   assert.match(tree['AGENTS.md'], /There is no recipe to merge, force-push, delete a branch or change repo visibility/);
   const settings = JSON.parse(tree['.claude/settings.json']);
   assert.ok(settings.permissions.deny.includes('Read(**/.env)'), 'the security rules stay');
-  for (const rule of ['Bash(just gh-protect:*)', 'Bash(gh pr merge:*)', 'Bash(gh repo edit:*)', 'Bash(just release:*)', 'Bash(just pr:*)']) {
+  for (const rule of ['Bash(just gh-protect:*)', 'Bash(gh pr merge:*)', 'Bash(gh repo edit:*)', 'Bash(just release:*)', 'Bash(just pr:*)', 'Bash(gh api:*)', 'Bash(gh issue create:*)', 'Bash(gh project item-add:*)']) {
     assert.ok(settings.permissions.ask.includes(rule), rule);
   }
   const manifest = readManifest(root);
@@ -417,6 +419,33 @@ test('protect: refuses a required check no workflow reports, a bad --approvals, 
   const bad = await yaw(root, ['protect', '--yes'], { gh: wrapped, env });
   assert.equal(bad.code, 1);
   assert.match(bad.err, /does not read back as requested/);
+});
+
+test('protect refuses unseen remote checks and accepts PR-only checks before making any ruleset write', async () => {
+  const { root, env } = await repo();
+  writeConfig(root, 'rules:\n  requiredChecks: [quality-gate, pr-policy]\n');
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  writeFileSync(join(root, '.github/workflows/quality-gate.yml'), 'name: quality-gate\n');
+  writeFileSync(join(root, '.github/workflows/pr-policy.yml'), 'name: pr-policy\n');
+  const missing = fakeGh({ checks: ['quality-gate'] });
+  const refused = await yaw(root, ['protect', '--yes'], { gh: missing, env });
+  assert.equal(refused.code, 1);
+  assert.match(refused.err, /have not reported.*pr-policy/);
+  assert.deepEqual(missing.writes(), []);
+  const sha = 'a'.repeat(40);
+  const base = fakeGh({ checks: ['quality-gate'], prs: [{ headRefOid: sha }] });
+  const gh = (args, opts) => args.includes(`repos/octo/demo/commits/${sha}/check-runs`) ? 'pr-policy\n' : base(args, opts);
+  const passed = await yaw(root, ['protect', '--yes'], { gh, env });
+  assert.equal(passed.code, 0, passed.err);
+  assert.equal(base.writes().length, 1);
+  const empty = fakeGh();
+  const unavailable = (args, opts) => {
+    if (args.includes('repos/octo/demo/commits/HEAD/check-runs')) throw new Error('remote has no first commit');
+    return empty(args, opts);
+  };
+  const noCommit = await yaw(root, ['protect', '--yes'], { gh: unavailable, env });
+  assert.equal(noCommit.code, 1);
+  assert.deepEqual(empty.writes(), []);
 });
 
 // ---------------------------------------------------------------------------- branch and commit

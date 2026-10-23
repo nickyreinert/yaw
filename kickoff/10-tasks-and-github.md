@@ -8,11 +8,13 @@
 | **GitHub only** | Issues + milestones + optional Project board | `TASKS.md` is a generated read-only view; `just task next` reads from GitHub |
 | **Both (local-first)** | `TASKS.md` | `just task sync` mirrors tasks to issues (one-way, with IDs linked); epics → milestones; status → Project field |
 
-IDs: local only `T-NNN`; GitHub only and team mode use issue numbers (`#123`); both uses `T-NNN` with the linked issue number.
+IDs: local only `T-NNN`; GitHub only and GitHub-backed team mode use issue numbers (`#123`); both uses `T-NNN` with the linked issue number. Teams without GitHub use local task IDs.
 
 Version management (releases, tags, changelog) is independent of the task mode.
 
-**Team mode (doc 14) forces "GitHub only"** with issue types, sub-issues, Project fields (priority, estimate, iteration, dates) and milestones per launch phase; `TASKS.md` then becomes a generated read-only view of *my* open issues for the session start.
+**Teams using GitHub force "GitHub only"**; `TASKS.md` becomes a generated read-only view of *my* open issues for the session start. Teams answering no to GitHub instead keep a local ledger, including when their Git remote is a repository in another folder (ADR-0047). Advanced Project fields and milestone synchronization remain later work (#110).
+
+Only `yaw:journal` comments authored by the repository owner are imported into the generated journal and resume point; a matching marker from another or missing author is not trusted. Organizational repositories do not treat ordinary members as the repository owner. The generated view is ignored as `/TASKS.md`, not every nested ledger; an edited view retained on module removal keeps that ignore as user-owned configuration.
 
 ## 2. `TASKS.md`: the first stop of every session
 

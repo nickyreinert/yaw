@@ -11,6 +11,10 @@ Rules for coding agents in this project, written by YAW (<%= mode %> setup). Edi
 
 ## Working agreement
 
+<% if team %>
+- Write code, comments, commit messages and docs in English; agree on chat language and autonomy per contributor.
+<% else %>
 - Chat in "<%= answers.user.language %>"; write code, comments, commit messages and docs in English.
 - <%= rules.autonomy %>
+<% end %>
 - Keep changes small and focused; do what was asked, no more.

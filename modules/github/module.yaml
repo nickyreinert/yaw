@@ -3,17 +3,9 @@ name: github
 description: Recipes for the GitHub side of a project (repo, labels, branch, commit, pull request, release, ruleset, project board, issues with native type or label), a PR template and .yaw/github.yaml; guarded actions need explicit authorisation.
 depends: [core]
 default: { quick: false, standard: true, full: true }
-# Relevance (ADR-0032): off when the user says they do not use GitHub; team projects always use it (facts.usesGitHub).
+# Off when the user does not use GitHub, including teams with a local Git remote.
 appliesTo: { usesGitHub: true }
-questions:
-  - id: tasks.use-github
-    ref: "10.2"
-    mode: S
-    type: boolean
-    label: Use GitHub for the repo?
-    hint: Off drops the github and ci modules and keeps tasks local; team projects always use GitHub.
-    when: { idea.team: solo }
-    default: true
+questions: []
 outputs:
   templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, just/github.just, justfile]
 agentsMd: |

@@ -4,7 +4,7 @@ A module is a folder in `modules/` with a `module.yaml`. It owns its questions, 
 
 ## 1. Catalogue and mode defaults
 
-Phase 1 (ADR-0009, amended by ADR-0032): two setup choices. **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal). **Full** = Quick + `git-hooks`, `decisions`, `sessions`, `comfort`, `github` and `ci` unless the project does not use GitHub (question 10.2), and `team` when the project is a team (ADR-0031). Team mode always requires `github` (10.2 is not asked); the remote can be local, then the GitHub-only parts (rulesets, `pr-policy`, issue sync, `gh` calls) are skipped and the local rules still apply. Standard is merged into Full; the `standard` alias keeps its previous selection. ADR-0032 lists each module's hooks and skills per mode; hooks are registered per module.
+Phase 1 (ADR-0009, amended by ADR-0032 and ADR-0047): two setup choices. **Quick** = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal). **Full** = Quick + `git-hooks`, `decisions`, `sessions`, `comfort`, `code-map`, plus `github` and `ci` when the project uses GitHub (question 10.2). The GitHub-specific `team` enforcement module is selected for teams and external reviewers using GitHub (ADR-0031). A team can instead use local tasks and Git with a remote in another folder; no GitHub-specific enforcement or files are selected, and existing remotes are untouched. Shared instructions omit personal preferences in either kind of team. Standard is merged into Full; `standard` remains an alias. ADR-0032 lists each module's hooks and skills per mode; hooks are registered per module.
 
 | Module | Purpose | Quick | Full | Depends |
 |---|---|:-:|:-:|---|
@@ -20,7 +20,7 @@ Phase 1 (ADR-0009, amended by ADR-0032): two setup choices. **Quick** = `core`, 
 | `decisions` | ADR + notice journal, local RAG, recall hook | – | ✔ | core |
 | `sessions` | Session registry, commit trailer, `/handoff` (doc 12) | – | ✔ | core |
 | `comfort` | Session hygiene, status line, notifications (doc 11; ADR-0030: one multi-select question, default hygiene + status line, personal settings in `~/.yaw/comfort.yaml`; the cache reminder is phase 2) | – | ✔ | core |
-| `team` | Team mode (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team (requires `github`; remote can be local) | tasks, github, git-hooks |
+| `team` | GitHub team enforcement (doc 14 §2–3, ADR-0031): lefthook `commit-msg` / `pre-push`, `pr-policy` check, agent rules in `AGENTS.md` (guidance), session-start sync; the ruleset (`just gh-protect`) is the boundary | – | if team or external reviewers and GitHub | tasks, github, git-hooks |
 | `code-map` | Maintained `docs/code-map.md` (declared areas, generated sections between `yaw:map` markers, your explanations kept), rebuildable index in `~/.yaw/cache/code-map/`, `yaw map update` / `check` / `show`; `map-check` runs with `just check` and as a lefthook `pre-commit` job when `git-hooks` is installed; no GitHub, no watcher, no agent hook (ADR-0033) | – (`yaw add code-map`) | ✔ | core |
 
 Later (phase 2 or 3, label `later`; in no mode until built). The last column is the target preselection in Full.

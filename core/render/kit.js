@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../lib/yaml.js';
 import { tasksMode } from '../lib/tasks.js';
+import { validAnswer } from '../interview/engine.js';
+import { deriveFacts } from '../interview/facts.js';
 import { formatError } from '../lib/schema.js';
 import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
@@ -267,8 +269,14 @@ function comfortFlags(picked, agents, team) {
 // answer take their default, so a template never sees a missing answer.
 export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   const flat = {};
-  for (const q of collectQuestions(kitRoot, modules, definitions)) flat[q.id] = q.default;
+  for (const q of collectQuestions(kitRoot, modules, definitions)) {
+    if (Object.hasOwn(answersDoc.answers ?? {}, q.id) && !validAnswer(q, answersDoc.answers[q.id])) {
+      throw new KitError(`invalid answer for ${q.id}: expected ${q.type}${q.choices ? ' from the available choices' : ''}`);
+    }
+    flat[q.id] = q.default;
+  }
   Object.assign(flat, answersDoc.answers ?? {});
+  const team = modules.includes('team') || deriveFacts(flat).team === true;
   const answers = {};
   for (const [id, value] of Object.entries(flat)) {
     const [group, name] = id.split('.');
@@ -299,21 +307,21 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
       expertise: STYLE.expertise[flat['user.expertise']] ?? '',
     },
     // ADR-0013: the user profile is personal; a team repository does not commit it.
-    team: (flat['idea.team'] ?? 'solo') !== 'solo',
+    team,
     // Output style: Claude only, and only when length or register differ from the default (doc 04).
-    outputStyle: (flat['user.agents'] ?? []).includes('claude')
+    outputStyle: !team && (flat['user.agents'] ?? []).includes('claude')
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
         || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
     profileStandards: profileOverlay(kitRoot, profiles),
     devenv: profileDevenv(kitRoot, profiles),
     // ADR-0027: toolchain steps for the ci module.
     ci: profileCi(kitRoot, profiles),
-    // ADR-0010: the effective task mode (team forces github) as booleans, since templates have no comparisons.
-    tasks: taskFlags(tasksMode(flat)),
+    // Explicit GitHub team enforcement also overrides a solo project's local task default.
+    tasks: taskFlags(tasksMode(flat, { teamModule: modules.includes('team') })),
     // ADR-0030: the comfort features the user picked. Only the status line is a committed setting, and it is
     // personal, so a team repository never gets it (ADR-0013); hooks are registered for everyone and decide at
     // run time, from the user's own configuration, what to do.
-    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], (flat['idea.team'] ?? 'solo') !== 'solo'),
+    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], team),
     // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
     teamModule: modules.includes('team'),
     // ADR-0033: git-hooks adds the code-map pre-commit job when the code-map module is installed.

@@ -61,7 +61,7 @@ questions:
     mode: Q
     type: choice
     label: Solo or team?
-    hint: Team mode makes issues and PRs mandatory (doc 14).
+    hint: Shared team rules; with GitHub enabled, Full also requires issues and PRs (doc 14). Git can use a remote in another local folder instead.
     choices: [solo, team, external-reviewers]
     default: solo
   - id: arch.language

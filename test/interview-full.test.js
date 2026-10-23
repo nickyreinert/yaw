@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
+import { readManifest } from '../core/render/manifest.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
@@ -72,6 +73,7 @@ const QUICK = {
   'user.register': 'professional',
   'user.examples': 'when-helpful',
   'user.explain': 'short-paragraph',
+  'tasks.use-github': true,
   'tasks.mode': 'local',
 };
 const QUICK_MODULES = ['core', 'communication', 'devenv', 'security', 'standards', 'tasks'];
@@ -108,15 +110,24 @@ test('Full solo without GitHub: github and ci are off and the answer is recorded
   assert.deepEqual(r.doc.proposal.modules, FULL_MODULES.filter((m) => m !== 'github' && m !== 'ci'));
 });
 
-test('Full team: team questions appear, tasks.mode and GitHub question do not, github stays on', async () => {
+test('Full team: team questions and GitHub choice appear, task mode is forced to issues', async () => {
   const r = await init({ depth: 'full', ...IDEA, 'Solo or team': 'team', 'Tell the agent the active issue': 'n' });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers, {
-    ...Object.fromEntries(Object.entries(SOLO_FULL).filter(([k]) => k !== 'tasks.use-github' && k !== 'tasks.mode')),
+    ...Object.fromEntries(Object.entries(SOLO_FULL).filter(([k]) => k !== 'tasks.mode')),
     'idea.team': 'team',
     'team.session-context': false,
   });
   assert.deepEqual(r.doc.proposal.modules, ['core', ...[...FULL_MODULES.slice(1), 'team'].sort()]);
+  assert.doesNotMatch(r.out, /tasks\.mode/);
+});
+
+test('teams can select a local Git remote without GitHub and without hidden questions in the summary', async () => {
+  const r = await init({ depth: 'full', ...IDEA, 'Solo or team': 'team', 'Use GitHub for the repo': 'n' });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.doc.answers['tasks.use-github'], false);
+  for (const name of ['github', 'ci', 'team']) assert.ok(!r.doc.proposal.modules.includes(name));
+  assert.doesNotMatch(r.out, /team\.session-context|tasks\.mode/);
 });
 
 test('Quick team: the choice is recorded; no team questions, Quick modules', async () => {
@@ -152,15 +163,18 @@ test('expertise: a layperson is still asked the Q and S questions', async () => 
   assert.ok(!r.out.includes('user.language  en  (default)'));
 });
 
-test('yaw add team on a solo project lists the question it does not ask as a default', async () => {
+test('yaw add team on a solo project fits the budget without committing personal preferences', async () => {
   const r = await init({ depth: 'full', ...IDEA });
   const stdout = capture();
   const stderr = capture();
   const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
-  // Known limit (issue #156): adding team to a solo Full project exceeds the 80-line AGENTS.md budget (86 lines).
-  assert.equal(code, 1);
-  assert.match(stderr.text(), /AGENTS\.md would have 86 lines, the budget is 80/);
-  assert.match(stdout.text(), /not asked team\.session-context: applies only when idea\.team = team; the default is true {2}\(default\)/);
+  assert.equal(code, 0, stderr.text());
+  const agents = readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8');
+  assert.ok(agents.trimEnd().split('\n').length <= 80);
+  assert.doesNotMatch(agents, /## Communication|Chat in "|Ask before risky/);
+  assert.equal(readManifest(r.cwd).modules.tasks.mode, 'github');
+  assert.match(stdout.text(), /existing local tasks are not migrated/);
+  assert.match(stdout.text(), /not asked team\.session-context: applies only when .*; the default is true {2}\(default\)/);
 });
 
 test('expertise: each level is recorded; the level changes how the interview is shown', async () => {
@@ -179,8 +193,8 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
-  assert.match(shown('intermediate'), /Team mode makes issues and PRs mandatory/);
-  assert.doesNotMatch(shown('expert'), /Team mode makes issues and PRs mandatory/);
+  assert.match(shown('intermediate'), /Shared team rules/);
+  assert.doesNotMatch(shown('expert'), /Shared team rules/);
   // the summary lists the layperson default
   assert.match(runs.layperson.out, /team\.session-context +true +\(default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(default\)/);

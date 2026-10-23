@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { loadModule } from '../../../core/render/kit.js';
@@ -13,7 +13,7 @@ import { addModule, initProject, moduleQuestions, readAnswers, removeModule } fr
 import { openYawDb } from '../../../core/lib/db.js';
 import { declaredAgent, fixture, hook, listFixtures, shim } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
-import { branchTask, clean, commitsOf, currentSession, openRegistry, tightenHome, readRegular, resumeCommand, sessionId, withRegistry } from '../lib/registry.js';
+import { branchTask, clean, commitsOf, currentSession, openRegistry, tightenHome, readRegular, realRoot, resumeCommand, sessionId, withRegistry } from '../lib/registry.js';
 import { commitMessage } from '../../github/lib/names.js';
 import { parseRef } from '../lib/cli.js';
 
@@ -391,6 +391,28 @@ test('list, current and the terminal-safe output', async () => {
   assert.deepEqual([nothing.code, nothing.out, nothing.err], [1, '', 'no current session\n']);
 });
 
+test('damaged session ids never emit terminal controls or enter commit trailers', async () => {
+  const { root, env } = await seeded();
+  withRegistry(env, (db) => db.prepare('INSERT INTO sessions (id, agent, project, started) VALUES (?, ?, ?, ?)').run('claude:bad\u009b31m\u001b[2J', 'claude', realRoot(root), new Date().toISOString()));
+  const list = await yaw(root, ['list'], env);
+  assert.doesNotMatch(list.out.replaceAll('\n', ''), /[\u0000-\u001f\u007f-\u009f]/);
+  const current = await yaw(root, ['current'], { ...env, YAW_SESSION: '' });
+  assert.equal(current.code, 1);
+  assert.equal(current.out, '');
+  assert.match(current.err, /looks damaged/);
+});
+
+test('resume refuses C1 controls in stored project paths', async () => {
+  const { root, env } = await seeded();
+  for (const control of ['\u0085', '\u009b', '\u009f']) {
+    withRegistry(env, (db) => db.prepare('UPDATE sessions SET project = ? WHERE agent = ?').run(`/tmp/x${control}bad`, 'claude'));
+    const r = await yaw(root, ['resume', `claude:${NATIVE.claude}`], env);
+    assert.equal(r.code, 1);
+    assert.equal(r.out, '');
+    assert.match(r.err, /looks damaged/);
+  }
+});
+
 test('handoff: sets the title on the current session, or creates one with --agent', async () => {
   const root = await project();
   writeFileSync(join(root, 'TASKS.md'), LEDGER);
@@ -456,6 +478,25 @@ test('the registry directory is 0700 even when it existed already', () => {
   mkdirSync(join(home, '.yaw'), { mode: 0o755 });
   openRegistry({ HOME: home }).close();
   assert.equal(statSync(join(home, '.yaw')).mode & 0o777, 0o700);
+});
+
+test('relative registry homes are refused before directory creation or chmod', () => {
+  for (const env of [{ YAW_HOME: '.yaw' }, { HOME: 'relative-home' }, {}]) {
+    assert.throws(() => openRegistry(env), /absolute path/);
+  }
+});
+
+test('readRegular refuses a file swapped for a symlink between the check and open', () => {
+  const root = tmp('yaw-ledger-race-');
+  const outside = tmp('yaw-ledger-target-');
+  writeFileSync(join(root, 'TASKS.md'), LEDGER);
+  writeFileSync(join(outside, 'target.md'), 'not a ledger');
+  const text = readRegular(root, 'TASKS.md', { open: (path, flags) => {
+    unlinkSync(path);
+    symlinkSync(join(outside, 'target.md'), path);
+    return openSync(path, flags);
+  } });
+  assert.equal(text, null);
 });
 
 test('0700 never follows a link, never touches a foreign or user-chosen directory, never throws', () => {

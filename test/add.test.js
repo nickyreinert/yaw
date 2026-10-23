@@ -5,7 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hashContent } from '../core/render/files.js';
 import { readManifest } from '../core/render/manifest.js';
-import { initProject, readAnswers } from '../core/render/project.js';
+import { addModule, initProject, readAnswers, updateProject } from '../core/render/project.js';
+import { validAnswer } from '../core/interview/engine.js';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { capture, makeKit, read, readTree, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
 
@@ -128,7 +131,7 @@ test('add then remove leaves only the (kept) answers behind; re-adding asks agai
   assert.equal(read(root, '.yaw/answers.yaml'), kept); // unchanged answers: file untouched
 });
 
-test('no new answers: answers.yaml is left byte for byte (comments survive)', async () => {
+test('no new answers: only proposal.modules changes and comments survive', async () => {
   const kitRoot = fixtureKit();
   const root = tmp('yaw-proj-');
   const text = `# my notes\nmode: quick\nanswers:\n  user.agents: [claude] # keep me\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: Node CLI, local tasks.\n  profiles: [node-cli]\n  modules: [core]\n`;
@@ -136,7 +139,45 @@ test('no new answers: answers.yaml is left byte for byte (comments survive)', as
   const before = read(root, '.yaw/answers.yaml');
   const r = await yaw(['add', 'plain', '--yes'], root, kitRoot);
   assert.equal(r.code, 0, r.stderr);
-  assert.equal(read(root, '.yaw/answers.yaml'), before);
+  assert.equal(read(root, '.yaw/answers.yaml'), before.replace('modules: [core]', 'modules: [core, plain]'));
+  assert.deepEqual(readAnswers(root).proposal.modules, ['core', 'plain']);
   assert.match(before, /# keep me/);
   assert.equal(read(root, 'plain.txt'), 'plain\n');
+});
+
+test('choice validation rejects unavailable values, duplicate multi values and wrong types', () => {
+  const choices = ['one', { value: 'two' }, { value: 'later', phase: 3 }];
+  assert.ok(validAnswer({ type: 'choice', choices }, 'two'));
+  for (const value of ['three', 'later', true, ['one']]) assert.equal(validAnswer({ type: 'choice', choices }, value), false);
+  assert.ok(validAnswer({ type: 'multi', choices }, ['one', 'two']));
+  for (const value of [['one', 'one'], ['later'], 'one']) assert.equal(validAnswer({ type: 'multi', choices }, value), false);
+  assert.equal(validAnswer({ type: 'boolean' }, 'false'), false);
+  assert.equal(validAnswer({ type: 'number' }, Infinity), false);
+});
+
+test('invalid module answers fail before writes in add and update, without echoing values', async () => {
+  const kitRoot = fixtureKit();
+  const root = await setup(kitRoot);
+  const before = readTree(root);
+  await assert.rejects(addModule({ root, kitRoot, module: 'extra', newAnswers: { 'quality.level': 'invalid-canary' } }), /invalid answer for quality.level/);
+  assert.deepEqual(readTree(root), before);
+  await addModule({ root, kitRoot, module: 'extra', newAnswers: { 'quality.level': 'high' } });
+  writeFileSync(join(root, '.yaw/answers.yaml'), read(root, '.yaw/answers.yaml').replace('quality.level: high', 'quality.level: invalid-canary'));
+  const bad = readTree(root);
+  await assert.rejects(updateProject({ root, kitRoot }), (e) => /invalid answer for quality.level/.test(e.message) && !e.message.includes('invalid-canary'));
+  assert.deepEqual(readTree(root), bad);
+});
+
+test('proposal modules stay synchronized for block lists and can be reused for init', async () => {
+  const kitRoot = fixtureKit();
+  const root = tmp('yaw-proj-');
+  const source = `# preserve\nmode: quick\nanswers:\n  user.agents: [claude]\nproposal:\n  modules:\n    - core\n  profiles: [node-cli]\n  summary: fixture\n  status: confirmed\n`;
+  await initProject({ root, kitRoot, answersFile: writeAnswers(tmp('yaw-ans-'), source) });
+  await addModule({ root, kitRoot, module: 'plain' });
+  const saved = read(root, '.yaw/answers.yaml');
+  assert.ok(saved.startsWith('# preserve\n'));
+  assert.deepEqual(readAnswers(root).proposal.modules, ['core', 'plain']);
+  const copy = tmp('yaw-proj-');
+  await initProject({ root: copy, kitRoot, answersFile: writeAnswers(tmp('yaw-ans-'), saved), modules: readAnswers(root).proposal.modules });
+  assert.equal(read(copy, 'plain.txt'), 'plain\n');
 });

@@ -6,11 +6,12 @@ name: team
 description: "Team mode: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
 depends: [tasks, github, git-hooks]
 default: { quick: false, standard: { team: true }, full: { team: true } }
+appliesTo: { usesGitHub: true }
 questions:
   - id: team.session-context
     mode: F
     type: boolean
-    when: { idea.team: team }
+    when: { idea.team: [team, external-reviewers], tasks.use-github: true }
     label: Tell the agent the active issue at session start?
     hint: One line (issue number and title of the current branch); off saves those tokens.
     default: true

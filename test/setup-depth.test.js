@@ -3,14 +3,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deriveFacts } from '../core/interview/facts.js';
 import { main } from '../core/cli/main.js';
-import { parseDocument } from '../core/lib/yaml.js';
+import { parseDocument, stringify } from '../core/lib/yaml.js';
 import { AGENTS_MAX_LINES } from '../core/render/compose.js';
 import { initProject, readAnswers, renderInit, selectModules } from '../core/render/project.js';
-import { KIT_ROOT, capture, makeKit, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
+import { KIT_ROOT, capture, cleanEnv, makeKit, read, run, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
 
 const fixture = (name) => JSON.parse(readFileSync(join(KIT_ROOT, 'test/fixtures/setup-depth', name), 'utf8'));
 const NO_PROJECT = tmp('yaw-none-');
@@ -46,11 +46,76 @@ test('Full: github and ci follow the GitHub answer; git-hooks, decisions, sessio
   assert.deepEqual(off, on.filter((m) => m !== 'github' && m !== 'ci'));
 });
 
-test('Full: a team project always has github and ci, whatever the GitHub answer says', () => {
-  for (const github of [undefined, false]) {
+test('Full: team projects default to GitHub but can use local Git instead', () => {
+  for (const github of [undefined, true]) {
     const modules = render('node-cli', { mode: 'full', team: true, github }).modules;
     for (const m of ['team', 'github', 'ci', 'tasks', 'git-hooks']) assert.ok(modules.includes(m), `${m} with github=${github}`);
   }
+  const { modules, desired } = render('node-cli', { mode: 'full', team: true, github: false });
+  for (const m of ['github', 'ci', 'team']) assert.ok(!modules.includes(m));
+  for (const path of desired.keys()) assert.ok(!path.startsWith('.github/'), path);
+  assert.doesNotMatch(desired.get('TASKS.md').content.toString(), /Read-only/);
+  assert.doesNotMatch(desired.get('AGENTS.md').content.toString(), /Chat in "|Ask before risky|just pr|gh-protect/);
+});
+
+test('external reviewers use the same team facts and GitHub opt-out as teams', () => {
+  assert.deepEqual(deriveFacts({ 'idea.team': 'external-reviewers' }), { team: true, usesGitHub: true });
+  assert.deepEqual(deriveFacts({ 'idea.team': 'external-reviewers', 'tasks.use-github': false }), { team: true, usesGitHub: false });
+});
+
+test('a team setup without GitHub preserves and can push to a local bare remote', async () => {
+  const root = tmp('yaw-local-team-');
+  const remote = tmp('yaw-local-remote-');
+  const env = cleanEnv(tmp('yaw-home-'));
+  const git = (cwd, ...args) => {
+    const r = run('git', args, { cwd, env });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  git(remote, 'init', '--bare', '--quiet', '-b', 'main');
+  git(root, 'init', '--quiet', '-b', 'main');
+  git(root, 'remote', 'add', 'origin', remote);
+  const doc = answersFor('node-cli', { mode: 'full', team: true, github: false });
+  const modules = selectModules({ mode: doc.mode, facts: deriveFacts(doc.answers) });
+  await initProject({ root, answers: { doc, text: stringify(doc) }, modules });
+  assert.equal(git(root, 'remote', 'get-url', 'origin'), remote);
+  git(root, 'add', 'AGENTS.md', 'TASKS.md');
+  git(root, 'commit', '--quiet', '-m', 'initial local team setup');
+  git(root, 'push', '--quiet', '-u', 'origin', 'main');
+  assert.equal(git(remote, 'rev-parse', 'main'), git(root, 'rev-parse', 'HEAD'));
+});
+
+test('Quick and Full register exactly the expected hook modules and handoff skills for every agent', () => {
+  for (const agent of ['claude', 'codex', 'copilot']) {
+    for (const mode of ['quick', 'full']) {
+      const doc = answersFor('node-cli', { mode });
+      doc.answers['user.agents'] = [agent];
+      const modules = selectModules({ mode, facts: deriveFacts(doc.answers) });
+      const { desired } = renderInit({ root: NO_PROJECT, answersDoc: doc, modules });
+      const path = agent === 'codex' ? '.codex/hooks.json' : '.claude/settings.json';
+      const actual = [...new Set([...desired.get(path).content.toString().matchAll(/--module ([a-z-]+)/g)].map((m) => m[1]))].sort();
+      const expected = mode === 'quick' ? ['security', 'tasks'] : agent === 'copilot' ? ['security', 'sessions', 'tasks'] : ['comfort', 'decisions', 'security', 'sessions', 'tasks'];
+      assert.deepEqual(actual, expected, `${agent}/${mode}`);
+      const skills = [...desired.keys()].filter((p) => p.endsWith('/SKILL.md'));
+      assert.deepEqual(skills.sort(), mode === 'quick' ? [] : (agent === 'claude' ? ['.claude/skills/handoff/SKILL.md', '.agents/skills/handoff/SKILL.md'].sort() : ['.agents/skills/handoff/SKILL.md']));
+    }
+  }
+});
+
+test('expanding a real Quick project preserves its mode, answers and edited instructions', async () => {
+  const root = tmp('yaw-expand-');
+  const doc = answersFor('node-cli', { mode: 'quick' });
+  const modules = selectModules({ mode: doc.mode, facts: deriveFacts(doc.answers) });
+  await initProject({ root, answers: { doc, text: stringify(doc) }, modules });
+  const edited = `${read(root, 'AGENTS.md')}\nMy own rule: preserve this text.\n`;
+  writeFileSync(join(root, 'AGENTS.md'), edited);
+  const stderr = capture();
+  const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, env: cleanEnv(tmp('yaw-home-')), stdout: capture(), stderr, prompter: { ...scripted(), interactive: false } });
+  assert.equal(code, 0, stderr.text());
+  assert.equal(readAnswers(root).mode, 'quick');
+  assert.deepEqual(readAnswers(root).answers, doc.answers);
+  assert.deepEqual(readAnswers(root).proposal.modules, [...modules, 'git-hooks']);
+  assert.equal(read(root, 'AGENTS.md'), edited);
 });
 
 test('Full without GitHub keeps tasks local, whatever tasks.mode says', async () => {

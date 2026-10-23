@@ -103,6 +103,7 @@ export async function add({ values, positionals, io }) {
     }
   }
   io.stdout.write(`\nyaw add ${module}\n`);
+  if (module === 'team') io.stdout.write('  note: team enforcement uses GitHub issues and shared instructions; existing local tasks are not migrated. Review them before running yaw task sync.\n');
   // A question hidden by `when` (for example the team questions on a solo project) is listed, not dropped silently.
   const seenAnswers = { ...answersDoc.answers, ...newAnswers };
   for (const q of questions) {

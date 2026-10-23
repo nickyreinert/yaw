@@ -24,7 +24,7 @@ const SHOWN = 10;
 const SCAN = 500;
 
 function line(s) {
-  return `${s.id}  ${String(s.started).slice(0, 10)}  ${clean(s.title) || '(untitled)'}${s.branch ? `  [${clean(s.branch)}]` : ''}`;
+  return `${clean(s.id)}  ${clean(s.started).slice(0, 10)}  ${clean(s.title) || '(untitled)'}${s.branch ? `  [${clean(s.branch)}]` : ''}`;
 }
 
 function candidates(db, { root, all }) {
@@ -84,7 +84,7 @@ function resume(db, args) {
   if (found.length === 0) throw new SessionsUsageError(`no session "${clean(q)}"; try: yaw sessions find "<words>"`);
   if (found.length > 1) throw new SessionsUsageError(`"${clean(q)}" matches ${found.length} sessions; give more of the id:\n${found.slice(0, SHOWN).map(line).join('\n')}`);
   const s = found[0];
-  if (!SESSION_ID.test(s.id) || !AGENTS.includes(s.agent) || /[\u0000-\u001f\u007f]/.test(s.project)) throw new SessionsUsageError('this registry row looks damaged; not printing a command for it');
+  if (!SESSION_ID.test(s.id) || !AGENTS.includes(s.agent) || /[\u0000-\u001f\u007f-\u009f]/.test(s.project)) throw new SessionsUsageError('this registry row looks damaged; not printing a command for it');
   // Rebuilt from the agent and the id, never taken from the stored `resume` text (the database is not trusted).
   const command = resumeCommand(s.agent, s.id.slice(s.id.indexOf(':') + 1));
   return [line(s), `cd ${quote(s.project)} && ${command}`, ...(s.transcript ? [`transcript: ${clean(s.transcript)}`] : [])];
@@ -132,4 +132,3 @@ export function runSessions({ verb, args = [], values = {}, io }) {
   out.write(lines.length > 0 ? `${lines.join('\n')}\n` : 'no matching session\n');
   return 0;
 }
-

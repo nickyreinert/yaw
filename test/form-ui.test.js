@@ -322,7 +322,7 @@ test('web API: preset roundtrip preserves GitHub opt-out after its module is rem
   const first = await (await f.post('preview', input)).json();
   assert.equal(first.answers['tasks.use-github'], false);
   assert.ok(!first.modules.includes('github') && !first.modules.includes('ci'));
-  assert.ok(!first.visible.includes('tasks.use-github'), 'the retained answer must not reveal a disabled module question');
+  assert.ok(first.visible.includes('tasks.use-github'), 'GitHub selection belongs to tasks and stays available after opting out');
   assert.equal((await f.post('preset', { ...input, consent: true })).status, 200);
   const presets = readdirSync(join(f.home, '.yaw', 'presets'));
   const saved = parse(readFileSync(join(f.home, '.yaw', 'presets', presets[0]), 'utf8'));

@@ -99,9 +99,10 @@ function firstLine(body, max = 160) {
 }
 
 // Journal comments are written by `just task log`: marker, "<date> text", optional "Resume point: text".
-export function journalFromComments(comments) {
+export function journalFromComments(comments, owner) {
   const entries = [];
   for (const c of comments ?? []) {
+    if (!owner || typeof c.author?.login !== 'string' || c.author.login.toLowerCase() !== owner.toLowerCase()) continue;
     const body = normalise(c.body);
     if (!body.startsWith(JOURNAL_MARK)) continue;
     const lines = body.slice(JOURNAL_MARK.length).split('\n').map((l) => l.trim()).filter(Boolean);
@@ -113,9 +114,9 @@ export function journalFromComments(comments) {
   return entries;
 }
 
-export function viewFromIssues({ mine, open }) {
+export function viewFromIssues({ mine, open, owner }) {
   const active = mine.map((issue) => {
-    const entries = journalFromComments(issue.comments);
+    const entries = journalFromComments(issue.comments, owner);
     const task = { id: `#${issue.number}`, title: oneLine(issue.title), status: STATUS[labelValue(issue, 'status:')] ?? 'in progress' };
     const brief = firstLine(issue.body);
     if (brief) task.brief = brief;
@@ -146,9 +147,12 @@ export function viewFromIssues({ mine, open }) {
 const FIELD_LIST = 'number,title,body,labels,milestone,comments';
 
 export function fetchView(gh) {
+  const repo = json(gh(['repo', 'view', '--json', 'owner']), 'repository owner');
+  const owner = repo.owner?.login;
+  if (typeof owner !== 'string' || !owner) throw new GhError('gh returned no repository owner; task journals cannot be verified');
   const mine = json(gh(['issue', 'list', '--assignee', '@me', '--state', 'open', '--limit', '100', '--json', FIELD_LIST]), 'my issues');
   const open = json(gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,labels']), 'open issues');
-  return viewFromIssues({ mine, open });
+  return viewFromIssues({ mine, open, owner });
 }
 
 export function journalComment(text, { now = new Date(), resume } = {}) {

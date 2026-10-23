@@ -49,7 +49,10 @@ jobs:
             '' | *[!0-9A-Za-z.+-]*) echo "Unexpected kit version in .yaw/manifest.json: $kit" >&2; exit 1 ;;
           esac
           repo="${YAW_REPO:-https://github.com/nickyreinert/yaw.git}"
-          git clone --quiet --depth 1 --branch "v${kit}" "$repo" "$RUNNER_TEMP/yaw-src"
+          if ! GIT_TERMINAL_PROMPT=0 git clone --quiet --depth 1 --branch "v${kit}" "$repo" "$RUNNER_TEMP/yaw-src"; then
+            echo "Cannot install YAW v${kit}. Check that the tag exists and YAW_REPO is accessible to this runner. Private kit repositories need explicit read access; the project's checkout credentials do not grant access to a different repository. Alternatively vendor the kit in .yaw/lib." >&2
+            exit 1
+          fi
           bash "$RUNNER_TEMP/yaw-src/install.sh" --tag "v${kit}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: just setup

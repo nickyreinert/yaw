@@ -177,12 +177,13 @@ export function renderTasks(ledger) {
   return `${out.join('\n')}\n`;
 }
 
-// Where the tasks live (BD4, ADR-0010): team mode forces GitHub only; otherwise the answer to 10.1 decides.
+// Without GitHub tasks stay local, including teams using a local Git remote.
 export const TASK_MODES = ['local', 'github', 'both'];
 
-export function tasksMode(answers = {}) {
+export function tasksMode(answers = {}, { teamModule = false } = {}) {
+  if (teamModule) return 'github';
+  if (answers['tasks.use-github'] === false) return 'local';
   if ((answers['idea.team'] ?? 'solo') !== 'solo') return 'github';
-  if (answers['tasks.use-github'] === false) return 'local'; // no GitHub: tasks stay local (ADR-0032)
   const mode = answers['tasks.mode'];
   return TASK_MODES.includes(mode) ? mode : 'local';
 }

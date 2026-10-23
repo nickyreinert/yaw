@@ -273,14 +273,19 @@ export function cacheFile(env, info) {
 }
 
 // The cache of this worktree, or null (missing, unreadable, another schema or another tree).
-export function readCache(file, info) {
+export function readCache(file, info, { open = openSync } = {}) {
   if (!file) return null;
+  let fd;
   try {
-    const doc = JSON.parse(readFileSync(file, 'utf8'));
+    fd = open(file, constants.O_RDONLY | NOFOLLOW | constants.O_NONBLOCK);
+    if (!fstatSync(fd).isFile()) return null;
+    const doc = JSON.parse(readFileSync(fd, 'utf8'));
     if (doc.schema !== SCHEMA || doc.root !== info.top || doc.gitDir !== info.gitDir || typeof doc.files !== 'object') return null;
     return doc;
   } catch {
     return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 

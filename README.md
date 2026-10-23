@@ -69,7 +69,9 @@ For a local browser form instead of terminal questions, run `yaw init --web`. Th
 
 **Quick** is the minimal setup: `core`, `communication`, `standards`, `devenv`, `tasks` and minimal `security`. It provides project instructions, basic agent configuration, development commands and security guards without selecting GitHub-specific integrations.
 
-**Full** includes Quick plus `git-hooks`, `decisions`, `sessions`, `comfort` and `code-map`. The `github` and `ci` modules are selected when the project uses GitHub; `team` is selected for team projects. Full can also be customized in the interview. The legacy `standard` name remains an alias for Full.
+**Full** includes Quick plus `git-hooks`, `decisions`, `sessions`, `comfort` and `code-map`. The `github` and `ci` modules are selected when the project uses GitHub; the GitHub-specific `team` enforcement module is selected for teams and external reviewers using GitHub. Full can also be customized in the interview. The legacy `standard` name remains an alias for Full.
+
+Git and GitHub are separate choices. Answer **no** to "Use GitHub for the repo?" to use local tasks and Git without GitHub integrations, including team projects with a bare remote in another folder. YAW leaves your Git remotes unchanged. Existing team setups without this answer retain their GitHub defaults.
 
 ## Maintain a project
 
@@ -81,3 +83,5 @@ Run these commands from the project root:
 - `yaw add <module>` / `yaw remove <module>` — add or remove a module and its owned files.
 
 YAW preserves user-owned files and provides reconciliation choices when managed files have been edited.
+
+Adding or removing modules also updates `proposal.modules` in the saved answers, so reusing those answers selects the current modules. Existing answer values are retained. Invalid values for a selected module's questions are rejected before rendering or writing files.
