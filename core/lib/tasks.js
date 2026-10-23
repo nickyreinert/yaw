@@ -15,6 +15,16 @@ const FIELDS = [
 ];
 const LABEL_TO_KEY = new Map(FIELDS.map(([k, label]) => [label, k]));
 
+// Optional block of working rules for the agent, kept verbatim (#175).
+export const RULES_HEADING = '## How to work with this file';
+export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const MODEL_LINE = /^ {2}model: (\S(?:.*?\S)?)(?: · effort: (\S+))?$/;
+
+// "sonnet", "medium" -> "sonnet · effort: medium" (the Model / effort field of an active task)
+export function modelEffort(model, effort) {
+  return effort ? `${model} · effort: ${effort}` : model;
+}
+
 export class TasksError extends Error {
   constructor(reason, { file, line } = {}) {
     super(`${file ?? 'TASKS.md'}:${line}: ${reason}`);
@@ -58,11 +68,21 @@ export function parseTasksDocument(text, { file } = {}) {
       pointers.set('/readOnly', idx + 1);
       return;
     }
+    if (section === 'rules' && !line.startsWith('## ')) {
+      if (line.startsWith('#')) fail('a heading inside the rules must start with "## "', idx);
+      ledger.rules.push(line);
+      return;
+    }
     if (line.startsWith('## ')) {
       task = null;
       inJournal = false;
-      if (line === '## Active') {
-        if (section !== null) fail('"## Active" must be the first section', idx);
+      if (line === RULES_HEADING) {
+        if (section !== null) fail(`"${RULES_HEADING}" must come before "## Active"`, idx);
+        section = 'rules';
+        ledger.rules = [];
+        pointers.set('/rules', idx + 1);
+      } else if (line === '## Active') {
+        if (section !== null && section !== 'rules') fail('"## Active" must be the first section', idx);
         section = 'active';
         pointers.set('/active', idx + 1);
       } else if (line === '## Backlog') {
@@ -121,6 +141,17 @@ export function parseTasksDocument(text, { file } = {}) {
       return;
     }
     if (section === 'backlog') {
+      if (line.startsWith('  ')) {
+        const item = ledger.backlog.at(-1);
+        const m = MODEL_LINE.exec(line);
+        if (!item || !m) fail('expected "  model: <tier>[ · effort: <level>]" under a backlog line', idx);
+        if (item.model !== undefined) fail(`duplicate model line for ${item.id}`, idx);
+        if (m[2] !== undefined && !EFFORTS.includes(m[2])) fail(`effort must be one of ${EFFORTS.join(', ')}`, idx);
+        item.model = m[1];
+        if (m[2] !== undefined) item.effort = m[2];
+        pointers.set(`/backlog/${ledger.backlog.length - 1}/model`, idx + 1);
+        return;
+      }
       const m = /^- (\S+)(?: \(#(\d+)\))? (.+?)(?: — (.+))?$/.exec(line);
       if (!m) fail('expected "- <id> <title>[ — <note>]"', idx);
       const item = { id: m[1] };
@@ -136,7 +167,8 @@ export function parseTasksDocument(text, { file } = {}) {
 
   if (!sawTitle) fail('expected "# Tasks" as the first line', 0);
   const last = lines.findLastIndex((l) => l.trim() !== '');
-  if (section === null) fail('missing "## Active" section', last);
+  if (section === null || section === 'rules') fail('missing "## Active" section', last);
+  if (ledger.rules?.length === 0) fail('the rules section is empty', lines.findIndex((l) => l === RULES_HEADING));
   if (section === 'active') fail('missing "## Backlog" section', last);
   for (const t of ledger.active) {
     if (!t.journalSeen) delete t.journal;
@@ -152,6 +184,7 @@ export function parseTasksDocument(text, { file } = {}) {
 export function renderTasks(ledger) {
   const out = ['# Tasks', ''];
   if (ledger.readOnly) out.push(READ_ONLY_NOTICE, '');
+  if (ledger.rules?.length) out.push(RULES_HEADING, '', ...ledger.rules, '');
   out.push('## Active');
   for (const t of ledger.active) {
     const issue = t.issue !== undefined ? ` (#${t.issue})` : '';
@@ -172,6 +205,7 @@ export function renderTasks(ledger) {
     const issue = b.issue !== undefined ? ` (#${b.issue})` : '';
     const note = b.note !== undefined ? ` — ${b.note}` : '';
     out.push(`- ${b.id}${issue} ${b.title}${note}`);
+    if (b.model !== undefined) out.push(`  model: ${modelEffort(b.model, b.effort)}`);
   }
   if (ledger.archive !== undefined) out.push('', `## Done → ${ledger.archive}`);
   return `${out.join('\n')}\n`;

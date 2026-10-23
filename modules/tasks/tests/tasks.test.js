@@ -13,7 +13,7 @@ import { addModule, initProject, moduleQuestions, readAnswers, removeModule } fr
 import { declaredAgent, fixture, hook } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { archiveText, doneTask, localDate, logTask, newTask, nextLocalId, startTask } from '../lib/ledger.js';
-import { journalFromComments, syncBoth, viewFromIssues } from '../lib/github.js';
+import { issueBody, issueModel, journalFromComments, syncBoth, viewFromIssues } from '../lib/github.js';
 
 const GH = join(import.meta.dirname, 'fixtures', 'gh');
 const recorded = (name) => readFileSync(join(GH, name), 'utf8');
@@ -111,14 +111,17 @@ test('task mode: team forces github, the answer decides otherwise, local is the 
 
 // ---------------------------------------------------------------- install per mode
 
-test('install: local and both start with the canonical empty ledger; github with the read-only view', async () => {
-  const empty = { active: [], backlog: [] };
-  const local = renderTasks({ readOnly: false, ...empty, archive: 'TASKS.archive.md' });
-  const view = renderTasks({ readOnly: true, ...empty });
-  for (const [options, text] of [[{}, local], [{ mode: 'local' }, local], [{ mode: 'both' }, local], [{ mode: 'github' }, view], [{ mode: 'local', team: 'team' }, view]]) {
-    const root = await project(options);
-    assert.equal(read(root, 'TASKS.md'), text, JSON.stringify(options));
-    assert.deepEqual(parseTasks(read(root, 'TASKS.md')).active, []);
+test('install: local and both start with the canonical empty ledger; github with the read-only view; both carry the working rules (#175)', async () => {
+  for (const [options, readOnly] of [[{}, false], [{ mode: 'local' }, false], [{ mode: 'both' }, false], [{ mode: 'github' }, true], [{ mode: 'local', team: 'team' }, true]]) {
+    const text = read(await project(options), 'TASKS.md');
+    const ledger = parseTasks(text);
+    assert.equal(renderTasks(ledger), text, `canonical: ${JSON.stringify(options)}`);
+    assert.deepEqual({ readOnly: ledger.readOnly, active: ledger.active, backlog: ledger.backlog, archive: ledger.archive },
+      { readOnly, active: [], backlog: [], archive: readOnly ? undefined : 'TASKS.archive.md' }, JSON.stringify(options));
+    assert.deepEqual(ledger.rules.map((r) => /^\d\. \*\*(.+?):\*\*/.exec(r)[1]), ['Track', 'Finish', 'Model and effort', 'Specs and plans']);
+    assert.match(text, readOnly ? /`just task start #<n>` assigns the issue/ : /`just task start <id>` moves an item to Active as "in progress"/);
+    assert.match(text, readOnly ? /labels `model:<tier>` and `effort:/ : /`  model: sonnet · effort: medium` under a backlog item/);
+    assert.match(text, /`docs\/plan\/` holds temporary plans; delete a plan file and its link here/);
   }
 });
 
@@ -602,4 +605,55 @@ test('hook state stays outside the project', async () => {
   assert.ok(existsSync(join(home, '.yaw', 'state', 'tasks-stop.json')));
   assert.equal(existsSync(join(root, '.yaw', 'state')), false);
   mkdirSync(join(home, 'x'), { recursive: true });
+});
+
+test('model and effort (#175): new records them, start carries them over, list and next show them; bad values are plain errors', async () => {
+  const root = await project({ mode: 'local' });
+  assert.match((await task(root, ['new', 'Lobby chat', '--model', 'sonnet', '--effort', 'medium'])).out, /^T-001 Lobby chat \(model: sonnet · effort: medium\)$/m);
+  await task(root, ['new', 'Sound', '--model', 'haiku']);
+  await task(root, ['new', 'Plain']);
+  let text = read(root, 'TASKS.md');
+  assert.match(text, /^- T-001 Lobby chat\n {2}model: sonnet · effort: medium\n- T-002 Sound\n {2}model: haiku\n- T-003 Plain\n/m);
+  assert.match(text, /^## How to work with this file$/m, 'the rules survive every rewrite');
+  assert.match((await task(root, ['next'])).out, /^T-001 Lobby chat\n {2}model: sonnet · effort: medium\n$/);
+  await task(root, ['start', 'T-001']);
+  text = read(root, 'TASKS.md');
+  assert.match(text, /### T-001 Lobby chat — in progress \(0 %\)\n- \*\*Model \/ effort:\*\* sonnet · effort: medium\n/);
+  assert.match((await task(root, ['list'])).out, /T-001 Lobby chat — in progress \(0 %\)\n {4}model: sonnet · effort: medium\n/);
+  for (const [args, message] of [
+    [['--model', 'sonnet', '--effort', 'huge'], /--effort must be one of low, medium, high, xhigh, max/],
+    [['--effort', 'low'], /--effort needs --model/],
+    [['--model', ' '], /--model needs a tier name/],
+  ]) {
+    const r = await task(root, ['new', 'X', ...args]);
+    assert.equal(r.code, 1);
+    assert.match(r.err, message);
+  }
+  assert.equal(parseTasks(read(root, 'TASKS.md')).backlog.length, 2);
+});
+
+test('model and effort on GitHub (#175): labels or the body line; new writes the body line; the view keeps the rules', async () => {
+  assert.deepEqual(issueModel({ labels: [{ name: 'model:opus' }, { name: 'effort:high' }], body: '**Model / effort:** haiku' }), { model: 'opus', effort: 'high' });
+  assert.deepEqual(issueModel({ labels: [], body: 'Text\n\n**Model / effort:** sonnet · effort: low' }), { model: 'sonnet', effort: 'low' });
+  assert.deepEqual(issueModel({ labels: [], body: '**Model / effort:** haiku · effort: silly' }), { model: 'haiku' });
+  assert.deepEqual(issueModel({ labels: [] }), {});
+  assert.match(issueBody({ id: 'T-002', title: 'S', model: 'haiku', effort: 'low' }), /\*\*Model \/ effort:\*\* haiku · effort: low/);
+  const view = viewFromIssues({
+    mine: [{ number: 7, title: 'Mine', labels: [], body: '**Model / effort:** sonnet · effort: medium\n\nThe real brief.', comments: [] }],
+    open: [{ number: 8, title: 'Next', labels: [{ name: 'model:haiku' }, { name: 'effort:low' }] }],
+    owner: 'demo-dev',
+  });
+  assert.equal(view.active[0].model, 'sonnet · effort: medium');
+  assert.equal(view.active[0].brief, 'The real brief.');
+  assert.deepEqual(view.backlog[0], { id: '#8', title: 'Next', model: 'haiku', effort: 'low' });
+
+  const root = await project({ mode: 'github' });
+  const g = fakeGh();
+  await task(root, ['sync'], { gh: g.gh });
+  const ledger = parseTasks(read(root, 'TASKS.md'));
+  assert.equal(ledger.rules.length, 4, 'the generated view keeps the rules of the file');
+  assert.match(ledger.rules[0], /`just task start #<n>`/);
+  g.calls.length = 0;
+  await task(root, ['new', 'Lobby chat', '--model', 'sonnet', '--effort', 'high'], { gh: g.gh });
+  assert.deepEqual(g.calls[0], ['issue', 'create', '--title', 'Lobby chat', '--body', '**Model / effort:** sonnet · effort: high']);
 });

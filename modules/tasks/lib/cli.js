@@ -5,8 +5,8 @@
 
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
-import { parseTasks, renderTasks } from '../../../core/lib/tasks.js';
-import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, newTask, oneLine, startTask } from './ledger.js';
+import { modelEffort, parseTasks, renderTasks } from '../../../core/lib/tasks.js';
+import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, modelOption, newTask, oneLine, startTask } from './ledger.js';
 import { createIssue, defaultGh, fetchView, journalComment, syncBoth } from './github.js';
 
 export const TASKS_FILE = 'TASKS.md';
@@ -16,7 +16,7 @@ export const USAGE = [
   '       yaw task start <id>',
   '       yaw task log <id> "text" [--resume "next step"] [--progress 0-100]',
   '       yaw task done <id>',
-  '       yaw task new "title"',
+  '       yaw task new "title" [--model <tier>] [--effort low|medium|high|xhigh|max]',
   'ids: T-012 (local, both) or #41 (github)',
   'Configured Project Status (github start/done) and epic milestones (sync) require user-terminal confirmation.',
 ].join('\n');
@@ -63,6 +63,17 @@ export function checkArchivePath(root, file) {
 
 const writeLedger = (root, ledger) => writeFileSync(join(root, TASKS_FILE), renderTasks(ledger));
 
+// The generated GitHub view keeps the working rules of the current file (#175); a broken file just loses them.
+function writeView(root, view) {
+  let rules;
+  try {
+    rules = parseTasks(readIf(root, TASKS_FILE) ?? '').rules;
+  } catch {
+    rules = undefined;
+  }
+  writeLedger(root, rules ? { ...view, rules } : view);
+}
+
 // io: { root, stdout, stderr, env, gh, now }; mode: local | github | both (manifest.modules.tasks.mode).
 export async function runTask({ verb, args = [], values = {}, mode = 'local', io }) {
   const { root, stdout, stderr } = io;
@@ -76,7 +87,7 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
   // Rewrite the generated view; a failure here must not hide that the change itself worked.
   const refresh = () => {
     try {
-      writeLedger(root, fetchView(gh));
+      writeView(root, fetchView(gh));
     } catch (e) {
       stderr.write(`task: could not refresh ${TASKS_FILE} (${e.message})\n`);
     }
@@ -88,14 +99,14 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         const apply = await io.prepareWorkflow?.({ verb, gh });
         apply?.();
         const view = fetchView(gh);
-        writeLedger(root, view);
+        writeView(root, view);
         stdout.write(`${TASKS_FILE}: ${view.active.length} active, ${view.backlog.length} in the backlog\n`);
         return 0;
       }
       case 'list':
       case 'next': {
         try {
-          writeLedger(root, fetchView(gh));
+          writeView(root, fetchView(gh));
         } catch (e) {
           stderr.write(`task: using the last ${TASKS_FILE} (${e.message})\n`);
         }
@@ -139,7 +150,8 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         need(1, 'title');
         const title = oneLine(args[0]);
         if (title === '') throw new LedgerError('a task needs a title');
-        const n = createIssue(gh, title);
+        const hint = modelOption(values);
+        const n = createIssue(gh, title, hint.model ? `**Model / effort:** ${modelEffort(hint.model, hint.effort)}` : '');
         stdout.write(`#${n} ${title}\n`);
         refresh();
         return 0;
@@ -193,9 +205,9 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
     }
     case 'new': {
       need(1, 'title');
-      const item = newTask(ledger, args[0], readIf(root, ledger.archive ?? ARCHIVE) ?? '');
+      const item = newTask(ledger, args[0], readIf(root, ledger.archive ?? ARCHIVE) ?? '', values);
       writeLedger(root, ledger);
-      stdout.write(`${item.id} ${item.title}\n`);
+      stdout.write(`${item.id} ${item.title}${item.model ? ` (model: ${modelEffort(item.model, item.effort)})` : ''}\n`);
       return 0;
     }
   }

@@ -1,6 +1,8 @@
 // Operations on a local task ledger (TASKS.md, local and both mode; ADR-0010). Pure functions over the
 // parsed ledger of core/lib/tasks.js; the CLI reads and writes the files.
 
+import { EFFORTS, modelEffort } from '../../../core/lib/tasks.js';
+
 export const ARCHIVE = 'TASKS.archive.md';
 
 export class LedgerError extends Error {
@@ -19,6 +21,15 @@ export function localDate(now = new Date()) {
 // One line of free text for a ledger field: no line breaks, no padding.
 export function oneLine(text) {
   return String(text ?? '').replace(/\s+/g, ' ').trim();
+}
+
+// --model / --effort of `task new` (#175) -> { model?, effort? }; effort needs a model.
+export function modelOption({ model, effort } = {}) {
+  const m = model === undefined ? undefined : oneLine(model);
+  if (m === '' || (m !== undefined && /·/.test(m))) throw new LedgerError('--model needs a tier name, for example sonnet');
+  if (effort !== undefined && !EFFORTS.includes(effort)) throw new LedgerError(`--effort must be one of ${EFFORTS.join(', ')}`);
+  if (effort !== undefined && m === undefined) throw new LedgerError('--effort needs --model');
+  return { ...(m !== undefined ? { model: m } : {}), ...(effort !== undefined ? { effort } : {}) };
 }
 
 // "T-012", "t-12" or "12" -> "T-012"
@@ -71,11 +82,11 @@ function find(ledger, id) {
 }
 
 // Add to the end of the backlog. -> the new item
-export function newTask(ledger, title, archiveText = '') {
+export function newTask(ledger, title, archiveText = '', { model, effort } = {}) {
   requireLocal(ledger);
   const clean = oneLine(title).replace(/ — /g, ' - ');
   if (clean === '') throw new LedgerError('a task needs a title');
-  const item = { id: nextLocalId(ledger, archiveText), title: clean };
+  const item = { id: nextLocalId(ledger, archiveText), title: clean, ...modelOption({ model, effort }) };
   ledger.backlog.push(item);
   return item;
 }
@@ -95,7 +106,8 @@ export function startTask(ledger, input) {
   active.title = task.title;
   active.status = 'in progress';
   active.progress = 0;
-  if (task.note !== undefined) active.model = task.note;
+  if (task.model !== undefined) active.model = modelEffort(task.model, task.effort);
+  else if (task.note !== undefined) active.model = task.note;
   active.resume = 'Started; nothing logged yet.';
   ledger.active.push(active);
   return active;
@@ -146,16 +158,20 @@ export function formatLedger(ledger) {
   for (const t of ledger.active) {
     const progress = t.progress !== undefined ? ` (${t.progress} %)` : '';
     out.push(`  ${t.id} ${t.title} — ${t.status}${progress}`);
+    if (t.model) out.push(`    model: ${t.model}`);
     if (t.resume) out.push(`    resume: ${t.resume}`);
   }
   out.push('Backlog');
   if (ledger.backlog.length === 0) out.push('  (none)');
-  for (const b of ledger.backlog) out.push(`  ${b.id} ${b.title}${b.note ? ` — ${b.note}` : ''}`);
+  for (const b of ledger.backlog) {
+    out.push(`  ${b.id} ${b.title}${b.note ? ` — ${b.note}` : ''}`);
+    if (b.model) out.push(`    model: ${modelEffort(b.model, b.effort)}`);
+  }
   return `${out.join('\n')}\n`;
 }
 
 export function formatNext(ledger) {
   const b = ledger.backlog[0];
   if (!b) return 'No tasks in the backlog.\n';
-  return `${b.id} ${b.title}${b.note ? ` — ${b.note}` : ''}\n`;
+  return `${b.id} ${b.title}${b.note ? ` — ${b.note}` : ''}\n${b.model ? `  model: ${modelEffort(b.model, b.effort)}\n` : ''}`;
 }

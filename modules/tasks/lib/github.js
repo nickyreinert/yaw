@@ -5,6 +5,7 @@
 //   github mode: viewFromIssues() issues -> generated read-only ledger; journal lines are issue comments
 
 import { GhError, defaultGh } from '../../../core/lib/gh.js';
+import { EFFORTS, modelEffort } from '../../../core/lib/tasks.js';
 import { localDate, oneLine, parseArchive } from './ledger.js';
 
 export { GhError, defaultGh };
@@ -29,7 +30,9 @@ const FIELDS = [['brief', 'Brief'], ['model', 'Model / effort'], ['spec', 'Spec'
 
 export function issueBody(task) {
   const lines = [taskMark(task.id), ''];
-  for (const [key, label] of FIELDS) if (task[key] !== undefined) lines.push(`**${label}:** ${task[key]}`, '');
+  // A backlog item keeps model and effort apart (#175); the issue gets the one Model / effort line.
+  const fields = task.effort !== undefined ? { ...task, model: modelEffort(task.model, task.effort) } : task;
+  for (const [key, label] of FIELDS) if (fields[key] !== undefined) lines.push(`**${label}:** ${fields[key]}`, '');
   if (task.progress !== undefined) lines.push(`**Progress:** ${task.progress} %`, '');
   lines.push('_Mirrored from TASKS.md by yaw (one way). Edit the task there; changes here are overwritten._');
   return lines.join('\n');
@@ -90,8 +93,23 @@ const STATUS = { todo: 'todo', 'in-progress': 'in progress', blocked: 'blocked',
 const labelNames = (issue) => (issue.labels ?? []).map((l) => (typeof l === 'string' ? l : l.name));
 const labelValue = (issue, prefix) => labelNames(issue).find((n) => n.startsWith(prefix))?.slice(prefix.length);
 
+const MODEL_BODY = /^\*\*Model \/ effort:\*\* (.+)$/m;
+
+// Model tier and effort of an issue (#175): labels model:<tier> and effort:<level>, else the body line
+// "**Model / effort:** sonnet · effort: medium". -> { model?, effort? }
+export function issueModel(issue) {
+  const label = labelValue(issue, 'model:');
+  const effort = labelValue(issue, 'effort:');
+  if (label) return { model: oneLine(label), ...(EFFORTS.includes(effort) ? { effort } : {}) };
+  const m = MODEL_BODY.exec(normalise(issue.body));
+  if (!m) return {};
+  const [, tier, level] = /^(.+?)(?: · effort: (\S+))?$/.exec(oneLine(m[1]));
+  return { model: tier, ...(EFFORTS.includes(level) ? { effort: level } : {}) };
+}
+
 function firstLine(body, max = 160) {
   for (const raw of normalise(body).split('\n')) {
+    if (MODEL_BODY.test(raw)) continue;
     const line = oneLine(raw.replace(/^[#>*\-\s]+/, '').replace(/<!--.*?-->/g, ''));
     if (line) return line.length > max ? `${line.slice(0, max - 1)}…` : line;
   }
@@ -120,6 +138,8 @@ export function viewFromIssues({ mine, open, owner }) {
     const task = { id: `#${issue.number}`, title: oneLine(issue.title), status: STATUS[labelValue(issue, 'status:')] ?? 'in progress' };
     const brief = firstLine(issue.body);
     if (brief) task.brief = brief;
+    const hint = issueModel(issue);
+    if (hint.model) task.model = modelEffort(hint.model, hint.effort);
     if (issue.milestone?.title) task.spec = `Milestone ${oneLine(issue.milestone.title)}`;
     const resume = [...entries].reverse().find((e) => e.resume)?.resume;
     if (resume) task.resume = resume;
@@ -139,6 +159,7 @@ export function viewFromIssues({ mine, open, owner }) {
       const item = { id: `#${i.number}`, title: oneLine(i.title) };
       const note = [labelValue(i, 'priority:'), labelValue(i, 'estimate:')].filter(Boolean).join(' · ');
       if (note) item.note = note;
+      Object.assign(item, issueModel(i));
       return item;
     });
   return { readOnly: true, active, backlog };
@@ -151,7 +172,7 @@ export function fetchView(gh) {
   const owner = repo.owner?.login;
   if (typeof owner !== 'string' || !owner) throw new GhError('gh returned no repository owner; task journals cannot be verified');
   const mine = json(gh(['issue', 'list', '--assignee', '@me', '--state', 'open', '--limit', '100', '--json', FIELD_LIST]), 'my issues');
-  const open = json(gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,labels']), 'open issues');
+  const open = json(gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,labels,body']), 'open issues');
   return viewFromIssues({ mine, open, owner });
 }
 
@@ -163,8 +184,8 @@ export function journalComment(text, { now = new Date(), resume } = {}) {
 }
 
 // "#41 Title" from `gh issue create` output (a URL).
-export function createIssue(gh, title) {
-  const url = gh(['issue', 'create', '--title', title, '--body', '']);
+export function createIssue(gh, title, body = '') {
+  const url = gh(['issue', 'create', '--title', title, '--body', body]);
   const m = /\/issues\/(\d+)\s*$/.exec(url.trim());
   if (!m) throw new GhError('gh issue create did not print the issue URL');
   return Number(m[1]);

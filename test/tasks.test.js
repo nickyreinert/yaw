@@ -7,7 +7,7 @@ import { EXAMPLES_DIR } from '../core/schema/validate.js';
 
 const example = (name) => readFileSync(join(EXAMPLES_DIR, 'tasks', name), 'utf8');
 
-for (const name of ['local.md', 'both.md', 'github-view.md']) {
+for (const name of ['local.md', 'both.md', 'github-view.md', 'with-rules.md']) {
   test(`${name} round-trips (text -> ledger -> text)`, () => {
     const text = example(name);
     const ledger = parseTasks(text);
@@ -96,3 +96,33 @@ for (const [name, text, line, re] of broken) {
     });
   });
 }
+
+test('rules and model lines (#175): kept verbatim, model and effort per backlog item', () => {
+  const { value: l, lines } = parseTasksDocument(example('with-rules.md'));
+  assert.deepEqual(l.rules, [
+    '1. **Track:** `just task start <id>` moves an item to Active as "in progress".',
+    '2. **Model and effort:** every item names a suggested model tier and reasoning effort.',
+  ]);
+  assert.equal(l.active[0].model, 'sonnet · effort: medium');
+  assert.deepEqual(l.backlog, [
+    { id: 'T-022', title: 'Sound effects', note: 'docs/plan/sound.md', model: 'haiku', effort: 'low' },
+    { id: 'T-023', title: 'Release notes', model: 'opus' },
+  ]);
+  assert.equal(lines.get('/rules'), 3);
+  assert.equal(lines.get('/backlog/0/model'), 15);
+});
+
+test('rules and model lines: errors name the line', () => {
+  const cases = [
+    ['rules after Active', '# Tasks\n\n## Active\n\n## How to work with this file\n\n1. x\n\n## Backlog\n', 5, /must come before "## Active"/],
+    ['empty rules', '# Tasks\n\n## How to work with this file\n\n## Active\n\n## Backlog\n', 3, /rules section is empty/],
+    ['only rules', '# Tasks\n\n## How to work with this file\n\n1. x\n', 5, /missing "## Active"/],
+    ['heading inside rules', '# Tasks\n\n## How to work with this file\n\n### x\n', 5, /heading inside the rules/],
+    ['model line first', '# Tasks\n\n## Active\n\n## Backlog\n  model: opus\n', 6, /under a backlog line/],
+    ['bad effort', '# Tasks\n\n## Active\n\n## Backlog\n- T-001 A\n  model: opus · effort: huge\n', 7, /effort must be one of low, medium, high, xhigh, max/],
+    ['two model lines', '# Tasks\n\n## Active\n\n## Backlog\n- T-001 A\n  model: opus\n  model: haiku\n', 8, /duplicate model line for T-001/],
+  ];
+  for (const [name, text, line, reason] of cases) {
+    assert.throws(() => parseTasks(text, { file: 'TASKS.md' }), (e) => e instanceof TasksError && e.line === line && reason.test(e.reason), name);
+  }
+});

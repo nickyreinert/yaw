@@ -35,15 +35,18 @@ Grammar, typing and rejected features: ADR-0001. In short: maps, lists, plain an
 `TASKS.md` grammar (BD4, doc 10 §2). Lines not listed here are errors (`TASKS.md:<line>: <reason>`); blank lines are free.
 
 ```text
-file        = "# Tasks" [notice] active backlog [done]
+file        = "# Tasks" [notice] [rules] active backlog [done]
 notice      = "> " text                                  ; GitHub view only, fixed text when generated
+rules       = "## How to work with this file" { text }  ; working rules for the agent, kept verbatim (#175)
 active      = "## Active" { task }
 task        = "### " id [" (#" number ")"] " " title " — " status [" (" percent " %)"]
               { "- **" field ":** " text }
               [ "- **Journal:**" { "  - " YYYY-MM-DD " " text } ]
 field       = "Brief" | "Model / effort" | "Spec" | "Resume point"
 status      = "todo" | "in progress" | "blocked" | "in review"
-backlog     = "## Backlog" { "- " id [" (#" number ")"] " " title [" — " note] }
+backlog     = "## Backlog" { "- " id [" (#" number ")"] " " title [" — " note]
+                             [ "  model: " tier [" · effort: " effort] ] }
+effort      = "low" | "medium" | "high" | "xhigh" | "max"
 done        = "## Done → " path                          ; one-line archive entries live in that file
 ```
 
@@ -53,7 +56,9 @@ done        = "## Done → " path                          ; one-line archive en
 | both | `T-NNN` | `T-012 (#34)` once synced | source of truth |
 | GitHub only / team | `#123` | – (the ID is the issue) | generated, read-only, starts with the notice |
 
-The parsed form (`tasks.schema.json`) is `{ readOnly, active[], backlog[], archive? }`; `renderTasks(parseTasks(text))` gives the canonical text back (`core/lib/tasks.js`).
+Model tier and effort (#175): a backlog item carries them on its indented `model:` line (`just task new "title" --model sonnet --effort medium`); `just task start` copies them into the "Model / effort" field as `sonnet · effort: medium`. On GitHub they are the labels `model:<tier>` and `effort:<level>`, or the body line `**Model / effort:** sonnet · effort: medium` (`just task new` writes it); both-mode sync writes that body line. The rules section is written by `yaw init` (local and GitHub wording) and is kept when the GitHub view is regenerated.
+
+The parsed form (`tasks.schema.json`) is `{ readOnly, active[], backlog[], archive?, rules? }`; `renderTasks(parseTasks(text))` gives the canonical text back (`core/lib/tasks.js`).
 
 ## Normalised hook event
 
