@@ -33,11 +33,11 @@ Work is on `fix/local-backlog` in the `_YAW-y74` worktree, based on `release/v0.
 | #112, #113, #114, #133 | Raw API/issue/Project permission prompts expanded; PTY limits documented in ADR-0048. Private-kit CI clone failures have actionable errors. Ruleset apply requires remote check names to have reported before any mutation; preflight tests use injected responses only. Live verification remains pending. |
 | #119, #120, #121, #122, #124, #142 | Critical titles are bounded quoted data, retired statuses match case-insensitively, terminal IDs are cleaned or rejected, C1 controls cannot enter resume commands, relative registry homes fail before permission changes, and cache reads use no-follow regular-file descriptors. |
 | #125, #131 | Already implemented before this follow-up; existing missing-tool hint and background-check tests pass locally. The plan already names `comfort.yaml` (ADR-0030), not a stale notification config. |
-| #116 | macOS restored in the checked-in Node 22.13/24 CI matrix, prepared locally only. Hosted execution stays deferred until November. |
+| #116 | macOS is enabled in the checked-in Node 22.13/24 CI matrix and the exact Node 22.13.0 + 24.22.1 runs pass locally on macOS. Ticket closed on local evidence; hosted execution remains deferred until November. |
 | #123 | Further mitigated locally: ledger descriptor identity rejects replacement files reached through swapped parents/roots before reading; directory chmod uses validated descriptors; registry creation requires private owner-controlled storage, checked ancestry and safe SQLite sidecars. Database descriptor identity is checked before chmod, and persistent SQLite-open replacements fail before migrations. **Still open:** Node's `DatabaseSync` accepts only a pathname, not the validated descriptor; transient swaps, ACL attestation and same-user isolation are not guaranteed. User chose zero-dependency mitigations over a native dependency; see ADR-0029's filesystem boundary. |
 | #94, #107 | Still open: real agent payloads and live `gh` output cannot be certified by invented fixtures. No external agent/API calls were made to manufacture these. |
 | #110 | Implemented locally (ADR-0049): five issue forms and three planning skills; guarded optional GitHub task Status updates (start → In progress, done → In review); guarded explicit epic-to-milestone mappings for sync; profile-aware, namespaced Dependabot updates; all kit action references SHA-pinned. Read-only preflight precedes writes, refusal blocks task mutations, cross-repository children/conflicting mappings are refused, unchanged milestone assignments make no writes. Synthetic CLI and generated-output tests pass; live GitHub execution remains deferred. |
-| #82, #85 | Release publication and the hosted matrix remain open as requested. #85's Linux part passed locally (see below); `curl` from the published tag and a macOS-like container remain open. |
+| #82, #85 | Local tag/install acceptance is complete: `v0.1.0` remains local, and tagged install + Quick setup passes in Linux containers and a fresh macOS HOME. No tag was pushed or published; GitHub-hosted verification remains deferred. |
 
 Validation: `YAW_TEST_OFFLINE=1 YAW_KIT="$PWD" just check` passed on Node 22.21.1/macOS: **704 passed, 13 skipped, 0 failed**; `npm run validate` passed **27/27**. Decisions (48 records) and adapter sync pass. Skips and the missing-shellcheck warning are not counted as coverage. No functioning local Node 24 runtime is available (the Homebrew `node@24` path resolves to a broken Node 25 installation); Node 22.13/24 execution remains pending without modifying the shared tool installation.
 
@@ -55,7 +55,7 @@ Local runtime/platform pass (user-approved tools: official Node 24.22.1 tarball 
 - `shellcheck` on every tracked `*.sh` (the kit-ci command): clean. kit-ci's `install-in-container` job reproduced in `node:22.13-bookworm`: `test/install.test.js` 4/4.
 - #85 Linux part: in clean `node:22-trixie` and `node:24-trixie` containers, the `v0.1.0` tag's `install.sh` piped to bash (`YAW_REPO` = local clone, `--tag v0.1.0`), then `yaw --version` (0.1.0), Quick `yaw init` with `examples/node-cli/answers.yaml` (setup and check verified) and `just check` passed.
 - Closed on this evidence: #10, #22, #33, #34, #35, #36, #37, #38 (ADR location superseded by BD7/ADR-0028), #42, #43, #44, #48, #70, #71, #72, #73, #75, #134, then trackers #30, #39 and #49 once all sub-issues were closed. Read-back: **14 issues remain open**.
-- Still open: #19 (sub-issue #21 needs hosted CI on macOS + Linux runners; its own acceptance passed locally), #21, #60 (hosted CI matrix; both PHP profiles now pass locally), #85, #3 (live state matches; the bootstrap re-run is not reproducible without the original script), #82, #94, #107, #116, #123.
+- At that point, still open: #19 (sub-issue #21), #21, #60, #85, #3, #82, #94, #107, #116, #123.
 - Findings filed (user-approved issue creation): #159 (form cookie `Max-Age`, P2) and #160 (`O_NOFOLLOW` for `~/.yaw` writes, P2) from Y-7.7; #161 (Y-8.1 HIGH finding, fixed under ADR-0046, closed after canary tests 44/44). Then closed #76, #78, #69 (parity and form-server tests 27/27) and #77. At that point, 12 issues remained open; the follow-up below closes #159 and #160.
 
 Local follow-up for #159 and #160 (2026-10-23):
@@ -63,7 +63,13 @@ Local follow-up for #159 and #160 (2026-10-23):
 - #160 uses `O_NOFOLLOW` for user-store file reads and writes; verifies regular-file and inode identity after opening; and applies file/directory modes through validated descriptors. The `.yaw` and `presets` directories are also checked with no-follow directory descriptors. Symlink tests cover user-profile, preset, history and `.yaw` targets and assert that outside targets stay unchanged.
 - Installed PHP 8.5.12 and Composer 2.10.3 for local testing. The `php-web` and `wordpress-plugin` profile smoke tests pass (2/2).
 - Full `just check` passes on macOS Node 22.21.1 and Node 24.22.1: each **731 passed, 4 skipped, 0 failed** (735 tests). Remaining skips need lefthook/gitleaks. `npm run validate` passes 27/27; decision index (49 records) and adapter sync pass.
-- Closed #159 and #160 with local test evidence; no push, PR, release or hosted workflow. **10 issues remain open:** #3, #19, #21, #60, #82, #85, #94, #107, #116, #123.
+- Closed #159 and #160 with local test evidence; no push, PR, release or hosted workflow. At that point, 10 issues remained open.
+
+Local matrix follow-up (2026-10-23):
+- Exact macOS workflow floor: checksum-verified Node 22.13.0 in `~/.local/node22.13`; full online `just check` passes on macOS Node 22.13.0 and 24.22.1, each **731 passed, 4 skipped, 0 failed**. The four skips require lefthook/gitleaks. All nine profile smoke tests ran, including PHP/Composer and Android/JDK 21. Node 22.21.1 also passes the same full check.
+- Linux Docker test matrix: `npm test` on Node 22.13.1/Bookworm and Node 24.22.1/Bookworm, offline, each **699 passed, 36 skipped, 0 failed**; schema validation 27/27 on each. The skips reflect offline/missing optional tools. Linux ShellCheck 0.10.0 passes every tracked shell script. The Node 22.13 Bookworm `install-in-container` test passes 4/4.
+- Tagged install smoke: in clean Node 22 and Node 24 Trixie containers, `curl file:///src/install.sh | bash` from the local `v0.1.0` tag, followed by `yaw --version`, Quick `yaw init`, and `just check`, passes. On macOS the local tag install passed with a fresh temporary HOME (native host, not a macOS container).
+- Closed #19, #21, #60, #82, #85 and #116 with explicit local-evidence comments. No GitHub Actions workflow was triggered, and no tag was pushed or published. **Four issues remain open:** #3 (bootstrap idempotence cannot be rerun from the missing original script), #94 (needs real agent payloads, including unavailable Codex/Copilot sessions), #107 (needs live `gh` fixtures from a writable test repository), and #123 (the user-retained SQLite pathname race; see ADR-0029).
 
 ---
 
@@ -267,14 +273,14 @@ Status: **implemented, awaiting the user's ADR review** (PR #87). All 24 example
 
 ### Step 2 — Kit skeleton, install, update
 
-Status: **implemented, awaiting the user's ADR review and a green kit-ci run** (PR #89). Done-when met locally: install → init (core only) → update → remove passes in `test/install.test.js` (temp HOME and project); `install.sh` second run changes nothing; `shellcheck install.sh` clean (0.10.0). `npm test` 215/215 on Node 22.13.0 and 24.22.0 (macOS). Open: ADRs 0004, 0006, 0008, 0014, 0019 accepted (Y-2.1); kit-ci on GitHub incl. the container job (Y-2.2, Y-2.3).
+Status: **implemented and locally verified**; hosted kit-ci remains deferred (PR #89). Install → init (core only) → update → remove passes in `test/install.test.js`; the second install is a no-op; shellcheck is clean. Full local tests pass on macOS Node 22.13.0/24.22.1 and Linux Node 22.13.1/24.22.1 containers (the offline Linux suites have documented skips). The clean Linux tag-install smoke also passes.
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
 | Y-2 | Step 2: kit skeleton, install, update | Epic | P0 | Y-1 | install → init (empty) → update → remove passes in a temp-dir test; `install.sh` idempotent and `shellcheck`-clean |
 | Y-2.1 | ADRs 0004, 0006, 0008, 0014 (written + ADR-0019; awaiting acceptance) | Chore | P0 | Y-1 | Accepted; 0008 records BD11 |
-| Y-2.2 | Kit repo layout + test runner + kit CI (written; CI run pending) | Chore | P0 | Y-2.1 | Layout per D01 §2 (adjusted by ADR-0014); `node --test` on Node 22 + 24 and `shellcheck` in CI; macOS + Linux runners |
-| Y-2.3 | `install.sh` (done locally; container job pending in CI) | Feature | P0 | Y-2.2 | Checks git/node (≥ 22.13)/just, prints install hints, never installs; clones or fetches into `~/.yaw/kit`; `--tag <kit>` (BD10) and `--channel main`; links into `~/.local/bin` or prints a PATH line; no `sudo`; second run is a no-op; tested in a container |
+| Y-2.2 | Kit repo layout + test runner + kit CI (locally verified; hosted run pending) | Chore | P0 | Y-2.1 | Layout per D01 §2 (adjusted by ADR-0014); local Node 22.13/24 tests on macOS + Linux, Linux shellcheck; hosted workflow remains deferred |
+| Y-2.3 | `install.sh` (**done locally**) | Feature | P0 | Y-2.2 | Checks git/node (≥ 22.13)/just, prints install hints, never installs; clones or fetches into `~/.yaw/kit`; `--tag <kit>` (BD10) and `--channel main`; links into `~/.local/bin` or prints a PATH line; no `sudo`; second run is a no-op; tested in clean Linux containers and fresh macOS HOME |
 | Y-2.4 | CLI entry (`bin/yaw`), arg parsing, `--version`, help (**done**) | Feature | P0 | Y-2.2 | `parseArgs`-based; unknown command exits 1 with usage; phase-1 command list fixed (S2) |
 | Y-2.5 | Render engine + manifest writer (**done**) | Feature | P0 | Y-1.4, Y-1.6, Y-2.1 | Atomic writes; rejects paths escaping the project (traversal tests); every written file recorded with SHA-256 |
 | Y-2.6 | `yaw update` keep/take/merge (**done**) | Feature | P0 | Y-1.5, Y-2.5 | Unedited files updated silently; edited files show a diff and offer keep/take/merge; conflicts left marked and reported; non-interactive flag documented |
@@ -338,7 +344,7 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
-| Y-6 | Step 6: remaining profiles | Epic | P1 | Y-5 | All 9 profiles green in the CI matrix (`yaw init` + `just check`) |
+| Y-6 | Step 6: remaining profiles | Epic | P1 | Y-5 | All 9 profile smoke tests pass locally on macOS Node 22.13.0 and 24.22.1; hosted CI matrix execution remains deferred |
 | Y-6.1 | `static-site` (#61, ADR-0034) | Feature | P1 | Y-3.4 | **done**: profile (html-validate, stylelint, local link check; Lighthouse budget and screenshot not included), fixtures in `test/profiles/static-site/`, smoke test in `test/profiles.test.js`, CI matrix job `profile` in `kit-ci.yml` |
 | Y-6.2 | `python-web` (#62, ADR-0035) | Feature | P1 | Y-3.4 | **done**: FastAPI profile (ruff + bandit, pyright, pytest, pip-audit, Dockerfile; no database, alembic, compose or screenshot yet), fixtures in `test/profiles/python-web/`, smoke test in `test/profiles.test.js`, `python-web` in the CI matrix job `profile` |
 | Y-6.3 | `node-ts-vercel` | Feature | P1 | Y-3.4 | same |
@@ -375,10 +381,10 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
-| Y-9 | Step 9: release v0.1.0 | Epic | P0 | Y-8 | **local release candidate**: local-only tag `v0.1.0` created; install from that tag passed on macOS in a fresh temporary HOME. Linux clean-container verification and hosted CI remain deferred until November; nothing was pushed or published. |
+| Y-9 | Step 9: release v0.1.0 | Epic | P0 | Y-8 | **local release candidate**: local-only tag `v0.1.0` created; install from that tag passed on macOS in a fresh temporary HOME and Linux Node 22/24 containers. Hosted CI/publication remain deferred until November; nothing was pushed or published. |
 | Y-9.1 | README (install, read-then-run variant, SHA256, quick start, Quick vs. Full, macOS/Linux/WSL, Node ≥ 22.13) | Chore | P0 | Y-3.1 | **done locally**: README documents supported runtimes, install and inspect-before-run commands with the installer SHA-256, Quick/Full module contents, setup, secret-handling, and maintenance commands. Digest verified against `install.sh`; matches `kickoff/04-modules.md`. |
 | Y-9.2 | CHANGELOG | Chore | P1 | – | **done locally**: `CHANGELOG.md` records the v0.1.0 additions and security behavior in Keep-a-Changelog format. |
-| Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | **partially verified locally**: installed local tag `v0.1.0` into a fresh temporary HOME on macOS; `yaw --version`, `yaw doctor`, Quick `yaw init`, `just setup` and `just check` passed. Linux-container and hosted CI runs are deferred until November (no GitHub access used). |
+| Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | **verified locally**: tagged `install.sh` via `curl file://` in clean Linux Node 22/24 containers, then `yaw --version`, Quick `yaw init` and `just check`; native macOS fresh-HOME install also passed. No macOS container or hosted workflow was used. |
 
 ### Not in phase 1 (label `later`)
 
