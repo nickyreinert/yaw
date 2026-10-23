@@ -30,6 +30,8 @@ export function isAdapterPath(path) {
 // .claude/settings.json is read by Claude and by Copilot.
 export function pathWanted(path, agents) {
   if (path === CLAUDE_SETTINGS) return agents.includes('claude') || agents.includes('copilot');
+  // Codex and Copilot read AGENTS.md directly; CLAUDE.md only imports it for Claude Code (#169).
+  if (path === 'CLAUDE.md') return agents.includes('claude');
   if (path.startsWith('.claude/')) return agents.includes('claude');
   if (path.startsWith('.codex/')) return agents.includes('codex');
   return true;

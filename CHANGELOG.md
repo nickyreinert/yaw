@@ -12,6 +12,8 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Fixed
 
+- `CLAUDE.md` is only written when Claude Code is a selected agent; Codex and Copilot read `AGENTS.md` (#169).
+- The generated `.gitignore` ignores machine-local YAW files: the web-form draft `.yaw/draft.yaml`, and `.claude/settings.local.json` when Claude is selected (#170).
 - The local form session cookie has an explicit `Max-Age` no longer than the server's idle timeout.
 - User profile, preset and history access refuses symlinked files and directories; file modes are set through validated descriptors.
 - GitHub is optional for team and external-reviewer setups, including projects with a local bare Git remote. CLI and browser selection stay identical.

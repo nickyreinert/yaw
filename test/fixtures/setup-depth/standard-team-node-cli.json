@@ -37,7 +37,7 @@
     ".github/pull_request_template.md": "4b8654fa19b3dc1931a95d253e6dc5abd41ce1ecc89248d90926d5e91953e8f6",
     ".github/workflows/pr-policy.yml": "9776e3613dfaebe69ee585e6a2a8a1dc9888da3836cc1cf0aa74fa0316e1f24c",
     ".github/workflows/quality-gate.yml": "fa6be19eb2b4b3f70eef264fe79101fe80e1547decbdafb898fc9d8f1c61a91a",
-    ".gitignore": "8bededefe271caa434d0463c6375820ac4447bfbbed86535b2213f8f02436f8c",
+    ".gitignore": "346f41c1fb2edca34c44931b4039239b60315db71422aeec2edd864273bfc1ec",
     ".lefthook/pre-push/yaw-default-branch.sh": "65dd84929b0638d5ff1799c08776a0b1a886210f1ed2f2765e50bae678724890",
     ".yaw/bin/yaw-hook": "01febb1801037c0ef003a421071023a3b75920fb127977bdc4806d0dfb19e928",
     ".yaw/github.yaml": "372030785a6cbb24911bc715d8939cf6b79b0bf893ddd89a0e1cdd6e06283287",

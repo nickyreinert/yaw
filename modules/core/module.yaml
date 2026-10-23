@@ -1,11 +1,11 @@
 # modules/core/module.yaml (Y-3.2)
 name: core
-description: AGENTS.md, CLAUDE.md, justfile and the manifest.
+description: AGENTS.md, CLAUDE.md, .gitignore, justfile and the manifest.
 depends: []
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:
-  templates: [AGENTS.md, CLAUDE.md, justfile]
+  templates: [AGENTS.md, CLAUDE.md, .gitignore, justfile]
 agentsMd: |
   - Start every task by reading `TASKS.md` (if present) and running decision retrieval (if enabled).
   - Run `just check` before you report a task as done; `just --list` shows all recipes.

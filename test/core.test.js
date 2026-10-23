@@ -51,6 +51,28 @@ test('CLAUDE.md imports AGENTS.md and nothing else', async () => {
   assert.equal(read(await init(), 'CLAUDE.md'), '@AGENTS.md\n');
 });
 
+test('CLAUDE.md is only written when Claude is a selected agent (#169)', async () => {
+  for (const agents of ['[codex]', '[copilot]', '[codex, copilot]']) {
+    const root = await init(ANSWERS_YAML.replace('user.agents: [claude]', `user.agents: ${agents}`));
+    assert.equal(existsSync(join(root, 'CLAUDE.md')), false, agents);
+    assert.ok(existsSync(join(root, 'AGENTS.md')), agents);
+  }
+  const both = await init(ANSWERS_YAML.replace('user.agents: [claude]', 'user.agents: [codex, claude]'));
+  assert.equal(read(both, 'CLAUDE.md'), '@AGENTS.md\n');
+});
+
+test('machine-local YAW files are git-ignored; committed YAW files are not (#170)', { skip: !hasTool('git') && 'git is not installed' }, async () => {
+  const ignored = (root, path) => run('git', ['check-ignore', '--quiet', path], { cwd: root }).status === 0;
+  const claude = await init();
+  run('git', ['init', '-q'], { cwd: claude });
+  for (const p of ['.yaw/draft.yaml', '.claude/settings.local.json']) assert.ok(ignored(claude, p), p);
+  for (const p of ['.yaw/answers.yaml', '.yaw/manifest.json', '.yaw/base/AGENTS.md', 'AGENTS.md']) assert.equal(ignored(claude, p), false, p);
+  const codex = await init(ANSWERS_YAML.replace('user.agents: [claude]', 'user.agents: [codex]'));
+  run('git', ['init', '-q'], { cwd: codex });
+  assert.ok(ignored(codex, '.yaw/draft.yaml'));
+  assert.doesNotMatch(read(codex, '.gitignore'), /\.claude/);
+});
+
 test('justfile: core frame, one import per profile, composed in marked blocks (ADR-0004)', async () => {
   const root = await init();
   assert.equal(read(root, 'justfile'), [
@@ -67,7 +89,17 @@ test('justfile: core frame, one import per profile, composed in marked blocks (A
     '# /yaw:node-cli',
     '',
   ].join('\n'));
-  assert.equal(read(root, '.gitignore'), '# yaw:node-cli\nnode_modules/\n# /yaw:node-cli\n');
+  assert.equal(read(root, '.gitignore'), [
+    '# local web-form draft (yaw init --web); it can hold unfinished answers',
+    '.yaw/draft.yaml',
+    '# personal Claude Code settings (status line, local permissions)',
+    '.claude/settings.local.json',
+    '',
+    '# yaw:node-cli',
+    'node_modules/',
+    '# /yaw:node-cli',
+    '',
+  ].join('\n'));
   const m = readManifest(root);
   const entry = (p) => m.files.find((f) => f.path === p);
   assert.equal(entry('justfile').module, 'core');
