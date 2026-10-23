@@ -209,8 +209,8 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 
 ### Setup depth and scope
 
-- Quick: concise map, navigation rule and explicit update/check.
-- Full: same foundation, with existing Git-hook/CI integration
+- Quick: not installed (`yaw add code-map` adds it later).
+- Full: map, navigation rule and explicit update/check, with existing Git-hook/CI integration
   enabled where those modules are selected.
 - Step 7 exposes these choices consistently in CLI and browser.
 - Phase 1 indexes paths and declared subsystem relationships.
