@@ -1,6 +1,11 @@
 // Pure browser state helpers; also tested without a DOM.
 export const choiceValue = (c) => typeof c === 'object' ? c.value : c;
-export const choiceLabel = (c) => typeof c === 'object' ? c.label ?? c.value : String(c);
+// The value stays visible (as in the terminal) unless the label already starts with it: "edge — code on a CDN ...".
+export const choiceLabel = (c) => {
+  if (typeof c !== 'object') return String(c);
+  if (!c.label) return String(c.value);
+  return c.label.toLowerCase().startsWith(String(c.value).toLowerCase()) ? c.label : `${c.value} — ${c.label}`;
+};
 export const available = (c) => !(typeof c === 'object' && c.phase > 1);
 export function installDialogCancellation(dialog) {
   const cancel = (event) => {

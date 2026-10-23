@@ -101,7 +101,7 @@
       "pattern": "^[a-z][a-z0-9+#-]*$"
     },
     "runsOn": {
-      "enum": ["local", "self-hosted", "docker", "serverless", "edge", "app-store"]
+      "enum": ["local", "self-hosted", "docker", "serverless", "edge", "static", "app-store"]
     },
     "facts": {
       "description": "Derived facts vocabulary (ADR-0017). All listed keys must match; a list means any of its values.",

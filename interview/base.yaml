@@ -70,7 +70,16 @@ questions:
     type: choice
     label: Preferred or required language? (auto = you choose)
     help: stack
-    choices: [python, javascript, typescript, auto]
+    choices:
+      - { value: python, label: "Python" }
+      - { value: javascript, label: "JavaScript (Node.js or browser)" }
+      - { value: typescript, label: "TypeScript" }
+      - { value: kotlin, label: "Kotlin (Android or JVM)" }
+      - { value: swift, label: "Swift (iOS / macOS)" }
+      - { value: go, label: "Go" }
+      - { value: rust, label: "Rust" }
+      - { value: java, label: "Java" }
+      - { value: auto, label: "you do not decide; YAW suggests a profile or asks" }
     default: auto
   - id: arch.runs-on
     ref: "3.2"
@@ -78,5 +87,12 @@ questions:
     type: choice
     label: Where should it run?
     help: stack
-    choices: [local, self-hosted, serverless, edge, app-store, auto]
+    choices:
+      - { value: local, label: "your own machine (scripts, CLIs, desktop tools)" }
+      - { value: self-hosted, label: "your own server or VPS (web app or API, usually in Docker)" }
+      - { value: serverless, label: "managed functions (Vercel, AWS Lambda, Netlify Functions)" }
+      - { value: edge, label: "code on a CDN, close to users (Cloudflare Workers, Deno Deploy)" }
+      - { value: static, label: "static files only, no server code (GitHub Pages, Netlify)" }
+      - { value: app-store, label: "mobile or desktop app shipped through an app store" }
+      - { value: auto, label: "you do not decide; YAW suggests a profile or asks" }
     default: auto

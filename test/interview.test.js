@@ -106,6 +106,12 @@ test('suggestion: the unique best match; ties, contradictions and unknown facts 
   assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'local' }), 'python-cli');
   assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'local' }), null, 'both match one fact: a tie');
   assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
+  assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'static' }), 'static-site');
+  assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'static' }), 'static-site');
+  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'app-store' }), 'android-kotlin');
+  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'auto' }), 'android-kotlin');
+  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'self-hosted' }), null, 'server-side Kotlin has no profile');
+  for (const language of ['swift', 'go', 'rust', 'java']) assert.equal(pick({ 'arch.language': language, 'arch.runs-on': 'local' }), null, `${language} has no profile`);
   assert.equal(pick({}), null);
 });
 

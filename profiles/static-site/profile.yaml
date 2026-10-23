@@ -1,9 +1,10 @@
 # profiles/static-site/profile.yaml
-# Never auto-suggested (ADR-0034): no narrow fact exists yet, the user picks it from the list.
+# Suggested for runs-on static (#165, ADR-0034): static files only, e.g. GitHub Pages or Netlify.
 name: static-site
 dependencyEcosystems: [npm]
 summary: Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.
-suggestWhen: {}
+suggestWhen:
+  runsOn: [static]
 defaults:
   modules: { devenv: false, ui-design: true, backup: false }
 requires: [node>=22.13, just]
