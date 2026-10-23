@@ -5,6 +5,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ## [Unreleased]
 
 ### Added
+- Terminal interview: colour (bold titles, cyan keys, dimmed hints, the default in green) and up/down arrow keys to move through choices, without dependencies; `NO_COLOR`, `TERM=dumb` and pipes stay plain (#163).
 - `yaw init`: answer `web` at the setup depth, any question or the profile choice to continue in the browser form with your answers so far (#162).
 - `yaw init` puts your idea into `README.md` (#171): a new README if there is none, otherwise one marked "Idea" section appended without touching your text. The confirmation lists it.
 

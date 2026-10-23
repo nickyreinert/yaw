@@ -10,6 +10,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PLAIN } from '../cli/style.js';
 
 export const MAX_BATCH = 6;
 
@@ -128,16 +129,24 @@ function helpText(q, kitRoot) {
   return parts.length > 0 ? parts.join('\n\n') : 'No further help for this question. Enter takes the default, skip lists it as "default".';
 }
 
-function render(q, number, total, expertise) {
-  const lines = [`  ${number}/${total} ${q.label}`];
+const isDefault = (q, value) => (Array.isArray(q.default) ? q.default.includes(value) : q.default === value);
+
+// style: plain text unless the prompter colours its terminal (#163); the default choice is green.
+function render(q, number, total, expertise, style) {
+  const lines = [`  ${style.dim(`${number}/${total}`)} ${style.bold(q.label)}`];
   // Expert: hints are collapsed behind "?" (doc 02 section 4).
-  if (q.hint && expertise !== 'expert') lines.push(`      ${q.hint}`);
+  if (q.hint && expertise !== 'expert') lines.push(`      ${style.dim(q.hint)}`);
   // A runtime status (e.g. the GitHub check, #166) is always shown.
-  if (q.status) lines.push(`      ${q.status}`);
+  if (q.status) lines.push(`      ${style.yellow(q.status)}`);
   if (q.choices) {
     q.choices.forEach((c, i) => {
-      const note = available(c) ? '' : ` (phase ${c.phase}, not available yet)`;
-      lines.push(`      ${i + 1}) ${choiceValue(c)}${typeof c === 'object' && c.label ? ` - ${c.label}` : ''}${note}`);
+      const label = typeof c === 'object' && c.label ? ` - ${c.label}` : '';
+      if (!available(c)) {
+        lines.push(style.dim(`      ${i + 1}) ${choiceValue(c)}${label} (phase ${c.phase}, not available yet)`));
+        return;
+      }
+      const value = isDefault(q, choiceValue(c)) ? style.green(style.bold(choiceValue(c))) : choiceValue(c);
+      lines.push(`      ${style.cyan(`${i + 1})`)} ${value}${label}`);
     });
   }
   return lines.join('\n');
@@ -170,9 +179,10 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     return out;
   };
   const options = allowWeb ? '? help, skip, web' : '? help, skip';
+  const style = prompter.style ?? PLAIN;
   for (let b = 0; b < batches.length; b++) {
     const batch = batches[b];
-    prompter.show(`\n${batch.title} (${b + 1}/${batches.length})\n`);
+    prompter.show(`\n${style.bold(batch.title)} ${style.dim(`(${b + 1}/${batches.length})`)}\n`);
     for (const q of batch.questions) {
       if (!whenMatches(q.when, seen())) continue;
       const expertise = expertiseOf(seen());
@@ -182,10 +192,13 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
         continue;
       }
       number++;
-      prompter.show(`${render(q, number, total, expertise)}\n`);
+      prompter.show(`${render(q, number, total, expertise, style)}\n`);
+      // Up and down move through the available choices, starting from the default (#163).
+      const values = (q.choices ?? []).filter(available).map(choiceValue);
+      const keys = { choices: values, start: values.findIndex((v) => isDefault(q, v)) };
       if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
       for (;;) {
-        const reply = await prompter.ask(`      [${formatDefault(q)}] (${options}) > `);
+        const reply = await prompter.ask(`      [${style.green(formatDefault(q))}] ${style.dim(`(${options})`)} > `, keys);
         if (allowWeb && reply.trim().toLowerCase() === 'web') return { answers: ordered(), defaulted, web: true };
         const r = parseReply(q, reply);
         if (r.help) {

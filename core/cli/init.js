@@ -28,17 +28,20 @@ import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
+import { PLAIN } from './style.js';
 
 // Reply that hands the interview over to the browser form (#162).
 const WEB = 'web';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose. -> name | WEB
 async function chooseProfile({ prompter, profiles, suggestion }) {
-  prompter.show('\nStack profile\n');
-  profiles.forEach((p, i) => prompter.show(`  ${i + 1}) ${p.name} - ${p.summary}\n`));
+  const s = prompter.style ?? PLAIN;
+  prompter.show(`\n${s.bold('Stack profile')}\n`);
+  profiles.forEach((p, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${p.name === suggestion ? s.green(s.bold(p.name)) : p.name} - ${p.summary}\n`));
   prompter.show(suggestion ? `  Suggested from your answers: ${suggestion}\n` : '  No single profile matches your answers; choose one.\n');
+  const keys = { choices: profiles.map((p) => p.name), start: profiles.findIndex((p) => p.name === suggestion) };
   for (;;) {
-    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${suggestion}]` : ''} (web) > `)).trim();
+    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${s.green(suggestion)}]` : ''} ${s.dim('(web)')} > `, keys)).trim();
     if (reply === '' && suggestion) return suggestion;
     if (reply.toLowerCase() === WEB) return WEB;
     const hit = profiles.find((p, i) => p.name === reply || String(i + 1) === reply);
@@ -49,11 +52,12 @@ async function chooseProfile({ prompter, profiles, suggestion }) {
 
 // Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | WEB
 async function chooseMode({ prompter }) {
-  prompter.show('\nSetup depth\n');
-  prompter.show('  1) quick - prototype or MVP: the essential baseline, short interview with defaults\n');
-  prompter.show('  2) full  - long-lived product: the tooling that applies to the project, all questions\n');
+  const s = prompter.style ?? PLAIN;
+  prompter.show(`\n${s.bold('Setup depth')}\n`);
+  prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
+  prompter.show(`  ${s.cyan('2)')} full  - long-lived product: the tooling that applies to the project, all questions\n`);
   for (;;) {
-    const reply = (await prompter.ask('  Setup depth [quick] (web) > ')).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] ${s.dim('(web)')} > `, { choices: ['quick', 'full'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'full') return 'full';
     if (reply === WEB) return WEB;

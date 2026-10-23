@@ -2,23 +2,48 @@
 
 import { createInterface } from 'node:readline/promises';
 import { StringDecoder } from 'node:string_decoder';
+import { colorEnabled, createStyle } from './style.js';
 
-export function createPrompter({ input = process.stdin, output = process.stdout } = {}) {
+// Next index when an arrow key moves through `count` choices; -1 means "nothing picked yet".
+export function stepChoice(index, count, key) {
+  if (count === 0) return index;
+  if (key === 'down') return index < 0 ? 0 : (index + 1) % count;
+  if (key === 'up') return index < 0 ? count - 1 : (index - 1 + count) % count;
+  return index;
+}
+
+export function createPrompter({ input = process.stdin, output = process.stdout, env = process.env } = {}) {
   let rl;
   return {
     interactive: Boolean(input.isTTY),
+    style: createStyle(colorEnabled(output, env)),
     show(text) {
       output.write(text);
     },
     // Rejects when the input ends before an answer arrives (instead of hanging or exiting silently).
-    ask(question) {
-      rl ??= createInterface({ input, output });
+    // choices: values the up and down arrow keys put on the input line in a terminal (#163); typing still works.
+    ask(question, { choices = [], start = -1 } = {}) {
+      rl ??= createInterface({ input, output, historySize: 0 });
       const reader = rl;
+      let index = start;
+      const onKeypress = (_, key) => {
+        if (!key || (key.name !== 'up' && key.name !== 'down')) return;
+        index = stepChoice(index, choices.length, key.name);
+        if (index < 0) return;
+        reader.write(null, { ctrl: true, name: 'u' });
+        reader.write(String(choices[index]));
+      };
+      const arrows = input.isTTY && choices.length > 0;
+      if (arrows) input.on('keypress', onKeypress);
       return new Promise((resolve, reject) => {
-        const onClose = () => reject(new Error('input ended before all questions were answered'));
+        const onClose = () => {
+          if (arrows) input.off('keypress', onKeypress);
+          reject(new Error('input ended before all questions were answered'));
+        };
         reader.once('close', onClose);
         reader.question(question).then((answer) => {
           reader.off('close', onClose);
+          if (arrows) input.off('keypress', onKeypress);
           resolve(answer);
         }, reject);
       });

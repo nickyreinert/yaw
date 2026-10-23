@@ -82,7 +82,7 @@ export async function main(argv, io = {}) {
     cwd: io.cwd ?? process.cwd(),
     env: io.env ?? process.env,
     kitRoot: io.kitRoot ?? KIT_ROOT,
-    prompter: io.prompter ?? createPrompter(),
+    prompter: io.prompter ?? createPrompter({ env: io.env ?? process.env }),
     confirm: io.confirm, // tests script the typed "y" of guarded actions (ADR-0027); undefined asks on a real terminal
     gh: io.gh, // tests replay recorded gh output; undefined runs the GitHub CLI
     now: io.now,
