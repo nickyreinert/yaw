@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runChecks } from '../core/cli/doctor.js';
+import { doctor, runChecks } from '../core/cli/doctor.js';
+import { hashContent } from '../core/render/files.js';
+import { CODEX_HOOKS, HOOK_SHIM } from '../core/render/agents.js';
+import { readManifest } from '../core/render/manifest.js';
 import { initProject } from '../core/render/project.js';
 import { makeKit, tmp, writeAnswers } from './helpers/fixtures.js';
 
@@ -56,6 +59,73 @@ test('doctor runs just --list when the project has a justfile', async () => {
   assert.equal(find(runChecks({ cwd: root, kitRoot: kit('1.0.0'), env: { PATH: `${good}:${process.env.PATH}` } }), /just --list works/).level, 'ok');
   const bad = fakeBin({ just: 'echo "error: recipe check defined twice" >&2; exit 1' });
   assert.equal(find(runChecks({ cwd: root, kitRoot: kit('1.0.0'), env: { PATH: `${bad}:${process.env.PATH}` } }), /just --list failed: error: recipe check defined twice/).level, 'fail');
+});
+
+test('doctor reports missing modules, conflicts, stale bases and an unavailable hook kit', async () => {
+  const root = tmp('yaw-proj-');
+  const k = kit('1.0.0');
+  await initProject({ root, kitRoot: k, answersFile: writeAnswers(tmp('yaw-ans-')) });
+  writeFileSync(join(root, 'notes.md'), '<<<<<<< ours\nours\n=======\ntheirs\n>>>>>>> theirs\n');
+  writeFileSync(join(root, '.yaw/base/notes.md'), 'stale base\n');
+  const manifest = readManifest(root);
+  manifest.modules.removed = { enabled: true };
+  manifest.files.push({ path: HOOK_SHIM, module: 'core', hash: hashContent('shim\n'), managed: false });
+  writeFileSync(join(root, '.yaw/manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  const home = tmp('yaw-home-');
+  const checks = runChecks({ cwd: root, kitRoot: k, env: { PATH: process.env.PATH, HOME: home, YAW_KIT: join(home, '.yaw/kit') } });
+  assert.equal(find(checks, /module "removed" is not in the installed kit/).level, 'warn');
+  assert.equal(find(checks, /notes\.md has unresolved merge conflict markers/).level, 'fail');
+  assert.equal(find(checks, /\.yaw\/base\/notes\.md does not match the manifest hash/).level, 'warn');
+  assert.equal(find(checks, /agent hooks \(incl\. the security guards\) do nothing until the kit is installed/).level, 'warn');
+});
+
+test('doctor recognises vendored and global hook kits and prints the Codex trust note', async () => {
+  const root = tmp('yaw-proj-');
+  const k = kit('1.0.0');
+  await initProject({ root, kitRoot: k, answersFile: writeAnswers(tmp('yaw-ans-')) });
+  const manifest = readManifest(root);
+  mkdirSync(join(root, '.yaw/bin'), { recursive: true });
+  mkdirSync(join(root, '.codex'), { recursive: true });
+  const shim = 'hook shim\n';
+  const hooks = '{}\n';
+  writeFileSync(join(root, HOOK_SHIM), shim);
+  writeFileSync(join(root, CODEX_HOOKS), hooks);
+  manifest.files.push(
+    { path: HOOK_SHIM, module: 'core', hash: hashContent(shim), managed: false },
+    { path: CODEX_HOOKS, module: 'core', hash: hashContent(hooks), managed: false },
+  );
+  writeFileSync(join(root, '.yaw/manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const home = tmp('yaw-home-');
+  const globalKit = join(home, '.yaw/kit');
+  mkdirSync(join(globalKit, 'bin'), { recursive: true });
+  writeFileSync(join(globalKit, 'bin/yaw'), '#!/bin/sh\n', { mode: 0o755 });
+  const global = runChecks({ cwd: root, kitRoot: k, env: { PATH: process.env.PATH, HOME: home } });
+  assert.equal(find(global, new RegExp(`${HOOK_SHIM} finds the kit at`)).level, 'ok');
+  assert.equal(find(global, /Codex runs \.codex\/hooks\.json only after you trust it/).level, 'note');
+
+  mkdirSync(join(root, '.yaw/lib/bin'), { recursive: true });
+  writeFileSync(join(root, '.yaw/lib/bin/yaw'), '#!/bin/sh\n', { mode: 0o755 });
+  const vendored = runChecks({ cwd: root, kitRoot: k, env: { PATH: process.env.PATH, HOME: home } });
+  assert.equal(find(vendored, /runs the vendored kit in \.yaw\/lib/).level, 'ok');
+});
+
+test('doctor warns when just is missing and maps errors to its exit status', async () => {
+  const root = tmp('yaw-proj-');
+  const k = kit('1.0.0');
+  await initProject({ root, kitRoot: k, answersFile: writeAnswers(tmp('yaw-ans-')) });
+  writeFileSync(join(root, 'justfile'), 'check:\n  true\n');
+  const bin = fakeBin({ git: 'case "$1" in --version) echo "git version 2.40.0";; esac' });
+  const env = { PATH: bin, HOME: tmp('yaw-home-') };
+  const output = [];
+  const io = { cwd: root, kitRoot: k, env, stdout: { write: (text) => output.push(text) } };
+  const warningExit = await doctor({ positionals: [], io });
+  assert.equal(warningExit, 0);
+  assert.ok(output.join('').includes('justfile present but just is not installed'));
+
+  writeFileSync(join(root, '.yaw/manifest.json'), 'not json\n');
+  assert.equal(await doctor({ positionals: [], io }), 1);
+  await assert.rejects(doctor({ positionals: ['extra'], io }), /unexpected argument/);
 });
 
 test('doctor recognises the yaw link of this kit', () => {
