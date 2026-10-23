@@ -191,3 +191,21 @@ test('verify without just: files stay, exit 1, install hint', async () => {
   assert.match(r.err, /just is not installed, so the project could not be verified/);
   assert.ok(existsSync(join(r.cwd, '.yaw/manifest.json')));
 });
+
+test('init ends with next steps: agent start, Codex hook trust, data locations, tools (#167, #176)', async () => {
+  const text = readFileSync(EXAMPLE, 'utf8').replace('user.agents: [claude]', 'user.agents: [codex]').replace('modules: [core]', 'modules: [core, standards, security, tasks, sessions, decisions]');
+  const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
+  assert.equal(r.code, 0, r.err);
+  const steps = r.out.slice(r.out.indexOf('\nNext steps\n'));
+  assert.ok(r.out.endsWith(steps), 'the block comes last');
+  assert.match(steps, /Start Codex in this folder; it reads AGENTS\.md\./);
+  assert.match(steps, /Codex: run \/hooks once and trust the YAW hooks/);
+  assert.match(steps, /Tasks: TASKS\.md \(just task list/);
+  assert.match(steps, /Sessions: yaw sessions list; the registry is ~\/\.yaw\/yaw\.db/);
+  assert.match(steps, /Decisions: \.decisions\//);
+  assert.match(steps, /Dashboard: yaw web/);
+  assert.match(steps, /Tools this setup needs: node>=22\.13, just/);
+  const claude = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify']);
+  assert.match(claude.out, /Start Claude Code in this folder; it reads AGENTS\.md \(through CLAUDE\.md\)\./);
+  assert.doesNotMatch(claude.out, /run \/hooks/);
+});

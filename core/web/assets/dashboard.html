@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YAW dashboard</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/dashboard.js"></script>
+</head>
+<body>
+  <header><h1 id="title">YAW dashboard</h1><p>Local and read-only: this page shows what YAW keeps for this project and in ~/.yaw on this machine. Nothing leaves your computer.</p></header>
+  <p id="status" role="status" aria-live="polite">Loading…</p>
+  <p id="error" role="alert" hidden></p>
+  <div class="layout dashboard">
+    <nav aria-label="Dashboard sections"><h2>Sections</h2><ul>
+      <li><a href="#project">Project</a></li>
+      <li><a href="#sessions">Sessions</a></li>
+      <li><a href="#tasks">Tasks</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#all">All projects</a></li>
+    </ul><button id="refresh" type="button">Refresh</button></nav>
+    <main id="main">
+      <section id="project" aria-labelledby="project-title"><h2 id="project-title">Project</h2><div class="body"></div></section>
+      <section id="sessions" aria-labelledby="sessions-title"><h2 id="sessions-title">Sessions in this project</h2><div class="body"></div></section>
+      <section id="tasks" aria-labelledby="tasks-title"><h2 id="tasks-title">Tasks</h2><div class="body"></div></section>
+      <section id="decisions" aria-labelledby="decisions-title"><h2 id="decisions-title">Decisions</h2><div class="body"></div></section>
+      <section id="all" aria-labelledby="all-title"><h2 id="all-title">All projects on this machine</h2><div class="body"></div></section>
+    </main>
+  </div>
+</body>
+</html>

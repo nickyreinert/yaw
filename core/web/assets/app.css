@@ -37,5 +37,26 @@ aside details { border-top: 1px solid var(--line); padding-top: .5rem; }
 dialog { max-width: 36rem; border: 2px solid var(--line); border-radius: .5rem; }
 dialog::backdrop { background: #0009; }
 [hidden] { display: none !important; }
+.dashboard { grid-template-columns: 11rem minmax(0, 1fr); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; margin: .5rem 0; }
+th, td { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: break-word; }
+th { white-space: nowrap; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0; }
+dt { font-weight: 600; }
+dd { margin: 0; overflow-wrap: anywhere; }
+.warn { border-left: 4px solid #e28100; padding-left: .5rem; }
+.bars { display: grid; gap: .2rem; font-size: .85rem; }
+.bar { display: grid; grid-template-columns: 6.5rem 1fr 2rem; align-items: center; gap: .5rem; }
+.bar > span:nth-child(2) { height: .8rem; background: var(--accent); border-radius: .2rem; }
+.bar > .w1 { width: 10%; }
+.bar > .w2 { width: 20%; }
+.bar > .w3 { width: 30%; }
+.bar > .w4 { width: 40%; }
+.bar > .w5 { width: 50%; }
+.bar > .w6 { width: 60%; }
+.bar > .w7 { width: 70%; }
+.bar > .w8 { width: 80%; }
+.bar > .w9 { width: 90%; }
+.bar > .w10 { width: 100%; }
 @media (max-width: 1050px) { .layout { grid-template-columns: 10rem minmax(0, 1fr); } aside { position: static; grid-column: 2; } }
 @media (max-width: 680px) { .layout { display: block; padding: .75rem; } nav, aside { position: static; max-height: none; } nav ul { display: flex; gap: .75rem; flex-wrap: wrap; } header { padding: 1rem; } }

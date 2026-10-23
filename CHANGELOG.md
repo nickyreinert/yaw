@@ -6,12 +6,15 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Added
 
+- `yaw web`: a read-only local dashboard with project setup, tasks, decisions and session statistics for this project and all projects; without a YAW setup it opens the setup form (#172).
+- `yaw init` (terminal and web) ends with next steps: how to start the selected agent, Codex hook trust, where tasks, sessions and decisions live, the dashboard and the tools the setup needs (#167).
 - GitHub issue forms for feature, bug, chore, spike and epic, plus issue-create, issue-triage and epic-plan skills for the selected agents.
 - Optional, guarded Project Status updates on GitHub task start/done and explicit epic-to-milestone mappings synchronized by task sync. Existing local-only workflows stay offline.
 - Profile-aware Dependabot ecosystems, including namespaced composed profiles; dependency-free profiles retain only action updates.
 
 ### Fixed
 
+- Codex hook entries have readable labels (`YAW security: guard-secret-read, guard-destructive`) and init reminds the user to trust them with `/hooks` (#176).
 - `CLAUDE.md` is only written when Claude Code is a selected agent; Codex and Copilot read `AGENTS.md` (#169).
 - The generated `.gitignore` ignores machine-local YAW files: the web-form draft `.yaw/draft.yaml`, and `.claude/settings.local.json` when Claude is selected (#170).
 - The local form session cookie has an explicit `Max-Age` no longer than the server's idle timeout.

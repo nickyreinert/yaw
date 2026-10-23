@@ -65,6 +65,8 @@ If you enter new secret values, YAW writes them only to a new mode-0600 `.env` f
 
 For a local browser form instead of terminal questions, run `yaw init --web`. The form is served locally and still requires an explicit confirmation before writing files.
 
+After setup, `yaw web` opens a local, read-only dashboard with the project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`).
+
 ## Quick and Full
 
 **Quick** is the minimal setup: `core`, `communication`, `standards`, `devenv`, `tasks` and minimal `security`. It provides project instructions, basic agent configuration, development commands and security guards without selecting GitHub-specific integrations.

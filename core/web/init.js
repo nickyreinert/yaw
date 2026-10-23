@@ -11,6 +11,7 @@ import { kitVersion } from '../render/kit.js';
 import { saveSetup } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
+import { printNextSteps } from '../cli/next-steps.js';
 
 export const DRAFT = '.yaw/draft.yaml';
 
@@ -90,6 +91,10 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         ok = await verify({ root, io: { env, stdout: output, stderr: output } });
         message = ok ? 'Applied and verified.' : 'Files applied, but verification failed. Fix the reported problem and run just setup && just check.';
       }
+      printNextSteps(output, {
+        root, kitRoot, answers: prepared.doc.answers, modules: prepared.modules,
+        profiles: prepared.doc.proposal?.profiles ?? [], files: result.manifest.files.map((f) => f.path),
+      });
       emit({ type: 'done', ok, message });
     },
     failed(error) {
@@ -109,7 +114,7 @@ export function writeLauncher(url) {
   return { file, remove: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-function openBrowser(target, env) {
+export function openBrowser(target, env) {
   const [command, args] = process.platform === 'darwin' ? ['open', [target]] :
     process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', target]] : ['xdg-open', [target]];
   return new Promise((resolve) => {

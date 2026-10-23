@@ -151,6 +151,8 @@ test('rendered settings: Claude hooks + permissions.deny, Codex hooks, shim; Cop
   const codex = JSON.parse(readFileSync(join(root, '.codex/hooks.json'), 'utf8'));
   assert.equal(codex.hooks.PreToolUse[0].matcher, 'apply_patch|Bash');
   assert.match(codex.hooks.PreToolUse[0].hooks[0].command, / PreToolUse --agent codex --module security$/);
+  assert.equal(codex.hooks.PreToolUse[0].hooks[0].statusMessage, 'YAW security: guard-secret-read, guard-destructive', 'readable label in /hooks (#176)');
+  assert.equal(claude.hooks.PreToolUse[0].hooks[0].statusMessage, undefined);
   assert.equal(codex.permissions, undefined);
   assert.ok(!JSON.stringify(codex).includes('"async"'), 'no async hooks (ADR-0007)');
   assert.ok(!existsSync(join(root, '.github/hooks')), 'no Copilot hook file (no double firing, ADR-0021)');

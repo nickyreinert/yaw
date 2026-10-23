@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 
 // module -> tools its generated files use, with the install hint (same texts as the module recipes).
-const MODULE_TOOLS = {
+export const MODULE_TOOLS = {
   'git-hooks': [
     { tool: 'lefthook', hint: 'brew install lefthook, or see https://lefthook.dev/installation/' },
     { tool: 'gitleaks', hint: 'brew install gitleaks' },

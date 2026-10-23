@@ -87,6 +87,7 @@ async function viaForm({ mode, answers, profile }) {
     const events = (await response.text()).trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(response.status, 200, JSON.stringify(events));
     assert.deepEqual(events.at(-1), { type: 'done', ok: true, message: 'Applied; verification skipped.' });
+    assert.match(events.filter((e) => e.type === 'log').map((e) => e.text).join(''), /Next steps[\s\S]*Dashboard: yaw web/);
   } finally {
     await server.close();
   }

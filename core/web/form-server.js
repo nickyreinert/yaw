@@ -68,7 +68,9 @@ function pageHtml(csrf) {
 
 // Starts the server. Options: port (0 = random), idleMs, onClose, signals (default true: SIGINT stops it).
 // Resolves { server, port, url, token, close() }; `url` carries the start token, never log it.
-export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api } = {}) {
+// `page`, `assets` and `get` let another local page (the dashboard, #172) reuse the same handshake and checks;
+// `get` maps a GET path under /api/ to a function returning JSON.
+export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api, page = pageHtml, assets: served = assets, get = {} } = {}) {
   const startToken = randomBytes(32).toString('hex');
   const session = randomBytes(32).toString('hex');
   let used = false;
@@ -109,13 +111,17 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     if (!same(cookieOf(req, COOKIE), session)) return fail(403, 'missing or invalid token');
     resetIdle(); // only an authenticated request keeps the server alive
     if (req.method === 'GET' || req.method === 'HEAD') {
-      const asset = assets.get(url.pathname);
+      const asset = served.get(url.pathname);
       if (url.pathname === '/' || asset) {
         res.writeHead(200, { 'content-type': asset?.[0] ?? 'text/html; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
-        return res.end(req.method === 'HEAD' ? undefined : asset?.[1] ?? pageHtml(session));
+        return res.end(req.method === 'HEAD' ? undefined : asset?.[1] ?? page(session));
       }
       if (api && url.pathname === '/api/bootstrap') {
         try { return json(200, api.bootstrap(), req.method === 'HEAD'); }
+        catch (e) { return error(e); }
+      }
+      if (Object.hasOwn(get, url.pathname)) {
+        try { return json(200, await get[url.pathname](), req.method === 'HEAD'); }
         catch (e) { return error(e); }
       }
       return fail(404, 'not found');

@@ -22,6 +22,7 @@ import { printReport, UsageError } from './commands.js';
 import { printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
+import { printNextSteps } from './next-steps.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
@@ -252,16 +253,20 @@ export async function init({ values, positionals, io }) {
   // save (opt-in, interview on a terminal only; never with --answers)
   if (!fromFile && io.prompter.interactive) await offerSave({ io, root, answersDoc, kit: result.manifest.kit });
 
+  const done = (code) => {
+    printNextSteps(io.stdout, { root, kitRoot, answers: answersDoc.answers, modules, profiles: chosen, files: result.manifest.files.map((f) => f.path) });
+    return code;
+  };
   // verify
   if (values['skip-verify']) {
     io.stdout.write('verification skipped (--skip-verify); run: just setup && just check\n');
-    return 0;
+    return done(0);
   }
   if (savedSecrets) {
     io.stdout.write('verification skipped because new secrets were saved; review the project recipes before running: just setup && just check\n');
-    return 0;
+    return done(0);
   }
   const ok = await verifyProject({ root, io });
   if (ok) io.stdout.write('\nverified: just setup and just check passed\n');
-  return ok ? 0 : 1;
+  return done(ok ? 0 : 1);
 }

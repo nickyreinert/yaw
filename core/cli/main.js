@@ -18,12 +18,14 @@ import { sessions } from './sessions.js';
 import { hygiene, notify, statusline } from './comfort.js';
 import { sessionStart } from './team.js';
 import { presets } from './presets.js';
+import { web } from './web.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
 // The phase-1 command list (ADR-0019). Commands without `run` are planned for a later step.
 export const COMMANDS = [
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--skip-verify]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, 'skip-verify': { type: 'boolean' }, ...yes }, run: init },
+  { name: 'web', args: '', summary: 'open the local web interface: the dashboard (sessions, tasks, decisions) in a YAW project, the setup form elsewhere', options: {}, run: web },
   { name: 'update', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
   { name: 'remove', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'remove a module and exactly its files', options: { ...yes, strategy: { type: 'string' } }, run: remove },
   { name: 'status', args: '', summary: 'show modules and files with their state', options: {}, run: status },
