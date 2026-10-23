@@ -91,10 +91,14 @@ function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModule
     const shown = hidden.has(id) ? '(hidden: looks like a secret)' : Array.isArray(value) ? value.join(', ') : String(value);
     out.write(`    ${id.padEnd(width)}  ${shown === '' ? '(empty)' : shown}${defaulted.has(id) ? '  (default)' : ''}\n`);
   }
-  const paths = [...desired.keys(), ANSWERS, MANIFEST].sort();
+  const readme = typeof answers['idea.text'] === 'string' && answers['idea.text'].trim() && !desired.has('README.md');
+  const paths = [...desired.keys(), ANSWERS, MANIFEST, ...(readme ? ['README.md'] : [])].sort();
   const bases = [...desired.values()].filter((d) => d.managed !== false).length;
   out.write(`  files (${paths.length}, plus ${bases} base copies in .yaw/base/):\n`);
-  for (const p of paths) out.write(`    ${p}${desired.get(p)?.managed === false ? '  (your code from the start)' : ''}\n`);
+  for (const p of paths) {
+    const note = p === 'README.md' && readme ? '  (your idea; an existing README gets an "Idea" section)' : desired.get(p)?.managed === false ? '  (your code from the start)' : '';
+    out.write(`    ${p}${note}\n`);
+  }
 }
 
 function run(cmd, args, { cwd, env, io }) {

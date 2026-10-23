@@ -52,7 +52,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
   // Quick = core + communication + standards + devenv + tasks + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 15);
+  assert.equal(readManifest(dir).files.length, 16);
+  assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -242,4 +243,23 @@ test('init refuses the home folder unless forced and asks before writing into a 
   const quiet = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify'], { cwd: repo });
   assert.equal(quiet.code, 0, quiet.err);
   assert.doesNotMatch(quiet.err, /not empty/);
+});
+
+test('init puts the idea into README.md: a new file, or a section appended once to an existing one (#171)', async () => {
+  const fresh = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify']);
+  assert.equal(fresh.code, 0, fresh.err);
+  const readme = readFileSync(join(fresh.cwd, 'README.md'), 'utf8');
+  assert.match(readme, /^# Project idea\n\nA small command-line tool that renames photos by their EXIF date\.\n/);
+  assert.match(fresh.out, /added: README\.md/);
+  assert.match(fresh.out, /Your idea: README\.md\./);
+  assert.deepEqual(readManifest(fresh.cwd).files.find((f) => f.path === 'README.md')?.managed, false);
+
+  const dir = tmp('yaw-proj-');
+  mkdirSync(join(dir, '.git'));
+  writeFileSync(join(dir, 'README.md'), '# Mine\n\nDo not touch.');
+  const kept = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify'], { cwd: dir });
+  assert.equal(kept.code, 0, kept.err);
+  assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), '# Mine\n\nDo not touch.\n\n<!-- yaw:idea -->\n## Idea\n\nA small command-line tool that renames photos by their EXIF date.\n<!-- /yaw:idea -->\n');
+  assert.match(kept.out, /added your idea as a section to: README\.md/);
+  assert.equal(readManifest(dir).files.find((f) => f.path === 'README.md'), undefined, 'the user file stays unrecorded');
 });

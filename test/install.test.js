@@ -137,7 +137,7 @@ test('install -> init (core only) -> update -> remove, then self-update and self
   const remove = yaw(['remove', 'core', '--yes']);
   assert.equal(remove.status, 0, remove.stderr);
   // what stays: the answers and the scaffold, which is your code
-  assert.deepEqual(Object.keys(readTree(project)), ['.yaw/answers.yaml', 'package.json', 'src/index.js', 'test/index.test.js']);
+  assert.deepEqual(Object.keys(readTree(project)), ['.yaw/answers.yaml', 'README.md', 'package.json', 'src/index.js', 'test/index.test.js']);
 
   // self-update: a new tag with a changelog entry in the kit repo
   const pkg = JSON.parse(readTree(src)['package.json']);

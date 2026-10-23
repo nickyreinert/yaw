@@ -5,6 +5,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ## [Unreleased]
 
 ### Added
+- `yaw init` puts your idea into `README.md` (#171): a new README if there is none, otherwise one marked "Idea" section appended without touching your text. The confirmation lists it.
 
 - The language question offers Kotlin, Swift, Go, Rust and Java; "where should it run" offers `static` (GitHub Pages, Netlify) and every option of both questions has a one-line description. `static` suggests the static-site profile, Kotlin for an app store suggests android-kotlin, and the help explains what happens when no profile fits (#164, #165).
 - `yaw web`: a read-only local dashboard with project setup, tasks, decisions and session statistics for this project and all projects; without a YAW setup it opens the setup form (#172).

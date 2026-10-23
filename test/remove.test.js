@@ -156,7 +156,7 @@ test('removing core (last module) removes YAW from the project except files owne
   const root = await setup(kitRoot);
   const result = await removeModule({ root, kitRoot, module: 'core' });
   assert.equal(result.manifest, null);
-  assert.deepEqual(Object.keys(readTree(root)), ['.yaw/answers.yaml']);
+  assert.deepEqual(Object.keys(readTree(root)), ['.yaw/answers.yaml', 'README.md']);
   assert.ok(result.report.some((r) => r.action === 'owned-kept' && r.path === '.yaw/answers.yaml'));
 });
 

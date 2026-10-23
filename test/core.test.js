@@ -156,7 +156,7 @@ test('core is removable: managed files and bases go, answers and your code stay 
   const root = await init();
   const r = await removeModule({ root, kitRoot: KIT_ROOT, module: 'core' });
   assert.equal(r.manifest, null);
-  assert.deepEqual(Object.keys(readTree(root)), ['.yaw/answers.yaml', 'package.json', 'src/index.js', 'test/index.test.js']);
+  assert.deepEqual(Object.keys(readTree(root)), ['.yaw/answers.yaml', 'README.md', 'package.json', 'src/index.js', 'test/index.test.js']);
   assert.ok(!existsSync(join(root, 'just')), 'folder left empty is removed');
 });
 

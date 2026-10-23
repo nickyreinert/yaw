@@ -49,6 +49,8 @@ Both lanes render the same question schema (`interview/base.yaml` + `modules/*/m
 
 Before either lane starts, the target folder is checked (#168): the home folder and the file-system root are refused unless `--force` is given; a non-empty folder without `.git` or `.yaw` (the `--answers` file does not count) needs a confirmation, which `--yes` gives with a warning on stderr. Without a terminal, the browser lane refuses such a folder unless forced.
 
+The idea goes into `README.md` (#171): without a README, init writes one (`# Project idea`, the idea text, a pointer to YAW) and records it as your file (`managed: false`, so `remove` keeps it). An existing README gets one marked `## Idea` section (`<!-- yaw:idea -->`) appended; your text is not touched, and a README that already holds the idea or the markers is left alone. An empty idea writes nothing.
+
 ### CLI lane
 
 - Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).

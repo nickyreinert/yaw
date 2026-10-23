@@ -19,6 +19,7 @@ export class UsageError extends Error {
 
 const LABELS = {
   added: 'added',
+  appended: 'added your idea as a section to',
   adopted: 'adopted (identical file existed)',
   updated: 'updated',
   rebased: 'updated (your edit already matched the kit)',

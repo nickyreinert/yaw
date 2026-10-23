@@ -71,7 +71,7 @@ test('init --answers --yes renders core and the profile; a second init is refuse
   assert.match(r.stdout, /added: AGENTS\.md/);
   assert.match(r.stdout, /verification skipped/);
   assert.deepEqual(Object.keys(readTree(dir)).filter((p) => !p.startsWith('.yaw/base/')), [
-    '.gitignore', '.yaw/answers.yaml', '.yaw/manifest.json', 'AGENTS.md', 'CLAUDE.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js',
+    '.gitignore', '.yaw/answers.yaml', '.yaw/manifest.json', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js',
   ]);
   assert.equal(readTree(dir)['.yaw/answers.yaml'], readFileSync(answers, 'utf8'));
   const again = yaw(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd: dir });
@@ -103,9 +103,10 @@ test('status prints the module and file table', () => {
   const r = yaw(['status'], { cwd: dir });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, new RegExp(`kit: project pinned to ${VERSION.replace(/\./g, '\\.')}, installed`));
-  assert.match(r.stdout, /^ {2}core +9 files$/m);
+  assert.match(r.stdout, /^ {2}core +10 files$/m);
   assert.match(r.stdout, /^ {2}AGENTS\.md +core +unedited$/m);
   assert.match(r.stdout, /^ {2}\.yaw\/answers\.yaml +core +owned$/m);
+  assert.match(r.stdout, /^ {2}README\.md +core +owned$/m);
   assert.equal(yaw(['status'], { cwd: tmp() }).status, 1);
 });
 

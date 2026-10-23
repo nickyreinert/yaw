@@ -188,6 +188,29 @@ export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   return { desired, definitions, missingProfiles: profileOutput.missing };
 }
 
+const README = 'README.md';
+const IDEA_START = '<!-- yaw:idea -->';
+const IDEA_END = '<!-- /yaw:idea -->';
+
+// The interview idea in README.md (#171), so it is visible right away. A missing README is created and recorded
+// as unmanaged (like answers.yaml); an existing one gets a marked section appended once, its text is never changed.
+// -> { action: 'added' | 'appended', hash } or null when there is nothing to do.
+export function writeIdeaReadme(root, idea) {
+  const text = typeof idea === 'string' ? idea.replaceAll(IDEA_END, '').trim() : '';
+  if (!text) return null;
+  const existing = readProjectFile(root, README);
+  if (existing === null) {
+    const content = `# Project idea\n\n${text}\n\nSet up with YAW: \`AGENTS.md\` holds the rules for coding agents, \`just --list\` shows the recipes.\n`;
+    writeAtomic(root, README, content);
+    return { action: 'added', hash: hashContent(content) };
+  }
+  const current = existing.toString('utf8');
+  if (current.includes(IDEA_START) || current.includes(text)) return null;
+  const content = `${current.replace(/\n*$/, '\n')}\n${IDEA_START}\n## Idea\n\n${text}\n${IDEA_END}\n`;
+  writeAtomic(root, README, content);
+  return { action: 'appended', hash: hashContent(content) };
+}
+
 // `yaw init`: render, then write files, bases and the manifest. The answers come from a file
 // (`answersFile`, copied byte for byte, ADR-0019) or from the interview (`answers: { text, doc }`).
 export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answers, modules = ['core'], ...options }) {
@@ -221,6 +244,8 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
   if (!sameFile) writeAtomic(root, ANSWERS, text);
   const answersEntry = { path: ANSWERS, module: 'core', hash: hashContent(text), managed: false };
   const result = await reconcile(root, [], desired, { ...options, mode: 'init', label: `kit ${version}` });
+  const readme = desired.has(README) ? null : writeIdeaReadme(root, answersDoc.answers['idea.text']);
+  if (readme) result.report.push({ path: README, action: readme.action });
   const manifest = writeManifest(root, {
     kit: version,
     profiles: answersDoc.proposal.profiles,
@@ -229,7 +254,7 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
     vendored: false,
     modules: Object.fromEntries(modules.map((m) => [m, moduleEntry(m, undefined, answersDoc.answers, modules)])),
     mcpServers: [],
-    files: [...result.files, answersEntry],
+    files: [...result.files, answersEntry, ...(readme?.action === 'added' ? [{ path: README, module: 'core', hash: readme.hash, managed: false }] : [])],
   });
   return { ...result, manifest, missingProfiles };
 }
