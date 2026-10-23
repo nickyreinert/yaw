@@ -330,10 +330,10 @@ Common AC for every row: installs, works for Claude + Codex (+ Copilot where the
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
 |---|---|---|---|---|---|
-| Y-9 | Step 9: release v0.1.0 | Epic | P0 | Y-8 | Tag `v0.1.0` exists; install from the tag verified |
+| Y-9 | Step 9: release v0.1.0 | Epic | P0 | Y-8 | **local release candidate**: local-only tag `v0.1.0` created; install from that tag passed on macOS in a fresh temporary HOME. Linux clean-container verification and hosted CI remain deferred until November; nothing was pushed or published. |
 | Y-9.1 | README (install, read-then-run variant, SHA256, quick start, Quick vs. Full, macOS/Linux/WSL, Node ≥ 22.13) | Chore | P0 | Y-3.1 | **done locally**: README documents supported runtimes, install and inspect-before-run commands with the installer SHA-256, Quick/Full module contents, setup, secret-handling, and maintenance commands. Digest verified against `install.sh`; matches `kickoff/04-modules.md`. |
 | Y-9.2 | CHANGELOG | Chore | P1 | – | **done locally**: `CHANGELOG.md` records the v0.1.0 additions and security behavior in Keep-a-Changelog format. |
-| Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | `curl … install.sh \| bash` from the tag in clean macOS-like and Linux containers: `yaw --version`, `yaw init` Quick, `just check` green |
+| Y-9.3 | Clean-machine install check | Chore | P0 | Y-9.1 | **partially verified locally**: installed local tag `v0.1.0` into a fresh temporary HOME on macOS; `yaw --version`, `yaw doctor`, Quick `yaw init`, `just setup` and `just check` passed. Linux-container and hosted CI runs are deferred until November (no GitHub access used). |
 
 ### Not in phase 1 (label `later`)
 
