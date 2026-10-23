@@ -15,11 +15,12 @@ import { KIT_ROOT, capture, makeKit, scripted, tmp, writeAnswers } from './helpe
 const fixture = (name) => JSON.parse(readFileSync(join(KIT_ROOT, 'test/fixtures/setup-depth', name), 'utf8'));
 const NO_PROJECT = tmp('yaw-none-');
 
-function answersFor(profile, { mode, team = false, github } = {}) {
+function answersFor(profile, { mode, team = false, github, tasks } = {}) {
   const doc = parseDocument(readFileSync(join(KIT_ROOT, 'examples', profile, 'answers.yaml'), 'utf8')).value;
   doc.mode = mode;
   if (team) doc.answers['idea.team'] = 'team';
   if (github !== undefined) doc.answers['tasks.use-github'] = github;
+  if (tasks !== undefined) doc.answers['tasks.mode'] = tasks;
   return doc;
 }
 
@@ -78,11 +79,13 @@ test('standard output is byte for byte the recorded fixture (AGENTS.md excluded:
   assert.deepEqual(hashes, before.files);
 });
 
-test(`AGENTS.md has at most ${AGENTS_MAX_LINES} lines for Full in every profile, solo and team`, () => {
+test(`AGENTS.md has at most ${AGENTS_MAX_LINES} lines for Full in every profile, solo and team, every task mode`, () => {
   for (const profile of ['node-cli', 'python-cli']) {
     for (const team of [false, true]) {
-      const { desired } = render(profile, { mode: 'full', team });
-      assert.ok(lines(desired) <= AGENTS_MAX_LINES, `${profile} ${team ? 'team' : 'solo'}: ${lines(desired)} lines`);
+      for (const tasks of ['local', 'github', 'both']) {
+        const { desired } = render(profile, { mode: 'full', team, tasks });
+        assert.ok(lines(desired) <= AGENTS_MAX_LINES, `${profile} ${team ? 'team' : 'solo'} tasks=${tasks}: ${lines(desired)} lines`);
+      }
     }
   }
 });

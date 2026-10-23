@@ -9,8 +9,9 @@
 - Start of session: read *Active* in `TASKS.md` and continue from the resume point unless told otherwise.
 - Work through `just task` (list, next, start T-012, log T-012 "text" --resume "next step", done T-012, new "title").
 - On stop: `just task log <id> "what changed" --resume "next step" --progress 60`.
-- Done = implemented + `just check` green + reviewed; then `just task done <id>`.
 <% if tasks.both %>
-- `just task sync` mirrors tasks to GitHub issues (one way); never edit the mirrored issues by hand.
+- Done = implemented + `just check` green + reviewed; then `just task done <id>`. `just task sync` mirrors tasks to GitHub issues (one way); never edit the mirrored issues by hand.
+<% else %>
+- Done = implemented + `just check` green + reviewed; then `just task done <id>`.
 <% end %>
 <% end %>
