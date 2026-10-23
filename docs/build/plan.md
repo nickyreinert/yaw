@@ -47,6 +47,8 @@ Reading the full ticket bodies before closure found two remaining acceptance det
 
 Final local validation after these acceptance follow-ups: offline `just check` **719 passed, 13 skipped, 0 failed** (732 tests); the PTY test actually ran and passed. Schema validation is **27/27**, decisions **49 records**, adapter sync passes. Shellcheck and the deferred platform/runtime matrix remain unverified.
 
+With the owner's explicit issue-read/closure permission, **35 completed GitHub tickets were closed**, with comments stating that changes are local/unreleased and hosted CI has not run: #1, #4, #8, #20, #31, #40, #74, #79, #80, #81, #83, #84, #98, #100, #101, #104, #105, #106, #110, #112, #113, #114, #119, #120, #121, #122, #124, #125, #131, #133, #137, #142, #154, #155, #156. Closure state was read back: **35 issues remain open**, including #123, #116 and #134. #134 and the original Feature trackers explicitly require Node 22/24 results, so local implementation is not treated as satisfying their unrun runtime acceptance. #94/#107 live recordings and #82/#85 release verification remain open. Inherited tracker requirements not established by this closure pass were not bulk-closed. No branches/tags were pushed, no release was published, and no workflow was dispatched.
+
 ---
 
 ## 0. Binding decisions (from BUILD.md)
