@@ -290,6 +290,12 @@ async function apply() {
     }
   }
 }
+function loadState(next) {
+  state = next;
+  document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
+  $('profile').value = state.profile;
+  update();
+}
 async function start() {
   const response = await fetch('/api/bootstrap');
   const body = await response.json();
@@ -310,14 +316,11 @@ async function start() {
   $('reset-modules').addEventListener('click', () => { state.modules = null; update(); });
   $('load').addEventListener('click', async () => {
     try {
-      if ($('prefill').value === 'new') state = { mode: 'quick', answers: {}, profile: '', modules: null };
+      if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, profile: '', modules: null });
       else {
         const [kind, name] = $('prefill').value.split(':');
-        state = await (await request('prefill', { kind, ...(name ? { name } : {}) })).json();
+        loadState(await (await request('prefill', { kind, ...(name ? { name } : {}) })).json());
       }
-      document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
-      $('profile').value = state.profile;
-      update();
     } catch (e) { error(e.message); }
   });
   $('draft').addEventListener('click', () => perform('draft'));
@@ -342,6 +345,9 @@ async function start() {
     if ($('apply-dialog').returnValue === 'apply') apply();
     else $('secret-fields').replaceChildren();
   });
-  update();
+  if (catalog.handoff) {
+    loadState({ profile: '', modules: null, ...catalog.handoff });
+    status('Continued from the terminal: your answers so far are filled in. Nothing is written until Apply.');
+  } else update();
 }
 start().catch((e) => { actions(false); error(e.message); status('The form could not start. Nothing was written.'); });

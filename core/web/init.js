@@ -15,13 +15,14 @@ import { printNextSteps } from '../cli/next-steps.js';
 
 export const DRAFT = '.yaw/draft.yaml';
 
-export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr }) {
+// handoff: answers given so far in the terminal (#162), shown prefilled; never written before apply.
+export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null }) {
   const model = createFormModel({ root, kitRoot, env });
   const ensureNew = () => {
     if (readManifest(root)) throw new FormError('This project is already initialized; use yaw update', 409);
   };
   return {
-    bootstrap: () => ({ ...model.bootstrap(), skipVerify }),
+    bootstrap: () => ({ ...model.bootstrap(), skipVerify, handoff }),
     prepareApply(input) {
       ensureNew();
       if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
@@ -124,8 +125,8 @@ export function openBrowser(target, env) {
   });
 }
 
-export async function initWeb({ io, skipVerify, verify }) {
-  const api = createFormApi({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, verify, skipVerify, stderr: io.stderr });
+export async function initWeb({ io, skipVerify, verify, handoff }) {
+  const api = createFormApi({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, verify, skipVerify, stderr: io.stderr, handoff });
   let finish;
   const done = new Promise((r) => { finish = r; });
   let exitCode = 1;

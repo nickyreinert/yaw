@@ -5,6 +5,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ## [Unreleased]
 
 ### Added
+- `yaw init`: answer `web` at the setup depth, any question or the profile choice to continue in the browser form with your answers so far (#162).
 - `yaw init` puts your idea into `README.md` (#171): a new README if there is none, otherwise one marked "Idea" section appended without touching your text. The confirmation lists it.
 
 - The language question offers Kotlin, Swift, Go, Rust and Java; "where should it run" offers `static` (GitHub Pages, Netlify) and every option of both questions has a one-line description. `static` suggests the static-site profile, Kotlin for an app store suggests android-kotlin, and the help explains what happens when no profile fits (#164, #165).

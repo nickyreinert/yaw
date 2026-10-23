@@ -53,7 +53,7 @@ The idea goes into `README.md` (#171): without a README, init writes one (`# Pro
 
 ### CLI lane
 
-- Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).
+- Prompts in batches per section (at most six), defaults in brackets, Enter takes the default, `?` expands help, `skip` takes the default and the summary lists it as "default". `web` (at the setup depth, at every question and at the profile choice) stops the terminal interview and opens the browser form with the answers so far filled in (#162); the folder check already ran, and the form writes nothing before Apply. Nothing is written before the summary is confirmed (ADR-0009, ADR-0020).
 - The first question is the setup depth (Quick or Full; Enter takes Quick), then the questions of the chosen depth for the modules it can select. The module set follows the answers (team, GitHub): the questions of a module that is not selected stay hidden by their `when` (for example the team questions of a solo project). The agent question (0.0) lists Claude Code, Codex and Copilot as selectable and the other agents with "(phase 3, not available yet)", which is the terminal form of greyed out. The expertise level (0.1) changes what is shown from the next question on (section 4).
 - Non-interactive: `yaw init --answers answers.yaml --yes` (CI, repeat setups).
 

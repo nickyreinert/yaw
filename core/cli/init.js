@@ -29,31 +29,43 @@ import { CODEX_HOOKS } from '../render/agents.js';
 import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
 
-// Ask for the profile; the suggestion is the default. Without one the user must choose.
+// Reply that hands the interview over to the browser form (#162).
+const WEB = 'web';
+
+// Ask for the profile; the suggestion is the default. Without one the user must choose. -> name | WEB
 async function chooseProfile({ prompter, profiles, suggestion }) {
   prompter.show('\nStack profile\n');
   profiles.forEach((p, i) => prompter.show(`  ${i + 1}) ${p.name} - ${p.summary}\n`));
   prompter.show(suggestion ? `  Suggested from your answers: ${suggestion}\n` : '  No single profile matches your answers; choose one.\n');
   for (;;) {
-    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${suggestion}]` : ''} > `)).trim();
+    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${suggestion}]` : ''} (web) > `)).trim();
     if (reply === '' && suggestion) return suggestion;
+    if (reply.toLowerCase() === WEB) return WEB;
     const hit = profiles.find((p, i) => p.name === reply || String(i + 1) === reply);
     if (hit) return hit.name;
     prompter.show(`  choose one of: ${profiles.map((p) => p.name).join(', ')}\n`);
   }
 }
 
-// Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full'
+// Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | WEB
 async function chooseMode({ prompter }) {
   prompter.show('\nSetup depth\n');
   prompter.show('  1) quick - prototype or MVP: the essential baseline, short interview with defaults\n');
   prompter.show('  2) full  - long-lived product: the tooling that applies to the project, all questions\n');
   for (;;) {
-    const reply = (await prompter.ask('  Setup depth [quick] > ')).trim().toLowerCase();
+    const reply = (await prompter.ask('  Setup depth [quick] (web) > ')).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'full') return 'full';
+    if (reply === WEB) return WEB;
     prompter.show('  choose quick or full\n');
   }
+}
+
+// Continue in the browser form with what was answered so far (#162). The folder guard already ran; nothing is written here.
+function handOff({ io, values, mode, answers = {}, profile = '' }) {
+  io.prompter.close?.();
+  io.stdout.write('\nContinuing in the browser with your answers so far; nothing was written.\n');
+  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers, profile } });
 }
 
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
@@ -185,13 +197,15 @@ export async function init({ values, positionals, io }) {
     }
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
-    io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default"). Nothing is written until you confirm.\n');
+    io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", web continues in the browser). Nothing is written until you confirm.\n');
     const mode = await chooseMode({ prompter: io.prompter });
+    if (mode === WEB) return handOff({ io, values, mode: 'quick' });
     // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
     // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
     // not selected is hidden by its `when` (team.session-context needs idea.team = team).
     const questions = withGitHubHint(collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } })), githubStatus({ root, env: io.env }));
-    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot });
+    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, allowWeb: true });
+    if (r.web) return handOff({ io, values, mode, answers: r.answers });
     if (r.answers['tasks.use-github'] === false && questions.some((q) => q.id === 'tasks.mode')) {
       io.prompter.show('      Task tracking: local (TASKS.md), because GitHub is off for this project.\n');
     }
@@ -214,6 +228,7 @@ export async function init({ values, positionals, io }) {
     how = `suggested from ${describeFacts(facts)}`;
   } else {
     const name = await chooseProfile({ prompter: io.prompter, profiles, suggestion });
+    if (name === WEB) return handOff({ io, values, mode: answersDoc.mode, answers: answersDoc.answers, profile: suggestion ?? '' });
     chosen = [name];
     how = name === suggestion ? `suggested from ${describeFacts(facts)}` : 'chosen by you';
   }

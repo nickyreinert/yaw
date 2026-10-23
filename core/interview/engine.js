@@ -4,6 +4,7 @@
 //   Enter   takes the default (counts as answered)
 //   skip    takes the default and lists the question as "default" in the summary
 //   ?       shows the help text
+//   web     (yaw init only) continues in the browser form with the answers so far (#162)
 // Questions of a mode that is not asked, and nothing else, are defaulted the same way. The engine only
 // returns answers; writing them is the caller's job after the user confirmed.
 
@@ -151,8 +152,9 @@ const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expert
 
 // questions: all questions of the enabled modules (base first). mode: quick | standard | full.
 // known: answers that already exist; only used to evaluate `when`, never returned.
+// allowWeb: the reply "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
 // -> { answers, defaulted: string[] }  (answers hold every question whose `when` holds, defaults included)
-export async function runInterview({ questions, mode, prompter, kitRoot, known = {} }) {
+export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, allowWeb = false }) {
   const answers = {};
   const seen = () => ({ ...known, ...answers }); // `when` may refer to answers given earlier (yaw add)
   const defaulted = [];
@@ -161,6 +163,13 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
   const total = asked.length;
   let number = 0;
   const batches = batchesOf(asked);
+  const ordered = () => {
+    // Keep the order of the question list so the answers file does not depend on the order of replies.
+    const out = {};
+    for (const q of questions) if (Object.hasOwn(answers, q.id)) out[q.id] = answers[q.id];
+    return out;
+  };
+  const options = allowWeb ? '? help, skip, web' : '? help, skip';
   for (let b = 0; b < batches.length; b++) {
     const batch = batches[b];
     prompter.show(`\n${batch.title} (${b + 1}/${batches.length})\n`);
@@ -176,7 +185,8 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
       prompter.show(`${render(q, number, total, expertise)}\n`);
       if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
       for (;;) {
-        const reply = await prompter.ask(`      [${formatDefault(q)}] (? help, skip) > `);
+        const reply = await prompter.ask(`      [${formatDefault(q)}] (${options}) > `);
+        if (allowWeb && reply.trim().toLowerCase() === 'web') return { answers: ordered(), defaulted, web: true };
         const r = parseReply(q, reply);
         if (r.help) {
           prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
@@ -199,8 +209,5 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     answers[q.id] = q.default;
     defaulted.push(q.id);
   }
-  // Keep the order of the question list so the answers file does not depend on the order of replies.
-  const ordered = {};
-  for (const q of questions) if (Object.hasOwn(answers, q.id)) ordered[q.id] = answers[q.id];
-  return { answers: ordered, defaulted };
+  return { answers: ordered(), defaulted };
 }

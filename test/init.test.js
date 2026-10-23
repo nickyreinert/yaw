@@ -263,3 +263,43 @@ test('init puts the idea into README.md: a new file, or a section appended once 
   assert.match(kept.out, /added your idea as a section to: README\.md/);
   assert.equal(readManifest(dir).files.find((f) => f.path === 'README.md'), undefined, 'the user file stays unrecorded');
 });
+
+test('interview: "web" at a question continues in the browser form with the answers so far; nothing is written (#162)', async () => {
+  const dir = tmp('yaw-proj-');
+  const stdout = capture();
+  const asked = [];
+  const prompter = scripted(['', 'codex', '', 'web']);
+  const ask = prompter.ask;
+  prompter.ask = async (q) => { asked.push(q); return ask(q); };
+  let url;
+  const running = main(['init', '--skip-verify'], {
+    cwd: dir, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter,
+    openBrowser: async (u) => { url = u; return true; },
+  });
+  for (let i = 0; i < 100 && !url; i++) await new Promise((r) => setTimeout(r, 20));
+  const cookie = (await fetch(url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
+  const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
+  process.emit('SIGINT');
+  await running;
+  assert.match(asked[0], /Setup depth \[quick\] \(web\) > $/);
+  assert.match(asked[1], /\(\? help, skip, web\) > $/);
+  assert.deepEqual(boot.handoff, { mode: 'quick', answers: { 'user.agents': ['codex'], 'user.expertise': 'intermediate' }, profile: '' });
+  assert.match(stdout.text(), /Continuing in the browser with your answers so far; nothing was written\./);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test('setup depth "web" opens the form at once, with an empty hand-off (#162)', async () => {
+  const dir = tmp('yaw-proj-');
+  let url;
+  const running = main(['init'], {
+    cwd: dir, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, stdout: capture(), stderr: capture(), prompter: scripted(['WEB']),
+    openBrowser: async (u) => { url = u; return true; },
+  });
+  for (let i = 0; i < 100 && !url; i++) await new Promise((r) => setTimeout(r, 20));
+  const cookie = (await fetch(url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
+  const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
+  process.emit('SIGINT');
+  await running;
+  assert.deepEqual(boot.handoff, { mode: 'quick', answers: {}, profile: '' });
+  assert.deepEqual(readdirSync(dir), []);
+});
