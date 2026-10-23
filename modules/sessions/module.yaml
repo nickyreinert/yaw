@@ -1,7 +1,7 @@
 # modules/sessions/module.yaml (Y-5.7, ADR-0029): session registry in ~/.yaw/yaw.db, Agent-Session commit trailer,
 # /handoff skill (doc 12 §4, doc 11 §1, BD3).
 name: sessions
-description: Registry of agent sessions (title from the active task, tasks, commits, files) in ~/.yaw/yaw.db, an Agent-Session trailer on `just commit`, the /handoff skill, and `yaw sessions find / for / resume`.
+description: Registry of agent sessions (title from the active task, tasks, commits, files) in ~/.yaw/yaw.db, an Agent-Session trailer on `just commit`, the /handoff skill, `yaw sessions find / for / resume`, and `yaw sessions import` for past sessions.
 depends: [core]
 default: { quick: false, standard: true, full: true }
 questions: []

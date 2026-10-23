@@ -20,7 +20,9 @@ test('phase-1 schema: migration table + session registry tables only (BD3)', (t)
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((r) => r.name);
   assert.deepEqual(tables, ['schema_migrations', 'session_links', 'sessions']);
   const versions = db.prepare('SELECT version, name FROM schema_migrations').all().map((r) => ({ ...r }));
-  assert.deepEqual(versions, [{ version: 1, name: 'session-registry' }]);
+  assert.deepEqual(versions, [{ version: 1, name: 'session-registry' }, { version: 2, name: 'session-usage' }]);
+  const columns = db.prepare('PRAGMA table_info(sessions)').all().map((c) => c.name);
+  assert.deepEqual(columns.slice(-5), ['model', 'tokens_in', 'tokens_out', 'cost_usd', 'source']);
   assert.equal(SCHEMA_VERSION, MIGRATIONS.length);
   db.close();
 });
@@ -50,7 +52,7 @@ test('migrations run once; reopening is a no-op; a newer database is refused', (
   const file = tempDb(t);
   openYawDb(file).close();
   const db = openYawDb(file);
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, SCHEMA_VERSION);
   assert.equal(migrate(db), SCHEMA_VERSION);
   db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(99, 'future', '2030-01-01T00:00:00Z');
   assert.throws(() => migrate(db), /schema version 99/);
@@ -72,4 +74,19 @@ test('loadSqlite restores process.emitWarning', () => {
   const before = process.emitWarning;
   loadSqlite();
   assert.equal(process.emitWarning, before);
+});
+
+test('a phase-1 registry (version 1) gains the usage columns and keeps its rows (#174)', (t) => {
+  const file = tempDb(t);
+  const { DatabaseSync } = loadSqlite();
+  const old = new DatabaseSync(file);
+  old.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL) STRICT');
+  old.exec(MIGRATIONS[0].sql);
+  old.prepare('INSERT INTO schema_migrations VALUES (1, ?, ?)').run(MIGRATIONS[0].name, '2026-10-01T00:00:00Z');
+  old.prepare("INSERT INTO sessions (id, agent, project, started) VALUES ('claude:x1', 'claude', '/p', '2026-10-01T00:00:00Z')").run();
+  old.close();
+  const db = openYawDb(file);
+  assert.deepEqual({ ...db.prepare('SELECT id, model, tokens_in, source FROM sessions').get() }, { id: 'claude:x1', model: null, tokens_in: null, source: null });
+  assert.equal(db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get().v, 2);
+  db.close();
 });

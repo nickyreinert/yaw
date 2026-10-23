@@ -4,9 +4,11 @@
 
 import { checkRelPath } from '../../../core/render/files.js';
 import { THRESHOLD, cosine, embed } from '../../../core/lib/retrieval.js';
-import { AGENTS, SESSION_ID, clean, currentSession, realRoot, recordSession, resumeCommand, withRegistry } from './registry.js';
+import { existsSync } from 'node:fs';
+import { AGENTS, SESSION_ID, clean, currentSession, realRoot, recordSession, registryFile, resumeCommand, withRegistry } from './registry.js';
+import { findSessions, importSessions } from './import.js';
 
-export const VERBS = ['find', 'for', 'resume', 'list', 'current', 'handoff'];
+export const VERBS = ['find', 'for', 'resume', 'list', 'current', 'handoff', 'import'];
 export const USAGE = [
   'usage: yaw sessions find "<words>" [--all]          sessions of this project whose title, branch or links match',
   '       yaw sessions for <T-012|#34|ADR-0004|hash|file> [--all]   sessions linked to a task, decision, commit or file',
@@ -15,6 +17,8 @@ export const USAGE = [
   '       yaw sessions current                        the session id `just commit` puts into the Agent-Session trailer',
   '       yaw sessions handoff [--title "T-012 title"] [--agent claude|codex|copilot] [--session <id>]',
   '                                                   record this session in the registry (the /handoff skill calls it)',
+  '       yaw sessions import [--dry-run] [--agent claude|codex|copilot]',
+  '                                                   load past sessions of this folder from the agents\' local history',
   '--all searches every project, not only this one. YAW_SESSION=<id> overrides the current session.',
 ].join('\n');
 
@@ -118,6 +122,7 @@ export function runSessions({ verb, args = [], values = {}, io }) {
       case 'resume': return resume(db, args);
       case 'list': return candidates(db, ctx).slice(0, SHOWN).map(line);
       case 'handoff': return handoff(db, ctx, values);
+      case 'import': throw new SessionsUsageError('import runs through runImport');
       case 'current': {
         const id = currentSession({ db, root: ctx.root, env: ctx.env, now: ctx.now });
         return id ? [id] : null;
@@ -130,5 +135,40 @@ export function runSessions({ verb, args = [], values = {}, io }) {
     return 1;
   }
   out.write(lines.length > 0 ? `${lines.join('\n')}\n` : 'no matching session\n');
+  return 0;
+}
+
+const thousands = (n) => (n ? `${Math.round(n / 1000)}k` : '-');
+
+// `yaw sessions import` (#174): metadata of past sessions of this folder from the agents' own local history.
+export async function runImport({ args = [], values = {}, io }) {
+  if (args.length > 0) throw new SessionsUsageError(`unexpected argument "${clean(args[0])}"`);
+  if (values.agent !== undefined && !AGENTS.includes(values.agent)) throw new SessionsUsageError(`--agent must be one of ${AGENTS.join(', ')}`);
+  const env = io.env ?? process.env;
+  const dryRun = Boolean(values['dry-run']);
+  const found = await findSessions({ env, root: io.root, agents: values.agent ? [values.agent] : AGENTS });
+  // A dry run never creates the registry: without one every session would be new.
+  const results = dryRun && !existsSync(registryFile(env)) ? importSessions(null, io.root, found, { dryRun }) : withRegistry(env, (db) => {
+    db.exec('BEGIN');
+    try {
+      const r = importSessions(db, io.root, found, { dryRun });
+      db.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
+      return r;
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  });
+  const out = io.stdout;
+  const counts = { new: 0, updated: 0, unchanged: 0 };
+  for (const s of results) {
+    counts[s.state] += 1;
+    if (s.state === 'unchanged') continue;
+    const label = dryRun ? { new: 'would add', updated: 'would update' }[s.state] : { new: 'added', updated: 'updated' }[s.state];
+    out.write(`${label}  ${s.id}  ${s.started.slice(0, 16).replace('T', ' ')}  ${clean(s.model) || '-'}  in ${thousands(s.tokensIn)} out ${thousands(s.tokensOut)}${s.costUsd ? `  $${s.costUsd.toFixed(2)}` : ''}${s.branch ? `  [${clean(s.branch)}]` : ''}\n`);
+  }
+  const project = realRoot(io.root);
+  out.write(`sessions import: ${results.length} session(s) of ${project} found; ${counts.new} new, ${counts.updated} updated, ${counts.unchanged} unchanged${dryRun ? '; nothing was written (--dry-run)' : ''}\n`);
+  if (results.length === 0) out.write('Looked in ~/.claude/projects, ~/.codex/sessions and ~/.copilot/session-state for sessions started in this folder.\n');
   return 0;
 }

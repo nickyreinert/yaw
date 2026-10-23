@@ -51,6 +51,18 @@ export const MIGRATIONS = [
       CREATE INDEX session_links_by_ref ON session_links (kind, ref);
     `,
   },
+  {
+    version: 2,
+    name: 'session-usage',
+    // #174: usage metadata of `yaw sessions import`; hook-recorded rows leave these NULL.
+    sql: `
+      ALTER TABLE sessions ADD COLUMN model      TEXT;     -- the model used most, as the agent names it
+      ALTER TABLE sessions ADD COLUMN tokens_in  INTEGER;  -- input tokens, cached input included
+      ALTER TABLE sessions ADD COLUMN tokens_out INTEGER;
+      ALTER TABLE sessions ADD COLUMN cost_usd   REAL;     -- only when the agent reports US dollars (Claude Code)
+      ALTER TABLE sessions ADD COLUMN source     TEXT;     -- NULL: recorded by hooks; 'import': yaw sessions import
+    `,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

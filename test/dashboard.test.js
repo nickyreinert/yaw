@@ -29,6 +29,7 @@ test('dashboard data: project facts, tasks, and session stats for this project a
     add.run('codex:b2', 'codex', project, 'Docs', '2026-10-21T09:00:00.000Z', '2026-10-21T09:20:00.000Z', 'main');
     add.run('claude:c3', 'claude', '/elsewhere', 'Other', '2026-10-22T09:00:00.000Z', null, 'main');
     db.prepare("INSERT INTO session_links (session_id, kind, ref) VALUES ('claude:a1', 'commit', 'abc1234'), ('claude:a1', 'task', 'T-001')").run();
+    db.prepare("UPDATE sessions SET model = 'opus', tokens_in = 1000, tokens_out = 200, cost_usd = 1.5 WHERE id = 'claude:a1'").run();
   });
   const data = await dashboardData({ root, kitRoot: KIT_ROOT, env, now: new Date('2026-10-23T00:00:00Z') });
   assert.equal(data.project.profiles[0], 'node-cli');
@@ -39,7 +40,10 @@ test('dashboard data: project facts, tasks, and session stats for this project a
   const mine = data.sessions.project;
   assert.equal(mine.sessions, 2);
   assert.equal(mine.minutes, 110);
-  assert.deepEqual(mine.byAgent, { claude: { sessions: 1, minutes: 90 }, codex: { sessions: 1, minutes: 20 } });
+  assert.deepEqual(mine.byAgent, { claude: { sessions: 1, minutes: 90, tokens: 1200 }, codex: { sessions: 1, minutes: 20 } });
+  assert.equal(mine.tokens, 1200);
+  assert.equal(mine.costUsd, 1.5);
+  assert.equal(mine.recent[1].model, 'opus');
   assert.equal(mine.recent[0].id, 'codex:b2');
   assert.equal(mine.recent[1].commits, 1);
   assert.equal(mine.recent[1].tasks, 1);

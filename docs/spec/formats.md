@@ -90,7 +90,7 @@ Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against t
 
 ## Session registry (`~/.yaw/yaw.db`)
 
-Phase 1 has only `schema_migrations`, `sessions` and `session_links` (BD3). See `core/lib/db.js` and ADR-0018; fields follow doc 12 §4 (`tasks`, `decisions`, `commits`, `files` become `session_links` rows of that `kind`). The `sessions` module (ADR-0029) fills it: ids are `<agent>:<native id>`, `task` / `commit` / `file` links are written by its hooks, `Agent-Session: <id>` is the commit trailer, `resume` is informational (`yaw sessions resume` rebuilds the command).
+Phase 1 has only `schema_migrations`, `sessions` and `session_links` (BD3). See `core/lib/db.js` and ADR-0018; fields follow doc 12 §4 (`tasks`, `decisions`, `commits`, `files` become `session_links` rows of that `kind`). The `sessions` module (ADR-0029) fills it: ids are `<agent>:<native id>`, `task` / `commit` / `file` links are written by its hooks, `Agent-Session: <id>` is the commit trailer, `resume` is informational (`yaw sessions resume` rebuilds the command). Migration 2 (`session-usage`, #174) adds `model`, `tokens_in` (cached input included), `tokens_out`, `cost_usd` (only what Claude Code reports) and `source` (`NULL` = hooks, `import`); `yaw sessions import` fills them from the agents' local history (Claude Code `~/.claude/projects/<path with non-alphanumerics as ->/*.jsonl`, Codex `~/.codex/sessions/**/rollout-*.jsonl`, Copilot CLI `~/.copilot/session-state/<id>/{workspace.yaml,events.jsonl}`), keyed by session id, never storing prompt, response, title or file content.
 
 ## Decision journal (`.decisions/`)
 

@@ -73,25 +73,33 @@ async function decisionsSection(root, kitRoot) {
   };
 }
 
+// Imported sessions (#174) carry token counts; hook-recorded ones count 0.
+const tokensOf = (r) => Number(r.tokens_in ?? 0) + Number(r.tokens_out ?? 0);
+
 // Session stats from the registry. A missing registry is reported, never created by the dashboard.
 export async function sessionsSection(root, kitRoot, env, now = new Date()) {
   const registry = await import(pathToFileURL(join(kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
   if (!existsSync(registry.registryFile(env))) return { available: false };
   return registry.withRegistry(env, (db) => {
     const project = registry.realRoot(root);
-    const rows = db.prepare('SELECT id, agent, project, title, started, ended, branch, pr FROM sessions ORDER BY started DESC').all();
+    const rows = db.prepare('SELECT id, agent, project, title, started, ended, branch, pr, model, tokens_in, tokens_out, cost_usd FROM sessions ORDER BY started DESC').all();
     const links = db.prepare("SELECT session_id, kind, COUNT(*) AS n FROM session_links GROUP BY session_id, kind").all();
     const linkCount = new Map();
     for (const l of links) linkCount.set(`${l.session_id}\u0000${l.kind}`, Number(l.n));
     const summarize = (list) => {
       const byAgent = {};
       let total = 0;
+      let tokens = 0;
+      let cost = 0;
       for (const r of list) {
         const m = minutes(r);
         total += m;
+        tokens += tokensOf(r);
+        cost += Number(r.cost_usd ?? 0);
         byAgent[r.agent] ??= { sessions: 0, minutes: 0 };
         byAgent[r.agent].sessions += 1;
         byAgent[r.agent].minutes += m;
+        if (tokensOf(r) > 0) byAgent[r.agent].tokens = (byAgent[r.agent].tokens ?? 0) + tokensOf(r);
       }
       const since = now.getTime() - 30 * DAY_MS;
       const days = {};
@@ -102,7 +110,7 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
           days[day] = (days[day] ?? 0) + 1;
         }
       }
-      return { sessions: list.length, minutes: total, byAgent, last30Days: days };
+      return { sessions: list.length, minutes: total, tokens, costUsd: Math.round(cost * 100) / 100, byAgent, last30Days: days };
     };
     const mine = rows.filter((r) => r.project === project);
     const projects = {};
@@ -110,6 +118,7 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
       projects[r.project] ??= { project: r.project, sessions: 0, minutes: 0, last: r.started };
       projects[r.project].sessions += 1;
       projects[r.project].minutes += minutes(r);
+      projects[r.project].tokens = (projects[r.project].tokens ?? 0) + tokensOf(r);
       if (r.started > projects[r.project].last) projects[r.project].last = r.started;
     }
     return {
@@ -118,7 +127,7 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
         ...summarize(mine),
         recent: mine.slice(0, 50).map((r) => ({
           id: r.id, agent: r.agent, title: registry.clean(r.title), started: r.started, ended: r.ended,
-          minutes: minutes(r), branch: registry.clean(r.branch), pr: r.pr,
+          minutes: minutes(r), branch: registry.clean(r.branch), pr: r.pr, model: registry.clean(r.model), tokens: tokensOf(r),
           commits: linkCount.get(`${r.id}\u0000commit`) ?? 0, tasks: linkCount.get(`${r.id}\u0000task`) ?? 0,
         })),
       },

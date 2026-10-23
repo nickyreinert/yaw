@@ -69,7 +69,7 @@ For a local browser form instead of terminal questions, run `yaw init --web`. Th
 
 To plan the work, `yaw kickoff` prints a planning prompt for your idea; paste the answer into `docs/plan/kickoff.md` and run `yaw kickoff import docs/plan/kickoff.md` to turn it into tasks with a model tier and reasoning effort each.
 
-After setup, `yaw web` opens a local, read-only dashboard with the project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`).
+After setup, `yaw web` opens a local, read-only dashboard with the project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`). `yaw sessions import --dry-run`, then `yaw sessions import`, loads the past sessions of any project folder (also one without YAW) from the local history of Claude Code, Codex and Copilot: times, model and token counts only, never prompt content.
 
 ## Quick and Full
 

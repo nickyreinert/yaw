@@ -31,6 +31,7 @@ function facts(pairs) {
 }
 
 const hours = (m) => (m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
+const tokens = (n) => (!n ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(1)} M` : `${Math.round(n / 1000)} k`);
 const when = (iso) => (iso ? iso.replace('T', ' ').slice(0, 16) : '');
 
 function fill(id, ...nodes) {
@@ -45,9 +46,12 @@ function problem(section, hint) {
 }
 
 function stats(s) {
-  const nodes = [facts([['Sessions', s.sessions], ['Time (start to last activity)', hours(s.minutes)]])];
+  const rows = [['Sessions', s.sessions], ['Time (start to last activity)', hours(s.minutes)]];
+  if (s.tokens) rows.push(['Tokens (imported sessions)', tokens(s.tokens)]);
+  if (s.costUsd) rows.push(['Cost reported by Claude Code', `$${s.costUsd.toFixed(2)}`]);
+  const nodes = [facts(rows)];
   const agents = Object.entries(s.byAgent);
-  if (agents.length) nodes.push(table(['Agent', 'Sessions', 'Time'], agents.map(([a, v]) => [a, v.sessions, hours(v.minutes)])));
+  if (agents.length) nodes.push(table(['Agent', 'Sessions', 'Time', 'Tokens'], agents.map(([a, v]) => [a, v.sessions, hours(v.minutes), tokens(v.tokens)])));
   const days = Object.entries(s.last30Days).sort();
   if (days.length) {
     const max = Math.max(...days.map(([, n]) => n));
@@ -77,7 +81,7 @@ function render(data) {
   }
 
   const s = data.sessions;
-  const noRegistry = 'No session registry yet. Sessions are recorded by the sessions module when an agent starts in a YAW project (~/.yaw/yaw.db).';
+  const noRegistry = 'No session registry yet. Sessions are recorded by the sessions module when an agent starts in a YAW project (~/.yaw/yaw.db); yaw sessions import loads past ones.';
   const none = problem(s, noRegistry);
   if (none) {
     fill('sessions', ...none);
@@ -85,11 +89,11 @@ function render(data) {
   } else {
     const recent = s.project.recent;
     fill('sessions', ...stats(s.project), el('h3', 'Recent sessions'),
-      recent.length ? table(['Started', 'Agent', 'Title', 'Branch', 'Time', 'Commits', 'Tasks'],
-        recent.map((r) => [when(r.started), r.agent, r.title, r.branch, hours(r.minutes), r.commits, r.tasks]))
-        : el('p', 'No sessions recorded for this project yet.'));
+      recent.length ? table(['Started', 'Agent', 'Title', 'Branch', 'Model', 'Tokens', 'Time', 'Commits', 'Tasks'],
+        recent.map((r) => [when(r.started), r.agent, r.title, r.branch, r.model, tokens(r.tokens), hours(r.minutes), r.commits, r.tasks]))
+        : el('p', 'No sessions recorded for this project yet. Past sessions: yaw sessions import.'));
     fill('all', ...stats(s.all), el('h3', 'Projects'),
-      table(['Project', 'Sessions', 'Time', 'Last session'], s.all.projects.map((x) => [x.project, x.sessions, hours(x.minutes), when(x.last)])));
+      table(['Project', 'Sessions', 'Time', 'Tokens', 'Last session'], s.all.projects.map((x) => [x.project, x.sessions, hours(x.minutes), tokens(x.tokens), when(x.last)])));
   }
 
   const t = data.tasks;
