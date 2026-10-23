@@ -67,6 +67,8 @@ If you enter new secret values, YAW writes them only to a new mode-0600 `.env` f
 
 For a local browser form instead of terminal questions, run `yaw init --web`. The form is served locally and still requires an explicit confirmation before writing files.
 
+To plan the work, `yaw kickoff` prints a planning prompt for your idea; paste the answer into `docs/plan/kickoff.md` and run `yaw kickoff import docs/plan/kickoff.md` to turn it into tasks with a model tier and reasoning effort each.
+
 After setup, `yaw web` opens a local, read-only dashboard with the project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`).
 
 ## Quick and Full

@@ -33,7 +33,7 @@ function tree(root, prefix = '') {
 
 test('opt-in: the default is no; declining and non-interactive runs write nothing to ~/.yaw', async () => {
   const home = tmp('yaw-home-');
-  const declinedP = scripted([...INTERVIEW, '', 'y', '', '']);
+  const declinedP = scripted([...INTERVIEW, '', 'y', '', '', '']);
   const declined = await yaw(['init', '--skip-verify'], { home, prompter: declinedP });
   assert.equal(declined.code, 0, declined.err);
   assert.match(declinedP.asked.join('\n'), /Save this setup as a preset in .*\.yaw\/presets\/ and add a line \(project path, date, kit version\) to .*history\.jsonl\?/);
@@ -49,7 +49,7 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
 
 test('opt-in yes: profile, preset and history are written with restrictive modes; every later setup asks again', async () => {
   const home = tmp('yaw-home-');
-  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y']) });
+  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y', '']) });
   assert.equal(r.code, 0, r.err);
   const dir = join(home, '.yaw');
   assert.equal(mode(dir), 0o700);
@@ -79,7 +79,7 @@ test('opt-in yes: profile, preset and history are written with restrictive modes
   assert.equal(lines[0].preset, preset.name);
 
   // no standing yes: the second setup is asked again, a "no" to both writes nothing new
-  const againP = scripted([...INTERVIEW, '', 'y', '', '']);
+  const againP = scripted([...INTERVIEW, '', 'y', '', '', '']);
   const again = await yaw(['init', '--skip-verify'], { home, prompter: againP });
   assert.equal(again.code, 0, again.err);
   assert.match(againP.asked.join('\n'), /Save this setup as a preset/);
@@ -88,7 +88,7 @@ test('opt-in yes: profile, preset and history are written with restrictive modes
 
   // preset yes, profile no: the profile file stays as it was
   const before = readFileSync(join(dir, 'user-profile.yaml'), 'utf8');
-  const third = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', '']) });
+  const third = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', '', '']) });
   assert.equal(third.code, 0, third.err);
   assert.equal(readFileSync(join(dir, 'history.jsonl'), 'utf8').trim().split('\n').length, 2);
   assert.equal(readdirSync(join(dir, 'presets')).length, 2);
@@ -101,7 +101,7 @@ test('a broken user-profile.yaml is never overwritten; an unknown key only print
     const home = tmp('yaw-home-');
     mkdirSync(join(home, '.yaw'), { recursive: true });
     writeFileSync(join(home, '.yaw/user-profile.yaml'), text);
-    const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y']) });
+    const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, '', 'y', 'y', 'y', '']) });
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, message);
     assert.match(r.out, /not saved/);
@@ -235,7 +235,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   const home = tmp('yaw-home-');
   const interview = [...INTERVIEW];
   interview[5] = `Deploy with ${CANARY}`;
-  const prompter = scripted([...interview, '', 'y', 'y', 'y']);
+  const prompter = scripted([...interview, '', 'y', 'y', 'y', '']);
   const r = await yaw(['init', '--skip-verify'], { home, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /not saved: idea\.text \(token-prefix\) looks like a secret/);

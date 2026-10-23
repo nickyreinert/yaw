@@ -25,7 +25,7 @@ const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted([...INTERVIEW, '', 'y', '', '']);
+  const prompter = scripted([...INTERVIEW, '', 'y', '', '', 'y']);
   // look at the folder at the moment the confirmation is asked
   const ask = prompter.ask;
   const seen = [];
@@ -54,6 +54,11 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
   assert.equal(readManifest(dir).files.length, 16);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
+  // kickoff guidance (#173): asked last, the prompt carries the idea and the task store
+  assert.match(prompter.asked.at(-1), /guidance to kick off/);
+  assert.match(r.out, /yaw kickoff prints a planning prompt/);
+  assert.match(r.out, /----- prompt -----\n[\s\S]*\nRename photos by EXIF date\.\n[\s\S]*Work items become local tasks in TASKS\.md[\s\S]*----- end of prompt -----/);
+  assert.match(r.out, /yaw kickoff import docs\/plan\/kickoff\.md --dry-run/);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {
@@ -66,7 +71,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: with no single match the user chooses the profile (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', '', 'nope', '6', 'y', '', '']);
+  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', '', 'nope', '6', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
@@ -302,4 +307,11 @@ test('setup depth "web" opens the form at once, with an empty hand-off (#162)', 
   await running;
   assert.deepEqual(boot.handoff, { mode: 'quick', answers: {}, profile: '' });
   assert.deepEqual(readdirSync(dir), []);
+});
+
+test('interview: declining the kickoff guidance prints no prompt', async () => {
+  const dir = tmp('yaw-proj-');
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter: scripted([...INTERVIEW, '', 'y', '', '', 'n']) });
+  assert.equal(r.code, 0, r.err);
+  assert.doesNotMatch(r.out, /----- prompt -----/);
 });

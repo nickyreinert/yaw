@@ -5,6 +5,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ## [Unreleased]
 
 ### Added
+- Kickoff guidance (#173): `yaw init` (terminal interview) asks at the end whether you want guidance to kick off; `yaw kickoff` prints the steps and a planning prompt built from your idea, stack and task store (phases with model tier and reasoning effort). Save the answer as `docs/plan/kickoff.md`; `yaw kickoff import <plan.md> [--dry-run]` turns it into tasks or GitHub issues with model and effort through `yaw task new`, skipping titles that already exist and items checked as done.
 - `TASKS.md` explains itself (#175): a "How to work with this file" section with the working rules (track in progress, finish into the Done history, model tier and effort per task, specs vs plans), local and GitHub wording. Backlog items carry `  model: <tier> · effort: <level>`; `just task new --model --effort` writes it, `start` carries it into "Model / effort". On GitHub: `model:`/`effort:` labels or a body line.
 - Terminal interview: colour (bold titles, cyan keys, dimmed hints, the default in green) and up/down arrow keys to move through choices, without dependencies; `NO_COLOR`, `TERM=dumb` and pipes stay plain (#163).
 - `yaw init`: answer `web` at the setup depth, any question or the profile choice to continue in the browser form with your answers so far (#162).

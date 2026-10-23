@@ -28,6 +28,7 @@ export function nextSteps({ root, kitRoot, answers = {}, modules = [], profiles 
   }
   if (has('sessions')) lines.push('Sessions: yaw sessions list; the registry is ~/.yaw/yaw.db, on this machine only (never committed).');
   if (has('decisions')) lines.push('Decisions: .decisions/ (just decisions list, just decisions recall "topic").');
+  lines.push('Plan the work: yaw kickoff prints a planning prompt for your idea; yaw kickoff import turns the plan into tasks.');
   lines.push('Dashboard: yaw web (sessions, tasks and decisions in your browser, local only).');
   lines.push('All recipes: just --list. Check the setup any time: yaw doctor.');
   const tools = new Set();
