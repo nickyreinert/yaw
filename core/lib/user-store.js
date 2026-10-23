@@ -1,10 +1,10 @@
 // The user folder ~/.yaw/ (Y-7.2, ADR-0043, doc 02 §5): user profile, saved setups ("presets"), history.jsonl.
 // Created only after the user opted in; files 0600, folders 0700; answers only, never secrets (doc 08).
 
-import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import { parse, stringify } from './yaml.js';
+import { parse, stringify, YamlError } from './yaml.js';
 import { formatError } from './schema.js';
 import { schemas } from '../render/kit.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
@@ -19,14 +19,75 @@ const profileFile = (env) => join(userDir(env), 'user-profile.yaml');
 const presetsDir = (env) => join(userDir(env), 'presets');
 const presetFile = (env, name) => join(presetsDir(env), `${name}.yaml`);
 
-function dir(path) {
-  mkdirSync(path, { recursive: true, mode: 0o700 });
-  chmodSync(path, 0o700);
+const sameFile = (a, b) => a.dev === b.dev && a.ino === b.ino;
+
+function existingStat(path) {
+  try {
+    const st = lstatSync(path);
+    if (st.isSymbolicLink() || !st.isFile()) throw new Error(`${path} must be a regular file, not a symbolic link`);
+    return st;
+  } catch (e) {
+    if (e.code === 'ENOENT') return null;
+    throw e;
+  }
 }
 
-function write(path, text) {
-  writeFileSync(path, text, { mode: 0o600 });
-  chmodSync(path, 0o600);
+function isRegularFile(path) {
+  try {
+    return lstatSync(path).isFile();
+  } catch (e) {
+    if (e.code === 'ENOENT') return false;
+    throw e;
+  }
+}
+
+function directory(path, create = false) {
+  if (create) mkdirSync(path, { recursive: true, mode: 0o700 });
+  let expected;
+  try {
+    expected = lstatSync(path);
+  } catch (e) {
+    if (!create && e.code === 'ENOENT') return false;
+    throw e;
+  }
+  if (expected.isSymbolicLink() || !expected.isDirectory()) throw new Error(`${path} must be a real directory, not a symbolic link`);
+  const fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  try {
+    const actual = fstatSync(fd);
+    if (!actual.isDirectory() || !sameFile(expected, actual)) throw new Error(`${path} changed while opening`);
+    if (create) fchmodSync(fd, 0o700);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
+}
+
+function read(path) {
+  const expected = existingStat(path);
+  if (!expected) throw new Error(`${path} does not exist`);
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const actual = fstatSync(fd);
+    if (!actual.isFile() || !sameFile(expected, actual)) throw new Error(`${path} changed while opening`);
+    return readFileSync(fd, 'utf8');
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function write(path, text, { append = false } = {}) {
+  let fd;
+  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK |
+    (append ? constants.O_APPEND : 0);
+  try {
+    fd = openSync(path, flags, 0o600);
+    if (!fstatSync(fd).isFile()) throw new Error(`${path} must be a regular file`);
+    fchmodSync(fd, 0o600);
+    if (!append) ftruncateSync(fd, 0);
+    writeFileSync(fd, text);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 // Answers that must not be stored: [{ key, rule }]. Reports key and rule id, never the value.
@@ -63,11 +124,12 @@ export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now =
 
   let profileDoc = null;
   if (wantProfile) {
+    directory(userDir(env));
     const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
     let profile = {};
-    if (existsSync(profileFile(env))) {
+    if (existingStat(profileFile(env))) {
       try {
-        profile = parse(readFileSync(profileFile(env), 'utf8'))?.answers ?? {};
+        profile = parse(read(profileFile(env)))?.answers ?? {};
       } catch {
         throw new Error(`${profileFile(env)} cannot be read; fix or remove the file (it was left untouched)`);
       }
@@ -80,36 +142,42 @@ export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now =
   let name = null;
   let presetDoc = null;
   if (wantPreset) {
+    directory(userDir(env));
+    directory(presetsDir(env));
     name = `${date}-${slug(basename(projectRoot))}`;
-    for (let n = 2; existsSync(presetFile(env, name)); n += 1) name = `${date}-${slug(basename(projectRoot))}-${n}`;
+    for (let n = 2; existingStat(presetFile(env, name)); n += 1) name = `${date}-${slug(basename(projectRoot))}-${n}`;
     presetDoc = { name, description: `Setup of ${basename(projectRoot)}.`, created: date, source: projectRoot, mode, answers };
     check(`presets/${name}.yaml`, 'preset.schema.json', presetDoc);
   }
 
-  dir(userDir(env));
-  dir(presetsDir(env));
+  if (profileDoc) existingStat(profileFile(env));
+  if (presetDoc) {
+    existingStat(presetFile(env, name));
+    existingStat(join(userDir(env), 'history.jsonl'));
+  }
+  directory(userDir(env), true);
+  directory(presetsDir(env), true);
   if (profileDoc) write(profileFile(env), stringify(profileDoc));
   if (presetDoc) {
     write(presetFile(env, name), stringify(presetDoc));
     const history = join(userDir(env), 'history.jsonl');
-    appendFileSync(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { mode: 0o600 });
-    chmodSync(history, 0o600);
+    write(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { append: true });
   }
   return { saved: true, preset: name, profile: Boolean(profileDoc), dir: userDir(env) };
 }
 
 // -> [{ name, description, created, mode }] sorted by name
 export function listPresets(env) {
-  if (!existsSync(presetsDir(env))) return [];
+  directory(userDir(env));
+  if (!directory(presetsDir(env))) return [];
   return readdirSync(presetsDir(env))
     .filter((f) => f.endsWith('.yaml') && PRESET_NAME.test(f.slice(0, -5)))
+    .filter((f) => isRegularFile(join(presetsDir(env), f)))
     .sort()
     .map((f) => {
       let doc = {};
-      try {
-        doc = parse(readFileSync(join(presetsDir(env), f), 'utf8')) ?? {};
-      } catch {
-        doc = {};
+      try { doc = parse(read(join(presetsDir(env), f))) ?? {}; } catch (e) {
+        if (!(e instanceof YamlError)) throw e;
       }
       return { name: f.slice(0, -5), description: doc.description ?? '', created: doc.created ?? '', mode: doc.mode ?? '' };
     });
@@ -117,20 +185,23 @@ export function listPresets(env) {
 
 function existingPreset(env, name) {
   if (!PRESET_NAME.test(name)) throw new Error(`"${name}" is not a preset name (lower-case letters, digits, hyphens)`);
+  directory(userDir(env));
+  directory(presetsDir(env));
   const file = presetFile(env, name);
-  if (!existsSync(file)) throw new Error(`no preset "${name}" (yaw presets list shows them)`);
+  if (!existingStat(file)) throw new Error(`no preset "${name}" (yaw presets list shows them)`);
   return file;
 }
 
 export function readPreset(env, name) {
-  return readFileSync(existingPreset(env, name), 'utf8');
+  return read(existingPreset(env, name));
 }
 
 // Reading preferences is not consent to save them again.
 export function readUserProfile(env) {
+  directory(userDir(env));
   const file = profileFile(env);
-  if (!existsSync(file)) return null;
-  const doc = parse(readFileSync(file, 'utf8'));
+  if (!existingStat(file)) return null;
+  const doc = parse(read(file));
   check('user-profile.yaml', 'user-profile.schema.json', doc);
   return doc;
 }

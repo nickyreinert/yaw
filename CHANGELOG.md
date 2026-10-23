@@ -12,6 +12,8 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Fixed
 
+- The local form session cookie has an explicit `Max-Age` no longer than the server's idle timeout.
+- User profile, preset and history access refuses symlinked files and directories; file modes are set through validated descriptors.
 - GitHub is optional for team and external-reviewer setups, including projects with a local bare Git remote. CLI and browser selection stay identical.
 - Shared team instructions omit personal language, autonomy and output-style preferences; adding team enforcement to a solo Full setup stays within the 80-line budget.
 - Module add/remove keeps saved proposal modules synchronized, preserves unrelated YAML comments when only the module list changes, and rejects invalid module answer values before writes.

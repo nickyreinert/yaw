@@ -56,6 +56,7 @@ test('form server: a valid session gets the page with CSP and the cookie flags',
   const setCookie = r.headers.get('set-cookie');
   assert.match(setCookie, /HttpOnly/);
   assert.match(setCookie, /SameSite=Strict/);
+  assert.match(setCookie, /Max-Age=1800/);
   const ok = await fetch(`${base(s)}/`, { headers: { cookie: setCookie.split(';')[0] } });
   assert.equal(ok.status, 200);
   assert.match(ok.headers.get('content-security-policy'), /default-src 'self'/);
@@ -67,6 +68,11 @@ test('form server: a valid session gets the page with CSP and the cookie flags',
   assert.ok(assets.every((path) => path.startsWith('/') && !path.startsWith('//') || path.startsWith('#')));
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>[\s\S]*?\S[\s\S]*?<\/script>/);
 }));
+
+test('form server: session cookie lifetime is bounded by the configured idle timeout', () => withServer(async (s) => {
+  const response = await fetch(s.url, { redirect: 'manual' });
+  assert.match(response.headers.get('set-cookie'), /Max-Age=1(?:;|$)/);
+}, { idleMs: 1500 }));
 
 test('form server: a foreign Host header is refused', () => withServer(async (s) => {
   const { cookie } = await session(s);

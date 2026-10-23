@@ -55,8 +55,15 @@ Local runtime/platform pass (user-approved tools: official Node 24.22.1 tarball 
 - `shellcheck` on every tracked `*.sh` (the kit-ci command): clean. kit-ci's `install-in-container` job reproduced in `node:22.13-bookworm`: `test/install.test.js` 4/4.
 - #85 Linux part: in clean `node:22-trixie` and `node:24-trixie` containers, the `v0.1.0` tag's `install.sh` piped to bash (`YAW_REPO` = local clone, `--tag v0.1.0`), then `yaw --version` (0.1.0), Quick `yaw init` with `examples/node-cli/answers.yaml` (setup and check verified) and `just check` passed.
 - Closed on this evidence: #10, #22, #33, #34, #35, #36, #37, #38 (ADR location superseded by BD7/ADR-0028), #42, #43, #44, #48, #70, #71, #72, #73, #75, #134, then trackers #30, #39 and #49 once all sub-issues were closed. Read-back: **14 issues remain open**.
-- Still open: #19 (sub-issue #21 needs hosted CI on macOS + Linux runners; its own acceptance passed locally), #21, #60 (CI matrix; PHP smokes unrun locally), #85, #3 (live state matches; the bootstrap re-run is not reproducible without the original script), #82, #94, #107, #116, #123.
-- Findings filed (user-approved issue creation): #159 (form cookie `Max-Age`, P2) and #160 (`O_NOFOLLOW` for `~/.yaw` writes, P2) from Y-7.7; #161 (Y-8.1 HIGH finding, fixed under ADR-0046, closed after canary tests 44/44). Then closed #76, #78, #69 (parity and form-server tests 27/27) and #77. Read-back: **12 issues open**: #3, #19, #21, #60, #82, #85, #94, #107, #116, #123, #159, #160.
+- Still open: #19 (sub-issue #21 needs hosted CI on macOS + Linux runners; its own acceptance passed locally), #21, #60 (hosted CI matrix; both PHP profiles now pass locally), #85, #3 (live state matches; the bootstrap re-run is not reproducible without the original script), #82, #94, #107, #116, #123.
+- Findings filed (user-approved issue creation): #159 (form cookie `Max-Age`, P2) and #160 (`O_NOFOLLOW` for `~/.yaw` writes, P2) from Y-7.7; #161 (Y-8.1 HIGH finding, fixed under ADR-0046, closed after canary tests 44/44). Then closed #76, #78, #69 (parity and form-server tests 27/27) and #77. At that point, 12 issues remained open; the follow-up below closes #159 and #160.
+
+Local follow-up for #159 and #160 (2026-10-23):
+- #159 sets the session cookie's `Max-Age` from the configured idle timeout, in whole seconds rounded down. Tests assert 1800 seconds for the default and 1 second for a 1.5-second injected timeout.
+- #160 uses `O_NOFOLLOW` for user-store file reads and writes; verifies regular-file and inode identity after opening; and applies file/directory modes through validated descriptors. The `.yaw` and `presets` directories are also checked with no-follow directory descriptors. Symlink tests cover user-profile, preset, history and `.yaw` targets and assert that outside targets stay unchanged.
+- Installed PHP 8.5.12 and Composer 2.10.3 for local testing. The `php-web` and `wordpress-plugin` profile smoke tests pass (2/2).
+- Full `just check` passes on macOS Node 22.21.1 and Node 24.22.1: each **731 passed, 4 skipped, 0 failed** (735 tests). Remaining skips need lefthook/gitleaks. `npm run validate` passes 27/27; decision index (49 records) and adapter sync pass.
+- Closed #159 and #160 with local test evidence; no push, PR, release or hosted workflow. **10 issues remain open:** #3, #19, #21, #60, #82, #85, #94, #107, #116, #123.
 
 ---
 

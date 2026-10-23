@@ -102,7 +102,8 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
       if (used || !same(url.searchParams.get('t'), startToken)) return fail(403, 'invalid token');
       used = true;
       resetIdle();
-      res.writeHead(303, { location: '/', 'set-cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/`, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' });
+      const maxAge = Math.max(0, Math.floor(idleMs / 1000));
+      res.writeHead(303, { location: '/', 'set-cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' });
       return res.end();
     }
     if (!same(cookieOf(req, COOKIE), session)) return fail(403, 'missing or invalid token');

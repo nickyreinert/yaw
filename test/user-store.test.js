@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
@@ -109,6 +109,43 @@ test('a broken user-profile.yaml is never overwritten; an unknown key only print
     assert.deepEqual(readdirSync(join(home, '.yaw')), ['user-profile.yaml'], 'nothing else written');
     assert.match(r.out, /verification skipped/, 'the run goes on');
   }
+});
+
+test('user-store refuses symlinked profile, preset, and history targets without writing through them', () => {
+  const date = new Date('2026-10-20T10:00:00Z');
+  const cases = [
+    { name: 'profile', path: '.yaw/user-profile.yaml', options: { preset: false } },
+    { name: 'preset', path: '.yaw/presets/2026-10-20-app.yaml', options: { profile: false } },
+    { name: 'history', path: '.yaw/history.jsonl', options: { profile: false } },
+  ];
+  for (const entry of cases) {
+    const home = tmp('yaw-home-');
+    const dir = join(home, '.yaw');
+    const target = join(home, 'outside.txt');
+    mkdirSync(join(dir, 'presets'), { recursive: true });
+    writeFileSync(target, 'untouched\n');
+    symlinkSync(target, join(home, entry.path));
+    assert.throws(() => saveSetup({
+      env: { HOME: home }, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'], 'idea.team': 'solo' },
+      mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', now: date, ...entry.options,
+    }), /symbolic link|cannot be read/i, entry.name);
+    assert.equal(readFileSync(target, 'utf8'), 'untouched\n', entry.name);
+    assert.deepEqual(readdirSync(join(dir, 'presets')), entry.name === 'preset' ? ['2026-10-20-app.yaml'] : [], entry.name);
+  }
+});
+
+test('user-store refuses symlinked ~/.yaw directories', () => {
+  const home = tmp('yaw-home-');
+  const outside = tmp('yaw-outside-');
+  const target = join(outside, 'user-profile.yaml');
+  writeFileSync(target, 'untouched\n');
+  symlinkSync(outside, join(home, '.yaw'));
+  assert.throws(() => saveSetup({
+    env: { HOME: home }, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'] },
+    mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', profile: true, preset: false,
+  }), /real directory|symbolic link/i);
+  assert.equal(readFileSync(target, 'utf8'), 'untouched\n');
+  assert.deepEqual(readdirSync(outside), ['user-profile.yaml']);
 });
 
 test('yaw presets list / show / delete', async () => {
