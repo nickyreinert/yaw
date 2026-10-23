@@ -2,12 +2,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readManifest } from '../core/render/manifest.js';
-import { applyModules, initProject, planRemove, removeModule } from '../core/render/project.js';
+import { loadModule } from '../core/render/kit.js';
+import { addModule, applyModules, initProject, planRemove, removeModule } from '../core/render/project.js';
 import { main } from '../core/cli/main.js';
-import { makeKit, read, readJson, readTree, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
+import { KIT_ROOT, makeKit, read, readJson, readTree, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
 
 const coreSettings = `${JSON.stringify({ permissions: { deny: ['Read(./.env)'] } })}\n`;
 const extraSettings = `${JSON.stringify({ hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'sh .yaw/bin/yaw-hook PreToolUse' }] }] } })}\n`;
@@ -66,6 +67,47 @@ test('add then remove a module leaves the project byte-identical (zero residue, 
   assert.equal(readJson(root, '.claude/settings.json').hooks, undefined);
   assert.ok(!existsSync(join(root, 'extra')));
   assert.ok(!existsSync(join(root, '.gitignore')));
+});
+
+test('adding then removing every real kit module returns to the exact pre-add tree', async () => {
+  const names = readdirSync(join(KIT_ROOT, 'modules')).filter((name) => existsSync(join(KIT_ROOT, 'modules', name, 'module.yaml'))).sort();
+  const dependencyClosure = (name, seen = new Set()) => {
+    for (const dependency of loadModule(KIT_ROOT, name).depends ?? []) dependencyClosure(dependency, seen);
+    seen.add(name);
+    return [...seen];
+  };
+
+  for (const module of names) {
+    const root = tmp(`yaw-remove-${module}-`);
+    // Profile scaffolds and declared starter outputs are user-owned after their first creation.
+    if (module === 'core') {
+      mkdirSync(join(root, '.yaw'), { recursive: true });
+      const answersFile = writeAnswers(join(root, '.yaw'));
+      await initProject({ root, kitRoot: KIT_ROOT, answersFile, modules: ['core'] });
+      await removeModule({ root, kitRoot: KIT_ROOT, module });
+      const before = readTree(root);
+      await initProject({ root, kitRoot: KIT_ROOT, answersFile, modules: ['core'] });
+      await removeModule({ root, kitRoot: KIT_ROOT, module });
+      assert.deepEqual(readTree(root), before, `${module} add/remove left residue`);
+      continue;
+    }
+
+    const baselineModules = dependencyClosure(module).filter((name) => name !== module);
+    await initProject({
+      root,
+      kitRoot: KIT_ROOT,
+      answersFile: join(KIT_ROOT, 'examples/node-cli/answers.yaml'),
+      modules: baselineModules,
+    });
+    if (loadModule(KIT_ROOT, module).outputs?.starter) {
+      await addModule({ root, kitRoot: KIT_ROOT, module, interactive: false });
+      await removeModule({ root, kitRoot: KIT_ROOT, module });
+    }
+    const before = readTree(root);
+    await addModule({ root, kitRoot: KIT_ROOT, module, interactive: false });
+    await removeModule({ root, kitRoot: KIT_ROOT, module });
+    assert.deepEqual(readTree(root), before, `${module} add/remove left residue`);
+  }
 });
 
 test('remove refuses while other modules depend on the module; core goes last', async () => {
