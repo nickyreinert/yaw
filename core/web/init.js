@@ -12,6 +12,8 @@ import { saveSetup } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
+import { dashboardData } from './dashboard.js';
+import { knowledgeData } from './knowledge.js';
 
 export const DRAFT = '.yaw/draft.yaml';
 
@@ -22,6 +24,10 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     if (readManifest(root)) throw new FormError('This project is already initialized; use yaw update', 409);
   };
   return {
+    get: {
+      '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
+      '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),
+    },
     bootstrap: () => ({ ...model.bootstrap(), skipVerify, handoff }),
     prepareApply(input) {
       ensureNew();

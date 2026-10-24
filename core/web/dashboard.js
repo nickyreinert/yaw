@@ -6,7 +6,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readManifest } from '../render/manifest.js';
-import { enabledModules, readAnswers } from '../render/project.js';
+import { enabledModules, readAnswers, fileStates } from '../render/project.js';
+import { kitVersion } from '../render/kit.js';
+import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
+import { profileSessions } from './session-profile.js';
+import { localHistory, mergeHistory } from './local-history.js';
+import { knowledgeData } from './knowledge.js';
 import { parseTasks, tasksMode } from '../lib/tasks.js';
 import { startFormServer } from './form-server.js';
 
@@ -14,6 +19,8 @@ const asset = (name, type) => [`/${name}`, [type, readFileSync(new URL(`./assets
 const DASHBOARD_ASSETS = new Map([
   asset('dashboard.js', 'text/javascript; charset=utf-8'),
   asset('app.css', 'text/css; charset=utf-8'),
+  asset('workspace.js', 'text/javascript; charset=utf-8'),
+  asset('yaw-shark.svg', 'image/svg+xml'),
 ]);
 const page = () => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8');
 
@@ -35,11 +42,13 @@ function section(fn) {
 
 function projectSection(root) {
   const manifest = readManifest(root);
+  if (!manifest) return { name: basename(root), root, initialized: false, modules: [], profiles: [], agents: [] };
   const doc = readAnswers(root) ?? {};
   const answers = doc.answers ?? {};
   const modules = enabledModules(manifest);
   return {
     name: basename(root),
+    initialized: true,
     root,
     kit: manifest.kit,
     mode: doc.mode ?? null,
@@ -77,13 +86,19 @@ async function decisionsSection(root, kitRoot) {
 const tokensOf = (r) => Number(r.tokens_in ?? 0) + Number(r.tokens_out ?? 0);
 
 // Session stats from the registry. A missing registry is reported, never created by the dashboard.
-export async function sessionsSection(root, kitRoot, env, now = new Date()) {
+export async function sessionsSection(root, kitRoot, env, now = new Date(), params) {
   const registry = await import(pathToFileURL(join(kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
-  if (!existsSync(registry.registryFile(env))) return { available: false };
-  return registry.withRegistry(env, (db) => {
-    const project = registry.realRoot(root);
-    const rows = db.prepare('SELECT id, agent, project, title, started, ended, branch, pr, model, tokens_in, tokens_out, cost_usd FROM sessions ORDER BY started DESC').all();
-    const links = db.prepare("SELECT session_id, kind, COUNT(*) AS n FROM session_links GROUP BY session_id, kind").all();
+  const stored = existsSync(registry.registryFile(env)) ? registry.withRegistry(env, (db) => ({
+    rows: db.prepare('SELECT id, agent, project, title, started, ended, branch, pr, model, tokens_in, tokens_out, cost_usd, source FROM sessions ORDER BY started DESC').all(),
+    links: db.prepare('SELECT session_id, kind, COUNT(*) AS n FROM session_links GROUP BY session_id, kind').all(),
+  })) : null;
+  const global = params?.get('history') === 'local';
+  if (!stored && !global) return { available: false };
+  const rows = global ? mergeHistory(stored?.rows ?? [], await localHistory(env, { refresh: params.get('refresh-history') === '1' })) : stored.rows;
+  const project = registry.realRoot(root);
+    // No registry strings become markup or commands. Profiling reads the registry only, never transcripts.
+    for (const row of rows) for (const key of ['title', 'branch', 'model']) row[key] = registry.clean(row[key]);
+    const links = stored?.links ?? [];
     const linkCount = new Map();
     for (const l of links) linkCount.set(`${l.session_id}\u0000${l.kind}`, Number(l.n));
     const summarize = (list) => {
@@ -123,6 +138,8 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
     }
     return {
       available: true,
+      history: { local: global, registered: stored?.rows.length ?? 0 },
+      profiling: profileSessions(rows, params, now),
       project: {
         ...summarize(mine),
         recent: mine.slice(0, 50).map((r) => ({
@@ -131,23 +148,36 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
           commits: linkCount.get(`${r.id}\u0000commit`) ?? 0, tasks: linkCount.get(`${r.id}\u0000task`) ?? 0,
         })),
       },
-      all: { ...summarize(rows), projects: Object.values(projects).sort((a, b) => b.sessions - a.sessions).slice(0, 50) },
+      all: { ...summarize(rows), projectCount: Object.keys(projects).length, projects: Object.values(projects).sort((a, b) => b.sessions - a.sessions).slice(0, 50) },
     };
-  });
 }
 
-export async function dashboardData({ root, kitRoot, env, now }) {
+function maintenanceSection(root, kitRoot) {
+  const manifest = readManifest(root);
+  if (!manifest) return { available: false, kit: kitVersion(kitRoot) };
+  const doc = readAnswers(root) ?? {};
+  const rules = loadRules({ kitRoot, profiles: doc.proposal?.profiles ?? [] });
+  // Never inspect secret files, even if a hand-edited manifest lists one.
+  const safe = { ...manifest, files: manifest.files.filter((f) => !/^\.env/.test(basename(f.path)) && !secretRule(rules, f.path)) };
+  const files = fileStates(root, safe).map(({ path, module, managed, state }) => ({ path, module, managed, state }));
+  return { available: true, kit: kitVersion(kitRoot), pinned: manifest.kit, files, excluded: manifest.files.length - files.length };
+}
+
+export async function dashboardData({ root, kitRoot, env, now, params }) {
   const project = section(() => projectSection(root));
   const [decisions, sessions] = await Promise.all([
     decisionsSection(root, kitRoot).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
-    sessionsSection(root, kitRoot, env, now).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
+    sessionsSection(root, kitRoot, env, now, params).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
   ]);
-  return { project, tasks: section(() => tasksSection(root)), decisions, sessions, generated: (now ?? new Date()).toISOString() };
+  return { project, maintenance: section(() => maintenanceSection(root, kitRoot)), tasks: section(() => tasksSection(root)), decisions, sessions, generated: (now ?? new Date()).toISOString() };
 }
 
 export async function startDashboard({ root, kitRoot, env, port, signals, onClose, idleMs, controlToken }) {
   return startFormServer({
     port, signals, onClose, idleMs, controlToken, page, assets: DASHBOARD_ASSETS,
-    get: { '/api/dashboard': () => dashboardData({ root, kitRoot, env }) },
+    get: {
+      '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
+      '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),
+    },
   });
 }

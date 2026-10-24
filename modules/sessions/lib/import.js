@@ -64,6 +64,7 @@ async function eachJson(file, fn) {
 // Does a session that ran in `cwd` belong to the project? The project folder itself or a folder below it.
 export function inProject(cwd, project) {
   if (typeof cwd !== 'string' || !isAbsolute(cwd)) return false;
+  if (project === null) return true; // explicit all-project metadata discovery; no registry write
   const candidates = new Set([cwd]);
   try {
     candidates.add(realpathSync(cwd));
@@ -104,7 +105,7 @@ const session = ({ agent, native, cwd, branch, usage, cost, transcript }) => ({
   agent, native, cwd, branch: branch ? clean(branch).slice(0, 200) : null,
   started: usage.first, ended: usage.last, model: usage.topModel(),
   tokensIn: usage.tokensIn || null, tokensOut: usage.tokensOut || null,
-  costUsd: Number.isFinite(cost) && cost > 0 ? Math.round(cost * 10000) / 10000 : null, transcript,
+  costUsd: Number.isFinite(cost) && cost >= 0 ? Math.round(cost * 10000) / 10000 : null, transcript,
 });
 
 // ------------------------------------------------------------------------------------------ Claude Code
@@ -146,12 +147,19 @@ export async function readClaude(file, project) {
 
 async function claude(env, project) {
   const base = env.CLAUDE_CONFIG_DIR || join(env.HOME ?? '', '.claude');
-  const dir = join(base, 'projects', claudeFolder(project));
+  const projects = join(base, 'projects');
+  if (!isDir(base) || !isDir(projects)) return [];
+  const dirs = project === null ? list(projects).filter((n) => isDir(join(projects, n))).map((n) => join(projects, n)) : [join(projects, claudeFolder(project))];
   const found = [];
-  for (const name of list(dir).filter((n) => n.endsWith('.jsonl')).slice(0, MAX_FILES)) {
-    if (!isFile(join(dir, name))) continue;
-    const s = await readClaude(join(dir, name), project);
-    if (s) found.push(s);
+  let inspected = 0;
+  for (const dir of dirs) {
+    if (!isDir(dir)) continue;
+    for (const name of list(dir).filter((n) => n.endsWith('.jsonl'))) {
+      if (inspected++ >= MAX_FILES) return found;
+      if (!isFile(join(dir, name))) continue;
+      try { const s = await readClaude(join(dir, name), project); if (s) found.push(s); }
+      catch (e) { if (project !== null) throw e; } // a rotating/unreadable history file must not hide other projects
+    }
   }
   return found;
 }
@@ -202,10 +210,11 @@ function codexFiles(dir, depth = 0, out = []) {
 
 async function codex(env, project) {
   const base = env.CODEX_HOME || join(env.HOME ?? '', '.codex');
+  if (!isDir(base) || !isDir(join(base, 'sessions'))) return [];
   const found = [];
   for (const file of codexFiles(join(base, 'sessions'))) {
-    const s = await readCodex(file, project);
-    if (s) found.push(s);
+    try { const s = await readCodex(file, project); if (s) found.push(s); }
+    catch (e) { if (project !== null) throw e; }
   }
   return found;
 }
@@ -263,12 +272,13 @@ export async function readCopilot(dir, project) {
 
 async function copilot(env, project) {
   const base = join(env.HOME ?? '', '.copilot', 'session-state');
+  if (!isDir(join(env.HOME ?? '', '.copilot')) || !isDir(base)) return [];
   const found = [];
   for (const name of list(base).slice(0, MAX_FILES)) {
     const dir = join(base, name);
     if (!isDir(dir)) continue;
-    const s = await readCopilot(dir, project);
-    if (s) found.push(s);
+    try { const s = await readCopilot(dir, project); if (s) found.push(s); }
+    catch (e) { if (project !== null) throw e; }
   }
   return found;
 }
@@ -277,8 +287,8 @@ async function copilot(env, project) {
 
 const READERS = { claude, codex, copilot };
 
-export async function findSessions({ env, root, agents = Object.keys(READERS) }) {
-  const project = realRoot(root);
+export async function findSessions({ env, root, agents = Object.keys(READERS), allProjects = false }) {
+  const project = allProjects ? null : realRoot(root);
   const all = [];
   for (const agent of agents) all.push(...(await READERS[agent](env, project)));
   return all.sort((a, b) => a.started.localeCompare(b.started));

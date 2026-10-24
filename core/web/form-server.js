@@ -14,6 +14,8 @@ const assets = new Map([
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
+  ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],
+  ['/yaw-shark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-shark.svg', import.meta.url))]],
 ]);
 
 async function readJson(req) {
@@ -135,8 +137,9 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
         try { return json(200, api.bootstrap(), req.method === 'HEAD'); }
         catch (e) { return error(e); }
       }
-      if (Object.hasOwn(get, url.pathname)) {
-        try { return json(200, await get[url.pathname](), req.method === 'HEAD'); }
+      const reads = { ...api?.get, ...get };
+      if (Object.hasOwn(reads, url.pathname)) {
+        try { return json(200, await reads[url.pathname](url.searchParams), req.method === 'HEAD'); }
         catch (e) { return error(e); }
       }
       return fail(404, 'not found');

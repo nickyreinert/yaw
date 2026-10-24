@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { KIT_ROOT, capture, cleanEnv, tmp } from '../../../test/helpers/fixtures.js';
-import { claudeFolder, inProject, workspaceFields } from '../lib/import.js';
+import { claudeFolder, findSessions, inProject, workspaceFields } from '../lib/import.js';
 import { realRoot, registryFile, withRegistry } from '../lib/registry.js';
 
 const SECRET = 'PROMPT-CANARY-7f3a';
@@ -115,4 +115,19 @@ test('yaw sessions: other verbs still need a YAW setup with the sessions module'
   const r = await yaw(['sessions', 'list'], { cwd: tmp('yaw-legacy-'), env });
   assert.equal(r.code, 1);
   assert.match(r.err, /run yaw init first/);
+});
+
+
+test('global history discovery spans all agents and projects without importing or retaining content', async () => {
+  const home = tmp('yaw-global-history-'), project = realRoot(tmp('yaw-global-project-'));
+  const env = { HOME: home, CODEX_HOME: join(home, '.codex'), CLAUDE_CONFIG_DIR: join(home, '.claude') };
+  history(home, project);
+  const sessions = await findSessions({ env, allProjects: true });
+  assert.equal(sessions.length, 6);
+  assert.deepEqual([...new Set(sessions.map((s) => s.agent))].sort(), ['claude', 'codex', 'copilot']);
+  assert.deepEqual([...new Set(sessions.map((s) => s.cwd))].sort(), ['/somewhere/else', project].sort());
+  assert.ok(!JSON.stringify(sessions).includes(SECRET));
+  assert.equal(existsSync(registryFile(env)), false);
+  assert.ok(inProject('/absolute/project', null));
+  assert.ok(!inProject('relative', null));
 });

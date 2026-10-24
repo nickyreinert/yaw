@@ -1,31 +1,48 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YAW dashboard</title>
-  <link rel="stylesheet" href="/app.css">
-  <script type="module" src="/dashboard.js"></script>
-</head>
-<body>
-  <header><h1 id="title">YAW dashboard</h1><p>Local and read-only: this page shows what YAW keeps for this project and in ~/.yaw on this machine. Nothing leaves your computer.</p></header>
-  <p id="status" role="status" aria-live="polite">Loading…</p>
-  <p id="error" role="alert" hidden></p>
-  <div class="layout dashboard">
-    <nav aria-label="Dashboard sections"><h2>Sections</h2><ul>
-      <li><a href="#project">Project</a></li>
-      <li><a href="#sessions">Sessions</a></li>
-      <li><a href="#tasks">Tasks</a></li>
-      <li><a href="#decisions">Decisions</a></li>
-      <li><a href="#all">All projects</a></li>
-    </ul><button id="refresh" type="button">Refresh</button></nav>
-    <main id="main">
-      <section id="project" aria-labelledby="project-title"><h2 id="project-title">Project</h2><div class="body"></div></section>
-      <section id="sessions" aria-labelledby="sessions-title"><h2 id="sessions-title">Sessions in this project</h2><div class="body"></div></section>
-      <section id="tasks" aria-labelledby="tasks-title"><h2 id="tasks-title">Tasks</h2><div class="body"></div></section>
-      <section id="decisions" aria-labelledby="decisions-title"><h2 id="decisions-title">Decisions</h2><div class="body"></div></section>
-      <section id="all" aria-labelledby="all-title"><h2 id="all-title">All projects on this machine</h2><div class="body"></div></section>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YAW dashboard</title><link rel="stylesheet" href="/app.css"><script type="module" src="/dashboard.js"></script></head><body data-mode="dashboard">
+  <a class="skip" href="#overview-title">Skip to content</a>
+  <aside class="sidebar">
+    <a class="brand" href="#overview"><img src="/yaw-shark.svg" width="38" height="38" alt=""><span>YAW<span class="brand-dot">.</span><span class="brand-caption">LOCAL WORKSPACE</span></span></a>
+    <div class="project-switch"><span class="eyebrow">CURRENT FOLDER</span><strong id="project-name">Local project</strong><span id="project-state" class="small muted">Reading project…</span></div>
+    <nav aria-label="Workspace">
+      <span class="nav-label">WORKSPACE</span>
+      <button type="button" data-route="overview"><span aria-hidden="true">◫</span> Overview</button>
+
+      <button type="button" data-route="maintenance"><span aria-hidden="true">⊞</span> Maintenance</button>
+      <span class="nav-label">DATA</span>
+      <button type="button" data-route="profiling"><span aria-hidden="true">▥</span> Sessions <span class="nav-tag">GLOBAL</span></button>
+      <button type="button" data-route="tasks"><span aria-hidden="true">☷</span> Tasks</button>
+      <button type="button" data-route="knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
+    </nav>
+    <div class="sidebar-footer"><span class="local-dot"></span> Local only<p>127.0.0.1</p><code>yaw web</code></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div>Workspace <span aria-hidden="true">/</span> <strong id="breadcrumb">Overview</strong></div><div class="topbar-actions"><span class="local-badge"><span class="local-dot"></span> Local workspace</span><button type="button" id="refresh" aria-label="Refresh workspace data">↻ <span>Refresh</span></button></div></header>
+    <main class="content">
+      <p id="workspace-error" role="alert" class="warn" hidden></p>
+      <section data-view="overview" class="view">
+        <div class="page-heading"><h1 id="overview-title" tabindex="-1">Overview</h1><span id="overview-intro" class="small muted">All local sessions · Current project</span></div>
+        <p id="overview-warning" class="warn"></p><div id="overview-metrics" class="metrics"></div>
+        <div id="workspace-actions" class="overview-grid"></div>
+        <article class="card"><div class="section-heading"><h2>Projects</h2><button type="button" data-route="profiling">All sessions →</button></div><div id="overview-projects"></div></article>
+        <div class="folder-line"><span class="eyebrow">PROJECT</span><code id="project-path"></code></div>
+      </section>
+      <section data-view="profiling" class="view" hidden>
+        <div class="page-heading"><h1 tabindex="-1">Sessions</h1><span id="history-source" class="small muted">Registry + local history · All projects</span></div>
+        <div class="filters card"><label>Project<select id="filter-project"><option value="">All projects</option></select></label><label>Agent<select id="filter-agent"><option value="">All agents</option></select></label><label>Model<select id="filter-model"><option value="">All models</option></select></label><label>Period<select id="filter-days"><option value="all" selected>All history</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label><button type="button" id="reset-filters">Reset</button></div>
+        <div id="profile-results" aria-live="polite"></div>
+        <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Claude Code, Codex, Copilot local history + YAW registry. Metadata only; no import required. Scan cache: 60 seconds; Refresh rescans. Scan limit: 20,000 files per agent. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Activity uses UTC days.</p><p>Outcome scoring, cache breakdowns, tool failures, and OpenTelemetry are not collected.</p></details>
+      </section>
+      <section data-view="knowledge" class="view" hidden>
+        <div class="page-heading"><h1 tabindex="-1">Knowledge</h1><span class="small muted">User + project records · Read-only</span></div>
+        <div class="filters knowledge-filters card"><label class="knowledge-search">Search<input id="knowledge-search" type="search" placeholder="Title, content, tags…" maxlength="200"></label><label>Scope<select id="knowledge-scope"><option value="all">All scopes</option><option value="user">User</option><option value="project">Project</option></select></label><label>Namespace<select id="knowledge-namespace"><option value="">All namespaces</option></select></label><label>Type<select id="knowledge-type"><option value="">All types</option></select></label></div>
+        <p id="knowledge-status" class="small muted" role="status"></p><p id="knowledge-error" class="warn" role="alert" hidden></p>
+        <div class="knowledge-layout"><div id="knowledge-list" class="card"></div><article id="knowledge-detail" class="card"><p class="muted">Select a record.</p></article></div>
+        <details class="data-notes"><summary>Sources</summary><div id="knowledge-sources"></div></details>
+      </section>
+      <section data-view="maintenance" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Maintenance</h1><span class="small muted">Current project · File state &amp; kit version</span></div><div id="maintenance-body"></div></section>
+      <section data-view="tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">Current project · TASKS.md</span></div><div id="tasks-body" class="card"></div></section>
+      <footer class="content-footer"><span id="workspace-status" role="status">Loading workspace…</span><span>YAW</span></footer>
     </main>
   </div>
-</body>
-</html>
+<noscript>Run yaw in a terminal, or enable JavaScript to use this local workspace.</noscript></body></html>

@@ -52,6 +52,20 @@ test('web model: schema catalogue, local help, ownership and phase-3 choices', (
   assert.deepEqual(readdirSync(f.home), []);
 });
 
+test('workspace: setup exposes authenticated cross-project history and maintenance before initialization', async (t) => {
+  const f = await serverFixture(t);
+  assert.equal((await fetch(`${f.origin}/api/dashboard`)).status, 403);
+  const res = await fetch(`${f.origin}/api/dashboard?days=all`, { headers: { cookie: f.cookie } });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.project.initialized, false);
+  assert.equal(data.maintenance.available, false);
+  assert.deepEqual(data.sessions, { available: false });
+  assert.deepEqual(readdirSync(f.root), []);
+  assert.deepEqual(readdirSync(f.home), []);
+  assert.equal((await fetch(`${f.origin}/workspace.js`, { headers: { cookie: f.cookie } })).status, 200);
+});
+
 test('web model: normalization and browser defaults match the CLI interview', async () => {
   const f = fixture(), m = createFormModel(f), c = m.bootstrap();
   for (const mode of ['quick', 'full', 'standard']) {

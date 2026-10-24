@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { dashboardData, startDashboard } from '../core/web/dashboard.js';
 import { realRoot, registryFile, withRegistry } from '../modules/sessions/lib/registry.js';
 import { main } from '../core/cli/main.js';
+import { readManifest, writeManifest } from '../core/render/manifest.js';
+import { hashContent } from '../core/render/files.js';
 import { makeProject } from './helpers/hooks.js';
 import { KIT_ROOT, capture, tmp } from './helpers/fixtures.js';
 
@@ -62,6 +64,22 @@ test('dashboard data: a missing registry is reported and never created; a broken
   assert.equal(existsSync(registryFile(env)), false);
   assert.match(data.tasks.error, /# Tasks/);
   assert.equal(data.project.name.length > 0, true);
+});
+
+test('workspace: maintenance reports actual file state without reading secret files or running recipes', async () => {
+  const root = await makeProject({ modules: ['core'] });
+  const manifest = readManifest(root);
+  const file = manifest.files.find((f) => f.managed && !f.path.startsWith('.yaw/'));
+  writeFileSync(join(root, file.path), 'Local customization\n');
+  // Secret paths may appear in a hand-edited manifest. They must never be inspected or returned.
+  manifest.files.push({ path: '.env.private', module: 'core', managed: false, hash: hashContent('fixture') });
+  writeManifest(root, manifest);
+  const d = await dashboardData({ root, kitRoot: KIT_ROOT, env: home() });
+  assert.equal(d.project.initialized, true);
+  assert.equal(d.maintenance.available, true);
+  assert.equal(d.maintenance.files.find((f) => f.path === file.path).state, 'edited');
+  assert.ok(d.maintenance.files.every((f) => !f.path.startsWith('.env')));
+  assert.equal(d.maintenance.excluded, 1);
 });
 
 test('dashboard server: same handshake as the form, read-only API, no POST routes', async () => {
