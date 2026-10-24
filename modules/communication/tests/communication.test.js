@@ -27,11 +27,11 @@ async function project(opts = {}) {
 
 const section = (text, module) => text.match(new RegExp(`<!-- yaw:${module} -->\\n([\\s\\S]*?)<!-- /yaw:${module} -->`))?.[1];
 
-test('default profile: about six lines in AGENTS.md, no output style, no settings entry', async () => {
+test('default profile: four lines in AGENTS.md, no output style, no settings entry', async () => {
   const root = await project();
   const body = section(read(root, 'AGENTS.md'), 'communication');
   const lines = body.trim().split('\n');
-  assert.equal(lines.length, 7); // heading, blank line, five rules (about six lines of content)
+  assert.equal(lines.length, 4); // heading, blank line, five rules on two lines
   assert.equal(lines[0], '## Communication');
   assert.match(body, /balanced answers/);
   assert.match(body, /professional tone/);

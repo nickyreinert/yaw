@@ -1,5 +1,5 @@
 // Derived facts (ADR-0017 §3) and the rule that matches a facts condition.
-// Used for profile suggestion (suggestWhen) and module selection (appliesTo, default).
+// Used for module selection (appliesTo, default); the stack itself is picked from arch.language and arch.runs-on.
 
 // Facts from answers. Only facts with a source in the asked questions are derived; "auto" and
 // unanswered questions leave a fact unknown (never guessed).

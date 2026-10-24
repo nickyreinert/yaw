@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createFormModel, assertSafe, FormError } from './form-model.js';
 import { startFormServer } from './form-server.js';
 import { editProject, initProject } from '../render/project.js';
+import { gitInit, isGitRepo } from '../lib/git-init.js';
 import { readManifest } from '../render/manifest.js';
 import { writeAtomic } from '../render/files.js';
 import { kitVersion } from '../render/kit.js';
@@ -86,6 +87,10 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       assertSafe(prepared.doc.answers, kitRoot);
       const output = { write: (text) => emit({ type: 'log', text: String(text) }) };
       emit({ type: 'log', text: 'Applying confirmed setup…\n' });
+      if (prepared.gitInit && !isGitRepo(root)) {
+        const git = gitInit(root);
+        emit({ type: 'log', text: git.created ? 'Created a git repository (git init).\n' : `git init failed: ${git.error}; create it later with git init.\n` });
+      }
       const result = edit
         ? await editProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc } })
         : await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });

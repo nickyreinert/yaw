@@ -1,0 +1,5 @@
+- Use Swift 5.9+ and Swift Package Manager; keep external packages to a minimum.
+- Keep application logic in `Sources/` and XCTest tests in `Tests/`.
+- Run `swift build` and `swift test` before changes are done.
+- Use `swift-format` when it is available in the toolchain.
+- Tests are deterministic and do not depend on a network or host service.

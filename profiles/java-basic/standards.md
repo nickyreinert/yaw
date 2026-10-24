@@ -1,0 +1,5 @@
+- Use Java 17+ and the Gradle wrapper; keep dependencies minimal and versioned.
+- Keep application code in `src/main/java` and JUnit 5 tests in `src/test/java`.
+- Compile with `-Xlint:all`; run `just test` before changes are done.
+- Prefer small classes and clear exceptions; do not swallow errors.
+- Tests are deterministic and make no network calls.

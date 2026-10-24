@@ -4,13 +4,21 @@
   "title": "profile.yaml",
   "description": "Stack profile definition (doc 05 §2).",
   "type": "object",
-  "required": ["name", "summary", "suggestWhen"],
+  "required": ["name", "title", "summary", "stack"],
   "properties": {
     "name": { "$ref": "common.schema.json#/$defs/name" },
+    "title": { "description": "Short name shown in the setup, e.g. FastAPI web app.", "type": "string", "minLength": 1, "maxLength": 60 },
     "summary": { "type": "string", "minLength": 1 },
-    "suggestWhen": {
-      "description": "Rule-based suggestion: the profile is suggested when all listed facts match.",
-      "$ref": "common.schema.json#/$defs/facts"
+    "stack": {
+      "description": "The language x runs-on pairs this profile is picked for (ADR-0054). Every pair belongs to at most one profile; basic profiles cover the pairs no tailored profile has.",
+      "type": "object",
+      "required": ["language", "runsOn"],
+      "properties": {
+        "language": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/language" }, "minItems": 1, "uniqueItems": true },
+        "runsOn": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/runsOn" }, "minItems": 1, "uniqueItems": true },
+        "basic": { "description": "Standard language tools only, no framework or host setup.", "type": "boolean" }
+      },
+      "additionalProperties": false
     },
     "options": {
       "description": "Common forks (framework, DB). The default must be one of the choices.",

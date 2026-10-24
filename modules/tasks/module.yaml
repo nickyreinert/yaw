@@ -1,6 +1,10 @@
 # modules/tasks/module.yaml (Y-5.3, ADR-0010): task ledger, local / GitHub / both (doc 10, BD4).
 name: tasks
 description: Task ledger in TASKS.md (local), GitHub issues with a generated read-only TASKS.md (GitHub), or both linked; `just task` recipes, session-start re-injection of the active task and a resume-point reminder.
+title: Task list
+group: memory
+what: "TASKS.md (or GitHub issues). The agent is told the active task at every session start."
+example: { when: "TASKS.md has", run: "- [ ] Add CSV export", then: "the next session starts with \"Active task: Add CSV export\"." }
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions:

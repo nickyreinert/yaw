@@ -332,9 +332,28 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     teamModule: modules.includes('team'),
     // ADR-0033: git-hooks adds the code-map pre-commit job when the code-map module is installed.
     codeMapModule: modules.includes('code-map'),
+    gitHooksModule: modules.includes('git-hooks'),
+    // ADR-0055: the review module's reviewers and push gate; git-hooks owns the shared pre-push key.
+    review: reviewFlags(flat, modules),
+    prePush: modules.includes('team') || reviewFlags(flat, modules).anyPush,
     // ADR-0028: gate recipes of the enabled modules (`outputs.gates`); `just check` runs them via sync-check.
     gates: [...new Set(modules.flatMap((m) => (definitions?.get(m) ?? loadModule(kitRoot, m)).outputs?.gates ?? []))].sort(),
   };
+}
+
+export const REVIEWERS = ['quality', 'logic', 'ux', 'feature'];
+export const REVIEW_DEFAULTS = { quality: 'push', logic: 'push', ux: 'off', feature: 'request' };
+
+// Trigger per reviewer (off | request | suggest | push) from the quality.review-* answers (ADR-0055).
+export function reviewTriggers(flat) {
+  return Object.fromEntries(REVIEWERS.map((k) => [k, flat[`quality.review-${k}`] ?? REVIEW_DEFAULTS[k]]));
+}
+
+function reviewFlags(flat, modules) {
+  const on = modules.includes('review');
+  const triggers = reviewTriggers(flat);
+  const flags = Object.fromEntries(REVIEWERS.map((k) => [k, { on: on && triggers[k] !== 'off', push: on && triggers[k] === 'push' }]));
+  return { ...flags, anyPush: REVIEWERS.some((k) => flags[k].push), block: flat['quality.review-gate'] === 'block' };
 }
 
 // ADR-0041: with several profiles each profile is a `just` module (`just <profile>::<verb>`) that runs in its

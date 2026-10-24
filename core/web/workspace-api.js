@@ -10,13 +10,14 @@ import { parseMap } from '../../modules/code-map/lib/map.js';
 import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
 import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
 import { ProjectError } from '../render/project.js';
+import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -37,6 +38,8 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       '/api/global/profile': () => profileData({ kitRoot, env }),
       '/api/global/presets': () => presetsData({ env }),
       '/api/global/files': () => globalFiles({ env }),
+      '/api/global/review-prompts': () => reviewPromptsData({ kitRoot, env }),
+      '/api/review-prompts': (params) => userError(() => reviewPromptsData({ root: rootOf(params?.get('workspace')), kitRoot, env })),
       '/api/global/file': (params) => globalFile({ env, path: params?.get('path') ?? '' }),
       // Which known projects have the comfort module, so notifications reach them.
       '/api/global/comfort': () => (projects ? projects.list().projects : [{ root: fixed, name: fixed.split('/').pop() }]).map((p) => {
@@ -71,7 +74,13 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       if (name === 'profile-preview') return profilePreview({ kitRoot, env, input });
       if (name === 'profile-apply') return profileApply({ kitRoot, env, input });
       if (name === 'preset-rename' || name === 'preset-delete') return presetAction({ env, input, remove: name === 'preset-delete' });
+      // Review prompts: scope global is the user's blueprint, scope project the open workspace's override.
+      if ((name === 'review-prompt-save' || name === 'review-prompt-remove') && input.scope === 'global') {
+        return name === 'review-prompt-save' ? saveReviewPrompt({ root: null, kitRoot, env, input }) : removeReviewPrompt({ root: null, env, input });
+      }
       const root = rootOf(input.workspace);
+      if (name === 'review-prompt-save') return saveReviewPrompt({ root, kitRoot, env, input });
+      if (name === 'review-prompt-remove') return removeReviewPrompt({ root, env, input });
       input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));
       if (name === 'knowledge-save') return saveKnowledge({ root, kitRoot, env, input: input.record });
       if (name === 'taxonomy-save') return userError(() => saveTaxonomy({ root, kitRoot, input }));

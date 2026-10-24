@@ -1,6 +1,10 @@
 # modules/standards/module.yaml (Y-5.1, ADR-0024): baseline standards plus the stack overlay of the profile.
 name: standards
 description: Baseline coding, security, testing, review and git standards in docs/standards.md, plus the stack overlay from the profile.
+title: Coding standards
+group: basics
+what: "A short docs/standards.md the agent follows: tests, reviews, git style, plus the rules of your stack."
+example: { when: "Agent writes a new function", then: "it adds a test for it, because the standards say so." }
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions: []

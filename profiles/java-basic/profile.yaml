@@ -1,0 +1,13 @@
+# profiles/java-basic/profile.yaml
+# Basic stack (ADR-0054): standard Java tools where Java runs without a tailored profile.
+name: java-basic
+title: Basic Java project
+dependencyEcosystems: [gradle]
+summary: Java project; Gradle, JUnit 5, javac -Xlint.
+stack:
+  language: [java]
+  runsOn: [local, self-hosted, serverless, app-store]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]

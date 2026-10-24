@@ -1,0 +1,12 @@
+# profiles/go-basic/profile.yaml
+# Basic stack (ADR-0054): standard Go tools wherever Go runs without a tailored profile.
+name: go-basic
+title: Basic Go project
+summary: Go project; gofmt, go vet, go test, optional staticcheck.
+stack:
+  language: [go]
+  runsOn: [local, self-hosted, serverless, app-store]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [go>=1.22, just]

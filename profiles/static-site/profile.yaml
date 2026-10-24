@@ -1,9 +1,11 @@
 # profiles/static-site/profile.yaml
-# Suggested for runs-on static (#165, ADR-0034): static files only, e.g. GitHub Pages or Netlify.
+# Picked for HTML & CSS x static hosting (ADR-0054, was ADR-0034): static files only, e.g. GitHub Pages or Netlify.
 name: static-site
+title: Landing page, portfolio or docs
 dependencyEcosystems: [npm]
 summary: Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.
-suggestWhen:
+stack:
+  language: [html]
   runsOn: [static]
 defaults:
   modules: { devenv: false, ui-design: true, backup: false }

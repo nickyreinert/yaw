@@ -1,6 +1,10 @@
 # modules/communication/module.yaml (Y-5.1, ADR-0013, ADR-0024): speaking style from the user profile.
 name: communication
 description: Renders the user profile (length, register, examples, explanation, experience) into AGENTS.md and, when it is not the default, a Claude output style.
+title: How the agent talks to you
+group: basics
+what: "Answer length, tone, examples and explanations, taken from your personal profile."
+example: { when: "Profile: short, in German, explain choices", then: "\"Ich nehme SQLite, weil die Daten lokal bleiben.\"" }
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions:

@@ -1,0 +1,102 @@
+# modules/review/module.yaml (ADR-0055): review sub-agents (quality, business logic, UI/UX, feature fit) that read
+# a change and report; on request, as a hint when work is done, or as a gate before `git push`.
+name: review
+description: "Review sub-agents for quality, business logic, UI/UX and feature fit: `just review <kind>` on request, a user-visible hint at the end of a session, and an optional pre-push gate (`yaw review gate`) that runs the required reviewers headless through the agent CLI and warns or blocks. Prompts are layered: project `.yaw/review/`, your blueprint `~/.yaw/review/`, kit default `prompts/`."
+title: Review agents
+group: quality
+what: "Sub-agents that look at a change from a non-technical angle. They only read and report; they never edit. Run them on request, get a hint when work is done, or make them the gate before a push."
+example: { when: "You push 3 commits", run: "git push", then: "quality and business-logic reviewers run first; findings stop or warn before the push." }
+cost: "Reviews use model tokens only when they run; results are cached per commit. The push gate needs git and an agent CLI (claude, codex or copilot)."
+depends: [core]
+default: { quick: false, standard: true, full: true }
+questions:
+  - id: quality.review-quality
+    mode: Q
+    type: choice
+    label: "Quality reviewer: readability, naming, duplication, missing tests and error handling"
+    hint: Off, on request, a hint when work is done, or required before every push.
+    help: review
+    choices:
+      - { value: "off", label: "Off" }
+      - { value: request, label: On request }
+      - { value: suggest, label: Suggest when a task is done }
+      - { value: push, label: Required before push }
+    default: push
+  - id: quality.review-logic
+    mode: Q
+    type: choice
+    label: "Business-logic reviewer: the change against your rules and the business-logic notices in .decisions/"
+    hint: Off, on request, a hint when work is done, or required before every push.
+    help: review
+    choices:
+      - { value: "off", label: "Off" }
+      - { value: request, label: On request }
+      - { value: suggest, label: Suggest when a task is done }
+      - { value: push, label: Required before push }
+    default: push
+  - id: quality.review-ux
+    mode: Q
+    type: choice
+    label: "UI/UX reviewer: labels, empty and error states, keyboard use, contrast, consistency"
+    hint: Useful for stacks with a user interface.
+    help: review
+    choices:
+      - { value: "off", label: "Off" }
+      - { value: request, label: On request }
+      - { value: suggest, label: Suggest when a task is done }
+      - { value: push, label: Required before push }
+    default: "off"
+  - id: quality.review-feature
+    mode: Q
+    type: choice
+    label: "Feature-fit reviewer: is every point of the task or issue done, is anything extra?"
+    hint: Off, on request, a hint when work is done, or required before every push.
+    help: review
+    choices:
+      - { value: "off", label: "Off" }
+      - { value: request, label: On request }
+      - { value: suggest, label: Suggest when a task is done }
+      - { value: push, label: Required before push }
+    default: request
+  - id: quality.review-gate
+    mode: Q
+    type: choice
+    label: "Push gate: what happens when a required reviewer has findings?"
+    hint: Warn asks you in the terminal (an agent without a terminal is stopped); block stops the push until fixed.
+    help: review
+    choices:
+      - { value: warn, label: Warn and push anyway after confirming }
+      - { value: block, label: Block the push }
+    default: warn
+outputs:
+  templates:
+    - justfile
+    - just/review.just
+    - .lefthook/pre-push/yaw-review.sh
+    - .claude/agents/review-quality.md
+    - .claude/agents/review-logic.md
+    - .claude/agents/review-ux.md
+    - .claude/agents/review-feature.md
+    - .github/agents/review-quality.agent.md
+    - .github/agents/review-logic.agent.md
+    - .github/agents/review-ux.agent.md
+    - .github/agents/review-feature.agent.md
+  skills: [review]
+  hooks:
+    # Comfort, not a block: a hint for the user, once per session, when "suggest" reviewers are set.
+    - name: stop-review-hint
+      event: Stop
+      kind: comfort
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "Stop systemMessage (user-visible only)" }
+        codex: { support: native, via: "Stop systemMessage (user-visible only)" }
+        copilot: { support: none, note: "no user message on Stop; the AGENTS.md rule applies (tier 2)" }
+agentsMd: |
+  - Reviews: reviewers only read and report. Run one with `just review <quality|logic|ux|feature>` or the `review` skill; never edit `.git/yaw/reviews.json`, never push with `--no-verify` or `YAW_REVIEW=skip` unless the user says so.
+agents:
+  claude:  { support: native, via: ".claude/agents/review-*.md sub-agents + review skill + pre-push gate (claude -p)" }
+  codex:   { support: native, via: "review skill + pre-push gate (codex exec)" }
+  copilot: { support: native, via: ".github/agents/review-*.agent.md + review skill + pre-push gate (copilot -p)" }
+tokenCost: low
+lastVerified: 2026-10-21

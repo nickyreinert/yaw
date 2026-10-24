@@ -26,6 +26,8 @@ const DASHBOARD_ASSETS = new Map([
   asset('global-view.js', 'text/javascript; charset=utf-8'),
   asset('global-settings-view.js', 'text/javascript; charset=utf-8'),
   asset('ui-state.js', 'text/javascript; charset=utf-8'),
+  asset('setup-cards.js', 'text/javascript; charset=utf-8'),
+  asset('review-prompts-view.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
 ]);
 const page = (csrf) => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8').replace('YAW_CSRF', csrf);

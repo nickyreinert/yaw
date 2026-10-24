@@ -9,7 +9,7 @@
 | Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project |
 | Sessions | Workspace (locked to the project) and Global; sticky folder/project/agent/model/period filter; usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
 | Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
-| Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply), Files (YAW-written files by purpose, read-only Form/Raw drawer). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications |
+| Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply; first setup for a folder without YAW), Files (YAW-written files by purpose, read-only Form/Raw drawer), Review prompts (project overrides). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications, Classification, Review prompts (blueprint) |
 | Tasks | Workspace `TASKS.md`; Global task snapshots filterable by folder/project, linking to each project |
 | Code map | Saved map; shown only when the code-map module is enabled |
 
@@ -53,4 +53,5 @@ Repository gate: `just check`. Keep its pre-existing adapter drift separate from
 Writes are CSRF-protected actions that carry the SHA-256 of the content they started from (409 on a concurrent change):
 
 - `taxonomy-save` validates `.decisions/taxonomy.json`, requires a keyword for each new pair, and refuses removing or renaming a pair still used by a decision (409, listing the IDs).
+- `review-prompt-save` / `review-prompt-remove` (ADR-0056) write or delete a review prompt: `scope: project` is `.yaw/review/<kind>.md` in the workspace, `scope: global` the blueprint `~/.yaw/review/<kind>.md` (0600). GET `/api/review-prompts?workspace=` and `/api/global/review-prompts` return every layer per kind. The store (`modules/review/lib/prompts.js`) refuses symbolic links, empty text, more than 32 KiB and secret-rule matches.
 - `interview-preview` renders the `yaw edit` plan and diff (capped at 256 KiB) without writing; `interview-apply` applies it through `editProject` with the keep strategy. Only one apply runs at a time.

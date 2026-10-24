@@ -21,3 +21,22 @@ pre-commit:
     - name: code-map
       run: just map-check
 <% end %>
+<% if prePush %>
+pre-push:
+  jobs:
+<% if teamModule %>
+    # Team mode (team module, ADR-0031): nobody pushes to the default branch. A script, not `run`: lefthook
+    # skips `run` jobs on pre-push when the push brings no new files, a script always runs.
+    - name: no-push-to-default-branch
+      script: yaw-default-branch.sh
+      runner: sh
+      use_stdin: true
+<% end %>
+<% if review.anyPush %>
+    # Push gate (review module, ADR-0055): the required reviewers check the commits being pushed.
+    - name: review-gate
+      script: yaw-review.sh
+      runner: sh
+      use_stdin: true
+<% end %>
+<% end %>

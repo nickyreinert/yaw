@@ -7,8 +7,8 @@ answers:
   user.autonomy: ask-risky
   idea.text: A small edge API for my notes.
   idea.team: solo
-  arch.language: typescript
-  arch.runs-on: serverless
+  arch.language: javascript
+  arch.runs-on: edge
 proposal:
   status: confirmed
   summary: cloudflare-workers - Cloudflare Worker in TypeScript; Wrangler (local only), tsc, ESLint, Vitest in the Workers runtime, npm audit.

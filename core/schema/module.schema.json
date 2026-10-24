@@ -8,6 +8,21 @@
   "properties": {
     "name": { "$ref": "common.schema.json#/$defs/name" },
     "description": { "type": "string", "minLength": 1 },
+    "title": { "description": "Friendly name in the setup (ADR-0054), e.g. Safety guard.", "type": "string", "minLength": 1, "maxLength": 40 },
+    "group": { "description": "Setup group of the module card.", "enum": ["basics", "memory", "quality", "github", "comfort"] },
+    "what": { "description": "What you get, in plain words (one or two sentences).", "type": "string", "minLength": 1, "maxLength": 300 },
+    "example": {
+      "description": "A small example: a situation, an optional command, and what happens.",
+      "type": "object",
+      "required": ["when", "then"],
+      "properties": {
+        "when": { "type": "string", "minLength": 1 },
+        "run": { "type": "string", "minLength": 1 },
+        "then": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "cost": { "description": "What it costs or needs (tokens, tools, personal data), shown on the card.", "type": "string", "minLength": 1, "maxLength": 200 },
     "appliesTo": {
       "description": "Module is offered only when these facts match.",
       "$ref": "common.schema.json#/$defs/facts"

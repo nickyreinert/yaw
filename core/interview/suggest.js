@@ -1,21 +1,25 @@
-// Rule-based profile suggestion (Y-3.6, doc 02 §1): no LLM, same input gives the same output.
-//
-// A profile is a candidate when none of its suggestWhen facts contradicts the known facts and at
-// least one matches. The suggestion is the candidate with the most matches; a tie means no suggestion
-// (the user chooses). Candidates are ordered by matches, then by name.
+// The stack (ADR-0054): language x runs-on picks exactly one profile. No LLM, no scoring: every pair
+// belongs to at most one profile (profile.yaml `stack`); a pair without a profile is not a valid stack.
 
-import { matchFacts } from './facts.js';
+const covers = (p, language, runsOn) => Boolean(p.stack?.language?.includes(language) && p.stack?.runsOn?.includes(runsOn));
 
-// profiles: [{ name, summary, suggestWhen }] -> { suggestion: name | null, candidates: [{ name, matched }] }
-export function suggestProfiles(profiles, facts) {
-  const candidates = [];
-  for (const p of profiles) {
-    const { matched, mismatched } = matchFacts(p.suggestWhen, facts);
-    if (mismatched === 0 && matched > 0) candidates.push({ name: p.name, matched });
-  }
-  candidates.sort((a, b) => b.matched - a.matched || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  const suggestion = candidates.length > 0 && (candidates.length === 1 || candidates[0].matched > candidates[1].matched)
-    ? candidates[0].name
-    : null;
-  return { suggestion, candidates };
+// -> profile | null
+export function profileForStack(profiles, language, runsOn) {
+  return profiles.find((p) => covers(p, language, runsOn)) ?? null;
+}
+
+// Places a language can run, in the order of `hosts` (the arch.runs-on choices). -> [runsOn]
+export function hostsFor(profiles, language, hosts) {
+  return hosts.filter((h) => profiles.some((p) => covers(p, language, h)));
+}
+
+// The profile for answers (arch.language, arch.runs-on). -> { profile: name | null, reason }
+export function stackProfile(profiles, answers = {}) {
+  const language = answers['arch.language'];
+  const runsOn = answers['arch.runs-on'];
+  if (typeof language !== 'string' || typeof runsOn !== 'string') return { profile: null, reason: 'choose a language and where it runs' };
+  const hit = profileForStack(profiles, language, runsOn);
+  if (hit) return { profile: hit.name, reason: `${hit.stack.basic ? 'basic' : 'tailored'} stack for ${language} on ${runsOn}` };
+  const fits = profiles.flatMap((p) => (p.stack?.language?.includes(language) ? p.stack.runsOn : []));
+  return { profile: null, reason: fits.length ? `${language} does not run on ${runsOn}; choose ${[...new Set(fits)].join(', ')}` : `no stack for ${language}` };
 }

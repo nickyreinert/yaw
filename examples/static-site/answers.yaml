@@ -7,8 +7,8 @@ answers:
   user.autonomy: ask-risky
   idea.text: A landing page for my bakery.
   idea.team: solo
-  arch.language: auto
-  arch.runs-on: serverless
+  arch.language: html
+  arch.runs-on: static
 proposal:
   status: confirmed
   summary: static-site - Landing page, portfolio or docs; plain HTML/CSS, html-validate, stylelint, link check.

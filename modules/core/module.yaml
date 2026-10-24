@@ -1,6 +1,10 @@
 # modules/core/module.yaml (Y-3.2)
 name: core
 description: AGENTS.md, CLAUDE.md, .gitignore, justfile and the manifest.
+title: Project rules
+group: basics
+what: "One rules file every agent reads (AGENTS.md, CLAUDE.md), a justfile with check and test recipes, and a .gitignore."
+example: { when: "You type", run: "just check", then: "runs the formatter, linter and tests of your stack, the same way for you and every agent." }
 depends: []
 default: { quick: true, standard: true, full: true }
 questions: []

@@ -1,12 +1,14 @@
 import { collectQuestions, listProfiles } from '../render/kit.js';
+import { stackProfile } from '../interview/suggest.js';
 import { editProject } from '../render/project.js';
 import { runInterview } from '../interview/engine.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { createFormModel } from '../web/form-model.js';
 import { initWeb } from '../web/init.js';
-import { chooseProfile, verifyProject } from './init.js';
+import { confirmStack, verifyProject } from './init.js';
 import { printReport, UsageError } from './commands.js';
 import { confirm } from './prompt.js';
+import { gitInit, isGitRepo, wantsGit } from '../lib/git-init.js';
 
 export async function edit({ values, positionals: sections, io }) {
   const model = createFormModel({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, edit: true, sections });
@@ -15,7 +17,7 @@ export async function edit({ values, positionals: sections, io }) {
     io.stdout.write(`Interview sections: ${model.sectionNames.join(', ')}\nUse yaw edit <section> or yaw edit <question.id>; multiple selectors are allowed.\n`);
     return 0;
   }
-  const state = { ...model.initial, answers: { ...model.initial.answers } };
+  const state = { mode: model.initial.mode, modules: model.initial.modules, answers: { ...model.initial.answers } };
   const browser = () => {
     model.assertUnchanged();
     io.prompter.close?.();
@@ -48,13 +50,14 @@ export async function edit({ values, positionals: sections, io }) {
   });
   state.answers = { ...state.answers, ...result.answers };
   if (result.web) return browser();
-  if (!sections.length) {
-    const profile = await chooseProfile({ prompter: io.prompter, profiles: listProfiles(io.kitRoot), suggestion: state.profile });
-    if (profile === 'web') return browser();
-    state.profile = profile;
+  const profiles = listProfiles(io.kitRoot);
+  if (!sections.length || !stackProfile(profiles, state.answers).profile) {
+    const stack = await confirmStack({ prompter: io.prompter, profiles, questions: collectQuestions(io.kitRoot, []), answers: state.answers });
+    if (stack === 'web') return browser();
+    state.answers = stack.answers;
   }
   const preview = model.preview(state, true);
-  io.stdout.write(`\nSummary (${state.mode} setup)\n  profiles: ${state.profile}\n  modules: ${preview.modules.join(', ')}\n`);
+  io.stdout.write(`\nSummary (${state.mode} setup)\n  stack: ${preview.profile}\n  modules: ${preview.modules.join(', ')}\n`);
   for (const [id, value] of Object.entries(preview.answers)) {
     io.stdout.write(`  ${id}: ${Array.isArray(value) ? value.join(', ') : String(value)}\n`);
   }
@@ -65,6 +68,11 @@ export async function edit({ values, positionals: sections, io }) {
     return 1;
   }
   const prepared = model.normalize(state);
+  if (!isGitRepo(io.cwd) && wantsGit(prepared.modules, prepared.doc.answers)
+    && (await confirm(io.prompter, 'No git repository here yet; create one now (git init)? Commit checks and the push gate need it.'))) {
+    const git = gitInit(io.cwd);
+    io.stdout.write(git.created ? 'created a git repository (git init)\n' : `git init failed: ${git.error}; run git init yourself\n`);
+  }
   const applied = await editProject({ root: io.cwd, kitRoot: io.kitRoot, answers: prepared });
   printReport(io.stdout, applied);
   if (values['skip-verify']) {

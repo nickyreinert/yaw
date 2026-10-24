@@ -1,6 +1,8 @@
-// Settings (Interview | Files) and the decision-category editor. Text nodes only: file content,
+// Settings (Interview | Files | Review prompts) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
-import { available, choiceLabel, choiceValue, toggleModules, visibleQuestions } from './ui-state.js';
+import { available, choiceLabel, choiceValue, defaultModules, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
+import { CARD_QUESTIONS, renderModuleGroups, renderStack } from './setup-cards.js';
+import { renderReviewPrompts } from './review-prompts-view.js';
 
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -140,16 +142,23 @@ export function createSettings({ api, get, report, refresh, go }) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden && !drawer.contains(document.activeElement)) closeDrawer(); });
 
   function show(name) {
-    tab = ['interview', 'files'].includes(name) ? name : 'interview';
+    tab = ['interview', 'files', 'review'].includes(name) ? name : 'interview';
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
-    for (const id of ['interview', 'files']) $(`settings-${id}`).hidden = id !== tab;
+    for (const id of ['interview', 'files', 'review']) $(`settings-${id}`).hidden = id !== tab;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
     if (tab === 'interview' && !interview) loadInterview().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);
+    if (tab === 'review') loadReview().catch(report);
     return tab;
   }
   function hide() { if (!drawer.hidden) closeDrawer(); }
   function reset() { files = null; interview = null; state = null; previewed = null; }
+
+  // Review prompts --------------------------------------------------------------------------------------
+  async function loadReview() {
+    const data = await get('review-prompts');
+    renderReviewPrompts($('settings-review'), { data, scope: 'project', api, load: loadReview });
+  }
 
   // Files ---------------------------------------------------------------------------------------------
   async function loadFiles() { files = await get('settings'); renderFiles(); }
@@ -211,40 +220,62 @@ export function createSettings({ api, get, report, refresh, go }) {
   // Interview -----------------------------------------------------------------------------------------
   async function loadInterview() {
     interview = await get('interview'); previewed = null;
-    state = interview.available ? { mode: interview.initial.mode, profile: interview.initial.profile, modules: [...interview.initial.modules], answers: structuredClone(interview.initial.answers) } : null;
+    const init = interview.available ? interview.initial : null;
+    state = init ? { mode: init.mode, modules: [...(init.modules ?? defaultModules(interview.modules, interview.questions, init.answers, init.mode))], answers: structuredClone(init.answers), gitInit: !interview.gitRepo, ...(interview.folder?.confirm ? { confirmFolder: false } : {}) } : null;
     renderInterview();
   }
-  const fingerprint = () => JSON.stringify(state);
+  let stackValid = true, compact = localStorage.getItem('yaw.setup.compact') === '1';
+  const fingerprint = () => JSON.stringify({ ...state, confirmFolder: undefined });
   function renderInterview() {
     const root = $('settings-interview'); root.replaceChildren();
-    if (!interview.available) { root.append(el('p', 'This folder has no YAW setup. Run yaw init here.', 'muted')); return; }
-    root.append(el('p', 'The same interview as yaw edit. Saved answers are filled in; nothing is written until you preview and apply. Files you edited yourself are kept.', 'small muted'));
+    if (!interview.available) { root.append(el('p', interview.message ?? 'This folder has no YAW setup. Run yaw init here.', 'muted')); return; }
+    root.append(el('p', interview.fresh
+      ? 'First setup of this folder: the same interview as yaw init. Pick your stack and modules, preview the files, then Apply. Nothing is written before Apply.'
+      : 'The same interview as yaw edit. Saved answers are filled in; nothing is written until you preview and apply. Files you edited yourself are kept.', 'small muted'));
+    if (interview.folder?.confirm) {
+      const f = interview.folder, warn = el('div', null, 'card'), l = el('label'), box = el('input');
+      box.type = 'checkbox'; box.checked = state.confirmFolder; box.addEventListener('change', () => { state.confirmFolder = box.checked; changed(); });
+      l.append(box, document.createTextNode(' Set up YAW in this folder anyway'));
+      warn.append(el('p', `This folder is not empty (${f.entries} entries${f.repos ? `, ${f.repos} of them Git repositories` : ''}) and is not a Git repository or YAW project. YAW writes AGENTS.md, a justfile, .yaw/ and more into it.${f.repos ? ' It looks like a folder of projects; add one project folder instead.' : ''}`, 'warn'), l);
+      root.append(warn);
+    }
     const setup = el('div', null, 'card interview-setup');
     const depth = el('select'); for (const m of ['quick', 'full']) { const o = el('option', m === 'quick' ? 'Quick' : 'Full'); o.value = m; depth.append(o); }
     depth.value = state.mode === 'full' ? 'full' : 'quick'; depth.addEventListener('change', () => { state.mode = depth.value; changed(true); });
-    const profile = el('select'); for (const p of interview.profiles) { const o = el('option', `${p.name} — ${p.summary}`); o.value = p.name; profile.append(o); }
-    profile.value = state.profile; profile.addEventListener('change', () => { state.profile = profile.value; changed(); });
     const label = (text, node) => { const l = el('label', text); l.append(node); return l; };
-    setup.append(label('Setup depth', depth), label('Stack profile', profile));
-    const mods = el('fieldset', null, 'interview-modules'); mods.append(el('legend', 'Modules'));
-    for (const m of interview.modules) {
-      const l = el('label'), c = el('input'); c.type = 'checkbox'; c.checked = state.modules.includes(m.name); c.disabled = m.name === 'core';
-      c.addEventListener('change', () => { state.modules = toggleModules(interview.modules, state.modules, m.name, c.checked); changed(true); });
-      l.title = `${m.description}${m.depends.length ? ` · requires ${m.depends.join(', ')}` : ''}`;
-      l.append(c, document.createTextNode(m.name)); mods.append(l);
-    }
-    setup.append(mods); root.append(setup);
+    setup.append(label('Setup depth', depth));
+    const answers = effectiveAnswers(interview.questions, state.answers, state.mode);
+    const stackBox = el('div', null, 'interview-stack'); stackBox.id = 'interview-stack';
+    const stack = renderStack(stackBox, { profiles: interview.profiles, questions: interview.questions, answers,
+      onChange: (id, value) => { state.answers[id] = value; changed(true); } });
+    stackValid = stack.valid;
+    const stackCard = el('section', null, 'card interview-section'); stackCard.append(el('h2', 'Your stack'), stackBox);
+    const modsBox = el('div'); modsBox.id = 'interview-modules';
+    renderModuleGroups(modsBox, {
+      modules: interview.modules, selected: state.modules, answers, questions: interview.questions, compact,
+      gitRepo: interview.gitRepo, gitInit: state.gitInit, usesGitHub: answers['tasks.use-github'] !== false,
+      onToggle: (name, on) => { state.modules = toggleModules(interview.modules, state.modules, name, on); changed(true); },
+      onAnswer: (id, value) => { state.answers[id] = value; changed(true); },
+      onGitInit: (on) => { state.gitInit = on; if (!on && state.modules.includes('git-hooks')) state.modules = toggleModules(interview.modules, state.modules, 'git-hooks', false); changed(true); },
+      onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderInterview(); },
+      onPreset: (kind) => { state.modules = defaultModules(interview.modules, interview.questions, state.answers, kind); changed(true); },
+    });
+    const modCard = el('section', null, 'card interview-section'); modCard.append(el('h2', 'What YAW adds to your project'), modsBox);
+    root.append(setup, stackCard, modCard);
     const visible = new Set(visibleQuestions(interview.questions, state.answers, state.mode, state.modules).map((q) => q.id));
     const sections = new Map();
     const titles = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
-    for (const q of interview.questions.filter((x) => visible.has(x.id))) {
+    for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id))) {
       const key = q.id.split('.')[0];
       if (!sections.has(key)) { const s = el('section', null, 'card interview-section'); s.append(el('h2', titles[key] ?? key)); sections.set(key, s); root.append(s); }
       sections.get(key).append(question(q));
     }
     const actions = el('div', null, 'interview-actions'), status = el('p', '', 'small muted'); status.id = 'interview-status'; status.setAttribute('role', 'status');
-    const apply = button('Apply', () => applyInterview().catch(fail), 'primary'); apply.id = 'interview-apply'; apply.disabled = !previewed || previewed.state !== fingerprint();
-    actions.append(button('Preview changes', () => previewInterview().catch(fail)), apply, button('Reset', () => loadInterview().catch(report)), status);
+    const blocked = interview.folder?.confirm && !state.confirmFolder;
+    const apply = button(interview.fresh ? 'Set up project' : 'Apply', () => applyInterview().catch(fail), 'primary'); apply.id = 'interview-apply'; apply.disabled = blocked || !stackValid || !previewed || previewed.state !== fingerprint();
+    const previewButton = button('Preview changes', () => previewInterview().catch(fail)); previewButton.disabled = !stackValid;
+    if (!stackValid) status.textContent = 'This language does not run there; pick another pair under Your stack.';
+    actions.append(previewButton, apply, button('Reset', () => loadInterview().catch(report)), status);
     const out = el('div'); out.id = 'interview-preview';
     root.append(actions, out);
     if (previewed) renderPreview(previewed.result);
@@ -279,7 +310,7 @@ export function createSettings({ api, get, report, refresh, go }) {
   function changed(rerender = false) {
     const apply = $('interview-apply');
     if (rerender) { const id = document.activeElement?.closest?.('.interview-question')?.querySelector('code')?.textContent; renderInterview(); if (id) [...document.querySelectorAll('.interview-question code')].find((c) => c.textContent === id)?.closest('.interview-question').querySelector('input,select,textarea')?.focus(); return; }
-    if (apply) apply.disabled = !previewed || previewed.state !== fingerprint();
+    if (apply) apply.disabled = (interview.folder?.confirm && !state.confirmFolder) || !previewed || previewed.state !== fingerprint();
     if (previewed && previewed.state !== fingerprint()) $('interview-status').textContent = 'Changed since the preview; preview again before applying.';
   }
   function fail(e) { const s = $('interview-status'); if (s) s.textContent = e.message; else report(e); }
@@ -291,18 +322,18 @@ export function createSettings({ api, get, report, refresh, go }) {
   }
   function renderPreview(r) {
     const out = $('interview-preview'), box = el('div', null, 'card');
-    box.append(el('h2', 'Preview'), el('p', `Profile ${r.profile} · modules ${r.modules.join(', ')} · ${r.kept} file(s) unchanged or kept as you edited them.`, 'small'));
+    box.append(el('h2', 'Preview'), el('p', `Stack ${r.profile} · modules ${r.modules.join(', ')} · ${r.kept} file(s) unchanged or kept as you edited them.`, 'small'));
     box.append(r.files.length ? grid(['File', 'Change'], r.files.map((f) => [code(f.path), f.action])) : el('p', 'No file changes.', 'muted'));
     const diff = el('details'); diff.append(el('summary', 'Full diff'), el('pre', r.diff, 'file-source plain')); box.append(diff);
     out.replaceChildren(box);
   }
   async function applyInterview() {
-    if (!confirm('Write the previewed changes to this project?')) return;
+    if (!confirm(interview.fresh ? 'Set up YAW in this folder with the previewed files?' : 'Write the previewed changes to this project?')) return;
     $('interview-status').textContent = 'Applying…';
     const result = await api('interview-apply', { ...state, expected: interview.hash });
     interview = null; files = null; await loadInterview();
     const out = $('interview-preview'), box = el('div', null, 'card');
-    box.append(el('h2', 'Applied'), el('p', result.message), result.report.length ? grid(['File', 'Result', 'Note'], result.report.map((r) => [code(r.path), r.action, r.reason])) : el('p', 'Nothing to do.', 'muted'));
+    box.append(el('h2', result.fresh ? 'Set up' : 'Applied'), el('p', result.message), result.report.length ? grid(['File', 'Result', 'Note'], result.report.map((r) => [code(r.path), r.action, r.reason])) : el('p', 'Nothing to do.', 'muted'));
     out.replaceChildren(box); $('interview-status').textContent = result.message; refresh();
   }
   return { show, hide, reset };

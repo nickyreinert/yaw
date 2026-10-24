@@ -1,10 +1,10 @@
 # The doc 05 §2 example, unchanged.
 name: python-web
+title: FastAPI web app
 summary: Flask or FastAPI web app, containerised, self-hosted.
-suggestWhen:
+stack:
   language: [python]
-  runsOn: [self-hosted, docker]
-  hasUI: [true, false]
+  runsOn: [self-hosted]
 options:
   framework: { choices: [flask, fastapi], default: fastapi }
   db: { choices: [none, sqlite, postgres], default: postgres }

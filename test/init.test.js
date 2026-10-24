@@ -117,7 +117,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
     const login = await fetch(url, { redirect: 'manual' });
     const cookie = login.headers.get('set-cookie').split(';')[0];
     const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
-    assert.deepEqual(boot.handoff, { mode: 'quick', answers: { ...answers, 'user.agents': ['claude'] }, profile: '' });
+    assert.deepEqual(boot.handoff, { mode: 'quick', answers: { ...answers, 'user.agents': ['claude'] } });
     assert.deepEqual(readdirSync(dir), []);
   } finally {
     process.emit('SIGINT');
@@ -127,7 +127,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted([...INTERVIEW, '', 'y', '', '', 'y']);
+  const prompter = scripted([...INTERVIEW, 'y', '', '', 'y']);
   // look at the folder at the moment the confirmation is asked
   const ask = prompter.ask;
   const seen = [];
@@ -138,7 +138,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
-  assert.match(r.out, /profile: node-cli \(suggested from language=javascript, runsOn=local, hosted=false, team=false, usesGitHub=true\)/);
+  assert.match(r.out, /profile: node-cli \(tailored stack for javascript on local\)/);
   assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(default\)$/m, '"skip" is listed as default');
   assert.doesNotMatch(r.out, /user\.language +en +\(default\)/);
   assert.match(r.out, /verification skipped/);
@@ -149,12 +149,12 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core', 'communication', 'devenv', 'security', 'standards', 'tasks'],
+    modules: ['core', 'communication', 'devenv', 'security', 'sessions', 'standards', 'tasks'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + communication + standards + devenv + tasks + security (ADR-0009): security adds .claude/settings.json and the hook shim (Claude only, no .codex/)
-  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 16);
+  // Quick = core + communication + standards + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
+  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.claude/skills/handoff/SKILL.md', '.yaw/bin/yaw-hook']);
+  assert.equal(readManifest(dir).files.length, 19);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
   // kickoff guidance (#173): asked last, the prompt carries the idea and the task store
   assert.match(prompter.asked.at(-1), /guidance to kick off/);
@@ -165,21 +165,21 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
 
 test('interview: declining writes nothing and exits 1', async () => {
   const dir = tmp('yaw-proj-');
-  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter: scripted([...INTERVIEW, '', 'n']) });
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter: scripted([...INTERVIEW, 'n']) });
   assert.equal(r.code, 1);
   assert.match(r.out, /cancelled; nothing was written/);
   assert.deepEqual(readdirSync(dir), []);
 });
 
-test('interview: with no single match the user chooses the profile (by number)', async () => {
+test('interview: a language that does not run there asks where it runs (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', '', 'auto', 'auto', '', '', '', 'nope', '6', 'y', '', '', 'n']);
+  const prompter = scripted(['', '', '', '', '', '', '', 'html', 'local', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
-  assert.match(prompter.shown.join(''), /No single profile matches your answers; choose one\./);
-  assert.match(prompter.shown.join(''), /choose one of: android-kotlin, cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site, wordpress-plugin/);
-  assert.match(r.out, /profile: python-cli \(chosen by you\)/);
-  assert.ok(existsSync(join(dir, 'pyproject.toml')));
+  assert.match(prompter.shown.join(''), /HTML & CSS only does not run there \(local\)/);
+  assert.match(prompter.shown.join(''), /choose one of: static/);
+  assert.match(r.out, /profile: static-site \(tailored stack for html on static\)/);
+  assert.ok(existsSync(join(dir, 'public')));
 });
 
 test('interview: input that ends early leaves the folder empty', async () => {
@@ -215,22 +215,22 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
-test('Quick footprint, complete after Y-5.3 (ADR-0009, ADR-0010): 16 files for Claude, 17 with Codex', async () => {
-  for (const [agents, count] of [['claude', 16], ['claude, codex', 17]]) {
+test('Quick footprint (ADR-0009, ADR-0010, ADR-0054): 19 files for Claude, 20 with Codex', async () => {
+  for (const [agents, count] of [['claude', 19], ['claude, codex', 20]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /modules: core, communication, devenv, security, standards, tasks/);
+    assert.match(r.out, /modules: core, communication, devenv, security, sessions, standards, tasks/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
     assert.equal(files.length, count, files.join(', '));
   }
 });
 
-test('answers without a proposal: the profile is suggested from the answers and written back', async () => {
+test('answers without a proposal: the stack picks the profile and it is written back', async () => {
   const text = 'mode: quick\nanswers:\n  user.agents: [codex]\n  arch.language: python\n  arch.runs-on: local\n';
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /profile: python-cli \(suggested from language=python, runsOn=local, hosted=false\)/);
+  assert.match(r.out, /profile: python-cli \(tailored stack for python on local\)/);
   assert.match(r.out, /user\.language +de +\(default\)/, 'questions missing from the file are listed as default');
   const doc = parseDocument(readFileSync(join(r.cwd, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(doc.proposal.profiles, ['python-cli']);
@@ -238,18 +238,18 @@ test('answers without a proposal: the profile is suggested from the answers and 
   assert.deepEqual(readManifest(r.cwd).agents, ['codex']);
 });
 
-test('answers without a proposal and without a clear match are refused before anything is written', async () => {
+test('answers without a proposal and without a stack are refused before anything is written', async () => {
   const text = 'mode: quick\nanswers:\n  user.agents: [claude]\n';
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 1);
-  assert.match(r.err, /no single profile matches \(no facts known\); add proposal\.profiles/);
+  assert.match(r.err, /choose a language and where it runs/);
   assert.deepEqual(readdirSync(r.cwd), []);
 });
 
 test('an unknown profile and a profile listed twice are refused', async () => {
   const body = (profiles) => `mode: quick\nanswers:\n  user.agents: [claude]\nproposal:\n  status: confirmed\n  summary: x\n  profiles: [${profiles}]\n  modules: [core]\n`;
   const unknown = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('go-cli')), '--yes', '--skip-verify']);
-  assert.match(unknown.err, /profile "go-cli" does not exist in this kit \(available: android-kotlin, cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site, wordpress-plugin\)/);
+  assert.match(unknown.err, /profile "go-cli" does not exist in this kit \(available: android-kotlin, cloudflare-workers, go-basic, /);
   const several = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('node-cli, node-cli')), '--yes', '--skip-verify']);
   assert.match(several.err, /proposal\/profiles\/1 duplicates item 0/);
   assert.deepEqual(readdirSync(several.cwd), []);
@@ -392,7 +392,7 @@ test('interview: "web" at a question continues in the browser form with the answ
   assert.match(asked[1], /\(\? help, skip\) > $/);
   assert.match(prompter.shown.join(''), / {2}w\) Continue in the browser\n/);
   assert.match(prompter.shown.join(''), / {6}w\) Continue in the browser\n/);
-  assert.deepEqual(boot.handoff, { mode: 'quick', answers: { 'user.agents': ['codex'], 'user.expertise': 'intermediate' }, profile: '' });
+  assert.deepEqual(boot.handoff, { mode: 'quick', answers: { 'user.agents': ['codex'], 'user.expertise': 'intermediate' } });
   assert.match(stdout.text(), /Continuing in the browser with your answers so far; nothing was written\./);
   assert.deepEqual(readdirSync(dir), []);
 });
@@ -409,13 +409,13 @@ test('setup depth "w" opens the form at once, with an empty hand-off (#162)', as
   const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
   process.emit('SIGINT');
   await running;
-  assert.deepEqual(boot.handoff, { mode: 'quick', answers: {}, profile: '' });
+  assert.deepEqual(boot.handoff, { mode: 'quick', answers: {} });
   assert.deepEqual(readdirSync(dir), []);
 });
 
 test('interview: declining the kickoff guidance prints no prompt', async () => {
   const dir = tmp('yaw-proj-');
-  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter: scripted([...INTERVIEW, '', 'y', '', '', 'n']) });
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter: scripted([...INTERVIEW, 'y', '', '', 'n']) });
   assert.equal(r.code, 0, r.err);
   assert.doesNotMatch(r.out, /----- prompt -----/);
 });

@@ -9,6 +9,7 @@ import { readManifest, writeManifest } from '../core/render/manifest.js';
 import { hashContent } from '../core/render/files.js';
 import { makeProject } from './helpers/hooks.js';
 import { KIT_ROOT, tmp } from './helpers/fixtures.js';
+import { createWorkspaceApi } from '../core/web/workspace-api.js';
 
 const SECRET = `.e${'nv'}.private`;
 const env = () => ({ HOME: tmp('yaw-home-') });
@@ -72,4 +73,49 @@ test('interview: preview lists changes without writing; apply needs the current 
   assert.match(r.message, /Applied/);
   assert.ok(readManifest(root).modules.tasks?.enabled);
   await assert.rejects(interviewApply({ root, kitRoot: KIT_ROOT, env: e, input }), (x) => x.status === 409, 'the old hash is stale after apply');
+});
+
+test('interview in a folder without YAW: home is refused, a non-empty folder needs confirmation, then it is set up', async () => {
+  const home = tmp('yaw-home-');
+  assert.equal(interviewData({ root: home, kitRoot: KIT_ROOT, env: { HOME: home } }).available, false);
+
+  const root = tmp('yaw-fresh-'), e = env();
+  writeFileSync(join(root, 'notes.txt'), 'mine\n');
+  const i = interviewData({ root, kitRoot: KIT_ROOT, env: e });
+  assert.equal(i.available, true);
+  assert.equal(i.fresh, true);
+  assert.equal(i.hash, null);
+  assert.equal(i.folder.confirm, true);
+  const input = { mode: 'quick', answers: { 'user.agents': ['claude'], 'idea.text': 'A tiny tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, modules: ['core'], expected: null };
+  await assert.rejects(interviewApply({ root, kitRoot: KIT_ROOT, env: e, input }), /confirm/);
+  assert.equal(readManifest(root), null, 'nothing written without confirmation');
+  const r = await interviewApply({ root, kitRoot: KIT_ROOT, env: e, input: { ...input, confirmFolder: true } });
+  assert.match(r.message, /Set up/);
+  assert.ok(readManifest(root).modules.core?.enabled);
+  assert.equal(readFileSync(join(root, 'notes.txt'), 'utf8'), 'mine\n');
+  assert.equal(interviewData({ root, kitRoot: KIT_ROOT, env: e }).fresh, false);
+});
+
+test('review prompts API: project override and global blueprint through workspace actions', async () => {
+  const root = await makeProject({ modules: ['core', 'review'] });
+  const e = env(), api = createWorkspaceApi({ root, kitRoot: KIT_ROOT, env: e });
+  const data = await api.get['/api/review-prompts'](new URLSearchParams());
+  assert.equal(data.enabled, true);
+  assert.deepEqual(data.prompts.map((p) => p.kind), ['rules', 'quality', 'logic', 'ux', 'feature']);
+  assert.ok(data.prompts.every((p) => p.effective.source === 'kit'));
+
+  const g = await api.action('review-prompt-save', { scope: 'global', kind: 'ux', text: 'Blueprint UX', expected: null });
+  assert.match(g.message, /Projects without their own prompt/);
+  assert.equal((await api.get['/api/global/review-prompts']()).prompts.find((p) => p.kind === 'ux').effective.source, 'global');
+  await api.action('review-prompt-save', { scope: 'project', kind: 'ux', text: 'Project UX', expected: null });
+  const ux = (await api.get['/api/review-prompts'](new URLSearchParams())).prompts.find((p) => p.kind === 'ux');
+  assert.equal(ux.effective.source, 'project');
+  assert.equal(readFileSync(join(root, '.yaw', 'review', 'ux.md'), 'utf8'), 'Project UX\n');
+  await assert.rejects(api.action('review-prompt-save', { scope: 'project', kind: 'ux', text: 'again', expected: null }), (x) => x.status === 409);
+  await assert.rejects(api.action('review-prompt-save', { scope: 'nowhere', kind: 'ux', text: 'x', expected: null }), /project or global/);
+  await api.action('review-prompt-remove', { scope: 'project', kind: 'ux', expected: ux.project.hash });
+  assert.equal((await api.get['/api/review-prompts'](new URLSearchParams())).prompts.find((p) => p.kind === 'ux').effective.source, 'global');
+
+  const off = await makeProject({ modules: ['core'] });
+  assert.equal((await createWorkspaceApi({ root: off, kitRoot: KIT_ROOT, env: e }).get['/api/review-prompts'](new URLSearchParams())).enabled, false);
 });

@@ -3,6 +3,11 @@
 # live in ~/.yaw, never in the repository.
 name: comfort
 description: "Comfort features that cost no model tokens: session hygiene hints, a Claude status line (task, context, cache, last `just check`) and notifications after long runs; personal, switchable with `yaw hygiene`."
+title: Comfort
+group: comfort
+what: "Small personal helpers: a status line, context hints (\"context is 80% full: run /handoff\") and notifications after long runs."
+example: { when: "Context is 80% full", then: "\"run /handoff, then /clear\" appears for you, not for the model." }
+cost: "No model tokens; personal, switch them with `yaw hygiene`."
 depends: [core]
 default: { quick: false, standard: true, full: true }
 questions:

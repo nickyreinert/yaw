@@ -1,6 +1,10 @@
 # modules/code-map/module.yaml (Y-5.11, ADR-0033): a maintained code map, a rebuildable local index, read-only checks.
 name: code-map
 description: Maintained docs/code-map.md (declared areas, generated sections, your explanations), a rebuildable index outside the project, and `yaw map update` / `check` / `show`; the check runs with `just check` and as a pre-commit job.
+title: Code map
+group: memory
+what: "docs/code-map.md: what each part of the code does, kept up to date, so agents find the right files quickly."
+example: { when: "New folder src/export/", run: "just check", then: "\"code map: src/export is not described yet\"." }
 depends: [core]
 default: { quick: false, standard: true, full: true }
 questions: []

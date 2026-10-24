@@ -4,6 +4,10 @@
 # start talks to the user (systemMessage); the only model-visible output is the active issue (BUILD.md rule 5).
 name: team
 description: "Team mode: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
+title: Team rules
+group: github
+what: "No change without an issue; the agent is told your open issues and pull requests at session start."
+example: { when: "A commit without #12", run: "git push", then: "rejected: \"link an open issue\"." }
 depends: [tasks, github, git-hooks]
 default: { quick: false, standard: { team: true }, full: { team: true } }
 appliesTo: { usesGitHub: true }

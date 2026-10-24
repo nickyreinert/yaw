@@ -1,0 +1,12 @@
+<% if review.anyPush %>
+<% if gitHooksModule %>
+#!/bin/sh
+# Push gate (review module, ADR-0055): the required reviewers check the commits being pushed.
+# git passes the remote name and URL as arguments and the ref lines on stdin; `yaw review gate` reads both.
+# Skip once: YAW_REVIEW=skip git push (or git push --no-verify, which skips every hook).
+if command -v yaw >/dev/null 2>&1; then exec yaw review gate "$@"; fi
+if [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then exec node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" review gate "$@"; fi
+echo "review gate: the YAW kit is not installed, the push was not reviewed" >&2
+exit 0
+<% end %>
+<% end %>

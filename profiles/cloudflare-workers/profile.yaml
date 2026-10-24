@@ -1,10 +1,13 @@
 # profiles/cloudflare-workers/profile.yaml
-# Never auto-suggested (ADR-0039): no pair of facts is narrow enough (typescript plus serverless also fits node-ts-vercel, and an unknown fact would suggest it alone); the user picks it from the list.
+# Picked for JavaScript/TypeScript x edge (ADR-0054, was ADR-0039).
 # D1, R2 and KV bindings, the local D1 migration and the Playwright screenshot come with the full interview (step 7); the scaffold is one plain TypeScript Worker.
 name: cloudflare-workers
+title: Cloudflare Worker in TypeScript
 dependencyEcosystems: [npm]
 summary: Cloudflare Worker in TypeScript; Wrangler (local only), tsc, ESLint, Vitest in the Workers runtime, npm audit.
-suggestWhen: {}
+stack:
+  language: [javascript]
+  runsOn: [edge]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [node>=22.13, just]

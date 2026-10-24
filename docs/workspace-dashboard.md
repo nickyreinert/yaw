@@ -14,9 +14,12 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
 
 - **Overview**: this workspace's sessions, tasks and setup.
 - **Sessions**: the session browser, locked to this workspace.
-- **Settings** has two tabs:
+- **Settings** has three tabs:
   - **Interview**: the same questions as `yaw edit`, with your saved answers,
-    setup depth, stack profile and modules. **Preview changes** lists every
+    setup depth, stack and modules. In a folder without YAW (the **Configure
+    project** button on the Overview), it is the first setup instead: empty
+    answers, **Set up project** writes the files; a folder that is not empty
+    needs a confirmation first, and your home folder is refused. **Preview changes** lists every
     file that would change, with a diff; **Apply** writes them (files you
     edited yourself are kept). Apply is enabled only after a preview of the
     current answers, and is refused if `.yaw/answers.yaml` changed on disk.
@@ -26,6 +29,10 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
     content (hooks table, recipes, YAW blocks versus your own text), **Raw**
     the source. Files are read-only here; `.env*` and secret files are never
     listed. Change tracking is git's job.
+  - **Review prompts** (review module): what each review agent is told, one
+    text per reviewer plus the shared reporting rules. **Save for this
+    project** writes `.yaw/review/<kind>.md` (commit it, so the team and the
+    push gate use it); **Use blueprint** removes it again.
   Notification preferences are personal, so they live under Global Settings.
 - **Knowledge**: this workspace's knowledge records and decisions. Use
   **+ New record**, and **Edit** / **Delete** on a selected record.
@@ -62,7 +69,9 @@ filters, for example one project split by agent.
   (view, rename, delete); **Files** shows `~/.yaw` read-only with a Form/Raw
   panel; **Notifications** holds the notification preferences and lists which
   projects have the comfort module; **Classification** holds the Laya settings
-  and setup steps (see below).
+  and setup steps (see below); **Review prompts** edits your blueprint
+  (`~/.yaw/review/<kind>.md`), which every project without its own prompt
+  uses, and **Reset to kit default** removes it.
 
 Every table can be filtered and sorted and is paged. Filters, splits, tabs,
 table searches, sorting, pages and the open file are kept in the address

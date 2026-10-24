@@ -1,0 +1,12 @@
+# profiles/node-basic/profile.yaml
+# Basic stack (ADR-0054): standard JavaScript tools for places Node runs without a tailored profile.
+name: node-basic
+title: Basic JavaScript project
+summary: JavaScript project; Node.js built-in test runner, zero dependencies.
+stack:
+  language: [javascript]
+  runsOn: [self-hosted, static, app-store]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [node>=22.13, just]

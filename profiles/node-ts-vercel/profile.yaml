@@ -1,10 +1,13 @@
 # profiles/node-ts-vercel/profile.yaml
-# Never auto-suggested (ADR-0036): no pair of facts is narrow enough (an unknown language or runs-on would suggest it alone); the user picks it from the list.
+# Picked for JavaScript/TypeScript x serverless (ADR-0054, was ADR-0036).
 # Profile options (framework: next | vite, doc 05 §2) come with the full interview (step 7); the scaffold is plain TypeScript with one serverless function.
 name: node-ts-vercel
+title: TypeScript app on Vercel
 dependencyEcosystems: [npm]
 summary: TypeScript app with serverless functions for Vercel; tsc, ESLint, Vitest, npm audit.
-suggestWhen: {}
+stack:
+  language: [javascript]
+  runsOn: [serverless]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [node>=22.13, just]

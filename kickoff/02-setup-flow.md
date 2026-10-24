@@ -26,7 +26,7 @@
 
 The LLM only proposes. Collection and application are scripts, so the result is reproducible and inspectable.
 
-**Who proposes when no agent is running?** `yaw init` can run fully without an LLM: it picks the profile by matching the answers against `profiles/*/profile.yaml` (`suggestWhen`) and preselects modules by preset. With Claude Code available, `yaw init --agent claude` hands the answers to a `/kickoff` command that produces the proposal and writes it back into `answers.yaml` (`proposal:` section) for confirmation.
+**Who proposes when no agent is running?** `yaw init` can run fully without an LLM: the stack answers (language and where it runs) pick exactly one profile from `profiles/*/profile.yaml` (`stack`, ADR-0054), tailored or basic, and modules are preselected by preset. With Claude Code available, `yaw init --agent claude` hands the answers to a `/kickoff` command that produces the proposal and writes it back into `answers.yaml` (`proposal:` section) for confirmation.
 
 ## 2. Modes (lean, not too lean)
 

@@ -16,8 +16,8 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local' 
   const idea = String(answers['idea.text'] ?? '').trim() || '(describe the idea here)';
   const facts = [
     summary && `- Stack: ${summary}`,
-    answers['arch.language'] && answers['arch.language'] !== 'auto' && `- Language: ${answers['arch.language']}`,
-    answers['arch.runs-on'] && answers['arch.runs-on'] !== 'auto' && `- Runs on: ${answers['arch.runs-on']}`,
+    answers['arch.language'] && `- Language: ${answers['arch.language']}`,
+    answers['arch.runs-on'] && `- Runs on: ${answers['arch.runs-on']}`,
     answers['idea.team'] && `- Team: ${answers['idea.team']}`,
     `- Work items become ${TASK_TARGET[tasksMode] ?? TASK_TARGET.local}`,
   ].filter(Boolean);

@@ -1,10 +1,11 @@
 # profiles/android-kotlin/profile.yaml
-# Suggested for language kotlin (#164, ADR-0040); runs-on app-store fits, any other place contradicts it (Kotlin on a server: pick a profile yourself).
+# Picked for Kotlin x app-store (ADR-0054, was ADR-0040).
 # The emulator, Paparazzi / Maestro screenshots and the device verbs of the remote dev loop (doc 11 §4) come later; the scaffold is one Compose activity with a JVM unit test.
 name: android-kotlin
+title: Android app with Compose
 dependencyEcosystems: [gradle]
 summary: Android app in Kotlin with Compose; Gradle, ktlint, detekt, Android Lint, JUnit.
-suggestWhen:
+stack:
   language: [kotlin]
   runsOn: [app-store]
 defaults:

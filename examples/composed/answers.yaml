@@ -7,8 +7,8 @@ answers:
   user.autonomy: ask-risky
   idea.text: A landing page for my bakery.
   idea.team: solo
-  arch.language: typescript
-  arch.runs-on: serverless
+  arch.language: javascript
+  arch.runs-on: edge
 proposal:
   status: confirmed
   summary: static-site + cloudflare-workers - a static front end with a Worker API.

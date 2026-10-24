@@ -21,7 +21,7 @@ function interview(replies = {}, confirm = 'y') {
   p.ask = async (prompt) => {
     p.asked.push(prompt);
     if (prompt.startsWith('Review in the')) return 't';
-    if (prompt.startsWith('Setup depth') || prompt.startsWith('  Profile')) return '';
+    if (prompt.startsWith('Setup depth')) return '';
     if (prompt === 'Apply these setup changes? [y/N] ') return confirm;
     if (prompt.includes('Apply these setup changes?')) return confirm;
     const label = p.shown.join('').split('\n').filter((l) => /^  \d+\/\d+ /.test(l)).at(-1)?.replace(/^  \d+\/\d+ /, '');
@@ -91,7 +91,7 @@ test('edit without selectors reruns the interview and lists sections without pro
   const io = ioFor(root, interview());
   assert.equal(await main(['edit', '--skip-verify'], io), 0, io.stderr.text());
   assert.ok(io.prompter.asked.some((q) => q.startsWith('Setup depth')));
-  assert.ok(io.prompter.asked.some((q) => q.startsWith('  Profile')));
+  assert.match(io.stdout.text(), /stack: node-cli/);
   assert.equal(await main(['edit', '--list'], ioFor(root)), 0);
   assert.equal(await main(['edit'], { ...ioFor(root), prompter: { interactive: false } }), 1);
 });
@@ -169,11 +169,11 @@ test('edit --web and terminal browser choice hand off saved answers', async () =
   }
 });
 
-test('changing profiles updates manifest and preserves user-owned scaffolding', async () => {
+test('changing the stack updates manifest and preserves user-owned scaffolding', async () => {
   const root = await makeProject({ modules: ['core'] });
   writeFileSync(join(root, 'src/index.js'), '// user code\n');
   const model = modelFor(root);
-  const prepared = model.normalize({ ...model.initial, profile: 'static-site' });
+  const prepared = model.normalize({ ...model.initial, answers: { ...model.initial.answers, 'arch.language': 'html', 'arch.runs-on': 'static' } });
   await editProject({ root, kitRoot: KIT_ROOT, answers: prepared });
   assert.deepEqual(requireManifest(root).profiles, ['static-site']);
   assert.equal(readTree(root)['src/index.js'], '// user code\n');

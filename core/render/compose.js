@@ -18,7 +18,7 @@ export const SHARED_FILES = {
   '.github/pull_request_template.md': { owner: 'core', style: 'markdown' },
   '.claude/settings.json': { owner: 'core', style: 'json' },
   '.codex/hooks.json': { owner: 'core', style: 'json' },
-  // git-hooks renders the frame (pre-commit); the team module adds commit-msg and pre-push as top-level keys (ADR-0031).
+  // git-hooks renders the frame (pre-commit, pre-push); the team module adds commit-msg as a top-level key (ADR-0031).
   'lefthook.yml': { owner: 'git-hooks', style: 'lines' },
 };
 

@@ -30,7 +30,7 @@ function kitWithContainerProfile({ twice = false } = {}) {
   const from = join(kit, 'profiles', 'node-cli');
   const dir = join(kit, 'profiles', 'container-demo');
   cpSync(from, dir, { recursive: true });
-  writeFileSync(join(dir, 'profile.yaml'), 'name: container-demo\nsummary: Container demo.\nsuggestWhen:\n  language: [javascript]\n');
+  writeFileSync(join(dir, 'profile.yaml'), 'name: container-demo\ntitle: Container demo\nsummary: Container demo.\nstack:\n  language: [html]\n  runsOn: [local]\n');
   writeFileSync(join(dir, 'env.example'), '# Database\nDATABASE_URL=postgres://app@db/app\nAPI_KEY=\n');
   mkdirSync(join(dir, 'devenv'));
   writeFileSync(join(dir, 'devenv', 'Dockerfile'), 'FROM node:22-slim\nWORKDIR /app\n');
@@ -39,7 +39,7 @@ function kitWithContainerProfile({ twice = false } = {}) {
   if (twice) {
     const other = join(kit, 'profiles', 'other-demo');
     cpSync(dir, other, { recursive: true });
-    writeFileSync(join(other, 'profile.yaml'), 'name: other-demo\nsummary: Other.\nsuggestWhen:\n  language: [javascript]\n');
+    writeFileSync(join(other, 'profile.yaml'), 'name: other-demo\ntitle: Other demo\nsummary: Other.\nstack:\n  language: [html]\n  runsOn: [self-hosted]\n');
   }
   return kit;
 }

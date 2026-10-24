@@ -1,0 +1,3 @@
+# Dangerous command patterns of this stack (doc 04 §3).
+guards:
+  - { id: python-publish, pattern: "\\b(twine\\s+upload|uv\\s+publish)\\b", reason: Publishing a package needs your approval. }

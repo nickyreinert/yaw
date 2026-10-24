@@ -1,10 +1,10 @@
 # profiles/node-cli/profile.yaml (BD7: used for YAW itself)
 name: node-cli
+title: Node command-line tool
 summary: Node CLI or tool, zero dependencies where possible; node --test, no Docker.
-suggestWhen:
-  language: [javascript, typescript]
+stack:
+  language: [javascript]
   runsOn: [local]
-  hasUI: [false]
 options:
   checkJs: { choices: [false, true], default: false }   # tsc --checkJs is optional
 defaults:

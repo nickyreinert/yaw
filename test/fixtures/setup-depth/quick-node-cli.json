@@ -4,11 +4,14 @@
     "communication",
     "devenv",
     "security",
+    "sessions",
     "standards",
     "tasks"
   ],
   "files": [
+    ".agents/skills/handoff/SKILL.md",
     ".claude/settings.json",
+    ".claude/skills/handoff/SKILL.md",
     ".env.example",
     ".gitignore",
     ".yaw/bin/yaw-hook",
@@ -17,6 +20,7 @@
     "TASKS.md",
     "docs/standards.md",
     "just/node-cli.just",
+    "just/sessions.just",
     "just/tasks.just",
     "justfile",
     "package.json",

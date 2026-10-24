@@ -112,7 +112,7 @@ function overview(d) {
     metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
-  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'setup', true));
+  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : setup ? 'setup' : 'settings/interview', true));
   document.querySelector('[data-route="code-map"]').hidden = !p.modules?.includes('code-map');
   const activity = card('Activity', 'Last 30 active days · UTC');
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));

@@ -64,35 +64,37 @@ questions:
     hint: Shared team rules; with GitHub enabled, Full also requires issues and PRs (doc 14). Git can use a remote in another local folder instead.
     choices: [solo, team, external-reviewers]
     default: solo
+  # The stack is language x runs-on (ADR-0054): together they pick exactly one profile, tailored or basic.
+  # A pair no profile covers is rejected with the places that language can run.
   - id: arch.language
     ref: "3.1"
     mode: Q
     type: choice
-    label: Preferred or required language? (auto = you choose)
+    label: What language do you want to use?
     help: stack
     choices:
       - { value: python, label: "Python" }
-      - { value: javascript, label: "JavaScript (Node.js or browser)" }
-      - { value: typescript, label: "TypeScript" }
-      - { value: kotlin, label: "Kotlin (Android or JVM)" }
-      - { value: swift, label: "Swift (iOS / macOS)" }
+      - { value: javascript, label: "JavaScript / TypeScript" }
+      - { value: php, label: "PHP" }
+      - { value: kotlin, label: "Kotlin" }
+      - { value: html, label: "HTML & CSS only" }
       - { value: go, label: "Go" }
       - { value: rust, label: "Rust" }
+      - { value: swift, label: "Swift" }
       - { value: java, label: "Java" }
-      - { value: auto, label: "you do not decide; YAW suggests a profile or asks" }
-    default: auto
+    default: javascript
   - id: arch.runs-on
     ref: "3.2"
     mode: Q
     type: choice
-    label: Where should it run?
+    label: Where will it run?
     help: stack
     choices:
-      - { value: local, label: "your own machine (scripts, CLIs, desktop tools)" }
-      - { value: self-hosted, label: "your own server or VPS (web app or API, usually in Docker)" }
-      - { value: serverless, label: "managed functions (Vercel, AWS Lambda, Netlify Functions)" }
-      - { value: edge, label: "code on a CDN, close to users (Cloudflare Workers, Deno Deploy)" }
-      - { value: static, label: "static files only, no server code (GitHub Pages, Netlify)" }
-      - { value: app-store, label: "mobile or desktop app shipped through an app store" }
-      - { value: auto, label: "you do not decide; YAW suggests a profile or asks" }
-    default: auto
+      - { value: local, label: "your computer: command-line tools, scripts, data jobs" }
+      - { value: self-hosted, label: "your own server: web app or API, usually in Docker" }
+      - { value: serverless, label: "serverless functions: Vercel, Netlify Functions, AWS Lambda" }
+      - { value: edge, label: "edge / CDN: Cloudflare Workers, close to users" }
+      - { value: static, label: "static hosting: GitHub Pages, Netlify; no server code" }
+      - { value: wordpress, label: "inside WordPress: a plugin for an existing site" }
+      - { value: app-store, label: "desktop or mobile app: macOS, Windows, Linux, iOS, Android" }
+    default: local

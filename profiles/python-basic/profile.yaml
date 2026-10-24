@@ -1,0 +1,13 @@
+# profiles/python-basic/profile.yaml
+# Basic stack (ADR-0054): standard Python tools for places Python runs without a tailored profile.
+name: python-basic
+title: Basic Python project
+summary: Python project; uv, Ruff, Pyright, pytest.
+stack:
+  language: [python]
+  runsOn: [serverless, edge, app-store]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [python>=3.11, uv, just]
+dependencyEcosystems: [pip]

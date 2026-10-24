@@ -16,7 +16,7 @@ import { main } from '../core/cli/main.js';
 import { verifyProject } from '../core/cli/init.js';
 import { KIT_ROOT, capture, fakeJust, readTree, tmp } from './helpers/fixtures.js';
 
-const setup = (extra = {}) => ({ mode: 'quick', profile: 'node-cli', answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local' }, ...extra });
+const setup = (extra = {}) => ({ mode: 'quick', answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local' }, ...extra });
 const fixture = () => {
   const root = tmp('yaw-form-project-'), home = tmp('yaw-form-home-');
   const env = { ...process.env, HOME: home, USERPROFILE: home, YAW_TEST_OFFLINE: '1' };
@@ -298,7 +298,8 @@ test('web API: draft is an explicit private save, can resume, and does not initi
   assert.equal(readManifest(f.root), null);
   const resumed = await (await f.post('prefill', { kind: 'draft' })).json();
   assert.equal(resumed.answers['idea.text'], 'A small tool');
-  assert.equal(resumed.profile, 'node-cli');
+  assert.equal(resumed.answers['arch.language'], 'javascript');
+  assert.ok(!Object.hasOwn(resumed, 'profile'));
   assert.deepEqual(readTree(f.home), {});
   assert.equal((await f.post('apply', resumed)).status, 200);
   assert.ok(readManifest(f.root));
@@ -319,7 +320,7 @@ test('web API: preset/profile prefill stays editable, saves require consent each
   const preset = await (await f.post('prefill', { kind: 'preset', name })).json();
   assert.equal(preset.answers['idea.text'], 'Original idea');
   assert.ok(!Object.hasOwn(preset, 'consent'));
-  preset.profile = 'node-cli'; preset.answers['idea.text'] = 'Edited idea';
+  preset.answers['idea.text'] = 'Edited idea';
   assert.equal((await (await f.post('preview', preset)).json()).answers['idea.text'], 'Edited idea');
   const profile = await (await f.post('prefill', { kind: 'profile' })).json();
   assert.equal(profile.answers['user.language'], 'en');
@@ -344,14 +345,14 @@ test('web API: preset roundtrip preserves GitHub opt-out after its module is rem
   assert.equal(saved.answers['tasks.use-github'], false);
   const resumed = await (await f.post('prefill', { kind: 'preset', name: presets[0].replace('.yaml', '') })).json();
   assert.equal(resumed.answers['tasks.use-github'], false);
-  const restored = await (await f.post('preview', { ...resumed, profile: 'node-cli' })).json();
+  const restored = await (await f.post('preview', resumed)).json();
   assert.equal(restored.answers['tasks.use-github'], false);
   assert.ok(!restored.modules.includes('github') && !restored.modules.includes('ci'));
   const catalog = f.api.bootstrap();
   assert.ok(!defaultModules(catalog.modules, catalog.questions, resumed.answers, resumed.mode).includes('github'));
-  assert.equal((await f.post('draft', { ...resumed, profile: 'node-cli' })).status, 200);
+  assert.equal((await f.post('draft', resumed)).status, 200);
   assert.equal(parse(readFileSync(join(f.root, DRAFT), 'utf8')).answers['tasks.use-github'], false);
-  const applied = await f.post('apply', { ...resumed, profile: 'node-cli' });
+  const applied = await f.post('apply', resumed);
   assert.match(await applied.text(), /"ok":true/);
   assert.equal(parse(readFileSync(join(f.root, '.yaw', 'answers.yaml'), 'utf8')).answers['tasks.use-github'], false);
   assert.ok(!Object.hasOwn(readManifest(f.root).modules, 'github'));

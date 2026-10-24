@@ -1,0 +1,3 @@
+# Dangerous command patterns of this stack (doc 04 §3).
+guards:
+  - { id: tag-push, pattern: "\\bgit\\s+push\\b.*(--tags|\\brefs/tags/|\\sv[0-9])", reason: Pushing a release tag needs your approval. }

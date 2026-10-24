@@ -1,6 +1,10 @@
 # modules/github/module.yaml (Y-5.5, ADR-0027): GitHub scripts as `just` recipes (doc 10 §3).
 name: github
 description: GitHub recipes, issue forms and planning skills, a PR template and .yaw/github.yaml; configured task Project and epic milestone updates need guarded confirmation.
+title: GitHub workflow
+group: github
+what: "Issue forms, a pull-request template and planning skills, so the agent can turn a plan into issues."
+example: { when: "You ask", run: "\"split this plan into issues\"", then: "5 issues with labels, ready to review." }
 depends: [core]
 default: { quick: false, standard: true, full: true }
 # Off when the user does not use GitHub, including teams with a local Git remote.

@@ -57,6 +57,11 @@ const SOLO_FULL = {
   'user.register': 'professional',
   'user.examples': 'when-helpful',
   'user.explain': 'short-paragraph',
+  'quality.review-quality': 'push',
+  'quality.review-logic': 'push',
+  'quality.review-ux': 'off',
+  'quality.review-feature': 'request',
+  'quality.review-gate': 'warn',
   'tasks.use-github': true,
   'tasks.mode': 'local',
 };
@@ -76,8 +81,8 @@ const QUICK = {
   'tasks.use-github': true,
   'tasks.mode': 'local',
 };
-const QUICK_MODULES = ['core', 'communication', 'devenv', 'security', 'standards', 'tasks'];
-const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'security', 'sessions', 'standards', 'tasks'];
+const QUICK_MODULES = ['core', 'communication', 'devenv', 'security', 'sessions', 'standards', 'tasks'];
+const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
 
 test('Quick: depth is the first question; answers.yaml holds the Q answers and the Quick modules', async () => {
   const r = await init({ depth: 'quick', ...IDEA });

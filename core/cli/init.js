@@ -4,7 +4,7 @@
 //   confirm  summary of the decisions and the files; --yes confirms, otherwise ask
 //   apply    render, write files, bases and the manifest (the only step that writes)
 //   verify   `just setup && just check` in the new project
-// Without an LLM the profile comes from the answers (suggestWhen); `proposal:` is filled in from that.
+// Without an LLM the profile comes from the stack answers (language x runs-on, ADR-0054); `proposal:` is filled in from that.
 
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -13,10 +13,11 @@ import { stringify } from '../lib/yaml.js';
 import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview, whenMatches } from '../interview/engine.js';
-import { suggestProfiles } from '../interview/suggest.js';
+import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
+import { gitInit, isGitRepo, wantsGit } from '../lib/git-init.js';
 import { ANSWERS, ProjectError, initProject, parseAnswers, checkDependencies, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
 import { printToolHints } from './tool-hints.js';
@@ -35,21 +36,34 @@ import { PLAIN } from './style.js';
 // Reply that hands the interview over to the browser form (#162).
 const WEB = 'web';
 
-// Ask for the profile; the suggestion is the default. Without one the user must choose. -> name | WEB
-export async function chooseProfile({ prompter, profiles, suggestion }) {
+const choiceLabel = (q, value) => q?.choices?.find((c) => (c.value ?? c) === value)?.label ?? value;
+
+// The stack is language x runs-on (ADR-0054). Show the profile it picks; when the pair does not work, ask
+// again where it runs, listing only the places that language can run. -> { profile, answers } | WEB
+export async function confirmStack({ prompter, profiles, questions, answers }) {
   const s = prompter.style ?? PLAIN;
-  prompter.show(`\n${s.bold('Stack profile')}\n`);
-  profiles.forEach((p, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${p.name === suggestion ? s.green(s.bold(p.name)) : p.name} - ${p.summary}\n`));
-  prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
-  prompter.show(suggestion ? `  Suggested from your answers: ${suggestion}\n` : '  No single profile matches your answers; choose one.\n');
-  const keys = { choices: [...profiles.map((p) => p.name), 'w'], start: profiles.findIndex((p) => p.name === suggestion) };
+  const langQ = questions.find((q) => q.id === 'arch.language');
+  const hostQ = questions.find((q) => q.id === 'arch.runs-on');
+  const next = { ...answers };
   for (;;) {
-    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${s.green(suggestion)}]` : ''} > `, keys)).trim();
-    if (reply === '' && suggestion) return suggestion;
+    const language = next['arch.language'];
+    const hit = profileForStack(profiles, language, next['arch.runs-on']);
+    if (hit) {
+      prompter.show(`\n${s.bold('Stack')}: ${s.green(hit.title)} (${hit.name}; ${hit.stack.basic ? 'basic: the standard tools of the language' : 'tailored'})\n`);
+      const tools = (hit.requires ?? []).filter((r) => !r.startsWith('just'));
+      if (tools.length) prompter.show(`  Needs on your computer: ${tools.join(', ')}. yaw doctor tells you what is missing.\n`);
+      return { profile: hit.name, answers: next };
+    }
+    const hosts = hostsFor(profiles, language, (hostQ?.choices ?? []).map((c) => c.value ?? c));
+    if (hosts.length === 0) throw new ProjectError(`no stack for ${language} in this kit`);
+    prompter.show(`\n${choiceLabel(langQ, language)} does not run there (${next['arch.runs-on']}). ${s.bold('Where will it run?')}\n`);
+    hosts.forEach((h, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${choiceLabel(hostQ, h)} - ${profileForStack(profiles, language, h).title}\n`));
+    prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
+    const reply = (await prompter.ask('  Runs on > ', { choices: [...hosts, 'w'], start: 0 })).trim();
     if (['w', WEB].includes(reply.toLowerCase())) return WEB;
-    const hit = profiles.find((p, i) => p.name === reply || String(i + 1) === reply);
-    if (hit) return hit.name;
-    prompter.show(`  choose one of: ${profiles.map((p) => p.name).join(', ')}\n`);
+    const pick = hosts.find((h, i) => h === reply || String(i + 1) === reply);
+    if (pick) next['arch.runs-on'] = pick;
+    else prompter.show(`  choose one of: ${hosts.join(', ')}\n`);
   }
 }
 
@@ -97,10 +111,10 @@ async function choosePrevious(io) {
 }
 
 // Continue in the browser form with what was answered so far (#162). The folder guard already ran; nothing is written here.
-function handOff({ io, values, mode, answers = {}, profile = '' }) {
+function handOff({ io, values, mode, answers = {} }) {
   io.prompter.close?.();
   io.stdout.write('\nContinuing in the browser with your answers so far; nothing was written.\n');
-  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers, profile } });
+  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers } });
 }
 
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
@@ -119,11 +133,6 @@ function summaryAnswers(questions, given, defaulted) {
   }
   for (const [id, value] of Object.entries(given)) if (!Object.hasOwn(out, id) && !hidden.has(id)) out[id] = value;
   return out;
-}
-
-function describeFacts(facts) {
-  const parts = Object.entries(facts).map(([k, v]) => `${k}=${v}`);
-  return parts.length > 0 ? parts.join(', ') : 'no facts known';
 }
 
 function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
@@ -260,8 +269,6 @@ export async function init({ values, positionals, io }) {
   }
 
   // profile and modules (rule-based, no LLM)
-  const facts = deriveFacts(answersDoc.answers);
-  const { suggestion } = suggestProfiles(profiles, facts);
   let chosen = answersDoc.proposal?.profiles;
   if (chosen) {
     for (const p of chosen) {
@@ -269,15 +276,20 @@ export async function init({ values, positionals, io }) {
     }
     how = 'from the answers file';
   } else if (fromFile) {
-    if (!suggestion) throw new ProjectError(`${values.answers}: no single profile matches (${describeFacts(facts)}); add proposal.profiles`);
-    chosen = [suggestion];
-    how = `suggested from ${describeFacts(facts)}`;
+    const stack = stackProfile(profiles, answersDoc.answers);
+    if (!stack.profile) throw new ProjectError(`${values.answers}: ${stack.reason}; fix arch.language / arch.runs-on or add proposal.profiles`);
+    chosen = [stack.profile];
+    how = stack.reason;
   } else {
-    const name = await chooseProfile({ prompter: io.prompter, profiles, suggestion });
-    if (name === WEB) return handOff({ io, values, mode: answersDoc.mode, answers: answersDoc.answers, profile: suggestion ?? '' });
-    chosen = [name];
-    how = name === suggestion ? `suggested from ${describeFacts(facts)}` : 'chosen by you';
+    const before = answersDoc.answers['arch.runs-on'];
+    const r = await confirmStack({ prompter: io.prompter, profiles, questions: collectQuestions(kitRoot, []), answers: answersDoc.answers });
+    if (r === WEB) return handOff({ io, values, mode: answersDoc.mode, answers: answersDoc.answers });
+    if (r.answers['arch.runs-on'] !== before) defaulted.delete('arch.runs-on');
+    answersDoc = { ...answersDoc, answers: r.answers };
+    chosen = [r.profile];
+    how = stackProfile(profiles, r.answers).reason;
   }
+  const facts = deriveFacts(answersDoc.answers);
   const wanted = answersDoc.proposal?.modules ?? selectModules({ kitRoot, mode: answersDoc.mode, facts });
   const modules = ['core', ...wanted.filter((m) => m !== 'core' && hasModule(kitRoot, m))];
   checkDependencies({ kitRoot, modules });
@@ -304,6 +316,14 @@ export async function init({ values, positionals, io }) {
   }
 
   // apply
+  if (!isGitRepo(root) && wantsGit(modules, answersDoc.answers)) {
+    const create = values.yes || !io.prompter.interactive
+      || (await confirm(io.prompter, 'No git repository here yet; create one now (git init)? Commit checks and the push gate need it.'));
+    if (create) {
+      const git = gitInit(root);
+      io.stdout.write(git.created ? 'created a git repository (git init)\n' : `git init failed: ${git.error}; run git init yourself\n`);
+    } else io.stdout.write('no git repository: run git init (or yaw edit) later for commit checks and the push gate\n');
+  }
   const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules });
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);

@@ -26,7 +26,7 @@ Remote dev loop (doc 11 §4): `android-kotlin` implements `device-pair`, `device
 
 ```
 profiles/python-web/
-├── profile.yaml          # metadata, suggestWhen, defaults, applicable modules
+├── profile.yaml          # metadata, stack (language x runs-on), defaults, applicable modules
 ├── standards.md          # ≤ 20 lines stack overlay
 ├── just/python-web.just  # implements the uniform verbs
 ├── env.example           # variable names for .env.example (optional, ADR-0025)
@@ -43,10 +43,11 @@ profiles/python-web/
 
 ```yaml
 name: python-web
+title: Python web app
 summary: Flask or FastAPI web app, containerised, self-hosted.
-suggestWhen:
+stack:                    # ADR-0054: every language x runs-on pair belongs to exactly one profile
   language: [python]
-  runsOn: [self-hosted]   # ADR-0035; hasUI is not listed (no information)
+  runsOn: [self-hosted]
 options:
   framework: { choices: [flask, fastapi], default: fastapi }
   db: { choices: [none, sqlite, postgres], default: postgres }
@@ -56,6 +57,8 @@ defaults:
 requires: [docker, just, uv]
 dependencyEcosystems: [pip]
 ```
+
+The stack answers (`arch.language`, `arch.runs-on`) pick the profile; there is no scoring and no guessing. A pair without a tailored profile falls back to a basic profile of that language (`stack.basic: true`: the standard tools of the language, no framework or host setup), and a pair no profile covers is not offered. `yaw doctor` tells the user which language tools are missing on the computer.
 
 `dependencyEcosystems` is optional profile metadata for the CI module's Dependabot config. Declare `npm`, `pip`, `composer` or `gradle` when the scaffold has runtime or development dependencies; omit it for dependency-free profiles. Composed projects place these entries in each profile's own directory. Metadata changes do not install dependencies or scan user manifests.
 

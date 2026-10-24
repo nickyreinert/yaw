@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { asksIn, whenMatches, parseReply, validAnswer } from '../interview/engine.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
-import { suggestProfiles } from '../interview/suggest.js';
+import { stackProfile } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
 import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
 import { MANIFEST, hashContent, readProjectFile, resolveInside } from '../render/files.js';
@@ -40,6 +40,11 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   const questions = collectQuestions(kitRoot, names);
   const byId = new Map(questions.map((q) => [q.id, q]));
   const profiles = listProfiles(kitRoot);
+  // A project saved without a stack answer keeps the stack of its current profile.
+  if (edit && !stackProfile(profiles, original.answers).profile) {
+    const current = profiles.find((p) => p.name === manifest.profiles[0]);
+    if (current) original.answers = { ...original.answers, 'arch.language': current.stack.language[0], 'arch.runs-on': current.stack.runsOn[0] };
+  }
   const owner = new Map(definitions.flatMap((d) => (d.questions ?? []).map((q) => [q.id, d.name])));
   const editableQuestions = edit ? questions.filter((q) => enabledModules(manifest).includes(owner.get(q.id) ?? 'core')) : questions;
   const sectionNames = [...new Set(editableQuestions.map((q) => q.id.split('.')[0]))];
@@ -48,7 +53,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   }
   const editable = (q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
   const initial = edit ? {
-    mode: original.mode, answers: original.answers, profile: manifest.profiles[0], modules: enabledModules(manifest),
+    mode: original.mode, answers: original.answers, modules: enabledModules(manifest),
   } : null;
 
   function assertUnchanged() {
@@ -76,9 +81,10 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
 
   function normalize(input) {
     assertUnchanged();
-    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'profile', 'modules', 'consent', 'saveProfile'].includes(k))) {
-      throw new FormError('Expected a setup object with mode, answers, profile and optional modules');
+    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'modules', 'consent', 'saveProfile', 'gitInit'].includes(k))) {
+      throw new FormError('Expected a setup object with mode, answers and optional modules');
     }
+    if (input.gitInit !== undefined && typeof input.gitInit !== 'boolean') throw new FormError('gitInit must be true or false');
     if (!['quick', 'full', 'standard'].includes(input.mode)) throw new FormError('Choose Quick or Full');
     let given = input.answers ?? {};
     validateGiven(given);
@@ -88,9 +94,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
         throw new FormError('An answer is outside the selected interview sections; run yaw edit without sections');
       }
       if (sections.length && (input.mode !== original.mode ||
-        (input.profile && input.profile !== initial.profile) ||
         (input.modules != null && JSON.stringify(input.modules) !== JSON.stringify(initial.modules)))) {
-        throw new FormError('Section editing cannot change setup depth, profiles or module selection; run yaw edit without sections');
+        throw new FormError('Section editing cannot change setup depth or module selection; run yaw edit without sections');
       }
       given = { ...original.answers, ...Object.fromEntries(Object.entries(given).filter(([id]) => editable(byId.get(id)))) };
     }
@@ -122,11 +127,11 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       (q.id === 'tasks.use-github' && Object.hasOwn(given, q.id)));
     const { answers, defaulted } = normalizeFor(answerQuestions);
     assertSafe(answers, kitRoot);
-    const { suggestion } = suggestProfiles(profiles, deriveFacts(answers));
-    const profile = input.profile || (edit ? initial.profile : suggestion);
-    if (!profiles.some((p) => p.name === profile)) throw new FormError('Choose a stack profile; no single profile matches these answers');
+    const stack = stackProfile(profiles, answers);
+    if (!stack.profile) throw new FormError(`Choose another stack: ${stack.reason}`);
+    const profile = stack.profile;
     const p = profiles.find((p) => p.name === profile);
-    const chosenProfiles = edit && profile === initial.profile ? manifest.profiles : [profile];
+    const chosenProfiles = edit && manifest.profiles.includes(profile) ? manifest.profiles : [profile];
     const doc = { ...(original ?? {}), mode: input.mode, answers, proposal: { ...(original?.proposal ?? {}), status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: chosenProfiles, modules } };
     const text = stringify(doc);
     try { parseAnswers(text); }
@@ -134,7 +139,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       if (e instanceof ProjectError) throw new FormError('Invalid setup answers; select at least one available agent and valid task settings');
       throw e;
     }
-    return { doc, text, defaulted, modules, profile, suggestion, selected, answerQuestions };
+    return { doc, text, defaulted, modules, profile, selected, answerQuestions, gitInit: input.gitInit === true };
   }
 
   function secretCatalog(result, rendered = null) {
@@ -175,7 +180,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const visible = result.selected.filter((q) => (sections.length || (asksIn(q.mode, result.doc.mode) &&
       !(expertise === 'layperson' && q.mode === 'F'))) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
     const output = {
-      mode: result.doc.mode, profile: result.profile, suggestion: result.suggestion ?? null,
+      mode: result.doc.mode, profile: result.profile,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, visible, files,
       secrets: secretCatalog(result, { desired }),
       footprint: {
@@ -230,14 +235,15 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       if (schemas().validate('preset.schema.json', doc).length) throw new FormError('Saved preset is invalid; it was not loaded');
     } else throw new FormError('Choose a saved profile or preset');
     validateGiven(doc.answers);
-    return { mode: doc.mode ?? 'quick', answers: doc.answers, profile: doc.proposal?.profiles?.[0] ?? '', modules: doc.proposal?.modules ?? null };
+    return { mode: doc.mode ?? 'quick', answers: doc.answers, modules: doc.proposal?.modules ?? null };
   }
 
   function bootstrap() {
     return {
       kit: kitVersion(kitRoot),
-      profiles: profiles.map(({ name, summary }) => ({ name, summary })),
-      modules: definitions.map(({ name, description, depends, default: defaults, appliesTo }) => ({ name, description, depends: depends ?? [], defaults, appliesTo })),
+      profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
+      modules: definitions.map(({ name, title, group, what, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', what: what ?? null, description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
+      gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
         let help = '';
         if (q.help) {

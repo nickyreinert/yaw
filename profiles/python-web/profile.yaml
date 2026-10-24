@@ -1,10 +1,11 @@
 # profiles/python-web/profile.yaml
-# Narrow on purpose (ADR-0035): Python and self-hosted; python-cli wins when it runs locally.
+# Picked for Python x your own server (ADR-0054, was ADR-0035).
 # Profile options (framework, db; doc 05 §2) come with the full interview (step 7); the scaffold is FastAPI without a database.
 name: python-web
+title: FastAPI web app
 dependencyEcosystems: [pip]
 summary: FastAPI web app, self-hosted; uv venv, ruff, pyright, pytest, bandit, pip-audit, Dockerfile.
-suggestWhen:
+stack:
   language: [python]
   runsOn: [self-hosted]
 defaults:

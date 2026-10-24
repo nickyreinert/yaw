@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asksIn, batchesOf, parseReply, runInterview, whenMatches } from '../core/interview/engine.js';
 import { deriveFacts, matchFacts } from '../core/interview/facts.js';
-import { suggestProfiles } from '../core/interview/suggest.js';
+import { stackProfile } from '../core/interview/suggest.js';
 import { collectQuestions, listProfiles, loadBaseQuestions } from '../core/render/kit.js';
 import { KIT_ROOT, scripted } from './helpers/fixtures.js';
 
@@ -111,31 +111,19 @@ test('facts come only from answers that exist; auto leaves a fact unknown', () =
   assert.deepEqual(matchFacts({ language: ['python'], runsOn: ['local'], hasUI: [false] }, { language: 'python', runsOn: 'edge' }), { matched: 1, mismatched: 1 });
 });
 
-test('suggestion: the unique best match; ties, contradictions and unknown facts give none', () => {
+test('stack: language x runs-on picks exactly one profile, tailored or basic; other pairs are invalid', () => {
   const profiles = listProfiles(KIT_ROOT);
-  assert.deepEqual(profiles.map((p) => p.name), ['android-kotlin', 'cloudflare-workers', 'node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin']);
-  const pick = (answers) => suggestProfiles(profiles, deriveFacts(answers)).suggestion;
-  assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'local' }), 'node-cli');
-  assert.equal(pick({ 'arch.language': 'typescript', 'arch.runs-on': 'auto' }), 'node-cli');
-  assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'local' }), 'python-cli');
-  assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'local' }), null, 'both match one fact: a tie');
-  assert.equal(pick({ 'arch.language': 'python', 'arch.runs-on': 'app-store' }), null, 'every profile is contradicted');
-  assert.equal(pick({ 'arch.language': 'auto', 'arch.runs-on': 'static' }), 'static-site');
-  assert.equal(pick({ 'arch.language': 'javascript', 'arch.runs-on': 'static' }), 'static-site');
-  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'app-store' }), 'android-kotlin');
-  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'auto' }), 'android-kotlin');
-  assert.equal(pick({ 'arch.language': 'kotlin', 'arch.runs-on': 'self-hosted' }), null, 'server-side Kotlin has no profile');
-  for (const language of ['swift', 'go', 'rust', 'java']) assert.equal(pick({ 'arch.language': language, 'arch.runs-on': 'local' }), null, `${language} has no profile`);
-  assert.equal(pick({}), null);
+  const pick = (language, runsOn) => stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': runsOn }).profile;
+  assert.equal(pick('javascript', 'local'), 'node-cli');
+  assert.equal(pick('javascript', 'static'), 'node-basic');
+  assert.equal(pick('python', 'local'), 'python-cli');
+  assert.equal(pick('python', 'app-store'), 'python-basic');
+  assert.equal(pick('html', 'static'), 'static-site');
+  assert.equal(pick('kotlin', 'app-store'), 'android-kotlin');
+  assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-basic');
+  for (const language of ['swift', 'go', 'rust', 'java']) assert.equal(pick(language, 'local'), `${language}-basic`);
+  assert.equal(pick('html', 'local'), null);
+  assert.match(stackProfile(profiles, { 'arch.language': 'html', 'arch.runs-on': 'local' }).reason, /does not run on local; choose static/);
+  assert.equal(stackProfile(profiles, {}).profile, null);
 });
 
-test('suggestion is deterministic: input order does not matter, ties are listed by name', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  const facts = { runsOn: 'local' };
-  const a = suggestProfiles(profiles, facts);
-  const b = suggestProfiles([...profiles].reverse(), facts);
-  assert.deepEqual(a, b);
-  assert.deepEqual(a.candidates.map((c) => c.name), ['node-cli', 'python-cli']);
-  assert.equal(a.suggestion, null);
-  assert.deepEqual(suggestProfiles(profiles, { language: 'python', runsOn: 'local' }), suggestProfiles([...profiles].reverse(), { language: 'python', runsOn: 'local' }));
-});

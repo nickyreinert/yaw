@@ -1,6 +1,10 @@
 # modules/security/module.yaml (Y-5.0, ADR-0022): minimal guards (BD6); in Quick (ADR-0009).
 name: security
 description: Denies reading .env and secret files and guards destructive commands (rm -rf, force push, prod deploy).
+title: Safety guard
+group: basics
+what: "Stops agents from reading secrets and from running destructive commands unless you run them yourself."
+example: { when: "Agent runs", run: "cat .env", then: "blocked: \"secret file; ask the user\". Same for rm -rf, force push, prod deploy." }
 depends: [standards]
 default: { quick: true, standard: true, full: true }
 questions: []

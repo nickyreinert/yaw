@@ -42,8 +42,8 @@
       <fieldset id="setup-depth" tabindex="-1"><legend>Setup depth</legend><p class="muted">Modules can be added later.</p><div class="depth-options"><label class="depth-card"><input type="radio" name="mode" value="quick" checked><span><strong>Quick start <span class="pill">RECOMMENDED</span></strong><span>Core modules and defaults.</span></span></label><label class="depth-card"><input type="radio" name="mode" value="full"><span><strong>Full setup</strong><span>All applicable configuration.</span></span></label></div></fieldset>
       <section id="start" aria-labelledby="start-title"><h2 id="start-title">Starting answers</h2><label for="prefill">Starting answers</label><div class="inline-control"><select id="prefill"><option value="new">New setup</option></select><button id="load" type="button">Load answers</button></div><p class="small muted">Loading replaces the current answers.</p></section>
       <div id="questions"></div>
-      <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Stack profile</h2><label for="profile">Profile</label><select id="profile"><option value="">Suggest from answers</option></select><p class="small muted"></p></section>
-      <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">Modules</h2><p class="muted">Dependencies are selected automatically.</p><button id="reset-modules" type="button">Use recommended modules</button><div id="modules"></div></section>
+      <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Your stack</h2><p class="muted">Pick the language and where it runs; together they choose one stack. Every language stays selectable; a pair that cannot work keeps “Continue” disabled.</p><div id="stack-cards"></div></section>
+      <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">What YAW adds to your project</h2><p class="muted">Each card says what you get, with a small example. What a module needs is selected automatically; you can add or remove modules later with <code>yaw edit</code>.</p><div id="modules"></div></section>
       <section id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Review &amp; apply</h2><p>Inspect the file plan and diff before applying.</p><p id="verify-note" class="small muted"></p><div class="actions"><button type="button" id="diff" disabled>Inspect file diff</button><button type="button" id="preset" disabled>Save as preset…</button><button type="button" id="apply" class="primary" disabled>Apply setup →</button></div></section>
       <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="draft" disabled>Save draft</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
     </form>
@@ -59,11 +59,12 @@
         <div class="chart-grid" id="ov-charts"></div>
       </section>
       <section data-view="settings" id="settings-view" class="view" hidden>
-        <div class="page-heading"><h1 tabindex="-1">Settings</h1><span class="small muted">This workspace · Interview answers, YAW files</span></div>
-        <nav id="settings-tabs" class="editor-tabs" aria-label="Settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button></nav>
+        <div class="page-heading"><h1 tabindex="-1">Settings</h1><span class="small muted">This workspace · Interview answers, YAW files, review prompts</span></div>
+        <nav id="settings-tabs" class="editor-tabs" aria-label="Settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="review">Review prompts</button></nav>
         <p class="note-inline">Notifications come from the <strong>comfort</strong> module of each project; channels are personal and set under <a href="#global-settings/notifications">Global → Settings → Notifications</a>.</p>
         <div id="settings-interview"></div>
         <div id="settings-files" hidden></div>
+        <div id="settings-review" hidden></div>
         <aside id="settings-detail" aria-label="File preview" tabindex="-1" hidden></aside>
       </section>
       <section data-view="workspace-tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">This workspace · <code>TASKS.md</code></span></div><div id="workspace-task-list" class="card"></div></section>
@@ -91,11 +92,12 @@
       </section>
       <section data-view="global-settings" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Settings</h1><span class="small muted">You · ~/.yaw · applies to all projects</span></div>
-        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button><button type="button" data-tab="classification">Classification</button></nav>
+        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button><button type="button" data-tab="classification">Classification</button><button type="button" data-tab="review">Review prompts</button></nav>
         <div id="gs-interview"></div>
         <div id="gs-files" hidden></div>
         <div id="gs-notifications" hidden><div class="card"><h2>Notifications</h2><div id="notification-settings"></div></div><div id="gs-comfort" class="card"></div></div>
         <div id="gs-classification" hidden></div>
+        <div id="gs-review" hidden></div>
         <aside id="global-detail" aria-label="File preview" tabindex="-1" hidden></aside>
       </section>
       <footer class="content-footer"><span id="workspace-status" role="status">Loading workspace…</span><span>YAW</span></footer>

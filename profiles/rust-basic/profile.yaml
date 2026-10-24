@@ -1,0 +1,12 @@
+# profiles/rust-basic/profile.yaml
+# Basic stack (ADR-0054): standard Rust tools wherever Rust runs without a tailored profile.
+name: rust-basic
+title: Basic Rust project
+summary: Rust project; Cargo, rustfmt, clippy, cargo test.
+stack:
+  language: [rust]
+  runsOn: [local, self-hosted, serverless, edge, app-store]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [rustc, cargo, just]

@@ -9,10 +9,10 @@ import { execFileSync } from 'node:child_process';
 import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
 import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
-import { suggestProfiles } from '../core/interview/suggest.js';
+import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'node-cli', 'node-ts-vercel', 'php-web', 'python-cli', 'python-web', 'static-site', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'php-basic', 'php-web', 'python-basic', 'python-cli', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -20,7 +20,7 @@ const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
 
-test('the kit has exactly the profiles android-kotlin, cloudflare-workers, node-cli, node-ts-vercel, php-web, python-cli, python-web, static-site and wordpress-plugin, and profile.yaml validates', () => {
+test('the kit has exactly the tailored and basic profiles, and profile.yaml validates', () => {
   assert.deepEqual(listProfiles(KIT_ROOT).map((p) => p.name), PROFILES);
   for (const name of PROFILES) {
     const profile = loadProfile(KIT_ROOT, name);
@@ -30,8 +30,8 @@ test('the kit has exactly the profiles android-kotlin, cloudflare-workers, node-
   assert.deepEqual(loadProfile(KIT_ROOT, 'node-cli').requires, ['node>=22.13', 'just']);
 });
 
-test('examples/<profile>/answers.yaml validates and names its profile', () => {
-  for (const name of PROFILES) {
+test('examples/<profile>/answers.yaml validates and names its profile (tailored profiles)', () => {
+  for (const name of PROFILES.filter((n) => !loadProfile(KIT_ROOT, n).stack.basic)) {
     const file = join(KIT_ROOT, 'examples', name, 'answers.yaml');
     const { value, lines } = parseDocument(readFileSync(file, 'utf8'), { file });
     assert.deepEqual(schemas().validate('answers.schema.json', value, { lines }).map((e) => formatError(e, file)), []);
@@ -152,15 +152,6 @@ test('smoke python-cli: yaw init, just setup && just check pass (needs uv and ne
   assert.match(r.stdout, /verified: just setup and just check passed/);
 });
 
-test('static-site is never auto-suggested (empty suggestWhen); other profiles keep their suggestion', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{ runsOn: 'serverless', hosted: true }, { language: 'python', runsOn: 'self-hosted', hosted: true }, { public: true, runsOn: 'edge' }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'static-site'), JSON.stringify(facts));
-  }
-  assert.equal(suggestProfiles(profiles, { language: 'javascript', runsOn: 'local' }).suggestion, 'node-cli');
-  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'local' }).suggestion, 'python-cli');
-});
-
 test('static-site check-links: refuses targets outside public/ without reading them, strips queries, decodes paths', () => {
   const cwd = tmp('yaw-links-');
   const script = join(KIT_ROOT, 'profiles', 'static-site', 'scaffold', 'scripts', 'check-links.mjs');
@@ -241,16 +232,6 @@ test('smoke static-site: yaw init, just setup && just check pass; broken pages f
   assert.match(links.stderr, /bad\.html: broken link "missing\.html"/);
 });
 
-test('python-web is suggested only for a Python project (python-cli wins when local), never for other languages or unknown ones; python-cli keeps its suggestion', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  const names = (facts) => suggestProfiles(profiles, facts).candidates.map((c) => c.name);
-  for (const facts of [{ runsOn: 'serverless', hosted: true }, { language: 'javascript', runsOn: 'self-hosted', hosted: true }, { public: true }, { runsOn: 'edge', hosted: true }, { language: 'javascript', runsOn: 'local', hosted: false }]) {
-    assert.ok(!names(facts).includes('python-web'), JSON.stringify(facts));
-  }
-  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'self-hosted', hosted: true }).suggestion, 'python-web');
-  assert.equal(suggestProfiles(profiles, { language: 'python', runsOn: 'local', hosted: false }).suggestion, 'python-cli');
-});
-
 test('python-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('python-web', env, ['--skip-verify']);
@@ -289,14 +270,6 @@ test('python-web guards block publishing and remote forms, not local work', () =
     assert.ok(blocked(cmd), cmd);
   }
   for (const cmd of ['docker build -t app .', 'docker compose up', 'alembic upgrade head', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'uv run pytest']) assert.ok(!blocked(cmd), cmd);
-});
-
-test('node-ts-vercel is never suggested automatically (the user picks it); node-cli keeps its suggestion', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{}, { runsOn: 'serverless', hosted: true }, { language: 'typescript' }, { language: 'typescript', runsOn: 'serverless', hosted: true }, { language: 'typescript', runsOn: 'self-hosted', hosted: true }, { public: true }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'node-ts-vercel'), JSON.stringify(facts));
-  }
-  assert.equal(suggestProfiles(profiles, { language: 'typescript', runsOn: 'local', hosted: false }).suggestion, 'node-cli');
 });
 
 test('node-ts-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
@@ -342,13 +315,6 @@ test('node-ts-vercel guards block every Vercel CLI form and the deploy recipe, n
     assert.ok(blocked(cmd), cmd);
   }
   for (const cmd of ['vercel --version', 'vercel -v', 'vercel --help', 'npx vercel@65.0.0 --version', 'cat vercel.json', 'npx vitest run', 'just check', 'just test', 'npm test', 'npx tsc --noEmit', 'npx eslint .', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
-});
-
-test('php-web is never suggested automatically (the user picks it)', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{}, { runsOn: 'self-hosted', hosted: true }, { language: 'python' }, { runsOn: 'self-hosted', hosted: true, public: true }, { runsOn: 'local', hosted: false }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'php-web'), JSON.stringify(facts));
-  }
 });
 
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
@@ -399,13 +365,6 @@ test('php-web guards block migrations, remote hosts and registry pushes in every
     'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker build -t app .', 'docker compose up', 'docker compose exec app composer install', 'just check', 'just test', 'git add composer.lock', 'cat database/migrations/x.php',
   ];
   for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
-});
-
-test('wordpress-plugin is never suggested automatically (the user picks it)', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{}, { runsOn: 'self-hosted', hosted: true }, { language: 'python' }, { language: 'javascript' }, { runsOn: 'self-hosted', hosted: true, public: true }, { runsOn: 'local', hosted: false }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'wordpress-plugin'), JSON.stringify(facts));
-  }
 });
 
 test('wordpress-plugin: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
@@ -461,13 +420,6 @@ test('wordpress-plugin guards block SVN writes, deploy scripts, remote wp-cli an
     'vendor/bin/phpcs', 'vendor/bin/phpcbf', 'vendor/bin/phpstan analyse', 'vendor/bin/phpunit', 'php -l my-plugin.php', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'docker compose up', 'git add composer.lock readme.txt', 'cat readme.txt',
   ];
   for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
-});
-
-test('cloudflare-workers is never suggested automatically (the user picks it)', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{}, { runsOn: 'serverless', hosted: true }, { language: 'typescript' }, { language: 'javascript' }, { language: 'typescript', runsOn: 'serverless', hosted: true }, { public: true }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'cloudflare-workers'), JSON.stringify(facts));
-  }
 });
 
 test('cloudflare-workers: the gate recipes make no remote call; scaffold dev dependencies are exact versions', () => {
@@ -556,13 +508,6 @@ test('cloudflare-workers secretFiles: .dev.vars is a secret file, its template i
   const rules = loadRules({ kitRoot: KIT_ROOT, profiles: ['cloudflare-workers'] });
   for (const f of ['.dev.vars', '.dev.vars.staging', 'sub/.dev.vars']) assert.ok(secretRule(rules, f), f);
   for (const f of ['.dev.vars.example', 'wrangler.jsonc', 'dev.vars.md']) assert.equal(secretRule(rules, f), null, f);
-});
-
-test('android-kotlin is never suggested automatically (the user picks it)', () => {
-  const profiles = listProfiles(KIT_ROOT);
-  for (const facts of [{}, { language: 'typescript' }, { language: 'javascript' }, { language: 'python' }, { runsOn: 'local', hosted: false }, { runsOn: 'serverless', hosted: true, public: true }]) {
-    assert.ok(!suggestProfiles(profiles, facts).candidates.some((c) => c.name === 'android-kotlin'), JSON.stringify(facts));
-  }
 });
 
 test('android-kotlin: gate recipes need no emulator, device, keystore or store; versions are exact; the wrapper is pinned by checksum', () => {
@@ -696,4 +641,15 @@ test('android-kotlin secretFiles: keystores and keystore.properties are secret f
   const rules = loadRules({ kitRoot: KIT_ROOT, profiles: ['android-kotlin'] });
   for (const f of ['release.jks', 'app/upload.keystore', 'debug.keystore', 'keys/my-key.jks', 'keystore.properties', 'app/keystore.properties']) assert.ok(secretRule(rules, f), f);
   for (const f of ['build.gradle.kts', 'gradle.properties', 'local.properties', 'keystore.properties.md', 'jks.md', 'app/src/main/AndroidManifest.xml', 'docs/keystore.md']) assert.equal(secretRule(rules, f), null, f);
+});
+
+test('every tailored profile is picked for exactly its language and host (ADR-0054)', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
+  for (const [language, runsOn, name] of [
+    ['javascript', 'local', 'node-cli'], ['javascript', 'serverless', 'node-ts-vercel'], ['javascript', 'edge', 'cloudflare-workers'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['php', 'self-hosted', 'php-web'],
+    ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
+  ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
+  for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
 });

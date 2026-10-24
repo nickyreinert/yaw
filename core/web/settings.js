@@ -6,11 +6,13 @@ import { lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readManifest } from '../render/manifest.js';
-import { ANSWERS, ProjectError, editProject, readAnswers } from '../render/project.js';
+import { ANSWERS, ProjectError, editProject, initProject, readAnswers } from '../render/project.js';
+import { inspectFolder } from '../cli/folder-guard.js';
 import { MANIFEST, BASE_DIR } from '../render/files.js';
+import { gitInit, isGitRepo } from '../lib/git-init.js';
 import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { readRegular, MAX_BYTES } from './knowledge.js';
-import { FormError, createFormModel } from './form-model.js';
+import { FormError, assertSafe, createFormModel } from './form-model.js';
 
 const hash = (text) => `sha256:${createHash('sha256').update(text).digest('hex')}`;
 const MAX_BASE_FILES = 500;
@@ -143,21 +145,36 @@ export async function saveTaxonomy({ root, kitRoot, input }) {
 // ------------------------------------------------------------------------------- interview (yaw edit in the browser)
 
 const answersHash = (root) => { const doc = readRegular(root, ANSWERS); return hash(doc); };
+// An unconfigured workspace gets yaw init's model (first setup); a configured one yaw edit's. `expected` is the
+// answers hash the browser opened, or null for a first setup; either way a change on disk meanwhile is a 409.
 function editModel({ root, kitRoot, env, expected }) {
-  if (expected !== undefined && expected !== answersHash(root)) throw new FormError('Answers changed on disk; reload the Interview tab', 409);
-  try { return createFormModel({ root, kitRoot, env, edit: true }); }
+  const fresh = !readManifest(root);
+  if (expected !== undefined && expected !== (fresh ? null : answersHash(root))) throw new FormError('The setup changed on disk; reload the Interview tab', 409);
+  try { return createFormModel({ root, kitRoot, env, edit: !fresh }); }
   catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
 }
 const setupInput = (input) => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected interview answers');
-  const { mode, answers, profile, modules } = input;
-  return { mode, answers, profile, modules };
+  const { mode, answers, modules, gitInit } = input;
+  return { mode, answers, modules, ...(gitInit === true ? { gitInit } : {}) };
 };
+// The same folder rules as yaw init (#168): never the home folder or the file-system root; a non-empty folder that
+// is not a project needs an explicit confirmation.
+function freshFolder(root, env) {
+  const f = inspectFolder(root, env);
+  if (f.kind === 'home' || f.kind === 'root') {
+    return { refused: `YAW is not set up in ${f.kind === 'home' ? 'your home folder' : 'the file-system root'}. Add a project folder instead.` };
+  }
+  return { kind: f.kind, entries: f.entries, repos: f.repos, confirm: f.kind === 'non-empty' };
+}
 
 export function interviewData({ root, kitRoot, env }) {
-  if (!readManifest(root)) return { available: false };
+  const fresh = !readManifest(root);
+  const folder = fresh ? freshFolder(root, env) : null;
+  if (folder?.refused) return { available: false, fresh, message: folder.refused };
   const b = editModel({ root, kitRoot, env }).bootstrap();
-  return { available: true, hash: answersHash(root), kit: b.kit, profiles: b.profiles, modules: b.modules, questions: b.questions, initial: b.initial, sectionNames: b.sectionNames };
+  const initial = fresh ? { mode: 'full', answers: {}, modules: null } : b.initial;
+  return { available: true, fresh, folder, hash: fresh ? null : answersHash(root), kit: b.kit, profiles: b.profiles, modules: b.modules, questions: b.questions, initial, sectionNames: b.sectionNames ?? [], gitRepo: b.gitRepo };
 }
 
 export function interviewPreview({ root, kitRoot, env, input }) {
@@ -168,11 +185,26 @@ export function interviewPreview({ root, kitRoot, env, input }) {
 }
 
 export async function interviewApply({ root, kitRoot, env, input }) {
+  const fresh = !readManifest(root);
+  if (fresh) {
+    const folder = freshFolder(root, env);
+    if (folder.refused) throw new FormError(folder.refused);
+    if (folder.confirm && input?.confirmFolder !== true) throw new FormError('This folder is not empty and not a project yet; confirm that YAW may write into it');
+  }
   const model = editModel({ root, kitRoot, env, expected: input?.expected });
   const prepared = model.normalize(setupInput(input));
+  if (fresh) assertSafe(prepared.doc.answers, kitRoot);
   let applied;
-  try { applied = await editProject({ root, kitRoot, answers: prepared }); }
-  catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
+  if (prepared.gitInit && !isGitRepo(root)) {
+    const git = gitInit(root);
+    if (git.error) throw new FormError(`git init failed: ${git.error}`);
+  }
+  try {
+    applied = fresh
+      ? await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules })
+      : await editProject({ root, kitRoot, answers: prepared });
+  } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
   const report = applied.report.filter((r) => r.action !== 'edited').map(({ path, action, reason }) => ({ path, action, reason: reason ?? null }));
+  if (fresh) return { report, fresh, hash: answersHash(root), message: `Set up: ${report.length} file${report.length === 1 ? '' : 's'} written. Run just setup && just check in the project folder to verify.` };
   return { report, hash: answersHash(root), message: `Applied: ${report.length ? `${report.length} file${report.length === 1 ? '' : 's'} changed` : 'nothing to do'}. Run just check to verify.` };
 }

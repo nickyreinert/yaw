@@ -2,6 +2,10 @@
 # recall (doc 04, doc 12 §1–2, governance blueprint D, E, F, K).
 name: decisions
 description: Decision journal in .decisions/ (ADRs and security / business-logic / privacy notices), local recall at task start, a user-visible recall note per prompt, and the ID and index check in just check.
+title: Decision journal
+group: memory
+what: "Records why things are the way they are (.decisions/) and reminds the agent when a task touches an earlier decision."
+example: { when: "March: \"SQLite, not Postgres\"", then: "in June the agent proposes Postgres; YAW first shows ADR-0007 with your reason." }
 depends: [core]
 default: { quick: false, standard: true, full: true }
 questions: []

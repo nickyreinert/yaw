@@ -59,10 +59,9 @@ test('parsePlan: a plan without tasks or with a bad effort is refused', () => {
 });
 
 test('kickoffPrompt: carries the idea, the stack and the task store; asks for the parseable format', () => {
-  const p = kickoffPrompt({ answers: { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'auto', 'idea.team': 'solo' }, summary: 'node-cli - Node CLI', tasksMode: 'github' });
+  const p = kickoffPrompt({ answers: { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.team': 'solo' }, summary: 'node-cli - Node CLI', tasksMode: 'github' });
   assert.match(p, /Idea:\nRename photos\.\n/);
-  assert.match(p, /- Stack: node-cli - Node CLI\n- Language: javascript\n- Team: solo\n- Work items become GitHub issues/);
-  assert.doesNotMatch(p, /Runs on/);
+  assert.match(p, /- Stack: node-cli - Node CLI\n- Language: javascript\n- Runs on: local\n- Team: solo\n- Work items become GitHub issues/);
   assert.match(p, /## Phase 1: <phase name>\nmodel: <tier> · effort: <effort>/);
   assert.match(p, /low, medium, high, xhigh, max/);
   // the format the prompt asks for is the one the parser reads

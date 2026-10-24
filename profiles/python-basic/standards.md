@@ -1,0 +1,6 @@
+- Use Python 3.11+ with type hints; `just typecheck` runs Pyright.
+- Manage the environment with uv; do not install into system Python.
+- Format and lint with Ruff (`just fmt`, `just lint`).
+- Keep modules small and validate inputs at boundaries.
+- Tests use pytest, are deterministic, and make no network calls.
+- Avoid unnecessary runtime dependencies and framework-specific structure.

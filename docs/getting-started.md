@@ -59,7 +59,7 @@ From the root of a new project:
 yaw init
 ```
 
-Answer the interview, review the proposed files and confirm to apply them. YAW suggests a project profile and offers **Quick** or **Full** setup. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
+Answer the interview, review the proposed files and confirm to apply them. YAW asks which language you want to use and where the project will run (your computer, your own server, serverless, edge, static hosting, WordPress, or desktop/mobile). Pairs YAW knows well get a tailored stack; other valid pairs get a basic stack for the language; impossible pairs (for example Rust inside WordPress) cannot be continued. YAW does not install the language; `yaw doctor` tells you what is missing. Then it offers **Quick** or **Full** setup. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
 
 Run `yaw init` inside the project folder. YAW refuses your home folder and the file-system root, and asks before writing into a non-empty folder that is not yet a Git repository or YAW project (for example a folder that holds several projects); `--force` overrides both checks.
 
@@ -74,11 +74,23 @@ After setup, `yaw web` opens a local, read-only dashboard with the project setup
 
 ## Quick and Full
 
-**Quick** is the minimal setup: `core`, `communication`, `standards`, `devenv`, `tasks` and minimal `security`. It provides project instructions, basic agent configuration, development commands and security guards without selecting GitHub-specific integrations.
+**Quick** is the minimal setup: `core`, `communication`, `standards`, `devenv`, `tasks`, `sessions` and minimal `security`. It provides project instructions, basic agent configuration, development commands, session history and security guards without selecting GitHub-specific integrations.
 
-**Full** includes Quick plus `git-hooks`, `decisions`, `sessions`, `comfort` and `code-map`. The `github` and `ci` modules are selected when the project uses GitHub; the GitHub-specific `team` enforcement module is selected for teams and external reviewers using GitHub. Full can also be customized in the interview. The legacy `standard` name remains an alias for Full.
+**Full** includes Quick plus `git-hooks`, `decisions`, `comfort`, `code-map` and `review`. The `github` and `ci` modules are selected when the project uses GitHub; the GitHub-specific `team` enforcement module is selected for teams and external reviewers using GitHub. Full can also be customized in the interview. The legacy `standard` name remains an alias for Full.
 
 Git and GitHub are separate choices. Answer **no** to "Use GitHub for the repo?" to use local tasks and Git without GitHub integrations, including team projects with a bare remote in another folder. YAW leaves your Git remotes unchanged. Existing team setups without this answer retain their GitHub defaults.
+
+The browser form (`yaw init --web`, `yaw edit --web`, Workspace → Settings) shows modules as grouped cards with a short example each, plus a compact view for people who already know them.
+
+## Review agents
+
+The `review` module adds four read-only sub-agents: **quality** (readability, naming, duplication, missing tests), **business logic** (the change against your rules and business-logic notices), **UI/UX** (labels, empty and error states, keyboard use, contrast) and **feature fit** (does the change do what the task asked). Each one is off, on request (`just review <kind>`), a hint when work is done, or required before push.
+
+Required reviewers run as a `pre-push` hook (`yaw review gate`) through the agent CLI (Claude Code, Codex or Copilot). With **warn**, you can confirm in the terminal and push anyway; with **block**, the push stops until the findings are fixed. Without a terminal to confirm in (for example when an agent pushes), warn behaves like block, so the agent has to fix the findings first; you can still push yourself. Results are cached per commit. Without a Git repository, reviews run only on request or as a hint; setup offers `git init` for a fresh folder.
+
+The gate hands the prompt to the agent on stdin and runs it read-only: `claude -p` with `--permission-mode dontAsk` and only read and `git diff/log/show` tools, `codex exec --sandbox read-only --ephemeral -`, or `copilot -s --no-ask-user --deny-tool=write`. Set `YAW_REVIEW_AGENT` to pick one.
+
+Each reviewer's prompt, and the reporting rules they share, are separate texts you can edit in `yaw web`: **Global → Settings → Review prompts** is your blueprint for every project (`~/.yaw/review/<kind>.md`); **Settings → Review prompts** in a workspace saves a project version (`.yaw/review/<kind>.md`, committed with the project). The project version wins, then the blueprint, then the kit default. `just review-prompt <kind>` prints the prompt in effect; the review skill and sub-agents read it that way. The read-only rule and the `VERDICT` line are fixed, so an edited prompt cannot turn a reviewer into an editor or break the gate.
 
 ## Maintain a project
 

@@ -1,0 +1,3 @@
+# Dangerous command patterns of this stack (doc 04 §3).
+guards:
+  - { id: cargo-publish, pattern: "\\bcargo\\s+publish\\b", reason: Publishing a crate needs your approval. }

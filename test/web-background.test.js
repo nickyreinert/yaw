@@ -154,7 +154,7 @@ test('background setup changes to a dashboard on the same port after Apply', asy
     const response = await fetch(new URL('/api/apply', url), {
       method: 'POST',
       headers: { cookie, 'x-yaw-token': csrf, 'content-type': 'application/json' },
-      body: JSON.stringify({ mode: 'quick', answers: { 'idea.text': 'Example tool.' }, profile: 'node-cli', modules: ['core'] }),
+      body: JSON.stringify({ mode: 'quick', answers: { 'idea.text': 'Example tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, modules: ['core'] }),
     });
     const events = (await response.text()).trim().split('\n').map((line) => JSON.parse(line));
     assert.equal(response.status, 200, JSON.stringify(events));

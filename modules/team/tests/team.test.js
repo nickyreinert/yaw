@@ -130,13 +130,14 @@ test('selection: preselected in Standard and Full for a team, never in Quick or 
   assert.ok(!selectModules({ mode: 'standard', facts: {} }).includes('team'));
 });
 
-test('install: lefthook commit-msg / pre-push in a team block, pr-policy workflow, just start, pr-policy required; manifest entries', async () => {
+test('install: lefthook commit-msg in a team block, pre-push job in the git-hooks frame, pr-policy workflow, just start, pr-policy required; manifest entries', async () => {
   const root = await project();
   const tree = readTree(root);
   assert.match(tree['lefthook.yml'], /^pre-commit:/m, 'the git-hooks frame stays');
-  assert.match(tree['lefthook.yml'], /# yaw:team\n[\s\S]*^commit-msg:[\s\S]*^pre-push:[\s\S]*# \/yaw:team/m);
+  assert.match(tree['lefthook.yml'], /# yaw:team\n[\s\S]*^commit-msg:[\s\S]*# \/yaw:team/m);
   const lefthook = parse(tree['lefthook.yml']);
-  assert.deepEqual(Object.keys(lefthook), ['pre-commit', 'commit-msg', 'pre-push']);
+  assert.deepEqual(Object.keys(lefthook), ['pre-commit', 'pre-push', 'commit-msg']);
+  assert.deepEqual(lefthook['pre-push'].jobs.map((j) => j.name), ['no-push-to-default-branch']);
   assert.equal(lefthook['pre-push'].jobs[0].use_stdin, true);
   assert.match(tree['just/team.just'], /^start:/m);
   assert.match(tree.justfile, /# yaw:team\nimport 'just\/team.just'\n# \/yaw:team/);

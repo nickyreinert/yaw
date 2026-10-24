@@ -34,9 +34,9 @@ yaw init
 
 This installs the current `main` channel, which includes the features described here. The [full guide](docs/getting-started.md) has the pinned v0.1.0 release install if you prefer a fixed version.
 
-`yaw init` asks about your project, suggests a profile and offers **Quick** or **Full** setup. Review the proposed files before YAW writes them. Prefer a browser form? Run `yaw init --web`, or switch to it during the terminal interview. Setup normally runs the generated `just setup` and `just check` afterward.
+`yaw init` asks which language you want to use and where the project will run; that pair picks a tailored stack (for example a Node CLI or a Cloudflare Worker) or a basic one for the language. Then it offers **Quick** or **Full** setup. Review the proposed files before YAW writes them. Prefer a browser form? Run `yaw init --web`, or switch to it during the terminal interview. Setup normally runs the generated `just setup` and `just check` afterward.
 
-Quick gives you shared instructions, basic agent configuration, project commands, local tasks and essential guards. Full adds decisions, session support, comfort features and a code map; GitHub and CI integrations depend on your project choices. You can change those choices later with `yaw edit` or the dashboard's **Workspace / Settings / Interview**, preview the diff, and apply it. `yaw add <module>` and `yaw remove <module>` adjust modules without starting over.
+Quick gives you shared instructions, basic agent configuration, project commands, local tasks and essential guards. Full adds decisions, comfort features, a code map, git hooks and review agents; GitHub and CI integrations depend on your project choices. Both include session history. You can change those choices later with `yaw edit` or the dashboard's **Workspace / Settings / Interview**, preview the diff, and apply it. `yaw add <module>` and `yaw remove <module>` adjust modules without starting over.
 
 To inspect the installer or follow platform-specific steps, use the [full getting started guide](docs/getting-started.md).
 
@@ -46,6 +46,7 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 | --- | --- |
 | Start a project or revise its setup | `yaw init`, `yaw edit`, `yaw status` and `yaw apply`. The dashboard's Settings view also previews and applies interview changes and lets you inspect YAW-written files. |
 | Turn an idea into work | `yaw kickoff` creates a project-aware planning prompt; `yaw kickoff import <plan.md>` turns the saved plan into tasks with model and effort hints. |
+| Get a second opinion on a change | The optional review module adds four read-only reviewers (quality, business logic, UI/UX, feature fit). Run them with `just review <kind>`, get a hint when work is done, or make them a pre-push gate that warns or blocks `git push`. Edit their prompts in `yaw web`, per project or as your blueprint for all projects. |
 | Track the next task | `TASKS.md`, GitHub issues or both; `yaw task next` finds the next local task. Optional team mode adds issue-linked commit and PR checks. |
 | Keep useful context | Decision records, risk notices and Markdown knowledge can be searched and edited with `yaw knowledge` or in the dashboard. Decision retrieval helps agents find relevant records at task start. |
 | Understand past sessions | `yaw sessions scan` explicitly analyzes local Claude Code, Codex and Copilot CLI histories. `yaw sessions analytics` and the dashboard show saved counts, lengths, timing and usage where available. Optional local Laya classification is experimental and separate. |

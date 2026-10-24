@@ -1,0 +1,5 @@
+- Use Kotlin/JVM on JDK 17+; do not add Android plugins or SDK requirements.
+- Use the Gradle wrapper and keep dependency versions explicit.
+- Format and lint with ktlint (`just fmt`, `just lint`).
+- Keep business logic in plain Kotlin functions and classes.
+- Tests use JUnit 5 and are deterministic, with no network or host services.

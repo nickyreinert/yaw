@@ -1,10 +1,12 @@
 import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 
 import { showView, startWorkspace } from './workspace.js';
+import { CARD_QUESTIONS, renderModuleGroups, renderStack } from './setup-cards.js';
 
 const $ = (id) => document.getElementById(id);
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
-let catalog, state = { mode: 'quick', answers: {}, profile: '', modules: null };
+let catalog, state = { mode: 'quick', answers: {}, modules: null };
+let stackValid = true, compact = localStorage.getItem('yaw.setup.compact') === '1';
 let revision = 0, timer, busy = false, lastPreview;
 const controls = new Map(), sections = new Map();
 const actionIds = ['draft', 'preset', 'diff', 'apply'];
@@ -38,6 +40,9 @@ function renderWizard(focus = false) {
   $('step-count').textContent = `STEP ${stepIndex + 1} OF ${steps.length} · ${step.title}`;
   $('previous-step').disabled = stepIndex === 0;
   $('next-step-button').hidden = stepIndex === steps.length - 1;
+  const blocked = step.ids.includes('stack') && !stackValid;
+  $('next-step-button').disabled = blocked;
+  $('next-step-button').title = blocked ? 'Pick a language and a place where it can run' : '';
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
     const heading = visibleSection?.querySelector('h2') ?? $(step.ids[0])?.querySelector('h2, legend');
@@ -46,6 +51,7 @@ function renderWizard(focus = false) {
 }
 function advance() {
   if (stepIndex === steps.length - 1) return;
+  if (steps[stepIndex].ids.includes('stack') && !stackValid) return;
   const modules = selectedModules();
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner)), state.answers, state.mode);
   for (const q of visibleQuestions(catalog.questions, state.answers, state.mode, modules)) {
@@ -150,7 +156,7 @@ function renderQuestions() {
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner)), state.answers, state.mode);
   const expertise = answers['user.expertise'] ?? 'intermediate';
   for (const [id, c] of controls) {
-    c.node.hidden = !visible.has(id);
+    c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id);
     c.label.textContent = expertise === 'expert' ? `${c.q.id} — ${c.plainLabel}` : c.plainLabel;
     const value = answers[id] ?? c.q.default;
     for (const input of c.inputs) {
@@ -179,33 +185,45 @@ function renderQuestions() {
     }
   }
   for (const [id, s] of sections) {
-    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id));
+    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id));
     s.applicable = qs.length > 0;
     s.node.hidden = !s.applicable;
   }
 }
+const sectionEditing = () => Boolean(catalog.editing && catalog.sections.length);
+function renderStackStep() {
+  const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
+  const result = renderStack($('stack-cards'), {
+    profiles: catalog.profiles, questions: catalog.questions, answers,
+    disabled: sectionEditing() && !catalog.sections.some((s) => s === 'arch' || s.startsWith('arch.')),
+    onChange: (id, value) => { state.answers[id] = value; update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus(); },
+  });
+  stackValid = result.valid;
+}
 function renderModules() {
-  const selected = selectedModules();
-  $('modules').replaceChildren();
-  for (const m of catalog.modules) {
-    const card = element('div', undefined, { class: 'module-card' });
-    const label = element('label');
-    const input = element('input', undefined, { type: 'checkbox', id: `module-${m.name}` });
-    input.checked = selected.includes(m.name); input.disabled = m.name === 'core' || Boolean(catalog.editing && catalog.sections.length);
-    label.append(input, document.createTextNode(`${m.name}${m.name === 'core' ? ' (required)' : ''}`));
-    card.append(label, element('p', m.description));
-    if (m.depends.length) card.append(element('p', `Requires: ${m.depends.join(', ')}`));
-    input.addEventListener('change', () => {
-      state.modules = toggleModules(catalog.modules, selectedModules(), m.name, input.checked);
+  const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
+  renderModuleGroups($('modules'), {
+    modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
+    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
+    readOnly: sectionEditing(),
+    onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
+    onAnswer: (id, value) => { state.answers[id] = value; update(); },
+    onGitInit: (on) => {
+      state.gitInit = on;
+      if (!on && selectedModules().includes('git-hooks')) state.modules = toggleModules(catalog.modules, selectedModules(), 'git-hooks', false);
       update();
-      $(`module-${m.name}`).focus();
-    });
-    $('modules').append(card);
-  }
+    },
+    onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); },
+    onPreset: (kind) => {
+      let next = defaultModules(catalog.modules, catalog.questions, state.answers, kind);
+      if (!catalog.gitRepo && state.gitInit === false) next = toggleModules(catalog.modules, next, 'git-hooks', false);
+      state.modules = next; update();
+    },
+  });
 }
 function summary(preview) {
   const root = $('summary'); root.replaceChildren();
-  root.append(element('p', `Profile: ${preview.profile}${preview.profile === preview.suggestion ? ' (suggested)' : ''}`));
+  root.append(element('p', `Stack: ${preview.profile}`));
   root.append(element('p', `Modules: ${preview.modules.join(', ')}`));
   root.append(element('p', `${preview.files.length} files; approximately ${preview.footprint.bytes.toLocaleString()} bytes + ${preview.footprint.baseCopies} base copies.`));
   root.append(element('p', preview.footprint.note));
@@ -252,7 +270,7 @@ function update() {
   // Do not leave a stale preview or diff (possibly including an earlier value) on screen.
   $('summary').textContent = 'Updating preview…';
   $('diff-panel').hidden = true; $('diff-output').textContent = '';
-  renderQuestions(); renderModules(); renderWizard();
+  renderQuestions(); renderStackStep(); renderModules(); renderWizard();
   clearTimeout(timer);
   const current = revision;
   timer = setTimeout(async () => {
@@ -263,9 +281,9 @@ function update() {
       status(catalog.editing ? 'Preview only. Saved answers and user-edited files are preserved until you confirm.' : 'Preview only. Unreviewed questions use the documented defaults.');
     } catch (e) {
       if (current !== revision) return;
-      if (e.message === 'Choose a stack profile; no single profile matches these answers') {
-        $('summary').replaceChildren(element('p', 'Your file plan will appear after choosing a stack profile in step 4.'), element('p', `Suggested modules: ${selectedModules().join(', ')}`));
-        status('Continue through the steps. Choose a stack profile before saving or applying.');
+      if (e.message.startsWith('Choose another stack')) {
+        $('summary').replaceChildren(element('p', 'Your file plan appears once language and place fit together (step 4).'), element('p', `Suggested modules: ${selectedModules().join(', ')}`));
+        status('This language does not run there; pick another pair in step 4.');
       } else {
         $('summary').textContent = 'Preview unavailable. Fix the error before saving or applying.';
         error(e.message); status('Nothing was saved or applied.');
@@ -326,10 +344,10 @@ async function apply() {
   }
 }
 function loadState(next) {
-  state = catalog.editing ? { ...next, modules: next.modules ?? catalog.initial.modules } : next;
+  const { profile: _ignored, ...rest } = next;
+  state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: !catalog.gitRepo };
   visitedSteps.clear();
   document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
-  $('profile').value = state.profile;
   update();
 }
 async function start() {
@@ -337,6 +355,7 @@ async function start() {
   const body = await response.json();
   if (!response.ok) throw new Error(body.error);
   catalog = body;
+  state.gitInit = !catalog.gitRepo;
   if (catalog.editing) {
     document.title = 'YAW edit setup';
     $('prefill').append(element('option', 'Current project setup', { value: 'current' }));
@@ -344,13 +363,12 @@ async function start() {
     if (catalog.sections.length) {
       const selected = (q) => catalog.sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
       catalog.questions = catalog.questions.map((q) => selected(q) ? q : { ...q, editHidden: true });
-      for (const id of ['profile', 'reset-modules', 'prefill', 'load']) $(id).disabled = true;
+      for (const id of ['prefill', 'load']) $(id).disabled = true;
       document.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = true; });
     }
     catalog.questions = catalog.questions.map((q) => Object.hasOwn(catalog.initial.answers, q.id) ? { ...q, default: catalog.initial.answers[q.id] } : q);
   }
   for (const id of ['save-dialog', 'apply-dialog']) installDialogCancellation($(id));
-  for (const p of catalog.profiles) $('profile').append(element('option', `${p.name} — ${p.summary}`, { value: p.name }));
   if (catalog.hasUserProfile) $('prefill').append(element('option', 'Saved user preferences', { value: 'profile' }));
   if (catalog.hasDraft) $('prefill').append(element('option', 'Resume project draft', { value: 'draft' }));
   for (const p of catalog.presets) $('prefill').append(element('option', `Preset / previous project: ${p.name}`, { value: `preset:${p.name}` }));
@@ -370,15 +388,10 @@ async function start() {
     if (!catalog.editing) state.modules = null;
     update();
   }));
-  $('profile').addEventListener('change', () => { state.profile = $('profile').value; update(); });
-  $('reset-modules').addEventListener('click', () => {
-    state.modules = catalog.editing ? defaultModules(catalog.modules, catalog.questions, state.answers, state.mode) : null;
-    update();
-  });
   $('load').addEventListener('click', async () => {
     try {
       if ($('prefill').value === 'current') loadState(catalog.initial);
-      else if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, profile: '', modules: null });
+      else if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, modules: null });
       else {
         const [kind, name] = $('prefill').value.split(':');
         loadState(await (await request('prefill', { kind, ...(name ? { name } : {}) })).json());
@@ -412,7 +425,7 @@ async function start() {
     status('Editing the current project. Saved answers are prefilled; user-edited files will be kept.');
     showView('setup', false);
   } else if (catalog.handoff) {
-    loadState({ profile: '', modules: null, ...catalog.handoff });
+    loadState({ modules: null, ...catalog.handoff });
     status('Continued from the terminal: your answers so far are filled in. Nothing is written until Apply.');
   } else update();
 }

@@ -1,0 +1,5 @@
+- Use Go 1.22+ and keep modules small and explicit.
+- Format with gofmt; run go vet and `go test ./...` before changes are done.
+- Use the standard library unless a dependency has a clear benefit.
+- Return errors with context; do not silently discard failures.
+- Tests are deterministic and must not require a network or external service.

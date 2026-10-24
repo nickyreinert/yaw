@@ -1,0 +1,13 @@
+# profiles/php-basic/profile.yaml
+# Basic stack (ADR-0054): standard PHP tools where PHP runs without a tailored profile.
+name: php-basic
+title: Basic PHP project
+dependencyEcosystems: [composer]
+summary: PHP project; Composer, PHPStan, PHP-CS-Fixer, PHPUnit.
+stack:
+  language: [php]
+  runsOn: [local, serverless]
+  basic: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [php>=8.2, composer, just]

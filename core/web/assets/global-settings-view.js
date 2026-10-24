@@ -1,10 +1,11 @@
 // Global Settings: Interview (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
-// Notifications (personal channels) and Classification (local Laya settings and setup steps). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
+// Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { available, choiceLabel, choiceValue } from './ui-state.js';
+import { renderReviewPrompts } from './review-prompts-view.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'review'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -40,6 +41,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
     if (tab === 'notifications') loadNotifications().catch(report);
     if (tab === 'classification') loadClassifier().catch(report);
+    if (tab === 'review') loadReview().catch(report);
     const file = tab === 'files' ? new URLSearchParams(query).get('file') ?? '' : '';
     if (tab === 'files') (files ? Promise.resolve() : loadFiles()).then(() => { if (file && file !== selected) openFile(file); else if (!file && selected) closeDrawer(); else renderFiles(); }).catch(report);
     else hide();
@@ -47,6 +49,11 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   }
   function hide() { if (!drawer.hidden) { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; } }
   function reset() { classifier = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
+
+  async function loadReview() {
+    const data = await get('global/review-prompts');
+    renderReviewPrompts($('gs-review'), { data, scope: 'global', api, load: loadReview });
+  }
 
   // Interview --------------------------------------------------------------------------------------------
   async function loadInterview() {

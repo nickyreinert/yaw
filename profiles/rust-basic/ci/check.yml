@@ -1,0 +1,11 @@
+# CI steps fragment: stable Rust with formatting and lint components, then the local gate.
+# Actions are pinned by commit SHA (ADR-0027).
+steps:
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+  - uses: actions-rust-lang/setup-rust-toolchain@17808738e7175c6bf350e964fdc42bc24d19f463 # v1.15.2
+    with:
+      toolchain: stable
+      components: rustfmt, clippy
+  - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+  - run: just setup
+  - run: just check

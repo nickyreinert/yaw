@@ -50,13 +50,13 @@ const SCENARIOS = [
   { name: 'Quick, every answer non-default', mode: 'quick', answers: nonDefaults({ ...BASE, 'user.language': 'en' }) },
 ];
 
-async function viaCli({ mode, answers, profile }) {
+async function viaCli({ mode, answers }) {
   const cwd = tmp('yaw-parity-cli-');
   const p = scripted();
   p.ask = async (question) => {
     p.asked.push(question);
     if (/Setup depth \[/.test(question)) return mode;
-    if (/^ {2}Profile/.test(question)) return profile;
+    if (/create one now \(git init\)\?/.test(question)) return 'n';
     if (/Write these files\?/.test(question)) return 'y';
     if (/Save /.test(question)) return 'n';
     if (/guidance to kick off/.test(question)) return 'n';
@@ -71,7 +71,7 @@ async function viaCli({ mode, answers, profile }) {
   return cwd;
 }
 
-async function viaForm({ mode, answers, profile }) {
+async function viaForm({ mode, answers }) {
   const root = tmp('yaw-parity-web-');
   const home = tmp('yaw-parity-home-');
   const api = createFormApi({ root, kitRoot: KIT_ROOT, env: { PATH: NODE_ONLY, HOME: home }, skipVerify: true, verify: async () => true, stderr: capture() });
@@ -83,7 +83,7 @@ async function viaForm({ mode, answers, profile }) {
     const response = await fetch(`${origin}/api/apply`, {
       method: 'POST',
       headers: { cookie, origin, 'Content-Type': 'application/json', 'X-YAW-Token': csrf },
-      body: JSON.stringify({ mode, answers, profile, modules: null }), // what app.js posts when no module was toggled
+      body: JSON.stringify({ mode, answers, modules: null }), // what app.js posts when no module was toggled
     });
     const events = (await response.text()).trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(response.status, 200, JSON.stringify(events));
@@ -101,9 +101,8 @@ test('labels are unique, so the CLI side can find each question by its prompt', 
 
 for (const scenario of SCENARIOS) {
   test(`parity: ${scenario.name}`, async () => {
-    const choices = { ...scenario, profile: 'node-cli' };
-    const cli = await viaCli(choices);
-    const web = await viaForm(choices);
+    const cli = await viaCli(scenario);
+    const web = await viaForm(scenario);
     const cliAnswers = readFileSync(join(cli, '.yaw/answers.yaml'));
     const webAnswers = readFileSync(join(web, '.yaw/answers.yaml'));
     assert.equal(webAnswers.toString('utf8'), cliAnswers.toString('utf8'));

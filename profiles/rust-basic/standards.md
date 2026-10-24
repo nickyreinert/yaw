@@ -1,0 +1,5 @@
+- Use stable Rust and Cargo; keep edition and minimum toolchain explicit.
+- Format with rustfmt and run clippy with warnings denied.
+- Prefer safe Rust and the standard library unless dependencies are justified.
+- Return `Result` for recoverable errors; avoid panics in library code.
+- Tests are deterministic and do not make network calls.
