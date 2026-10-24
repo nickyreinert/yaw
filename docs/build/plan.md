@@ -413,6 +413,16 @@ User-reported setup usability items #162–#176, fixed and closed locally on `fi
 
 ## 4. Remaining open points
 
+### Unimplemented CLI placeholders
+
+The command table still reserves `apply`, `config` and `session`, but none has a handler. They are not completed work or missing tool installations. General help lists them separately as unimplemented, and their individual help describes the current alternatives and limits (ADR-0019):
+
+- `apply`: a standalone command to reapply answers is missing; `yaw update` already re-renders an initialized project's managed files.
+- `config`: `config.schema.json` already defines knowledge namespaces, but the settings editor and runtime `.yaw/config.yaml` loading/saving are not implemented. Current project setup is stored in `.yaw/answers.yaml`.
+- `session`: native agent-session renaming and its agent-specific integrations are missing. `yaw sessions` manages registry records; a registry title is not a native agent-session rename.
+
+### Original planning questions
+
 None need a user answer before Step 1. Per B rule 10 each is decided by the ADR named in §1 and listed in that step's summary. A question goes to the user only if an ADR changes scope, user-visible behaviour or security, or is hard to reverse. Likely candidates:
 
 1. **ADR-0009:** Does Quick include minimal `security`? Answered: yes (changes BD5).

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { COMMANDS } from '../core/cli/main.js';
+import { COMMANDS, HELP_GROUPS } from '../core/cli/main.js';
 import { initProject } from '../core/render/project.js';
 import { KIT_ROOT, makeKit, readTree, run, tmp, writeAnswers } from './helpers/fixtures.js';
 
@@ -34,6 +34,23 @@ test('the phase-1 command list is fixed (ADR-0019)', () => {
   ]);
 });
 
+test('help groups every implemented command exactly once and labels placeholders honestly', () => {
+  const names = HELP_GROUPS.flatMap((group) => group.names);
+  const built = COMMANDS.filter((c) => !c.step).map((c) => c.name);
+  assert.equal(new Set(names).size, names.length);
+  assert.deepEqual([...names].sort(), built.sort());
+  const output = yaw([]).stdout;
+  for (const group of HELP_GROUPS) {
+    assert.ok(output.includes(`${group.title}:\n`));
+    for (const name of group.names) assert.equal(output.match(new RegExp(`^  ${name} `, 'gm')).length, 1);
+  }
+  assert.match(output, /Not implemented \(placeholders\):/);
+  assert.doesNotMatch(output, /coming later in phase 1|\(step [35]\)/);
+  assert.match(yaw(['help', 'apply']).stdout, /not implemented.*yaw update/);
+  assert.match(yaw(['help', 'config']).stdout, /No config editor/);
+  assert.match(yaw(['help', 'session']).stdout, /Native agent-session renaming is not implemented/);
+});
+
 test('unknown command exits 1 with usage on stderr', () => {
   const r = yaw(['frobnicate']);
   assert.equal(r.status, 1);
@@ -48,7 +65,7 @@ test('unknown option and planned commands exit 1', () => {
   assert.match(opt.stderr, /usage: yaw update/);
   const planned = yaw(['config']);
   assert.equal(planned.status, 1);
-  assert.match(planned.stderr, /comes with step 5/);
+  assert.match(planned.stderr, /not implemented.*No config editor/);
   assert.equal(yaw(['update', '--strategy', 'yolo'], { cwd: tmp() }).status, 1);
 });
 

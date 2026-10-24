@@ -161,9 +161,15 @@ const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expert
 
 // questions: all questions of the enabled modules (base first). mode: quick | standard | full.
 // known: answers that already exist; only used to evaluate `when`, never returned.
+// defaults: saved answers to review as question defaults, not automatically accepted answers.
 // allowWeb: "w" or "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
 // -> { answers, defaulted: string[] }  (answers hold every question whose `when` holds, defaults included)
-export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, allowWeb = false }) {
+export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, defaults = {}, allowWeb = false }) {
+  questions = questions.map((q) => {
+    if (!Object.hasOwn(defaults, q.id)) return q;
+    if (!validAnswer(q, defaults[q.id])) throw new Error(`Invalid saved answer for ${q.id}`);
+    return { ...q, default: defaults[q.id] };
+  });
   const answers = {};
   const seen = () => ({ ...known, ...answers }); // `when` may refer to answers given earlier (yaw add)
   const defaulted = [];

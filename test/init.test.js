@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { readManifest } from '../core/render/manifest.js';
 import { parseDocument } from '../core/lib/yaml.js';
+import { saveSetup } from '../core/lib/user-store.js';
 import { KIT_ROOT, capture, fakeJust, readTree, scripted, tmp, writeAnswers } from './helpers/fixtures.js';
 
 const EXAMPLE = join(KIT_ROOT, 'examples', 'node-cli', 'answers.yaml');
@@ -22,6 +23,107 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
 const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', '', ''];
+
+function previousSetup(mode = 'quick') {
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
+  const doc = parseDocument(readFileSync(EXAMPLE, 'utf8')).value;
+  const answers = { ...doc.answers, 'user.agents': ['codex'], 'idea.text': 'Saved project idea.' };
+  const saved = saveSetup({ env, kitRoot: KIT_ROOT, answers, mode, projectRoot: tmp('previous-project-'), kit: '0.1.0', preset: true, profile: false });
+  return { env, answers, file: join(saved.dir, 'presets', `${saved.preset}.yaml`) };
+}
+
+test('init: p loads a saved setup as editable defaults, asks before writing and preserves the source', async () => {
+  const { env, file } = previousSetup();
+  const source = readFileSync(file, 'utf8');
+  const dir = tmp('yaw-proj-');
+  const prompter = scripted();
+  prompter.ask = async (question) => {
+    prompter.asked.push(question);
+    if (/Setup depth/.test(question)) return 'p';
+    if (/\[Saved project idea\.\]/.test(question)) return 'A new project idea.';
+    if (/Write these files/.test(question)) {
+      assert.deepEqual(readdirSync(dir), []);
+      return 'y';
+    }
+    if (/Save |guidance to kick off/.test(question)) return 'n';
+    return '';
+  };
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, env, prompter });
+  assert.equal(r.code, 0, r.err);
+  const doc = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
+  assert.equal(doc.mode, 'quick');
+  assert.equal(doc.answers['idea.text'], 'A new project idea.');
+  assert.deepEqual(doc.answers['user.agents'], ['codex']);
+  assert.equal(readFileSync(file, 'utf8'), source);
+  assert.match(prompter.shown.join(''), /p\) Load a previous setup/);
+  assert.match(prompter.shown.join(''), /Saved answers are defaults/);
+  assert.match(prompter.asked.join('\n'), /\[codex\]/);
+});
+
+test('init: a saved Full setup keeps its mode and can be declined without any writes', async () => {
+  const { env } = previousSetup('full');
+  const dir = tmp('yaw-proj-');
+  const prompter = scripted();
+  prompter.ask = async (question) => {
+    if (/Setup depth/.test(question)) return 'p';
+    if (/Write these files/.test(question)) return 'n';
+    return '';
+  };
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, env, prompter });
+  assert.equal(r.code, 1, r.err);
+  assert.match(prompter.shown.join(''), /\(full\)\. Saved answers/);
+  assert.match(r.out, /cancelled; nothing was written/);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test('init: no presets explains how to save or copy a setup and returns to setup depth', async () => {
+  const dir = tmp('yaw-proj-');
+  const prompter = scripted(['p', ...INTERVIEW, '', 'n']);
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
+  assert.equal(r.code, 1, r.err);
+  assert.match(prompter.shown.join(''), /No saved setups yet/);
+  assert.match(prompter.shown.join(''), /yaw init --answers \/path\/to\/project\/\.yaw\/answers\.yaml/);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test('init: previous setup picker supports back and never displays invalid preset answers', async () => {
+  const { env, file } = previousSetup();
+  const prompter = scripted(['p', 'b', ...INTERVIEW, '', 'n']);
+  const dir = tmp('yaw-proj-');
+  assert.equal((await yaw(['init', '--skip-verify'], { cwd: dir, env, prompter })).code, 1);
+  assert.deepEqual(readdirSync(dir), []);
+  const canary = `ghp_${'a'.repeat(36)}`;
+  writeFileSync(file, readFileSync(file, 'utf8').replace('Saved project idea.', canary));
+  const invalid = scripted(['p', '']);
+  const r = await yaw(['init'], { cwd: dir, env, prompter: invalid });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /looks like a secret/);
+  assert.ok(!`${r.out}${r.err}${invalid.shown.join('')}`.includes(canary));
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test('init: browser handoff retains unreviewed saved defaults and newly edited answers', async () => {
+  const { env, answers } = previousSetup();
+  const dir = tmp('yaw-proj-');
+  const stdout = capture();
+  let url;
+  const running = main(['init', '--skip-verify'], {
+    cwd: dir, env, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter: scripted(['p', '1', 'claude', 'w']),
+    openBrowser: async (u) => { url = u; return true; },
+  });
+  try {
+    for (let i = 0; i < 100 && !url; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(url, stdout.text());
+    const login = await fetch(url, { redirect: 'manual' });
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+    const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
+    assert.deepEqual(boot.handoff, { mode: 'quick', answers: { ...answers, 'user.agents': ['claude'] }, profile: '' });
+    assert.deepEqual(readdirSync(dir), []);
+  } finally {
+    process.emit('SIGINT');
+    await running;
+  }
+});
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');

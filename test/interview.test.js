@@ -90,6 +90,20 @@ test('runInterview: input that ends is an error, not a silent exit', async () =>
   await assert.rejects(runInterview({ questions: [q()], mode: 'quick', prompter, kitRoot: KIT_ROOT }), /input ended/);
 });
 
+test('runInterview: saved answers are reviewable defaults without mutating the question definitions', async () => {
+  const questions = [
+    q({ id: 'idea.team' }),
+    q({ id: 'idea.text', type: 'text', default: 'Original default' }),
+    q({ id: 'team.approvals', type: 'number', default: 1, when: { 'idea.team': 'team' } }),
+  ];
+  const defaults = { 'idea.team': 'team', 'idea.text': 'Saved idea', 'team.approvals': 2 };
+  const r = await runInterview({ questions, mode: 'quick', defaults, prompter: scripted(['', 'New idea', '']) });
+  assert.deepEqual(r.answers, { 'idea.team': 'team', 'idea.text': 'New idea', 'team.approvals': 2 });
+  assert.equal(questions[0].default, 'solo');
+  assert.equal(defaults['idea.text'], 'Saved idea');
+  await assert.rejects(runInterview({ questions, mode: 'quick', defaults: { 'idea.team': 'invalid' }, prompter: scripted() }), /Invalid saved answer for idea.team/);
+});
+
 test('facts come only from answers that exist; auto leaves a fact unknown', () => {
   assert.deepEqual(deriveFacts({ 'arch.language': 'javascript', 'arch.runs-on': 'local' }), { language: 'javascript', runsOn: 'local', hosted: false });
   assert.deepEqual(deriveFacts({ 'arch.language': 'auto', 'arch.runs-on': 'auto' }), {});

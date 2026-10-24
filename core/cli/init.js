@@ -27,8 +27,9 @@ import { kickoffText } from './kickoff.js';
 import { guardFolder } from './folder-guard.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
-import { saveSetup, secretFindings, userDir } from '../lib/user-store.js';
+import { listPresets, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
+import { createFormModel } from '../web/form-model.js';
 import { PLAIN } from './style.js';
 
 // Reply that hands the interview over to the browser form (#162).
@@ -52,19 +53,46 @@ async function chooseProfile({ prompter, profiles, suggestion }) {
   }
 }
 
-// Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | WEB
+// Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | 'previous' | WEB
 async function chooseMode({ prompter }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Setup depth')}\n`);
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
   prompter.show(`  ${s.cyan('2)')} full  - long-lived product: the tooling that applies to the project, all questions\n`);
+  prompter.show(`  ${s.cyan('p)')} Load a previous setup - clone saved answers, then review them\n`);
   prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   for (;;) {
-    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'full', 'w'], start: 0 })).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'full', 'p', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'full') return 'full';
+    if (reply === 'p') return 'previous';
     if (['w', WEB].includes(reply)) return WEB;
-    prompter.show('  choose quick, full or w to continue in the browser\n');
+    prompter.show('  choose quick, full, p to load a previous setup, or w to continue in the browser\n');
+  }
+}
+
+async function choosePrevious(io) {
+  const presets = listPresets(io.env).reverse();
+  if (presets.length === 0) {
+    io.prompter.show('\nNo saved setups yet. Save a preset at the end of yaw init to reuse it here.\nYou can also copy another project with: yaw init --answers /path/to/project/.yaw/answers.yaml\n');
+    return null;
+  }
+  const s = io.prompter.style ?? PLAIN;
+  io.prompter.show(`\n${s.bold('Previous setups')} (newest names first)\n`);
+  presets.forEach((p, i) => io.prompter.show(`  ${s.cyan(`${i + 1})`)} ${i === 0 ? s.green(s.bold(p.name)) : p.name}\n`));
+  io.prompter.show(`  ${s.cyan('b)')} Back to setup depth\n  ${s.cyan('w)')} Continue in the browser\n`);
+  for (;;) {
+    const reply = (await io.prompter.ask(`  Previous setup [${s.green(presets[0].name)}] > `, { choices: [...presets.map((p) => p.name), 'b', 'w'], start: 0 })).trim();
+    if (['w', WEB].includes(reply.toLowerCase())) return WEB;
+    if (['b', 'back'].includes(reply.toLowerCase())) return null;
+    const preset = reply === '' ? presets[0] : presets.find((p, i) => p.name === reply || String(i + 1) === reply);
+    if (!preset) {
+      io.prompter.show('  choose a listed setup, b to go back, or w to continue in the browser\n');
+      continue;
+    }
+    const saved = createFormModel({ root: io.cwd, kitRoot: io.kitRoot, env: io.env }).prefill('preset', preset.name);
+    io.prompter.show(`\nLoaded ${preset.name} (${saved.mode}). Saved answers are defaults; Enter keeps them.\nReview the previous project's idea and other answers before confirming. No files or secrets are copied.\n`);
+    return saved;
   }
 }
 
@@ -205,14 +233,25 @@ export async function init({ values, positionals, io }) {
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
     io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", w continues in the browser). Nothing is written until you confirm.\n');
-    const mode = await chooseMode({ prompter: io.prompter });
-    if (mode === WEB) return handOff({ io, values, mode: 'quick' });
+    let mode;
+    let defaults = {};
+    for (;;) {
+      mode = await chooseMode({ prompter: io.prompter });
+      if (mode === WEB) return handOff({ io, values, mode: 'quick' });
+      if (mode !== 'previous') break;
+      const previous = await choosePrevious(io);
+      if (previous === WEB) return handOff({ io, values, mode: 'quick' });
+      if (!previous) continue;
+      mode = previous.mode;
+      defaults = previous.answers;
+      break;
+    }
     // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
     // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
     // not selected is hidden by its `when` (team.session-context needs idea.team = team).
     const questions = withGitHubHint(collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } })), githubStatus({ root, env: io.env }));
-    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, allowWeb: true });
-    if (r.web) return handOff({ io, values, mode, answers: r.answers });
+    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, defaults, allowWeb: true });
+    if (r.web) return handOff({ io, values, mode, answers: { ...defaults, ...r.answers } });
     if (r.answers['tasks.use-github'] === false && questions.some((q) => q.id === 'tasks.mode')) {
       io.prompter.show('      Task tracking: local (TASKS.md), because GitHub is off for this project.\n');
     }

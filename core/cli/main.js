@@ -34,19 +34,19 @@ export const COMMANDS = [
   { name: 'self-update', args: '[--tag <tag> | --channel main]', summary: 'switch the installed kit to a newer tag', options: { tag: { type: 'string' }, channel: { type: 'string' } }, run: selfUpdate },
   { name: 'self-uninstall', args: '[--yes]', summary: 'remove the installed kit and the yaw link', options: { ...yes }, run: selfUninstall },
   { name: 'help', args: '[<command>]', summary: 'show this help', options: {} },
-  { name: 'apply', step: 3, summary: 'apply .yaw/answers.yaml again' },
+  { name: 'apply', step: 3, summary: 'apply .yaw/answers.yaml again', guidance: 'Use yaw update to re-render an initialized project; the separate apply handler is not implemented.' },
   { name: 'add', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'add a module, asking only its questions', options: { ...yes, strategy: { type: 'string' } }, run: add },
   { name: 'hook', args: '<event> --agent claude|codex|copilot --module <module>', summary: 'hook entry point for coding agents (reads the payload on stdin; always exits 0)', options: {} },
   { name: 'sync', args: '--check', summary: 'check that agent adapter files match their source (fails on drift)', options: { check: { type: 'boolean' } }, run: sync },
   { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },
   { name: 'task', args: '<list|next|start|log|done|new|sync> [...]', summary: 'task ledger helpers (tasks module; `just task ...` calls this)', options: { resume: { type: 'string' }, progress: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' } }, run: task },
   { name: 'kickoff', args: '[import <plan.md> [--dry-run]]', summary: 'kickoff guidance: print the planning prompt for your idea, import the plan as tasks with model tier and effort', options: { 'dry-run': { type: 'boolean' } }, run: kickoff },
-  { name: 'config', step: 5, summary: 'change .yaw/config.yaml' },
+  { name: 'config', step: 5, summary: 'edit project settings through the CLI', guidance: 'No config editor exists. A schema for knowledge namespaces is defined, but runtime settings loading/saving is not implemented; current project setup is stored in .yaw/answers.yaml.' },
   { name: 'gh', args: '<init|labels|protect|branch|commit|pr|pr-status|release|project-add|issue> [...]', summary: 'GitHub scripts (github module; `just gh-*`, `just branch` ... call this); guarded actions need a person at a terminal to confirm', options: { ...yes, owner: { type: 'string' }, public: { type: 'boolean' }, approvals: { type: 'string' }, verify: { type: 'boolean' }, check: { type: 'string', multiple: true }, type: { type: 'string' }, scope: { type: 'string' }, task: { type: 'string' }, title: { type: 'string' }, ready: { type: 'boolean' }, status: { type: 'string' }, body: { type: 'string' }, priority: { type: 'string' }, estimate: { type: 'string' } }, run: gh },
   { name: 'decisions', args: '<recall|record|query|list|rebuild|check|taxonomy|seed> [...]', summary: 'decision journal: ADRs and notices in .decisions/ (decisions module; `just decisions ...` calls this)', options: { type: { type: 'string' }, kind: { type: 'string' }, category: { type: 'string' }, subcategory: { type: 'string' }, summary: { type: 'string' }, context: { type: 'string' }, decision: { type: 'string' }, consequences: { type: 'string' }, consideration: { type: 'string' }, importance: { type: 'string' }, status: { type: 'string' }, supersedes: { type: 'string', multiple: true }, scope: { type: 'string', multiple: true }, 'review-by': { type: 'string' }, tag: { type: 'string', multiple: true }, ref: { type: 'string', multiple: true }, issue: { type: 'string' }, text: { type: 'string' }, path: { type: 'string', multiple: true }, keywords: { type: 'string' } }, run: decisions },
   { name: 'map', args: '<update|check|show> [area|path-prefix]', summary: 'code map: refresh docs/code-map.md and the local index, check it (read-only), show an area (code-map module; `just map ...` calls this)', options: {}, run: map },
   { name: 'sessions', args: '<find|for|resume|list|current|handoff|import> [...]', summary: 'agent session registry: find, link and resume sessions, import past sessions of any project (sessions module; `just sessions ...` calls this)', options: { all: { type: 'boolean' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' }, 'dry-run': { type: 'boolean' } }, run: sessions },
-  { name: 'session', step: 5, summary: 'rename the current session' },
+  { name: 'session', step: 5, summary: 'rename the current agent session', guidance: 'Native agent-session renaming is not implemented. yaw sessions manages YAW registry records, not agent conversation names.' },
   { name: 'session-start', args: '', summary: 'team mode: fetch, safe fast-forward, my issues and pull requests (team module; `just start` calls this)', options: {}, run: sessionStart },
   { name: 'hygiene', args: '[status|on|off] [--all]', summary: 'session hygiene hints: show the state, switch them on or off (comfort module)', options: { all: { type: 'boolean' } }, run: hygiene },
   { name: 'notify', args: '[status|test|send] [--status done|input|failed] [--minutes N] [--summary text]', summary: 'notifications after long runs: show the channels, send a test or a message (comfort module)', options: { status: { type: 'string' }, minutes: { type: 'string' }, summary: { type: 'string' } }, run: notify },
@@ -54,19 +54,32 @@ export const COMMANDS = [
   { name: 'presets', args: 'list | show <name> | delete <name> [--yes]', summary: 'list, show and delete saved setups in ~/.yaw/presets/', options: { ...yes }, run: presets },
 ];
 
+export const HELP_GROUPS = [
+  { title: 'Project setup and maintenance', names: ['init', 'presets', 'status', 'update', 'add', 'remove', 'agents'] },
+  { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'map', 'sessions'] },
+  { title: 'Monitoring and collaboration', names: ['web', 'session-start', 'gh', 'hygiene', 'notify'] },
+  { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
+  { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
+];
+
 export function usage() {
-  const built = COMMANDS.filter((c) => c.run || c.name === 'help' || c.name === 'hook');
   const planned = COMMANDS.filter((c) => c.step);
   const lines = [
     'usage: yaw <command> [options]',
     '       yaw --version',
     '',
-    'commands:',
-    ...built.map((c) => `  ${c.name.padEnd(15)} ${c.summary}`),
+    ...HELP_GROUPS.flatMap(({ title, names }) => [
+      `${title}:`,
+      ...names.map((name) => {
+        const c = COMMANDS.find((c) => c.name === name);
+        return `  ${c.name.padEnd(15)} ${c.summary}`;
+      }),
+      '',
+    ]),
+    'Not implemented (placeholders):',
+    ...planned.map((c) => `  ${c.name.padEnd(15)} ${c.summary}`),
     '',
-    'coming later in phase 1:',
-    ...planned.map((c) => `  ${c.name.padEnd(15)} ${c.summary} (step ${c.step})`),
-    '',
+    'Placeholders have no command handlers; yaw help <command> explains the available alternatives.',
     'yaw help <command> shows its options.',
   ];
   return `${lines.join('\n')}\n`;
@@ -111,13 +124,13 @@ export async function main(argv, io = {}) {
       ctx.stderr.write(`yaw: unknown command "${rest[0]}"\n\n${usage()}`);
       return 1;
     }
-    ctx.stdout.write(target ? (target.step ? `yaw ${target.name}: ${target.summary} (step ${target.step})\n` : commandUsage(target)) : usage());
+    ctx.stdout.write(target ? (target.step ? `yaw ${target.name}: not implemented. ${target.guidance}\n` : commandUsage(target)) : usage());
     return 0;
   }
   // The hook entry point parses its own arguments and never fails (ADR-0007): no usage, no stderr.
   if (command.name === 'hook') return runHook(rest, { ...ctx, stdin: io.stdin ?? process.stdin });
   if (!command.run) {
-    ctx.stderr.write(`yaw ${command.name}: not available yet; it comes with step ${command.step} of phase 1\n`);
+    ctx.stderr.write(`yaw ${command.name}: not implemented. ${command.guidance}\n`);
     return 1;
   }
   let parsed;
