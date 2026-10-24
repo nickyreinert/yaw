@@ -145,9 +145,9 @@ export async function dashboardData({ root, kitRoot, env, now }) {
   return { project, tasks: section(() => tasksSection(root)), decisions, sessions, generated: (now ?? new Date()).toISOString() };
 }
 
-export async function startDashboard({ root, kitRoot, env, port, signals, onClose, idleMs }) {
+export async function startDashboard({ root, kitRoot, env, port, signals, onClose, idleMs, controlToken }) {
   return startFormServer({
-    port, signals, onClose, idleMs, page, assets: DASHBOARD_ASSETS,
+    port, signals, onClose, idleMs, controlToken, page, assets: DASHBOARD_ASSETS,
     get: { '/api/dashboard': () => dashboardData({ root, kitRoot, env }) },
   });
 }

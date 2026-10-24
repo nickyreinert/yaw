@@ -1297,6 +1297,14 @@
         {
           "type": "code",
           "path": "core/web/form-server.js"
+        },
+        {
+          "type": "code",
+          "path": "core/web/background.js"
+        },
+        {
+          "type": "code",
+          "path": "core/web/background-worker.js"
         }
       ],
       "embeddingModel": "local-hash-ngram-v2",

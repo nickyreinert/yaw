@@ -50,6 +50,24 @@ test('form server: the start token works once', () => withServer(async (s) => {
   assert.equal((await fetch(s.url, { redirect: 'manual' })).status, 403);
 }));
 
+test('form server: an authenticated browser can revisit its consumed login link', () => withServer(async (s) => {
+  const { cookie } = await session(s);
+  assert.equal((await fetch(s.url, { redirect: 'manual', headers: { cookie } })).status, 303);
+  assert.equal((await fetch(s.url, { redirect: 'manual' })).status, 403, 'not reusable by another browser');
+}));
+
+test('form server: concurrent servers do not overwrite each other in the browser cookie jar', () => withServer(async (a) => {
+  await withServer(async (b) => {
+    const first = await session(a);
+    const second = await session(b);
+    assert.notEqual(first.cookie.split('=')[0], second.cookie.split('=')[0]);
+    const cookie = `${first.cookie}; ${second.cookie}`;
+    assert.equal((await fetch(`${base(a)}/`, { headers: { cookie } })).status, 200);
+    assert.equal((await fetch(`${base(b)}/`, { headers: { cookie } })).status, 200);
+    assert.equal((await fetch(`${base(a)}/`, { headers: { cookie: second.cookie } })).status, 403);
+  });
+}));
+
 test('form server: a valid session gets the page with CSP and the cookie flags', () => withServer(async (s) => {
   const r = await fetch(s.url, { redirect: 'manual' });
   assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
@@ -73,6 +91,29 @@ test('form server: session cookie lifetime is bounded by the configured idle tim
   const response = await fetch(s.url, { redirect: 'manual' });
   assert.match(response.headers.get('set-cookie'), /Max-Age=1(?:;|$)/);
 }, { idleMs: 1500 }));
+
+test('form server: active use renews the cookie and persistent mode has no idle shutdown', () => withServer(async (s) => {
+  const { cookie } = await session(s);
+  const response = await fetch(`${base(s)}/`, { headers: { cookie } });
+  assert.match(response.headers.get('set-cookie'), /HttpOnly; SameSite=Strict/);
+  assert.doesNotMatch(response.headers.get('set-cookie'), /Max-Age=0/);
+  await new Promise((r) => setTimeout(r, 40));
+  assert.equal(s.server.listening, true);
+}, { idleMs: 0 }));
+
+test('form server: background control requires its own secret and issues fresh one-time links', () => withServer(async (s) => {
+  const address = `${base(s)}/api/web/open`;
+  assert.equal((await fetch(address, { method: 'POST' })).status, 403);
+  assert.equal((await fetch(address, { method: 'POST', headers: { 'x-yaw-control': 'wrong' } })).status, 403);
+  const { cookie } = await session(s);
+  assert.equal((await fetch(address, { method: 'POST', headers: { cookie } })).status, 403);
+  const response = await fetch(address, { method: 'POST', headers: { 'x-yaw-control': 'control-test-secret' } });
+  const { url } = await response.json();
+  assert.notEqual(url, s.url);
+  assert.equal((await fetch(url, { redirect: 'manual' })).status, 303);
+  assert.equal((await fetch(url, { redirect: 'manual' })).status, 403);
+  assert.equal((await fetch(address, { method: 'POST', headers: { 'x-yaw-control': 'control-test-secret', origin: 'https://evil.example' } })).status, 403);
+}, { idleMs: 0, controlToken: 'control-test-secret' }));
 
 test('form server: a foreign Host header is refused', () => withServer(async (s) => {
   const { cookie } = await session(s);

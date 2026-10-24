@@ -8,7 +8,6 @@ import { FormError } from './form-model.js';
 
 export const IDLE_MS = 30 * 60 * 1000;
 export const CSRF_HEADER = 'x-yaw-token';
-const COOKIE = 'yaw_session';
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 export const MAX_JSON_BYTES = 256 * 1024;
 const assets = new Map([
@@ -70,9 +69,10 @@ function pageHtml(csrf) {
 // Resolves { server, port, url, token, close() }; `url` carries the start token, never log it.
 // `page`, `assets` and `get` let another local page (the dashboard, #172) reuse the same handshake and checks;
 // `get` maps a GET path under /api/ to a function returning JSON.
-export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api, page = pageHtml, assets: served = assets, get = {} } = {}) {
-  const startToken = randomBytes(32).toString('hex');
+export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api, page = pageHtml, assets: served = assets, get = {}, controlToken } = {}) {
+  let startToken = randomBytes(32).toString('hex');
   const session = randomBytes(32).toString('hex');
+  const cookieName = `yaw_session_${randomBytes(8).toString('hex')}`;
   let used = false;
   let idle;
   let closed;
@@ -80,7 +80,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
   let applying = false;
   const resetIdle = () => {
     clearTimeout(idle);
-    if (applying) return;
+    if (applying || idleMs === 0) return;
     idle = setTimeout(() => close(), idleMs);
     idle.unref?.();
   };
@@ -100,15 +100,30 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
 
     let url;
     try { url = new URL(req.url, `http://127.0.0.1:${bound}`); } catch { return fail(400, 'bad request'); }
+    if (controlToken && req.method === 'POST' && ['/api/web/open', '/api/web/stop'].includes(url.pathname)) {
+      req.resume();
+      if (!same(req.headers['x-yaw-control'], controlToken)) return fail(403, 'invalid control token');
+      if (url.pathname === '/api/web/stop') {
+        res.writeHead(200, headers('application/json'));
+        res.once('finish', () => close({ graceful: true }));
+        return res.end('{"stopped":true}');
+      }
+      startToken = randomBytes(32).toString('hex');
+      used = false;
+      res.writeHead(200, headers('application/json'));
+      return res.end(JSON.stringify({ url: `http://127.0.0.1:${bound}/?t=${startToken}` }));
+    }
+    const authenticated = same(cookieOf(req, cookieName), session);
+    const setCookie = `${cookieName}=${session}; HttpOnly; SameSite=Strict; Path=/${idleMs > 0 ? `; Max-Age=${Math.floor(idleMs / 1000)}` : ''}`;
     if (req.method === 'GET' && url.pathname === '/' && url.searchParams.has('t')) {
-      if (used || !same(url.searchParams.get('t'), startToken)) return fail(403, 'invalid token');
+      if (!authenticated && (used || !same(url.searchParams.get('t'), startToken))) return fail(403, 'invalid token; run yaw web for a new login link');
       used = true;
       resetIdle();
-      const maxAge = Math.max(0, Math.floor(idleMs / 1000));
-      res.writeHead(303, { location: '/', 'set-cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff' });
+      res.writeHead(303, { location: '/', 'set-cookie': setCookie, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
       return res.end();
     }
-    if (!same(cookieOf(req, COOKIE), session)) return fail(403, 'missing or invalid token');
+    if (!authenticated) return fail(403, 'missing or invalid token; run yaw web for a new login link');
+    res.setHeader('set-cookie', setCookie);
     resetIdle(); // only an authenticated request keeps the server alive
     if (req.method === 'GET' || req.method === 'HEAD') {
       const asset = served.get(url.pathname);
@@ -182,6 +197,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     closed ??= new Promise((resolve) => {
       clearTimeout(idle);
       process.removeListener('SIGINT', close);
+      process.removeListener('SIGTERM', close);
       server.close(() => { onClose?.(); resolve(); });
       if (graceful) server.closeIdleConnections();
       else server.closeAllConnections();
@@ -190,7 +206,10 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
   }
   resetIdle();
   server.on('close', () => clearTimeout(idle));
-  if (signals) process.once('SIGINT', close);
+  if (signals) {
+    process.once('SIGINT', close);
+    process.once('SIGTERM', close);
+  }
 
   return { server, port: bound, url: `http://127.0.0.1:${bound}/?t=${startToken}`, token: startToken, close };
 }
