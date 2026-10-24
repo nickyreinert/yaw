@@ -24,7 +24,6 @@ const DASHBOARD_ASSETS = new Map([
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
-  asset('yaw-wordmark.svg', 'image/svg+xml'),
 ]);
 const page = (csrf) => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8').replace('YAW_CSRF', csrf);
 

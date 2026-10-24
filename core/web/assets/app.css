@@ -164,7 +164,7 @@ h2 { font-size: 1.05rem; }
 .sidebar { width: 220px; background: var(--ink); padding: 25px 16px 20px; }
 .brand { gap: 9px; font-family: 'Trebuchet MS', Arial, sans-serif; font-size: 1.65rem; letter-spacing: -.08em; }
 .brand img { width: 38px; height: 38px; }
-.brand .brand-wordmark { width: 92px; height: auto; }
+.brand .brand-name { font-family: Arial, sans-serif; font-size: 1.65rem; font-weight: 700; letter-spacing: .04em; }
 .project-switch { margin: 27px 0 18px; border-color: #40616a; padding: 12px; }
 .project-switch strong { font-family: ui-monospace, monospace; font-size: .8rem; }
 .sidebar nav button[aria-current] { background: #ccebe5; color: var(--ink); }
@@ -252,4 +252,4 @@ td { font-variant-numeric: tabular-nums; }
 .content-footer { margin-top: 28px; color: var(--muted); }
 @media (max-width: 1150px) { #overview-metrics { grid-template-columns: repeat(3, 1fr); } .metric:nth-child(n+4) { border-top: 1px solid var(--line); } .knowledge-layout { grid-template-columns: 1fr 1.2fr; } }
 @media (max-width: 900px) { .overview-grid, .knowledge-layout { grid-template-columns: 1fr; } #knowledge-detail { position: static; max-height: none; } .filters { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 760px) { .sidebar { width: 100%; position: static; padding: 14px 18px 0; } .workspace { margin-left: 0; } .brand img { width: 30px; height: 30px; } .brand .brand-wordmark { width: 75px; } .content { padding: 22px 18px; } .topbar { padding: 0 18px; } .sidebar nav button { padding: 8px 10px; } #overview-metrics { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 1.65rem; } .card, #setup { padding: 17px; } .knowledge-search { grid-column: 1 / -1; } .pager { flex-wrap: wrap; } .knowledge-layout { display: block; } }
+@media (max-width: 760px) { .sidebar { width: 100%; position: static; padding: 14px 18px 0; } .workspace { margin-left: 0; } .brand img { width: 30px; height: 30px; } .brand .brand-name { font-size: 1.4rem; } .content { padding: 22px 18px; } .topbar { padding: 0 18px; } .sidebar nav button { padding: 8px 10px; } #overview-metrics { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 1.65rem; } .card, #setup { padding: 17px; } .knowledge-search { grid-column: 1 / -1; } .pager { flex-wrap: wrap; } .knowledge-layout { display: block; } }
