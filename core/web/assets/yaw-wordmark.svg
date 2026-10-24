@@ -1,22 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 119 42" fill="none" aria-hidden="true">
-  <defs>
-    <linearGradient id="letter" x1="0" y1="0" x2="0" y2="42" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fffef7"/>
-      <stop offset="1" stop-color="#ccebe5"/>
-    </linearGradient>
-  </defs>
-  <!-- The inset teal edges give the angular strokes a little depth at small sizes. -->
-  <g stroke="#52bfc2" stroke-width="6" stroke-linecap="square" stroke-linejoin="bevel" opacity=".58" transform="translate(1.6 1.6)">
-    <path d="M4 5 19 21 34 5M19 21v16"/>
-    <path d="M41 37 57 5 73 37M47 26h20"/>
-    <path d="M80 5 87 37 97 19 107 37 114 5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 44" fill="none" role="img" aria-labelledby="title">
+  <title id="title">YAW</title>
+  <g stroke="#d9f1e8" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter">
+    <!-- Y: split arms converge, then its upright leans toward the centered A. -->
+    <path d="M4 4 25 22M8 4 29 22"/>
+    <path d="M50 4 29 22M54 4 33 22"/>
+    <path d="m25 22 5 18M29 22l5 18"/>
+    <!-- A: parallel rails keep the center letter as the visual axis. -->
+    <path d="M57 40 76 4M62 40 81 4M81 4l19 36M76 4l19 36"/>
+    <path d="M66 27h24M69 23h19"/>
+    <!-- W: alternating diagonals echo the Y; the inner valley aligns to the A. -->
+    <path d="m106 4 9 36M111 4l9 36"/>
+    <path d="m115 40 14-22M120 40l14-22"/>
+    <path d="m129 18 14 22M134 18l14 22"/>
+    <path d="m143 40 9-36M148 40l9-36"/>
   </g>
-  <g stroke="url(#letter)" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="bevel">
-    <path d="M4 5 19 21 34 5M19 21v16"/>
-    <path d="M41 37 57 5 73 37M47 26h20"/>
-    <path d="M80 5 87 37 97 19 107 37 114 5"/>
-  </g>
-  <g stroke="#fffef7" stroke-width=".9" opacity=".6" stroke-linecap="square">
-    <path d="M4 4 19 20 34 4M57 4 73 36M80 4 87 36 97 18 107 36 114 4"/>
+  <g stroke="#52bfc2" stroke-width="1" opacity=".85" stroke-linecap="butt">
+    <path d="M6 4 27 22M52 4 31 22M27 22l5 18"/>
+    <path d="M60 40 79 4M79 4l19 36M67 25h22"/>
+    <path d="m109 4 9 36m-1 0 14-22m1 0 14 22m1 0 9-36"/>
   </g>
 </svg>
