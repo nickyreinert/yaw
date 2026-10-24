@@ -14,7 +14,7 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
 
 - **Overview**: this workspace's sessions, tasks and setup.
 - **Sessions**: the session browser, locked to this workspace.
-- **Settings** has three tabs:
+- **Settings** has two tabs:
   - **Interview**: the same questions as `yaw edit`, with your saved answers,
     setup depth, stack profile and modules. **Preview changes** lists every
     file that would change, with a diff; **Apply** writes them (files you
@@ -26,8 +26,7 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
     content (hooks table, recipes, YAW blocks versus your own text), **Raw**
     the source. Files are read-only here; `.env*` and secret files are never
     listed. Change tracking is git's job.
-  - **Notifications**: personal notification preferences. The comfort module
-    must be enabled in each workspace where its hooks should run.
+  Notification preferences are personal, so they live under Global Settings.
 - **Knowledge**: this workspace's knowledge records and decisions. Use
   **+ New record**, and **Edit** / **Delete** on a selected record.
   **Decision categories** edits `.decisions/taxonomy.json` (Form or Raw JSON);
@@ -38,10 +37,37 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
   Run `yaw map update` to regenerate it and `yaw map check` to check it;
   opening the page does neither.
 
-**Global** spans workspaces: **Projects**, **Sessions** and **Tasks** (with
-project filters), and **Knowledge** for your personal records in
-`~/.yaw/knowledge`. Other workspaces' knowledge is never shown. The same
-knowledge operations work in the terminal with `yaw knowledge` (see below).
+**Global** spans workspaces. One filter bar, pinned to the top while you
+scroll, drives every card, chart and table on the page: folder, project, agent,
+model, period (7/30/90 days, all, or a From/To range). **Split charts by**
+stacks the charts by agent, model, folder or project; combine it with the
+filters, for example one project split by agent.
+
+- **Overview**: totals, a drill-down table of projects by folder, and charts.
+  The drill-down root is the folder shared by your innermost projects; click a
+  folder to go one level down, a project to filter by it. A project in a
+  parent folder (such as your home folder) is listed as `./` or by full path.
+- **Sessions**: usage and message-insight cards, then charts (sessions per
+  week, duration, prompt and answer length, response time, tokens by model,
+  outcomes), then two tabs. **Browse** holds the tables (sessions, lengths and
+  timing, agents, models, folders, projects, outcomes); **Collect & classify**
+  holds the explicit collection controls described below.
+- **Tasks**: open tasks across projects, filterable by folder and project;
+  **Open →** switches the dashboard to that project's Tasks page.
+- **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
+  workspaces' knowledge is never shown. The same operations work in the
+  terminal with `yaw knowledge` (see below).
+- **Settings**: **Interview** edits your personal defaults
+  (`~/.yaw/user-profile.yaml`; preview, then apply) and lists saved presets
+  (view, rename, delete); **Files** shows `~/.yaw` read-only with a Form/Raw
+  panel; **Notifications** holds the notification preferences and lists which
+  projects have the comfort module.
+
+Every table can be filtered and sorted and is paged. Filters, splits, tabs,
+table searches, sorting, pages and the open file are kept in the address
+(`#global-sessions?period=30&split=project&sort.sessions=tokens.desc`), so a
+view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
+same view locked to the current workspace.
 
 ## Explicit collection
 
@@ -55,7 +81,7 @@ yaw sessions analytics           # read saved current-workspace results
 yaw sessions analytics --all     # read all saved results
 ```
 
-The web equivalent is **Sessions / Refresh saved session data**.
+The web equivalent is **Global / Sessions / Collect & classify**.
 Choose current or all discovered workspaces and a date range. Results persist
 in `~/.yaw/session-analysis.json` (`YAW_HOME` overrides the directory), with
 private file permissions. Only metadata, aggregate lengths/timing, a content
@@ -69,9 +95,9 @@ An ordinary page refresh still just reads saved data when this option is off.
 
 Supported histories: Claude Code, Codex and Copilot CLI. This does not claim
 coverage of VS Code chat storage. Discovery examines at most 20,000 files per
-agent; inaccessible or unsupported files may be missed. Analysis reads the
-first 64 MiB and at most 2,000 text messages of each transcript; longer
-histories and malformed/oversized records get a partial coverage flag.
+agent; inaccessible or unsupported files may be missed. Analysis reads
+each transcript completely, whatever its size, streaming it line by line; lines
+above 4 MiB and malformed records are skipped and flag the session as partial.
 Unreadable transcripts are skipped and counted instead of failing the scan.
 Rescans reuse the saved row of every transcript whose size and modification
 time are unchanged (stored as a hash of the path, never the path itself), so
@@ -133,7 +159,7 @@ yaw add comfort
 yaw web
 ```
 
-Under **Notifications**, enable notifications and Telegram, choose the minimum
+Under **Global / Settings / Notifications**, enable notifications and Telegram, choose the minimum
 run duration, and set the **names** of the environment variables containing your
 bot token and chat ID. Defaults are `YAW_TELEGRAM_BOT_TOKEN` and
 `YAW_TELEGRAM_CHAT_ID`. Enter credentials privately in your shell, not in the

@@ -6,10 +6,11 @@
 | --- | --- |
 | Overview | Current workspace: session counts, reported tokens, elapsed time, task count, configuration, activity |
 | Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
-| Sessions | Workspace (project filter locked) and Global; registry + native Claude Code/Codex/Copilot history; project/agent/model/period filters; sortable session columns; Agents/Projects/Models comparisons; pagination |
+| Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project |
+| Sessions | Workspace (locked to the project) and Global; sticky folder/project/agent/model/period filter; usage and message-insight cards; stackable charts; Browse tables (filter/sort/page) and Collect & classify tabs; state in the URL |
 | Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
-| Settings | Interview (`yaw edit` in the browser: preview, then apply), Files (YAW-written files by purpose, read-only Form/Raw drawer), Notifications |
-| Tasks | Workspace `TASKS.md`; Global task snapshots with a project filter |
+| Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply), Files (YAW-written files by purpose, read-only Form/Raw drawer). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications |
+| Tasks | Workspace `TASKS.md`; Global task snapshots filterable by folder/project, linking to each project |
 | Code map | Saved map; shown only when the code-map module is enabled |
 
 ## Sessions
@@ -41,7 +42,7 @@ Reads reject symlinked roots/components and files, bind to checked file descript
 
 ## Verification
 
-Focused checks: `node --test test/knowledge.test.js test/knowledge-store.test.js test/session-profile.test.js test/dashboard.test.js test/form-ui.test.js test/web-background.test.js modules/sessions/tests/import.test.js`.
+Focused checks: `node --test test/knowledge.test.js test/knowledge-store.test.js test/session-rows.test.js test/session-analysis.test.js test/global-settings.test.js test/dashboard.test.js test/form-ui.test.js test/web-background.test.js modules/sessions/tests/import.test.js`.
 
 Repository gate: `just check`. Keep its pre-existing adapter drift separate from web changes. Browser QA covers setup retention, sorting/filtering/pagination, source coverage, knowledge scope/search/reader, keyboard navigation, and narrow layouts.
 

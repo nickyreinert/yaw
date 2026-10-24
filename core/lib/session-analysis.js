@@ -12,7 +12,9 @@ export const LABELS = {
   behaviour: ['admits_error', 'apology_loop', 'sycophantic_admission', 'none'],
   failure: ['misunderstood_intent', 'wrong_scope', 'broke_something', 'ignored_rule_or_adr', 'hallucinated_api', 'too_slow', 'tooling_error', 'none'],
 };
-const MAX_FILE = 64 * 1024 * 1024, MAX_LINE = 4 * 1024 * 1024, MAX_TURNS = 2000;
+// Transcripts are streamed in full; only single lines over MAX_LINE (usually huge tool output) are skipped.
+// READER marks rows read this way, so rows from the older capped reader are read once more.
+const MAX_LINE = 4 * 1024 * 1024, READER = 2;
 const textOf = (content) => typeof content === 'string' ? content : Array.isArray(content)
   ? content.filter((p) => ['text', 'input_text', 'output_text'].includes(p?.type) && typeof p.text === 'string').map((p) => p.text).join('\n') : '';
 
@@ -39,9 +41,7 @@ export async function readTurns(file, agent) {
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
-    // Very long histories are analysed from their first 64 MiB and marked as limited instead of failing the scan.
-    if (st.size > MAX_FILE) limited = true;
-    input = createReadStream(file, { fd, encoding: 'utf8', end: MAX_FILE - 1 });
+    input = createReadStream(file, { fd, encoding: 'utf8' });
     const lines = createInterface({ input, crlfDelay: Infinity });
     try {
       for await (const line of lines) {
@@ -60,7 +60,6 @@ export async function readTurns(file, agent) {
         const message = { role: m.role, text: m.text, time: m.time };
         if (key) seen.set(key, message);
         messages.push(message);
-        if (messages.length >= MAX_TURNS) { limited = true; break; }
       }
     } finally { lines.close(); }
   } finally {
@@ -170,7 +169,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   // Unchanged transcripts keep their saved row; a classification run rereads text, so it never reuses.
   const reuse = classify ? undefined : (path, stamp) => {
     const row = saved.get(sourceKey(path));
-    return row?.stamp === stamp ? { reused: row, cwd: row.project, started: row.started } : null;
+    return row?.stamp === stamp && row.reader === READER ? { reused: row, cwd: row.project, started: row.started } : null;
   };
   const sessions = (await findSessions({ env, root, allProjects: all, reuse })).filter((s) => Date.parse(s.started) >= since);
   const rows = [];
@@ -187,7 +186,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
     for (const message of turns.messages) hash.update(JSON.stringify(message)).update('\n');
     const row = {
       id: sessionId(s.agent, s.native), project: realRoot(s.cwd), agent: s.agent, title: '', started: s.started, ended: s.ended,
-      model: s.model, branch: s.branch, tokens_in: s.tokensIn, tokens_out: s.tokensOut, cost_usd: s.costUsd, source: 'local',
+      model: s.model, branch: s.branch, tokens_in: s.tokensIn, tokens_out: s.tokensOut, cost_usd: s.costUsd, source: 'local', reader: READER,
       metrics: messageMetrics(turns.messages, turns.limited), fingerprint: hash.digest('hex'),
     };
     if (!row.id) continue;
@@ -214,5 +213,5 @@ export async function collectAnalysis({ root, env, all = false, classify = false
 }
 
 export const scanSummary = (r) => [`Saved ${r.sessions} session(s)`, r.reused ? `${r.reused} unchanged and reused` : '',
-  r.limited ? `${r.limited} limited (very long history; first 64 MiB / 2,000 messages analysed)` : '',
+  r.limited ? `${r.limited} partial (oversized or broken lines skipped)` : '',
   r.skipped ? `${r.skipped} unreadable and skipped` : ''].filter(Boolean).join('; ') + '.';

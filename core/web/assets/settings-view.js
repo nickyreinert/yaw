@@ -1,16 +1,16 @@
-// Settings (Interview | Files | Notifications) and the decision-category editor. Text nodes only: file content,
+// Settings (Interview | Files) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
 import { available, choiceLabel, choiceValue, toggleModules, visibleQuestions } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
-function el(tag, text, cls) {
+export function el(tag, text, cls) {
   const node = document.createElement(tag);
   if (text !== undefined && text !== null) node.textContent = String(text);
   if (cls) node.className = cls;
   return node;
 }
-function button(text, fn, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
-function grid(head, rows) {
+export function button(text, fn, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
+export function grid(head, rows) {
   const wrap = el('div', null, 'table-scroll'), t = el('table'), tr = t.createTHead().insertRow();
   for (const h of head) { const th = el('th', h); th.scope = 'col'; tr.append(th); }
   const body = t.createTBody();
@@ -20,14 +20,14 @@ function grid(head, rows) {
 const code = (t) => el('code', t);
 const pills = (list, cls = '') => { const s = el('span'); for (const x of list) s.append(el('span', x, `pill ${cls}`)); return s; };
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
-function tabs(items, onPick, current) {
+export function tabs(items, onPick, current) {
   const nav = el('div', null, 'editor-tabs');
   for (const [id, label, disabled] of items) {
     const b = button(label, () => onPick(id)); b.dataset.mode = id; b.disabled = Boolean(disabled); b.setAttribute('aria-pressed', String(id === current)); nav.append(b);
   }
   return nav;
 }
-const press = (nav, id) => nav.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === id)));
+export const press = (nav, id) => nav.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === id)));
 
 // ------------------------------------------------------------------------------- read-only structured views
 
@@ -119,7 +119,7 @@ const VIEWS = {
     }
   },
 };
-function source(text) {
+export function source(text) {
   const pre = el('pre', null, 'file-source');
   let inYaw = false;
   for (const line of text.split('\n')) {
@@ -140,9 +140,9 @@ export function createSettings({ api, get, report, refresh, go }) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden && !drawer.contains(document.activeElement)) closeDrawer(); });
 
   function show(name) {
-    tab = ['interview', 'files', 'notifications'].includes(name) ? name : 'interview';
+    tab = ['interview', 'files'].includes(name) ? name : 'interview';
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
-    for (const id of ['interview', 'files', 'notifications']) $(`settings-${id}`).hidden = id !== tab;
+    for (const id of ['interview', 'files']) $(`settings-${id}`).hidden = id !== tab;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
     if (tab === 'interview' && !interview) loadInterview().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);

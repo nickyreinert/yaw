@@ -3,17 +3,21 @@ import { readUserData, writeUserData } from '../lib/user-store.js';
 import { collectAnalysis, localEndpoint, scanSummary } from '../lib/session-analysis.js';
 import { realRoot } from '../../modules/sessions/lib/registry.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
-import { tasksSection } from './dashboard.js';
+import { sessionsData, tasksSection } from './dashboard.js';
+import { readManifest } from '../render/manifest.js';
+import { enabledModules } from '../render/project.js';
 import { FormError } from './form-model.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
 import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
 import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
 import { ProjectError } from '../render/project.js';
+import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply'];
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete'];
 export const workspacePreferences = (env, root) => {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
   return { refreshOnLoad: doc[realRoot(root)]?.refreshOnLoad === true, endpoint: doc.endpoint ?? 'http://127.0.0.1:8000' };
@@ -26,6 +30,17 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
   return {
     actions: WORKSPACE_ACTIONS,
     get: {
+      '/api/sessions': (params) => sessionsData({ root: rootOf(params?.get('workspace')), kitRoot, env, projects }),
+      '/api/global/profile': () => profileData({ kitRoot, env }),
+      '/api/global/presets': () => presetsData({ env }),
+      '/api/global/files': () => globalFiles({ env }),
+      '/api/global/file': (params) => globalFile({ env, path: params?.get('path') ?? '' }),
+      // Which known projects have the comfort module, so notifications reach them.
+      '/api/global/comfort': () => (projects ? projects.list().projects : [{ root: fixed, name: fixed.split('/').pop() }]).map((p) => {
+        let comfort = false;
+        try { const manifest = readManifest(p.root); comfort = Boolean(manifest) && enabledModules(manifest).includes('comfort'); } catch { /* unreadable manifest */ }
+        return { root: p.root, name: p.name, comfort };
+      }),
       '/api/preferences': (params) => workspacePreferences(env, rootOf(params?.get('workspace'))),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
@@ -49,6 +64,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
         if (!projects) throw new FormError('Project switching is not available here', 404);
         return projects.add(input.path);
       }
+      // Global Settings: personal files under ~/.yaw, independent of the open workspace.
+      if (name === 'profile-preview') return profilePreview({ kitRoot, env, input });
+      if (name === 'profile-apply') return profileApply({ kitRoot, env, input });
+      if (name === 'preset-rename' || name === 'preset-delete') return presetAction({ env, input, remove: name === 'preset-delete' });
       const root = rootOf(input.workspace);
       input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));
       if (name === 'knowledge-save') return saveKnowledge({ root, kitRoot, env, input: input.record });

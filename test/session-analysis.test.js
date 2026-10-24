@@ -4,7 +4,7 @@ import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 
 import { join } from 'node:path';
 import { classifyMessages, collectAnalysis, LABELS, localEndpoint, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
-import { dashboardData, startDashboard } from '../core/web/dashboard.js';
+import { dashboardData, sessionsData, startDashboard } from '../core/web/dashboard.js';
 import { main } from '../core/cli/main.js';
 import { notificationSettings, saveNotifications, deliverNotifications } from '../modules/comfort/lib/settings.js';
 import { buildPayload } from '../modules/comfort/lib/notify.js';
@@ -48,7 +48,10 @@ test('saved scans are explicit, private, bounded to the chosen workspace, and co
   saved = readAnalysis(env); assert.equal(saved.rows.length, 2);
   const d = await dashboardData({ root, kitRoot: KIT_ROOT, env });
   assert.equal(d.sessions.project.sessions, 1); assert.equal(d.sessions.all.sessions, 2);
-  assert.equal(d.sessions.profiling.summary.measured, 2);
+  const all = await sessionsData({ root, kitRoot: KIT_ROOT, env });
+  assert.equal(all.available, true); assert.equal(all.rows.length, 2); assert.equal(all.current, realRoot(root));
+  assert.ok(all.rows.every((r) => r.answers === 1 && r.medianResp === 2));
+  assert.doesNotMatch(JSON.stringify(all), /Fix the parser|Parser fixed|Thanks, works|rollout-/);
 });
 
 test('rescans reuse unchanged transcripts and reread changed ones', async () => {
@@ -65,7 +68,25 @@ test('rescans reuse unchanged transcripts and reread changed ones', async () => 
   result = await collectAnalysis({ root, env });
   assert.equal(result.reused, 0);
   assert.equal(readAnalysis(env).rows[0].metrics.answerChars, 'Parser fixed now.'.length);
-  assert.match(scanSummary({ sessions: 3, reused: 2, skipped: 1, limited: 1 }), /2 unchanged.*1 limited.*1 unreadable/);
+  assert.match(scanSummary({ sessions: 3, reused: 2, skipped: 1, limited: 1 }), /2 unchanged.*1 partial.*1 unreadable/);
+});
+
+test('long transcripts are read in full; rows from the older capped reader are read again', async () => {
+  const env = environment(), root = tmp(), id = 'long';
+  const file = `sessions/2026/10/24/rollout-${id}.jsonl`;
+  const lines = [{ type: 'session_meta', timestamp: messages[0].time, payload: { id, cwd: root } }];
+  for (let n = 0; n < 1500; n++) for (const role of ['user', 'assistant']) {
+    lines.push({ type: 'response_item', timestamp: messages[0].time, payload: { type: 'message', role, content: [{ type: role === 'user' ? 'input_text' : 'output_text', text: `${role} ${n}` }] } });
+  }
+  writeTree(env.CODEX_HOME, { [file]: lines.map(JSON.stringify).join('\n') });
+  let result = await collectAnalysis({ root, env });
+  let row = readAnalysis(env).rows[0];
+  assert.equal(row.metrics.prompts, 1500); assert.equal(row.metrics.answers, 1500); assert.equal(row.metrics.limited, false); assert.equal(result.limited, 0);
+  assert.equal((await collectAnalysis({ root, env })).reused, 1);
+  const data = readAnalysis(env); delete data.rows[0].reader; data.rows[0].metrics.limited = true; writeUserData(env, 'session-analysis.json', data);
+  result = await collectAnalysis({ root, env });
+  assert.equal(result.reused, 0); row = readAnalysis(env).rows[0];
+  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 2);
 });
 
 test('message extraction ignores tools and non-text blocks; Unicode lengths and response timing are measured', () => {

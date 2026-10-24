@@ -211,6 +211,42 @@ export function deletePreset(env, name) {
   rmSync(existingPreset(env, name));
 }
 
+// The dashboard's Global Settings: rename keeps the content and updates its `name`.
+export function renamePreset(env, name, to) {
+  const from = existingPreset(env, name);
+  if (typeof to !== 'string' || !PRESET_NAME.test(to)) throw new Error('A preset name uses lower-case letters, digits and hyphens');
+  const target = presetFile(env, to);
+  if (existingStat(target)) throw new Error(`A preset named "${to}" already exists`);
+  const doc = parse(read(from)) ?? {};
+  doc.name = to;
+  check(`presets/${to}.yaml`, 'preset.schema.json', doc);
+  write(target, stringify(doc));
+  rmSync(from);
+  return to;
+}
+
+// -> { before: text | null, after: text } for the given personal answers; nothing is written.
+export function nextUserProfile(env, answers) {
+  directory(userDir(env));
+  const file = profileFile(env);
+  const before = existingStat(file) ? read(file) : null;
+  let profile = {};
+  if (before !== null) {
+    try { profile = parse(before)?.answers ?? {}; } catch { throw new Error(`${file} cannot be read; fix or remove the file (it was left untouched)`); }
+  }
+  const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
+  for (const k of known) if (Object.hasOwn(answers, k)) profile[k] = answers[k];
+  const doc = { answers: profile };
+  check('user-profile.yaml', 'user-profile.schema.json', doc);
+  return { before, after: stringify(doc) };
+}
+
+export function writeUserProfile(env, text) {
+  directory(userDir(env), true);
+  existingStat(profileFile(env));
+  write(profileFile(env), text);
+}
+
 export function readUserData(env, name) {
   if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('Invalid user data name');
   const dir = userDataDir(env);
@@ -231,7 +267,7 @@ export function writeUserData(env, name, value) {
   } finally { rmSync(temp, { force: true }); }
 }
 
-function userDataDir(env) {
+export function userDataDir(env) {
   const dir = env.YAW_HOME || userDir(env);
   if (!isAbsolute(dir) || /[\u0000-\u001f\u007f]/.test(dir)) throw new Error('YAW user data requires an absolute YAW_HOME / HOME');
   return dir;

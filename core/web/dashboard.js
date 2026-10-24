@@ -6,7 +6,7 @@ import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readManifest } from '../render/manifest.js';
 import { enabledModules, readAnswers } from '../render/project.js';
-import { profileSessions } from './session-profile.js';
+import { sessionRows } from './session-rows.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
 import { readAnalysis } from '../lib/session-analysis.js';
@@ -23,6 +23,8 @@ const DASHBOARD_ASSETS = new Map([
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
   asset('settings-view.js', 'text/javascript; charset=utf-8'),
+  asset('global-view.js', 'text/javascript; charset=utf-8'),
+  asset('global-settings-view.js', 'text/javascript; charset=utf-8'),
   asset('ui-state.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
 ]);
@@ -91,19 +93,43 @@ async function decisionsSection(root, kitRoot) {
 // Imported sessions (#174) carry token counts; hook-recorded ones count 0.
 const tokensOf = (r) => Number(r.tokens_in ?? 0) + Number(r.tokens_out ?? 0);
 
-// Session stats from the registry. A missing registry is reported, never created by the dashboard.
-export async function sessionsSection(root, kitRoot, env, now = new Date(), params) {
+// Registry plus saved scan, merged. A missing registry is reported, never created by the dashboard.
+async function history(kitRoot, env) {
   const registry = await import(pathToFileURL(join(kitRoot, 'modules', 'sessions', 'lib', 'registry.js')).href);
   const stored = existsSync(registry.registryFile(env)) ? registry.withRegistry(env, (db) => ({
     rows: db.prepare('SELECT id, agent, project, title, started, ended, branch, pr, model, tokens_in, tokens_out, cost_usd, source FROM sessions ORDER BY started DESC').all(),
     links: db.prepare('SELECT session_id, kind, COUNT(*) AS n FROM session_links GROUP BY session_id, kind').all(),
   })) : null;
   const saved = readAnalysis(env);
-  if (!stored && !saved.collected) return { available: false };
+  if (!stored && !saved.collected) return null;
   const rows = mergeHistory(stored?.rows ?? [], saved.rows);
+  // No registry strings become markup or commands.
+  for (const row of rows) for (const key of ['title', 'branch', 'model']) row[key] = registry.clean(row[key]);
+  return { registry, stored, saved, rows };
+}
+
+// Every known session as compact rows for the Sessions and Global views; the browser filters and charts them.
+export async function sessionsData({ root, kitRoot, env, projects }) {
+  const h = await history(kitRoot, env);
+  const current = realRoot(root);
+  const saved = h?.saved ?? readAnalysis(env);
+  const live = section(() => tasksSection(root));
+  const tasks = [...(saved.tasks ?? []).filter((t) => t.project !== current), ...(live.available ? [{ project: current, ...live }] : [])];
+  const known = projects ? projects.list().projects.map((p) => p.root) : [];
+  if (!h) return { available: false, current, tasks, projects: known, history: { collected: saved.collected ?? null } };
+  return {
+    available: true, current, tasks, projects: known,
+    history: { local: Boolean(h.saved.collected), collected: h.saved.collected, registered: h.stored?.rows.length ?? 0 },
+    ...sessionRows(h.rows),
+  };
+}
+
+// Session stats for the Overview.
+export async function sessionsSection(root, kitRoot, env, now = new Date()) {
+  const h = await history(kitRoot, env);
+  if (!h) return { available: false };
+  const { registry, stored, saved, rows } = h;
   const project = registry.realRoot(root);
-    // No registry strings become markup or commands. Profiling reads the registry only, never transcripts.
-    for (const row of rows) for (const key of ['title', 'branch', 'model']) row[key] = registry.clean(row[key]);
     const links = stored?.links ?? [];
     const linkCount = new Map();
     for (const l of links) linkCount.set(`${l.session_id}\u0000${l.kind}`, Number(l.n));
@@ -145,7 +171,6 @@ export async function sessionsSection(root, kitRoot, env, now = new Date(), para
     return {
       available: true,
       history: { local: Boolean(saved.collected), collected: saved.collected, registered: stored?.rows.length ?? 0 },
-      profiling: profileSessions(rows, params, now),
       project: {
         ...summarize(mine),
         recent: mine.slice(0, 50).map((r) => ({
@@ -158,11 +183,11 @@ export async function sessionsSection(root, kitRoot, env, now = new Date(), para
     };
 }
 
-export async function dashboardData({ root, kitRoot, env, now, params }) {
+export async function dashboardData({ root, kitRoot, env, now }) {
   const project = section(() => projectSection(root));
   const [decisions, sessions] = await Promise.all([
     decisionsSection(root, kitRoot).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
-    sessionsSection(root, kitRoot, env, now, params).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
+    sessionsSection(root, kitRoot, env, now).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
   ]);
   const saved = section(() => readAnalysis(env));
   return { project, tasks: section(() => tasksSection(root)), globalTasks: saved.tasks ?? [], decisions, sessions, generated: (now ?? new Date()).toISOString() };
@@ -178,7 +203,7 @@ export async function startDashboard({ root, kitRoot, env, port, signals, onClos
     onOpen: (input) => { if (input?.root !== undefined) projects.open(input.root); },
     get: {
       '/api/projects': () => projects.list(),
-      '/api/dashboard': (params) => dashboardData({ root: at(params), kitRoot, env, params }),
+      '/api/dashboard': (params) => dashboardData({ root: at(params), kitRoot, env }),
       '/api/knowledge': (params) => knowledgeData({ root: at(params), kitRoot, env, params }),
     },
   });

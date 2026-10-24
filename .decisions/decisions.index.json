@@ -1551,6 +1551,14 @@
         },
         {
           "type": "code",
+          "path": "core/web/global-settings.js"
+        },
+        {
+          "type": "code",
+          "path": "core/web/assets/global-view.js"
+        },
+        {
+          "type": "code",
           "path": "core/cli/next-steps.js"
         }
       ],
@@ -1615,7 +1623,7 @@
       "refs": [
         {
           "type": "code",
-          "path": "core/web/session-profile.js"
+          "path": "core/web/session-rows.js"
         },
         {
           "type": "spec",
