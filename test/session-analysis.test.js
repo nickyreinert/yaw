@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifyMessages, collectAnalysis, LABELS, localEndpoint, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary } from '../core/lib/session-analysis.js';
+import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { dashboardData, sessionsData, startDashboard } from '../core/web/dashboard.js';
 import { main } from '../core/cli/main.js';
@@ -128,6 +128,27 @@ test('Laya classification uses verified local protocol and strict probabilities,
   assert.equal(large.skipped, 1); assert.equal(large.classified, 0);
 });
 
+test('classifier settings are validated, applied to requests and probed with a made-up turn only', async () => {
+  assert.deepEqual(classifierSettings(), { endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120 });
+  assert.throws(() => classifierSettings({ endpoint: 'http://example.com:8000' }), /hosted endpoints/);
+  assert.throws(() => classifierSettings({ threshold: 0.2 }), /threshold/);
+  assert.throws(() => classifierSettings({ maxTurnBytes: 9000, maxLen: 4096 }), /truncated/);
+  assert.throws(() => classifierSettings({ timeoutSeconds: 1.5 }), /whole number/);
+  const seen = [];
+  const unsure = { ...responseFor(), answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((l, i) => [l, i === 0 ? 0.9 : i === 1 ? 0.1 : 0])) }])) };
+  const fetchFn = async (url, options) => { seen.push([url, JSON.parse(options.body)]); return Response.json(unsure); };
+  const result = await classifyMessages(messages, { endpoint: 'http://127.0.0.1:9100', threshold: 0.99, maxLen: 6000, fetchFn });
+  assert.equal(seen[0][0], 'http://127.0.0.1:9100/v1/systemone'); assert.equal(seen[0][1].max_len, 6000);
+  assert.equal(result.threshold, 0.99); assert.equal(result.counts.outcome.unknown, 1);
+  const smaller = await classifyMessages([{ ...messages[0], text: 'x'.repeat(1200) }, messages[1]], { maxTurnBytes: 1000, fetchFn: () => { throw new Error('must not call'); } });
+  assert.equal(smaller.skipped, 1);
+  seen.length = 0;
+  const probe = await probeClassifier({}, fetchFn);
+  assert.match(probe.message, /Laya answered at http:\/\/127\.0\.0\.1:8000/);
+  assert.doesNotMatch(seen[0][1].state, /Fix the parser/);
+  await assert.rejects(probeClassifier({}, async () => Response.json({ answers: {} })), (e) => !/no classification result was saved/.test(e.message));
+});
+
 test('failed local classification leaves saved results unchanged; CLI scan and analytics work without sessions module', async () => {
   const root = tmp(), env = environment(); fixture(env, root);
   await collectAnalysis({ root, env });
@@ -155,10 +176,17 @@ test('dashboard scan and preference actions require session plus CSRF; GET never
   assert.equal((await post('evaluate', {})).status, 400);
   assert.equal((await post('collect', { all: false })).status, 200);
   assert.equal(readAnalysis(env).rows.length, 1);
-  assert.equal((await post('preferences', { refreshOnLoad: true, endpoint: 'http://127.0.0.1:8000' })).status, 200);
+  assert.equal((await post('preferences', { autoRefresh: true })).status, 200);
+  assert.equal((await post('preferences', { autoRefresh: 'yes' })).status, 400);
+  assert.equal((await post('classifier-save', { classifier: { endpoint: 'http://127.0.0.1:8123', threshold: 0.8 } })).status, 200);
+  assert.equal((await post('classifier-save', { classifier: { endpoint: 'https://remote.example' } })).status, 400);
+  assert.equal((await post('classifier-save', { classifier: {} }, false)).status, 403);
   const prefs = await (await fetch(`${base}/api/preferences`, { headers: { cookie } })).json();
-  assert.equal(prefs.refreshOnLoad, true);
-  assert.equal((await post('preferences', { refreshOnLoad: false, endpoint: 'https://remote.example' })).status, 400);
+  assert.equal(prefs.autoRefresh, true);
+  assert.equal(prefs.classifier.endpoint, 'http://127.0.0.1:8123'); assert.equal(prefs.classifier.threshold, 0.8); assert.equal(prefs.classifier.maxLen, 8192);
+  // Nothing listens on port 9 on loopback, so the probe reports the failure instead of a 500.
+  const probe = await post('classifier-test', { classifier: { endpoint: 'http://127.0.0.1:9' } });
+  assert.equal(probe.status, 502); assert.match((await probe.json()).error, /not reachable/);
   assert.doesNotMatch(html, /sidebar-footer/);
 });
 

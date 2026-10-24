@@ -74,12 +74,8 @@
         <div class="metric-group-label">USAGE</div><div class="metrics compact" id="ss-metrics"></div>
         <div class="metric-group-label">MESSAGE INSIGHTS</div><div class="metrics compact" id="ss-insights"></div>
         <div class="chart-grid" id="ss-charts"></div>
-        <div class="tabbar" role="tablist" aria-label="Sessions views"><button type="button" role="tab" data-stab="browse" aria-selected="true">Browse</button><button type="button" role="tab" data-stab="collect" aria-selected="false">Collect &amp; classify</button></div>
         <div id="ss-browse"></div>
-        <div id="ss-collect" hidden>
-          <div class="card"><h2>Collect &amp; classify</h2><p>Saved results only until you explicitly scan. Scanning reads local message records for aggregate lengths and timing; message text is not saved. Classification sends turn text only to local Laya, never a hosted API. Both use the period chosen in the filter above (a custom range means all history).</p><p id="ss-collected" class="small muted"></p><label>Scan scope<select id="scan-scope"><option value="current">Current workspace</option><option value="all">All discovered workspaces</option></select></label><button type="button" id="scan-history">Refresh saved session data</button><label class="check"><input type="checkbox" id="refresh-on-load"> Refresh session data whenever this web interface reloads (all discovered workspaces; no model)</label><label>Local Laya address<input id="laya-endpoint" value="http://127.0.0.1:8000" type="url"></label><button type="button" id="save-analysis-settings">Save preferences</button><button type="button" id="classify-history">Classify sessions with local Laya</button><p id="analysis-status" role="status"></p></div>
-          <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Explicit scans support Claude Code, Codex and Copilot CLI local history. No scan on page load unless you enable refresh-on-load. Scan limit: 20,000 files per agent. Transcripts of any size are read completely; single lines over 4 MiB and broken lines are skipped and the session is marked partial. Unchanged transcripts are reused from the last scan, so rescans only read new or changed files. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Response time is prompt-to-first-recorded-answer, not network latency. Charts use UTC days. Classification is experimental, can be wrong, and never runs automatically. Oversized turns are skipped rather than truncated.</p></details>
-        </div>
+        <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Pages read saved results only; <strong>Refresh</strong> (or <strong>Auto</strong>) reads Claude Code, Codex and Copilot CLI local history, and <strong>Classify</strong> runs local Laya. Scan limit: 20,000 files per agent. Transcripts of any size are read completely; single lines over 4 MiB and broken lines are skipped and the session is marked partial. Unchanged transcripts are reused from the last scan, so rescans only read new or changed files. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Response time is prompt-to-first-recorded-answer, not network latency. Charts use UTC days. Classification is experimental, can be wrong, and never runs automatically. Turns above the configured size are skipped rather than truncated.</p></details>
       </section>
       <section data-view="knowledge" class="view" hidden>
         <div class="page-heading"><h1 id="knowledge-title" tabindex="-1">Knowledge</h1><span id="knowledge-intro" class="small muted">This workspace · Knowledge records and decisions</span><button type="button" id="knowledge-categories">Decision categories</button><button type="button" id="knowledge-new" class="primary">+ New record</button></div>
@@ -95,13 +91,31 @@
       </section>
       <section data-view="global-settings" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Settings</h1><span class="small muted">You · ~/.yaw · applies to all projects</span></div>
-        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button></nav>
+        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button><button type="button" data-tab="classification">Classification</button></nav>
         <div id="gs-interview"></div>
         <div id="gs-files" hidden></div>
         <div id="gs-notifications" hidden><div class="card"><h2>Notifications</h2><div id="notification-settings"></div></div><div id="gs-comfort" class="card"></div></div>
+        <div id="gs-classification" hidden></div>
         <aside id="global-detail" aria-label="File preview" tabindex="-1" hidden></aside>
       </section>
       <footer class="content-footer"><span id="workspace-status" role="status">Loading workspace…</span><span>YAW</span></footer>
     </main>
   </div>
+  <dialog id="save-dialog" aria-labelledby="save-title">
+    <form method="dialog">
+      <h2 id="save-title">Save this setup?</h2>
+      <p>Writes answers only to your user folder (~/.yaw/presets/) and adds a history entry. No secrets. This permission is only for this save.</p>
+      <label><input id="save-consent" type="checkbox"> I explicitly agree to save this preset and history entry.</label>
+      <label><input id="save-profile" type="checkbox"> Also save my user preferences to ~/.yaw/user-profile.yaml.</label>
+      <button value="cancel">Cancel</button><button id="save-confirm" value="save">Save this time</button>
+    </form>
+  </dialog>
+  <dialog id="apply-dialog" aria-labelledby="apply-title">
+    <form method="dialog">
+      <h2 id="apply-title">Apply these files?</h2>
+      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. If any new secret value is saved, automatic verification is skipped because project recipes could read .env; review those recipes before running them. This does not save a preset or user profile.</p>
+      <div id="secret-fields" hidden></div>
+      <button value="cancel">Cancel</button><button value="apply">Apply now</button>
+    </form>
+  </dialog>
 <noscript>Run yaw in a terminal, or enable JavaScript to use this local workspace.</noscript></body></html>

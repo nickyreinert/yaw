@@ -1,7 +1,6 @@
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
-import { collectAnalysis, localEndpoint, scanSummary } from '../lib/session-analysis.js';
-import { realRoot } from '../../modules/sessions/lib/registry.js';
+import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSettings, collectAnalysis, probeClassifier, scanSummary } from '../lib/session-analysis.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
 import { sessionsData, tasksSection } from './dashboard.js';
 import { readManifest } from '../render/manifest.js';
@@ -16,12 +15,16 @@ import { globalFile, globalFiles, presetAction, presetsData, profileApply, profi
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
   'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete'];
-export const workspacePreferences = (env, root) => {
+// Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
+export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
-  return { refreshOnLoad: doc[realRoot(root)]?.refreshOnLoad === true, endpoint: doc.endpoint ?? 'http://127.0.0.1:8000' };
-};
+  let classifier;
+  try { classifier = classifierSettings(doc.classifier ?? {}); } catch { classifier = { ...CLASSIFIER_DEFAULTS }; }
+  return { autoRefresh: doc.autoRefresh === true, classifier, defaults: CLASSIFIER_DEFAULTS, limits: CLASSIFIER_LIMITS };
+}
+const savePreferences = (env, change) => writeUserData(env, 'web-preferences.json', { ...(readUserData(env, 'web-preferences.json') ?? {}), ...change });
 // `projects` (the dashboard's project switcher) resolves the `workspace` each request names; without it the API is
 // bound to `root`. Every action and read runs against that one resolved project.
 export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
@@ -41,7 +44,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
         try { const manifest = readManifest(p.root); comfort = Boolean(manifest) && enabledModules(manifest).includes('comfort'); } catch { /* unreadable manifest */ }
         return { root: p.root, name: p.name, comfort };
       }),
-      '/api/preferences': (params) => workspacePreferences(env, rootOf(params?.get('workspace'))),
+      '/api/preferences': () => webPreferences(env),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
       '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
@@ -80,14 +83,15 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       }
       if (name === 'knowledge-remove') return removeKnowledge({ root, kitRoot, env, input: input.record });
       if (name === 'preferences') {
-        if (typeof input.refreshOnLoad !== 'boolean') throw new FormError('Choose whether to refresh on load');
-        let endpoint;
-        try { endpoint = localEndpoint(input.endpoint); } catch (e) { throw new FormError(e.message); }
-        const doc = readUserData(env, 'web-preferences.json') ?? {};
-        doc[realRoot(root)] = { refreshOnLoad: input.refreshOnLoad };
-        doc.endpoint = endpoint;
-        writeUserData(env, 'web-preferences.json', doc);
-        return { message: 'Refresh preference and local Laya address saved. Classification never runs automatically.' };
+        if (typeof input.autoRefresh !== 'boolean') throw new FormError('Choose whether to refresh automatically');
+        savePreferences(env, { autoRefresh: input.autoRefresh });
+        return { message: input.autoRefresh ? 'Auto refresh on: opening a Sessions page reads new or changed transcripts. Classification never runs automatically.' : 'Auto refresh off: pages read saved results only.' };
+      }
+      if (name === 'classifier-save' || name === 'classifier-test') {
+        let classifier;
+        try { classifier = classifierSettings(input.classifier ?? {}); } catch (e) { throw new FormError(e.message); }
+        if (name === 'classifier-save') { savePreferences(env, { classifier }); return { classifier, message: 'Classification settings saved.' }; }
+        try { return await probeClassifier(classifier); } catch (e) { throw new FormError(e.message, 502); }
       }
       if (name === 'notifications') {
         try { return saveNotifications({ root, env, input }); }
@@ -106,7 +110,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       try {
         const result = await collectAnalysis({
           root, env, all: input.all === true, days: input.days ?? 'all', classify: name === 'evaluate',
-          endpoint: workspacePreferences(env, root).endpoint,
+          classifier: webPreferences(env).classifier,
           tasksFor: (project) => { try { return tasksSection(project); } catch (e) { return { error: e.message }; } },
         });
         return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? 'Local classifications included.' : 'No model was called.'}` };

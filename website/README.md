@@ -6,4 +6,4 @@ Static, dependency-free landing page for YAW. It introduces kickoff planning, lo
 python3 -m http.server 8080 --directory website
 ```
 
-The setup screenshot was captured from YAW's local browser form using a temporary Node CLI project. The dashboard graphic is an illustration, labeled as such. The page itself does not collect information or call a service.
+The setup screenshot was captured from the current six-step local browser form in a temporary demo project with the node-cli profile selected. The dashboard graphic is an illustration, labeled as such. The page itself does not collect information or call a service.

@@ -82,7 +82,7 @@ export function showView(hash, focus = true) {
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
   if (name === 'global-settings' && sub === 'files' && new URLSearchParams(query).get('file')) sub = `files?file=${encodeURIComponent(new URLSearchParams(query).get('file'))}`;
-  if (GLOBAL_VIEWS.includes(name)) { if (name === 'sessions' || name === 'global-sessions') $('scan-scope').value = name === 'sessions' ? 'current' : 'all'; globalView.show(name, query); }
+  if (GLOBAL_VIEWS.includes(name)) globalView.show(name, query);
   else { globalView?.hide(); replace(`#${sub ? `${name}/${sub}` : name}`); }
   if (focus && changed) { document.querySelector(`[data-view="${section}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
   if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null);
@@ -118,7 +118,7 @@ function overview(d) {
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
   activity.append(action('Browse workspace sessions →', 'sessions'), action('Browse knowledge →', 'knowledge'));
   $('workspace-actions').replaceChildren(project, activity);
-  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Collect them under Global → Sessions → Collect & classify.'));
+  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Sessions and press Refresh to read local history.'));
   if (mine && mine.sessions > (mine.recent?.length ?? 0)) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
   const t = d.tasks;
   $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
@@ -272,17 +272,11 @@ export function startWorkspace() {
     if (active === 'settings') { settings.reset(); showView(location.hash.slice(1), false); }
     if (active === 'global-settings') { globalSettings.reset(); showView(location.hash.slice(1), false); }
   });
-  $('scan-history').addEventListener('click', () => collect(false).catch(reportError));
-  $('classify-history').addEventListener('click', () => {
-    if (confirm('Read conversation text in the selected scan scope and period and send eligible turns to local Laya? No hosted API is used. This can take time.')) collect(true).catch(reportError);
-  });
-  $('save-analysis-settings').addEventListener('click', () => savePreferences().catch(reportError));
-  $('refresh-on-load').addEventListener('change', () => savePreferences().catch(reportError));
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
   $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
   settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(`settings/${tab}`) });
-  globalView = createGlobal({ get, report: reportError, openProject, replace });
+  globalView = createGlobal({ get, api, report: reportError, openProject, replace, afterCollect: () => load() });
   globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications,
     onFile: (path) => { if (path) navigate(`global-settings/files?file=${encodeURIComponent(path)}`); else replace('#global-settings/files'); } });
   document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(`settings/${b.dataset.tab}`)));
@@ -294,7 +288,6 @@ export function startWorkspace() {
   startProjects().finally(() => {
     showView(location.hash.slice(1) || 'overview', false);
     load();
-    loadPreferences().catch(reportError);
   });
 }
 
@@ -316,25 +309,6 @@ async function api(path, input) {
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
-}
-async function savePreferences() {
-  const result = await api('preferences', { refreshOnLoad: $('refresh-on-load').checked, endpoint: $('laya-endpoint').value });
-  $('analysis-status').textContent = result.message;
-}
-async function loadPreferences() {
-  const prefs = await api('preferences');
-  $('refresh-on-load').checked = prefs.refreshOnLoad;
-  $('laya-endpoint').value = prefs.endpoint;
-  if (prefs.refreshOnLoad) await collect(false, true);
-}
-async function collect(classify, all = $('scan-scope').value === 'all') {
-  const buttons = [$('scan-history'), $('classify-history')]; buttons.forEach((b) => { b.disabled = true; });
-  $('analysis-status').textContent = classify ? 'Classifying eligible turns with local Laya…' : 'Reading local history and saving aggregates…';
-  try {
-    if (classify) await savePreferences();
-    const result = await api(classify ? 'evaluate' : 'collect', { all, days: globalView.days(), confirm: classify });
-    await Promise.all([load(), globalView.reload()]); $('analysis-status').textContent = result.message;
-  } finally { buttons.forEach((b) => { b.disabled = false; }); }
 }
 async function loadMap() {
   const map = await api('code-map');

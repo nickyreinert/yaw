@@ -1,10 +1,10 @@
-// Global Settings: Interview (your defaults for new projects, plus presets), Files (~/.yaw, read-only) and
-// Notifications (personal channels). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
+// Global Settings: Interview (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
+// Notifications (personal channels) and Classification (local Laya settings and setup steps). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { available, choiceLabel, choiceValue } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications'];
+const TABS = ['interview', 'files', 'notifications', 'classification'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -28,7 +28,7 @@ function formView(value, depth = 0) {
 }
 
 export function createGlobalSettings({ api, get, report, notifications, onFile }) {
-  let tab = 'interview', profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
+  let tab = 'interview', classifier = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
   const drawer = $('global-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -39,13 +39,14 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     for (const id of TABS) $(`gs-${id}`).hidden = id !== tab;
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
     if (tab === 'notifications') loadNotifications().catch(report);
+    if (tab === 'classification') loadClassifier().catch(report);
     const file = tab === 'files' ? new URLSearchParams(query).get('file') ?? '' : '';
     if (tab === 'files') (files ? Promise.resolve() : loadFiles()).then(() => { if (file && file !== selected) openFile(file); else if (!file && selected) closeDrawer(); else renderFiles(); }).catch(report);
     else hide();
     return tab;
   }
   function hide() { if (!drawer.hidden) { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; } }
-  function reset() { profile = null; presets = null; files = null; comfort = null; previewed = null; }
+  function reset() { classifier = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
 
   // Interview --------------------------------------------------------------------------------------------
   async function loadInterview() {
@@ -188,6 +189,71 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const root = $('gs-comfort'); root.replaceChildren(el('h2', 'Projects'));
     root.append(el('p', 'Notifications fire in projects with the comfort module. Add it with yaw add comfort in that project.', 'small muted'));
     root.append(comfort.length ? grid(['Project', 'Folder', 'Comfort'], comfort.map((p) => [p.name, code(p.root), p.comfort ? 'enabled' : 'not installed'])) : el('p', 'No projects in the switcher yet.', 'muted'));
+  }
+
+  // Classification -----------------------------------------------------------------------------------------
+  const FIELDS = [
+    ['endpoint', 'Laya address', 'text', 'Loopback only: http://127.0.0.1:<port> or http://[::1]:<port>. Hosted addresses and redirects are refused.'],
+    ['threshold', 'Confidence threshold', 'number', 'Predictions below this probability are counted as unknown. Higher is stricter.', 0.01],
+    ['maxTurnBytes', 'Largest turn (bytes)', 'number', 'A prompt, its answers and the next prompt, as UTF-8. Larger turns are skipped, never shortened. Laya is most accurate up to about 4,000 tokens.', 100],
+    ['maxLen', 'Token budget (max_len)', 'number', 'Sent to Laya per turn; must be at least the largest turn. Laya caps it with LAYA_MAX_TOKEN_BUDGET.', 256],
+    ['timeoutSeconds', 'Timeout per turn (seconds)', 'number', 'How long to wait for one answer. The first call can be slow while Laya loads its checkpoint.', 10],
+  ];
+  async function loadClassifier() { classifier ??= await get('preferences'); renderClassifier(); }
+  function renderClassifier() {
+    const root = $('gs-classification'); root.replaceChildren();
+    const { classifier: saved, defaults, limits } = classifier;
+    const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
+    card.append(el('p', 'Classify (in the filter bar of a Sessions page, or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.', 'small muted'));
+    const form = el('div', null, 'classifier-form'), inputs = {};
+    for (const [key, label, type, help, step] of FIELDS) {
+      const wrap = el('label', label), input = el('input'), range = limits[key];
+      input.type = type; input.name = key; input.id = `classifier-${key}`; input.value = String(saved[key]);
+      if (step) { input.step = String(step); input.min = String(range[0]); input.max = String(range[1]); input.inputMode = 'decimal'; }
+      inputs[key] = input;
+      wrap.append(input, el('span', `${help} Default ${defaults[key]}${range ? `; ${range[0]}–${range[1]}` : ''}.`, 'small muted'));
+      form.append(wrap);
+    }
+    const values = () => Object.fromEntries(FIELDS.map(([key, , type]) => [key, type === 'number' ? Number(inputs[key].value) : inputs[key].value.trim()]));
+    const s = el('p', '', 'small muted'); s.setAttribute('role', 'status');
+    const say = (text, bad = false) => { s.textContent = text; s.className = `small ${bad ? 'error-text' : 'muted'}`; };
+    const act = async (fn) => { buttons.forEach((b) => { b.disabled = true; }); try { await fn(); } catch (e) { say(e.message, true); } finally { buttons.forEach((b) => { b.disabled = false; }); } };
+    const buttons = [
+      button('Test connection', () => act(async () => { say('Sending one made-up test turn to Laya…'); say((await api('classifier-test', { classifier: values() })).message); }), ''),
+      button('Save', () => act(async () => { const r = await api('classifier-save', { classifier: values() }); classifier = { ...classifier, classifier: r.classifier }; say(r.message); }), 'primary'),
+      button('Reset to defaults', () => { for (const [key] of FIELDS) inputs[key].value = String(defaults[key]); say('Defaults restored in the form; press Save to keep them.'); }, ''),
+    ];
+    buttons[0].title = 'Sends one fixed, made-up turn (no session text) with the values in this form and checks the answer format. Nothing is saved.';
+    const actions = el('div', null, 'interview-actions'); actions.append(...buttons, s);
+    card.append(form, actions);
+    root.append(card, setupCard(saved));
+  }
+  function setupCard(saved) {
+    const port = new URL(saved.endpoint).port || '80', host = new URL(saved.endpoint).hostname.replace(/^\[|\]$/g, '');
+    const card = el('section', null, 'card laya-setup'); card.append(el('h2', 'Set up Laya'));
+    const step = (title, text, command) => {
+      const box = el('div', null, 'setup-step'); box.append(el('h3', title));
+      if (text) box.append(el('p', text, 'small'));
+      if (command) {
+        const pre = el('pre', null, 'command'), copy = button('Copy', async () => {
+          try { await navigator.clipboard.writeText(command); copy.textContent = 'Copied'; } catch { copy.textContent = 'Select and copy'; }
+          setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+        }, 'copy');
+        pre.append(el('code', command)); box.append(el('div', null, 'command-wrap')); box.lastChild.append(pre, copy);
+      }
+      card.append(box);
+    };
+    card.append(el('p', 'Laya is an open-source (Apache-2.0) Python decision model by NandhaKishorM. It needs Python 3.10 or newer. On first use it downloads the multilingual checkpoint (about 322M parameters) into the Hugging Face cache (HF_HUB_CACHE moves it). Review the model card and your disk and memory before you start.', 'small'));
+    step('1. Install it in its own virtual environment', 'Keeps Laya and PyTorch out of your other Python setups.', 'python3 -m venv ~/.laya\n~/.laya/bin/python -m pip install "laya[serve]"');
+    step('Or install with uv', null, 'uv venv ~/.laya --python 3.12\nuv pip install --python ~/.laya/bin/python "laya[serve]"');
+    step('2. Start the service on this computer only', 'Keep this terminal open while you classify. LAYA_HOST matters: by default laya-serve listens on all network interfaces (0.0.0.0). Add LAYA_DEVICE=mps (Apple), cuda or cpu to pick the device.',
+      `LAYA_HOST=${host} LAYA_PORT=${port} LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve`);
+    step('3. Test it', 'Press Test connection above. The first answer may take a while as the checkpoint downloads and loads.', null);
+    step('4. Classify', 'Press Classify in the filter bar of Global → Sessions (all workspaces) or Workspace → Sessions (this workspace), or run:', 'yaw sessions evaluate --days 30');
+    const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), link = el('a', 'github.com/NandhaKishorM/laya');
+    link.href = 'https://github.com/NandhaKishorM/laya'; link.target = '_blank'; link.rel = 'noopener noreferrer'; more.append(link, '. YAW never installs, downloads or starts anything for Laya.');
+    card.append(more);
+    return card;
   }
 
   return { show, hide, reset };

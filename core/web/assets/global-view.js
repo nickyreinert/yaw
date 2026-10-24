@@ -1,5 +1,6 @@
 // Global Overview, Sessions (also Workspace → Sessions, locked to the open project) and Global Tasks.
-// One sticky filter drives every card, chart and table; filters, split, tabs and table state live in the URL.
+// One sticky filter drives every card, chart and table; filters, split and table state live in the URL. On Sessions it
+// also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
@@ -32,17 +33,18 @@ const median = (list) => { const x = list.filter((v) => v !== null && v !== unde
 const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', { class: 'eyebrow' }, label), h('strong', {}, value), note ? h('span', { class: 'muted' }, note) : null);
 const measured = (r) => r.prompts !== null;
 
-const DEFAULTS = { path: '', project: '', agent: '', model: '', period: '90', from: '', to: '', split: 'agent', tab: 'browse', table: 'sessions' };
+const DEFAULTS = { path: '', project: '', agent: '', model: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
 const FILTERS = ['path', 'project', 'agent', 'model', 'period', 'from', 'to', 'split'];
-const KEYS = { global: FILTERS, 'global-sessions': [...FILTERS, 'tab', 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'tab', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { global: FILTERS, 'global-sessions': [...FILTERS, 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
 const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a' };
 const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes']];
 const TABLE_IDS = { folders: 'folders-s' };
 
-export function createGlobal({ get, report, openProject, replace, onData }) {
-  const state = { ...DEFAULTS }, tables = {};
+export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
+  const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
+  let prefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
   let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], S;
   const locked = () => route === 'sessions';
@@ -86,9 +88,8 @@ export function createGlobal({ get, report, openProject, replace, onData }) {
     }
     if (!['7', '30', '90', 'all'].includes(state.period)) state.period = DEFAULTS.period;
     if (!DIMS.some(([d]) => d === state.split) || (locked() && ['folder', 'project'].includes(state.split))) state.split = DEFAULTS.split;
-    if (!['browse', 'collect'].includes(state.tab)) state.tab = 'browse';
   }
-  const visibleTables = () => route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : state.tab === 'browse' ? [TABLE_IDS[state.table] ?? state.table] : [];
+  const visibleTables = () => route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
   function writeUrl() {
     if (!route) return;
     const p = new URLSearchParams();
@@ -267,11 +268,58 @@ export function createGlobal({ get, report, openProject, replace, onData }) {
       h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
       seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS)]));
     bar.append(h('div', { class: 'gfilter-end' }, mode === 'tasks' ? null : h('strong', {}, `${fmt(filtered().length)} sessions`),
-      h('button', { type: 'button', on: { click: () => set({ ...DEFAULTS, tab: state.tab, table: state.table }) } }, 'Reset')));
+      mode === 'sessions' ? collectControls() : null,
+      h('button', { type: 'button', title: 'Clear all filters and the chart split', on: { click: () => set({ ...DEFAULTS, table: state.table }) } }, 'Reset')));
+    if (mode === 'sessions') bar.append(collectStatus());
     return bar;
   }
+
+  // ---------- Refresh / Auto / Classify ----------
+  const scopeText = () => locked() ? 'this workspace' : 'all discovered workspaces';
+  const periodText = () => state.from || state.to ? 'all history (a custom date range scans everything)' : state.period === 'all' ? 'all history' : `the last ${state.period} days`;
+  function collectControls() {
+    const busy = Boolean(job.busy), endpoint = prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000';
+    return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' },
+      h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
+        title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast.` },
+      job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
+      h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when a Sessions page opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Sessions' : 'all workspaces here, only the open one on Workspace → Sessions'}). A personal setting; it never classifies.` },
+        h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
+      h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
+        title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
+      job.busy === 'classify' ? 'Classifying…' : 'Classify'));
+  }
+  function collectStatus() {
+    const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
+    return h('p', { class: `gfilter-status small${job.error ? ' error-text' : ' muted'}`, role: 'status' }, job.message || last,
+      job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
+  }
+  async function saveAuto(on) {
+    try {
+      const result = await api('preferences', { autoRefresh: on });
+      prefs = { ...prefs, autoRefresh: on }; Object.assign(job, { message: result.message, error: false, classify: false });
+    } catch (e) { Object.assign(job, { message: e.message, error: true, classify: false }); }
+    render();
+  }
+  async function run(classify) {
+    if (job.busy) return;
+    const all = !locked();
+    if (classify && !confirm(`Classify ${scopeText()} for ${periodText()}?\n\nYAW reads the conversation text of each session and sends eligible turns to your local Laya service (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). No hosted API is used and only counts are saved. This can take a long time.`)) return;
+    Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, classify,
+      message: classify ? 'Classifying eligible turns with local Laya… this can take a while.' : `Reading local transcripts of ${scopeText()}…` });
+    render();
+    try {
+      const result = await api(classify ? 'evaluate' : 'collect', { all, days: days(), confirm: classify });
+      job.message = result.message;
+      if (all) autoDone.add('current');
+      autoDone.add(all ? 'all' : 'current');
+      await load(true); afterCollect?.();
+    } catch (e) { Object.assign(job, { message: e.message, error: true }); }
+    finally { job.busy = null; render(); }
+  }
+  const days = () => state.from || state.to ? 'all' : state.period;
   const empty = (node, text) => fill(node, h('article', { class: 'card' }, h('h2', {}, 'No saved sessions'), h('p', {}, text)));
-  const noData = 'No registry or saved scan yet. Open Global → Sessions → Collect & classify and refresh saved session data.';
+  const noData = 'No registry or saved scan yet. Press Refresh in the filter bar of a Sessions page to read local session history.';
   const openButton = (root, target, label = 'Open →') => known(root)
     ? h('button', { type: 'button', class: 'open-proj', title: `Open ${root} in the Workspace area`, on: { click: () => openProject(root, target) } }, label)
     : h('span', { class: 'small muted', title: 'Not in the project switcher: run yaw web in that folder or add it there' }, 'not added');
@@ -325,11 +373,9 @@ export function createGlobal({ get, report, openProject, replace, onData }) {
   // ---------- Sessions (global, or locked to the workspace) ----------
   function sessions() {
     $('ss-intro').textContent = locked() ? `This workspace · ${data?.current ?? ''}` : 'All projects · Claude Code, Codex, Copilot CLI · registry + saved scans';
-    document.querySelectorAll('[data-stab]').forEach((x) => x.setAttribute('aria-selected', String(x.dataset.stab === state.tab)));
-    $('ss-browse').hidden = state.tab !== 'browse'; $('ss-collect').hidden = state.tab !== 'collect';
-    $('ss-collected').textContent = data.history?.collected ? `Last scan: ${new Date(data.history.collected).toLocaleString()}. Page loads read saved results only.` : 'No saved scan yet.';
     const labels = document.querySelectorAll('#sessions .metric-group-label');
-    if (!data.available) { for (const id of ['ss-filter', 'ss-metrics', 'ss-insights', 'ss-charts']) fill($(id)); labels.forEach((x) => { x.hidden = true; }); empty($('ss-browse'), noData); return; }
+    // Without data the filter bar stays, so Refresh can collect the first scan.
+    if (!data.available) { fill($('ss-filter'), filterBar('sessions')); for (const id of ['ss-metrics', 'ss-insights', 'ss-charts']) fill($(id)); labels.forEach((x) => { x.hidden = true; }); empty($('ss-browse'), noData); return; }
     labels.forEach((x) => { x.hidden = false; });
     const rows = filtered(), m = rows.filter(measured), n = Math.max(1, m.length); S = makeSplit(rows);
     fill($('ss-filter'), filterBar('sessions'));
@@ -357,7 +403,6 @@ export function createGlobal({ get, report, openProject, replace, onData }) {
       chart('Response time', 'median seconds to first answer, per session', columns(bins(m, (r) => r.medianResp, [5, 10, 20, 30, Infinity]))),
       chart('Tokens by model', 'Only agents that report usage', bars(bySize(groupBy(rows, (r) => r.model)), tokens)),
       chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))));
-    if (state.tab !== 'browse') return;
     const tabs = locked() ? TABLES.filter(([k]) => !['folders', 'projects'].includes(k)) : TABLES;
     if (!tabs.some(([k]) => k === state.table)) state.table = 'sessions';
     const sub = h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Tables' }, tabs.map(([k, l]) =>
@@ -411,16 +456,18 @@ export function createGlobal({ get, report, openProject, replace, onData }) {
       else sessions();
     } catch (e) { report(e); }
   }
-  document.querySelectorAll('[data-stab]').forEach((b) => b.addEventListener('click', () => { state.tab = b.dataset.stab; writeUrl(); render(); }));
   return {
     async show(name, query = '') {
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
-      if (route === name) render();
+      if (['sessions', 'global-sessions'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
+      if (route !== name) return;
+      render();
+      // Auto refresh once per page load and scope; all workspaces cover the open one too.
+      const scope = locked() ? 'current' : 'all';
+      if (['sessions', 'global-sessions'].includes(name) && prefs?.autoRefresh && !autoDone.has(scope)) { autoDone.add(scope); run(false); }
     },
     async reload() { try { await load(true); } catch (e) { report(e); return; } render(); },
     hide() { route = null; },
-    // A collect run follows the chosen period unless a custom range is set.
-    days: () => state.from || state.to ? 'all' : state.period,
   };
 }

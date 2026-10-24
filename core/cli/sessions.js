@@ -7,7 +7,7 @@ import { enabledModules, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 import { collectAnalysis, readAnalysis, scanSummary } from '../lib/session-analysis.js';
 import { tasksSection } from '../web/dashboard.js';
-import { workspacePreferences } from '../web/workspace-api.js';
+import { webPreferences } from '../web/workspace-api.js';
 import { realRoot } from '../../modules/sessions/lib/registry.js';
 
 export async function sessions({ values, positionals, io }) {
@@ -25,7 +25,7 @@ export async function sessions({ values, positionals, io }) {
     io.stdout.write(`Reading ${values.all ? 'all workspaces' : 'this workspace'} session files explicitly; only aggregate metadata is saved.${verb === 'evaluate' ? ' Conversation text is sent only to the configured loopback Laya service.' : ' No model calls.'}\n`);
     const result = await collectAnalysis({
       root: io.cwd, env: io.env, all: values.all === true, days: values.days ?? 'all', classify: verb === 'evaluate',
-      endpoint: values.endpoint ?? workspacePreferences(io.env, io.cwd).endpoint,
+      classifier: { ...webPreferences(io.env).classifier, ...(values.endpoint ? { endpoint: values.endpoint } : {}) },
       tasksFor: (project) => { try { return tasksSection(project); } catch (e) { return { error: e.message }; } },
     });
     io.stdout.write(`${scanSummary(result)} Collected ${result.collected}\n`);

@@ -49,9 +49,9 @@ filters, for example one project split by agent.
   parent folder (such as your home folder) is listed as `./` or by full path.
 - **Sessions**: usage and message-insight cards, then charts (sessions per
   week, duration, prompt and answer length, response time, tokens by model,
-  outcomes), then two tabs. **Browse** holds the tables (sessions, lengths and
-  timing, agents, models, folders, projects, outcomes); **Collect & classify**
-  holds the explicit collection controls described below.
+  outcomes), then the tables (sessions, lengths and timing, agents, models,
+  folders, projects, outcomes). The sticky filter bar also holds **Refresh**,
+  **Auto** and **Classify**, described below.
 - **Tasks**: open tasks across projects, filterable by folder and project;
   **Open →** switches the dashboard to that project's Tasks page.
 - **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
@@ -61,7 +61,8 @@ filters, for example one project split by agent.
   (`~/.yaw/user-profile.yaml`; preview, then apply) and lists saved presets
   (view, rename, delete); **Files** shows `~/.yaw` read-only with a Form/Raw
   panel; **Notifications** holds the notification preferences and lists which
-  projects have the comfort module.
+  projects have the comfort module; **Classification** holds the Laya settings
+  and setup steps (see below).
 
 Every table can be filtered and sorted and is paged. Filters, splits, tabs,
 table searches, sorting, pages and the open file are kept in the address
@@ -81,17 +82,19 @@ yaw sessions analytics           # read saved current-workspace results
 yaw sessions analytics --all     # read all saved results
 ```
 
-The web equivalent is **Global / Sessions / Collect & classify**.
-Choose current or all discovered workspaces and a date range. Results persist
+In the dashboard, press **Refresh** in the filter bar of a Sessions page. On
+**Global / Sessions** it reads all discovered workspaces; on **Workspace /
+Sessions** only the open one. It uses the period chosen in the filter bar
+(**All** means everything). Hover a button for a short explanation. Results persist
 in `~/.yaw/session-analysis.json` (`YAW_HOME` overrides the directory), with
 private file permissions. Only metadata, aggregate lengths/timing, a content
 fingerprint, task snapshots and classification counts are saved: no conversation
 text or transcript paths.
 
-**Refresh session data whenever this web interface reloads** is unchecked by
-default and saved separately per workspace. Opting in explicitly allows
-all-discovered-workspace collection on reload. It never runs classification.
-An ordinary page refresh still just reads saved data when this option is off.
+**Auto**, next to Refresh, is off by default and is a personal setting
+(`~/.yaw/web-preferences.json`). When it is on, opening a Sessions page runs
+Refresh once per page load with that page's scope. It never classifies. With
+Auto off, opening or reloading a page only reads saved data.
 
 Supported histories: Claude Code, Codex and Copilot CLI. This does not claim
 coverage of VS Code chat storage. Discovery examines at most 20,000 files per
@@ -121,29 +124,59 @@ yaw sessions evaluate --days 30
 yaw sessions evaluate --all --endpoint http://127.0.0.1:8000
 ```
 
-Or use **Classify sessions with local Laya** and confirm the message-reading
-prompt. The address saved in the web preferences is also the CLI default.
-Only literal loopback HTTP addresses are accepted; redirects and hosted
-endpoints are refused.
+Or press **Classify** in the filter bar of a Sessions page (same scope as
+Refresh) and confirm the message-reading prompt.
+
+### Install Laya
 
 YAW does **not** install Python packages, download weights or start a service.
-If you choose to provision it yourself, follow the
-[upstream Laya instructions](https://github.com/NandhaKishorM/laya) for the
-`laya[serve]` extra, then run its separate service with a loopback bind:
+[Laya](https://github.com/NandhaKishorM/laya) is an Apache-2.0 Python model
+service; it needs Python 3.10+ and downloads its multilingual checkpoint (about
+322M parameters) into the Hugging Face cache on first use (`HF_HUB_CACHE`
+moves it). Review the model card and your disk and memory first. Install it in
+its own virtual environment:
 
 ```sh
-LAYA_HOST=127.0.0.1 LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual laya-serve
+python3 -m venv ~/.laya
+~/.laya/bin/python -m pip install "laya[serve]"
+# or: uv venv ~/.laya --python 3.12 && uv pip install --python ~/.laya/bin/python "laya[serve]"
 ```
 
-The upstream default bind may expose the service on your network; keep the
-explicit `LAYA_HOST`. Review the upstream model license and resource needs
-before downloading anything.
+Start it bound to this computer only and keep the terminal open while you
+classify:
+
+```sh
+LAYA_HOST=127.0.0.1 LAYA_PORT=8000 LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve
+```
+
+By default `laya-serve` listens on all network interfaces (`0.0.0.0`); keep the
+explicit `LAYA_HOST`. Add `LAYA_DEVICE=mps|cuda|cpu` to pick the device. YAW
+does not support `LAYA_API_KEY`.
+
+### Classification settings
+
+**Global / Settings / Classification** shows these steps with copy buttons and
+holds the settings, saved in `~/.yaw/web-preferences.json` and also used by
+`yaw sessions evaluate` (`--endpoint` overrides the address):
+
+| Setting | Default | Range |
+|---|---|---|
+| Laya address | `http://127.0.0.1:8000` | loopback HTTP only |
+| Confidence threshold | 0.65 | 0.5–0.99 |
+| Largest turn (UTF-8 bytes) | 5000 | 1000–32000 |
+| Token budget (`max_len`) | 8192 | 512–32768, at least the largest turn |
+| Timeout per turn (seconds) | 120 | 10–600 |
+
+**Test connection** sends one fixed, made-up turn (never your history) and
+reports whether Laya answered and how long it took. Only literal loopback HTTP
+addresses are accepted; redirects and hosted endpoints are refused.
 
 YAW sends eligible prompt/answer turns plus the next prompt to
-`POST /v1/systemone`, selects `multilingual`, and requests `max_len:8192`.
-Turns above 5,000 UTF-8 bytes are skipped, never silently shortened. The service
-must confirm untruncated multilingual inference and return valid choice
-probabilities. Predictions below 0.65 become `unknown`. Results count outcomes,
+`POST /v1/systemone`, selects `multilingual`, and requests the configured
+`max_len` (Laya caps it with `LAYA_MAX_TOKEN_BUDGET`). Turns above the largest
+turn size are skipped, never silently shortened. The service must confirm
+untruncated multilingual inference and return valid choice probabilities.
+Predictions below the threshold become `unknown`. Results count outcomes,
 sentiment, assistant behaviour and failure types per session; they are not
 verified task-success measurements. No raw model response or message text is
 saved. A fresh scan retains classifications only when its message fingerprint
