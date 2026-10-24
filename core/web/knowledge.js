@@ -1,4 +1,6 @@
-// Read-only knowledge browser. The server chooses the source roots; a request never supplies a file path.
+// Knowledge browser. The server chooses the source roots; a request never supplies a file path.
+// Writes go through core/lib/knowledge-store.js, which reuses these sources and safety checks.
+import { createHash } from 'node:crypto';
 import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { yawHome } from '../hooks/dispatch.js';
@@ -6,10 +8,11 @@ import { parse } from '../lib/yaml.js';
 import { loadRules, secretRule, secretValueRule } from '../../modules/security/lib/guards.js';
 import { FormError } from './form-model.js';
 
-const MAX_FILES = 1000, MAX_BYTES = 128 * 1024;
+const MAX_FILES = 1000;
+export const MAX_BYTES = 128 * 1024;
 const stat = (path) => { try { return lstatSync(path); } catch { return null; } };
 const kinds = new Set(['decision', 'notice', 'rule', 'preference', 'lesson', 'snippet', 'document']);
-function readRegular(root, rel) {
+export function readRegular(root, rel) {
   let path = root, expected;
   const rootStat = stat(root);
   if (!rootStat?.isDirectory() || rootStat.isSymbolicLink()) throw new Error('Unsafe root');
@@ -47,23 +50,26 @@ function metadata(text, path) {
     tags: Array.isArray(front.tags) ? front.tags.filter((t) => typeof t === 'string') : [],
   };
 }
-export function knowledgeData({ root, kitRoot, env, params = new URLSearchParams() }) {
-  const scope = params.get('scope') || 'all', query = (params.get('q') || '').trim().toLowerCase();
+export const KNOWLEDGE_SOURCES = [
+  { key: 'decisions', scope: 'project', rel: '.decisions', label: '.decisions' },
+  { key: 'project-knowledge', scope: 'project', rel: 'docs/knowledge', label: 'docs/knowledge' },
+  { key: 'specs', scope: 'project', rel: 'docs/spec', label: 'docs/spec' },
+  { key: 'user-knowledge', scope: 'user', rel: 'knowledge', label: '~/.yaw/knowledge' },
+];
+export const sourceAnchor = (source, { root, env }) => source.scope === 'user' ? yawHome(env) : root;
+
+// Every readable record of the chosen scope, with content. Secret-looking files and links are excluded and counted.
+export function knowledgeRecords({ root, kitRoot, env, scope = 'all' }) {
   if (!['all', 'user', 'project'].includes(scope)) throw new FormError('Invalid knowledge scope.');
   const rules = loadRules({ kitRoot });
-  const sources = [
-    { key: 'decisions', scope: 'project', anchor: root, rel: '.decisions', label: '.decisions' },
-    { key: 'project-knowledge', scope: 'project', anchor: root, rel: 'docs/knowledge', label: 'docs/knowledge' },
-    { key: 'specs', scope: 'project', anchor: root, rel: 'docs/spec', label: 'docs/spec' },
-    { key: 'user-knowledge', scope: 'user', anchor: yawHome(env), rel: 'knowledge', label: '~/.yaw/knowledge' },
-  ];
   const records = [], sourcesInfo = [];
   let excluded = 0, limited = false;
-  for (const source of sources) {
-    if (scope !== 'all' && source.scope !== scope) continue;
+  for (const template of KNOWLEDGE_SOURCES) {
+    if (scope !== 'all' && template.scope !== scope) continue;
+    const source = { ...template, anchor: sourceAnchor(template, { root, env }) };
     source.root = join(source.anchor, source.rel);
     const base = stat(source.root);
-    const info = { scope: source.scope, path: source.label, state: !base ? 'missing' : base.isDirectory() && !base.isSymbolicLink() ? 'available' : 'blocked', records: 0 };
+    const info = { key: source.key, scope: source.scope, path: source.label, state: !base ? 'missing' : base.isDirectory() && !base.isSymbolicLink() ? 'available' : 'blocked', records: 0 };
     let ancestor = source.anchor;
     for (const part of ['', ...source.rel.split('/')]) {
       if (part) ancestor = join(ancestor, part);
@@ -87,13 +93,19 @@ export function knowledgeData({ root, kitRoot, env, params = new URLSearchParams
           if (secretValueRule(rules, content)) { excluded++; continue; }
           const meta = metadata(content, rel);
           const namespace = source.scope === 'user' && rel.includes('/') ? rel.split('/')[0] : 'default';
-          records.push({ key: `${source.key}:${rel}`, scope: source.scope, namespace, path: `${source.label}/${rel}`, ...meta, modified: entry.mtime.toISOString(), content });
+          records.push({ key: `${source.key}:${rel}`, source: source.key, rel, scope: source.scope, namespace, path: `${source.label}/${rel}`, ...meta, modified: entry.mtime.toISOString(), content });
           info.records++;
         } catch { excluded++; }
       }
     };
     walk('');
   }
+  return { records, sources: sourcesInfo, excluded, limited };
+}
+
+export function knowledgeData({ root, kitRoot, env, params = new URLSearchParams() }) {
+  const scope = params.get('scope') || 'all', query = (params.get('q') || '').trim().toLowerCase();
+  const { records, sources: sourcesInfo, excluded, limited } = knowledgeRecords({ root, kitRoot, env, scope });
   const selected = records.filter((r) => (!params.get('namespace') || r.namespace === params.get('namespace')) &&
     (!params.get('type') || r.type === params.get('type')) && (!query || `${r.title}\n${r.path}\n${r.category}\n${r.tags.join(' ')}\n${r.content}`.toLowerCase().includes(query)));
   selected.sort((a, b) => a.title.localeCompare(b.title));
@@ -106,6 +118,7 @@ export function knowledgeData({ root, kitRoot, env, params = new URLSearchParams
     total: selected.length, page, pages, excluded, limited, sources: sourcesInfo,
     options: { namespaces: [...new Set(records.map((r) => r.namespace))].sort(), types: [...new Set(records.map((r) => r.type))].sort() },
     entries: selected.slice((page - 1) * pageSize, page * pageSize).map(({ content, ...r }) => r),
-    record: detail ?? null,
+    record: detail ? { ...detail, hash: createHash('sha256').update(detail.content).digest('hex') } : null,
+    editable: KNOWLEDGE_SOURCES.map((x) => ({ key: x.key, scope: x.scope, path: x.label, create: x.key !== 'decisions' })),
   };
 }

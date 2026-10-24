@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lstatSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifyMessages, collectAnalysis, LABELS, localEndpoint, messageMetrics, messageOf, readAnalysis, readTurns } from '../core/lib/session-analysis.js';
+import { classifyMessages, collectAnalysis, LABELS, localEndpoint, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { dashboardData, startDashboard } from '../core/web/dashboard.js';
 import { main } from '../core/cli/main.js';
@@ -49,6 +49,23 @@ test('saved scans are explicit, private, bounded to the chosen workspace, and co
   const d = await dashboardData({ root, kitRoot: KIT_ROOT, env });
   assert.equal(d.sessions.project.sessions, 1); assert.equal(d.sessions.all.sessions, 2);
   assert.equal(d.sessions.profiling.summary.measured, 2);
+});
+
+test('rescans reuse unchanged transcripts and reread changed ones', async () => {
+  const env = environment(), root = tmp(), file = fixture(env, root);
+  utimesSync(file, 1800000000, 1800000000);
+  let result = await collectAnalysis({ root, env });
+  assert.deepEqual([result.sessions, result.reused, result.skipped], [1, 0, 0]);
+  const text = readFileSync(file, 'utf8');
+  writeFileSync(file, text.replace('Parser fixed.', 'Parser FIXED.')); utimesSync(file, 1800000000, 1800000000);
+  result = await collectAnalysis({ root, env });
+  assert.equal(result.reused, 1);
+  assert.equal(readAnalysis(env).rows[0].metrics.answerChars, 'Parser fixed.'.length);
+  writeFileSync(file, text.replace('Parser fixed.', 'Parser fixed now.'));
+  result = await collectAnalysis({ root, env });
+  assert.equal(result.reused, 0);
+  assert.equal(readAnalysis(env).rows[0].metrics.answerChars, 'Parser fixed now.'.length);
+  assert.match(scanSummary({ sessions: 3, reused: 2, skipped: 1, limited: 1 }), /2 unchanged.*1 limited.*1 unreadable/);
 });
 
 test('message extraction ignores tools and non-text blocks; Unicode lengths and response timing are measured', () => {

@@ -120,7 +120,7 @@ test('yaw web: the dashboard in a YAW project, the setup form elsewhere; listed 
   };
   const dash = await run(root);
   assert.equal(dash.title, 'YAW dashboard');
-  assert.match(dash.out, /YAW dashboard \(local only, read-only\)/);
+  assert.match(dash.out, /YAW dashboard \(local only\)\. Switch projects/);
   const form = await run(tmp('yaw-empty-'));
   assert.equal(form.title, 'YAW setup');
   assert.match(form.out, /opens the setup form/);

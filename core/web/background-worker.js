@@ -14,7 +14,7 @@ process.once('disconnect', () => {
 
 process.once('message', async ({ root, kitRoot, file, controlToken }) => {
   const remove = () => {
-    for (const path of [file, `${file}.html`]) {
+    for (const path of [`${file}.html`, file]) { // the state file last: once it is gone, cleanup is complete
       try { unlinkSync(path); } catch (e) { if (e.code !== 'ENOENT') throw e; }
     }
   };

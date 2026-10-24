@@ -38,8 +38,10 @@ export async function readTurns(file, agent) {
   let limited = false;
   try {
     const st = fstatSync(fd);
-    if (!st.isFile() || st.size > MAX_FILE) throw new Error('Session analysis requires regular transcripts smaller than 64 MiB');
-    input = createReadStream(file, { fd, encoding: 'utf8' });
+    if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
+    // Very long histories are analysed from their first 64 MiB and marked as limited instead of failing the scan.
+    if (st.size > MAX_FILE) limited = true;
+    input = createReadStream(file, { fd, encoding: 'utf8', end: MAX_FILE - 1 });
     const lines = createInterface({ input, crlfDelay: Infinity });
     try {
       for await (const line of lines) {
@@ -157,30 +159,48 @@ export async function classifyMessages(messages, { endpoint, fetchFn = fetch, th
   return { backend: 'laya-multilingual', classified, skipped, threshold, counts, evaluated: new Date().toISOString() };
 }
 
+// A hash, not the path, so the saved file does not list history locations.
+const sourceKey = (path) => createHash('sha256').update(String(path)).digest('hex');
+
 export async function collectAnalysis({ root, env, all = false, classify = false, endpoint, fetchFn, tasksFor, days = 'all' }) {
   if (!['all', '7', '30', '90'].includes(days)) throw new Error('Choose all, 7, 30 or 90 days');
   const since = days === 'all' ? -Infinity : Date.now() - Number(days) * 86400000;
-  const sessions = (await findSessions({ env, root, allProjects: all })).filter((s) => Date.parse(s.started) >= since);
+  const old = readAnalysis(env);
+  const saved = new Map(old.rows.filter((r) => r.file_key && r.stamp).map((r) => [r.file_key, r]));
+  // Unchanged transcripts keep their saved row; a classification run rereads text, so it never reuses.
+  const reuse = classify ? undefined : (path, stamp) => {
+    const row = saved.get(sourceKey(path));
+    return row?.stamp === stamp ? { reused: row, cwd: row.project, started: row.started } : null;
+  };
+  const sessions = (await findSessions({ env, root, allProjects: all, reuse })).filter((s) => Date.parse(s.started) >= since);
   const rows = [];
+  let reused = 0, skipped = 0, limited = 0;
   for (const s of sessions) {
-    const { messages, limited } = await readTurns(s.transcript, s.agent);
+    if (s.reused) {
+      rows.push(s.reused); reused++;
+      if (s.reused.metrics?.limited) limited++;
+      continue;
+    }
+    let turns;
+    try { turns = await readTurns(s.transcript, s.agent); } catch { skipped++; continue; }
     const hash = createHash('sha256');
-    for (const message of messages) hash.update(JSON.stringify(message)).update('\n');
+    for (const message of turns.messages) hash.update(JSON.stringify(message)).update('\n');
     const row = {
       id: sessionId(s.agent, s.native), project: realRoot(s.cwd), agent: s.agent, title: '', started: s.started, ended: s.ended,
       model: s.model, branch: s.branch, tokens_in: s.tokensIn, tokens_out: s.tokensOut, cost_usd: s.costUsd, source: 'local',
-      metrics: messageMetrics(messages, limited), fingerprint: hash.digest('hex'),
+      metrics: messageMetrics(turns.messages, turns.limited), fingerprint: hash.digest('hex'),
     };
     if (!row.id) continue;
-    if (classify) row.evaluation = await classifyMessages(messages, { endpoint, fetchFn });
+    if (s.transcript && s.stamp) Object.assign(row, { file_key: sourceKey(s.transcript), stamp: s.stamp });
+    if (turns.limited) limited++;
+    if (classify) row.evaluation = await classifyMessages(turns.messages, { endpoint, fetchFn });
     rows.push(row);
   }
-  const old = readAnalysis(env);
   const project = realRoot(root);
   const merged = new Map(old.rows.filter((r) => (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
   for (const row of rows) {
     const previous = old.rows.find((r) => r.id === row.id);
-    if (!classify && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
+    if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
     merged.set(row.id, row);
   }
   const roots = new Set([project, ...rows.map((r) => r.project)]);
@@ -190,5 +210,9 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   ] : old.tasks;
   const data = { version: 1, rows: [...merged.values()], tasks, collected: new Date().toISOString() };
   writeUserData(env, 'session-analysis.json', data);
-  return { sessions: rows.length, collected: data.collected, classified: classify };
+  return { sessions: rows.length, reused, skipped, limited, collected: data.collected, classified: classify };
 }
+
+export const scanSummary = (r) => [`Saved ${r.sessions} session(s)`, r.reused ? `${r.reused} unchanged and reused` : '',
+  r.limited ? `${r.limited} limited (very long history; first 64 MiB / 2,000 messages analysed)` : '',
+  r.skipped ? `${r.skipped} unreadable and skipped` : ''].filter(Boolean).join('; ') + '.';

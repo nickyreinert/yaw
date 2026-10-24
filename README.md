@@ -27,12 +27,12 @@ YAW is a zero-runtime-dependency Node.js CLI. It works locally on macOS and Linu
 | --- | --- |
 | Turn an idea into work | `yaw kickoff` prints a project-aware planning prompt. Save the plan and use `yaw kickoff import <plan.md>` to create tasks with model and effort hints. |
 | Track tasks your way | Keep `TASKS.md` locally, use GitHub issues, or link both. Optional team mode checks issue links in commits and pull requests; GitHub issue forms and planning skills provide structure. |
-| Remember decisions and knowledge | Record decisions and risks, recall relevant records at task start, and browse project and personal Markdown knowledge in a read-only local dashboard. |
+| Remember decisions and knowledge | Record decisions and risks, recall relevant records at task start, and browse and edit project and personal Markdown knowledge in the local dashboard or with `yaw knowledge`. |
 | Understand agent sessions | Explicitly scan local Claude Code, Codex and Copilot CLI history, then review session counts, lengths and timing. Optional local Laya classification groups outcomes and failure types; it is experimental and requires your own local service. |
 | Know when attention is needed | Optional comfort hooks can send Telegram notifications after long runs. Personal preferences live outside the repo; bot credentials stay in your environment. |
 | Resume across agents | A session registry, handoff skill and links from tasks, decisions, commits and files help find earlier work. |
 
-Run `yaw web` for the local dashboard. Its overview stays scoped to the current workspace; global projects, sessions and tasks have separate views. Opening it reads saved results. Transcript scanning and Laya classification require explicit actions unless you choose the refresh-on-load scan setting. See the [dashboard guide](docs/workspace-dashboard.md) for coverage, privacy and setup details.
+Run `yaw web` for the local dashboard. One background server (`yaw web --background`) serves all your YAW workspaces; switch between them in the sidebar. Its overview stays scoped to the selected workspace; global projects, sessions and tasks have separate views. Opening it reads saved results. Transcript scanning and Laya classification require explicit actions unless you choose the refresh-on-load scan setting. See the [dashboard guide](docs/workspace-dashboard.md) for coverage, privacy and setup details.
 
 ## See the setup
 

@@ -37,6 +37,31 @@ const list = (dir) => {
     return [];
   }
 };
+// Size and modification time of the files a session was read from: unchanged stamps let a caller reuse its saved row.
+export function fileStamp(...paths) {
+  return paths.map((p) => {
+    try {
+      const st = lstatSync(p);
+      return st.isFile() ? `${st.size}:${Math.trunc(st.mtimeMs)}` : '-';
+    } catch {
+      return '-';
+    }
+  }).join('|');
+}
+// `reuse(path, stamp)` may return a saved session for an unchanged file; it is kept only when it still belongs to the project.
+async function readOne(found, path, stamp, project, reuse, read) {
+  const hit = reuse?.(path, stamp);
+  if (hit) {
+    if (inProject(hit.cwd, project)) found.push({ ...hit, stamp });
+    return;
+  }
+  try {
+    const s = await read();
+    if (s) found.push(reuse ? { ...s, stamp } : s);
+  } catch (e) {
+    if (project !== null) throw e; // a rotating/unreadable history file must not hide other projects
+  }
+}
 const num = (v) => (Number.isFinite(v) && v >= 0 ? v : 0);
 const iso = (v) => {
   const t = typeof v === 'number' ? v : Date.parse(v);
@@ -145,7 +170,7 @@ export async function readClaude(file, project) {
   return session({ agent: 'claude', native, cwd, branch, usage, cost, transcript: file });
 }
 
-async function claude(env, project) {
+async function claude(env, project, reuse) {
   const base = env.CLAUDE_CONFIG_DIR || join(env.HOME ?? '', '.claude');
   const projects = join(base, 'projects');
   if (!isDir(base) || !isDir(projects)) return [];
@@ -156,9 +181,9 @@ async function claude(env, project) {
     if (!isDir(dir)) continue;
     for (const name of list(dir).filter((n) => n.endsWith('.jsonl'))) {
       if (inspected++ >= MAX_FILES) return found;
-      if (!isFile(join(dir, name))) continue;
-      try { const s = await readClaude(join(dir, name), project); if (s) found.push(s); }
-      catch (e) { if (project !== null) throw e; } // a rotating/unreadable history file must not hide other projects
+      const file = join(dir, name);
+      if (!isFile(file)) continue;
+      await readOne(found, file, fileStamp(file), project, reuse, () => readClaude(file, project));
     }
   }
   return found;
@@ -208,13 +233,12 @@ function codexFiles(dir, depth = 0, out = []) {
   return out;
 }
 
-async function codex(env, project) {
+async function codex(env, project, reuse) {
   const base = env.CODEX_HOME || join(env.HOME ?? '', '.codex');
   if (!isDir(base) || !isDir(join(base, 'sessions'))) return [];
   const found = [];
   for (const file of codexFiles(join(base, 'sessions'))) {
-    try { const s = await readCodex(file, project); if (s) found.push(s); }
-    catch (e) { if (project !== null) throw e; }
+    await readOne(found, file, fileStamp(file), project, reuse, () => readCodex(file, project));
   }
   return found;
 }
@@ -270,15 +294,14 @@ export async function readCopilot(dir, project) {
   return session({ agent: 'copilot', native, cwd, branch, usage, cost: null, transcript: isFile(events) ? events : null });
 }
 
-async function copilot(env, project) {
+async function copilot(env, project, reuse) {
   const base = join(env.HOME ?? '', '.copilot', 'session-state');
   if (!isDir(join(env.HOME ?? '', '.copilot')) || !isDir(base)) return [];
   const found = [];
   for (const name of list(base).slice(0, MAX_FILES)) {
     const dir = join(base, name);
     if (!isDir(dir)) continue;
-    try { const s = await readCopilot(dir, project); if (s) found.push(s); }
-    catch (e) { if (project !== null) throw e; }
+    await readOne(found, dir, fileStamp(join(dir, 'workspace.yaml'), join(dir, 'events.jsonl')), project, reuse, () => readCopilot(dir, project));
   }
   return found;
 }
@@ -287,10 +310,10 @@ async function copilot(env, project) {
 
 const READERS = { claude, codex, copilot };
 
-export async function findSessions({ env, root, agents = Object.keys(READERS), allProjects = false }) {
+export async function findSessions({ env, root, agents = Object.keys(READERS), allProjects = false, reuse }) {
   const project = allProjects ? null : realRoot(root);
   const all = [];
-  for (const agent of agents) all.push(...(await READERS[agent](env, project)));
+  for (const agent of agents) all.push(...(await READERS[agent](env, project, reuse)));
   return all.sort((a, b) => a.started.localeCompare(b.started));
 }
 

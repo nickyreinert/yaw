@@ -1,16 +1,22 @@
 # Workspace dashboard, notifications and session analysis
 
-Run `yaw web` in the workspace you want to manage. `yaw web --background`
-keeps one server for that workspace; use `yaw web --stop` before restarting it
-with changed environment variables.
+Run `yaw web` in a YAW workspace. `yaw web --background` keeps one shared
+dashboard server for all your YAW workspaces: running `yaw web` in another
+workspace reopens that server with the workspace selected. Switch workspaces in
+the sidebar's **Project** list; each browser tab keeps its own choice. Use
+**Add project folder** to add a workspace you have not opened yet; only folders
+with a YAW setup are accepted. Use `yaw web --stop` before restarting the
+server with changed environment variables.
 
 ## Scope and controls
 
 - **Overview** contains only the current workspace's sessions, tasks and setup.
 - **Global / Projects, Sessions, Tasks** provides cross-workspace overviews.
   Sessions and tasks have project filters.
-- **Knowledge** reads only your personal knowledge and this workspace's
-  knowledge. It does not read another workspace's knowledge.
+- **Knowledge** shows your personal (global) knowledge and the selected
+  workspace's knowledge, never another workspace's. Use **+ New record**, and
+  **Edit** / **Delete** on a selected record. The same works in the terminal
+  with `yaw knowledge` (see below).
 - **Notifications** edits personal notification preferences. The comfort module
   must be enabled in each workspace where its hooks should run.
 - **Code map** reads this workspace's saved map. Run `yaw map update` to regenerate
@@ -42,10 +48,14 @@ An ordinary page refresh still just reads saved data when this option is off.
 
 Supported histories: Claude Code, Codex and Copilot CLI. This does not claim
 coverage of VS Code chat storage. Discovery examines at most 20,000 files per
-agent; inaccessible or unsupported files may be missed. Analysis rejects
-transcripts above 64 MiB, ignores malformed/oversized records with a partial
-coverage flag, and stops after 2,000 text messages. A failed collection leaves
-the previously saved results untouched.
+agent; inaccessible or unsupported files may be missed. Analysis reads the
+first 64 MiB and at most 2,000 text messages of each transcript; longer
+histories and malformed/oversized records get a partial coverage flag.
+Unreadable transcripts are skipped and counted instead of failing the scan.
+Rescans reuse the saved row of every transcript whose size and modification
+time are unchanged (stored as a hash of the path, never the path itself), so
+only new or changed files are read again; classification always rereads. A
+failed collection leaves the previously saved results untouched.
 
 Profiling includes prompt/answer counts, Unicode character lengths, median/p95
 answer length, and prompt-to-first-recorded-answer intervals. Those intervals
@@ -119,3 +129,25 @@ without changing their unrelated hygiene/status-line choices.
 configuration continues to work. Remote background delivery status appears
 in the notification panel. Terminal tests remain available with
 `yaw notify test`.
+
+## Editing knowledge
+
+Records are Markdown files. Global records live in
+`~/.yaw/knowledge/<namespace>/` (default namespace `personal`); project records
+live in `docs/knowledge/`, `docs/spec/` and `.decisions/`.
+
+```sh
+yaw knowledge list [--global|--project] [--query TEXT]
+yaw knowledge show <record>
+yaw knowledge add "Prefer uv" --global --type rule --tag python --body "Use uv."
+yaw knowledge add "API notes" --spec --file notes.md   # project docs/spec
+yaw knowledge edit <record> [--file PATH]               # default: $VISUAL / $EDITOR
+yaw knowledge remove <record> [--yes]
+```
+
+A record is named by its displayed path or its file name without `.md`.
+Saving refuses secret-looking text and file names, symbolic links and files
+over 128 KiB. If the file changed since you opened it, the save stops instead of
+overwriting. Deleting asks for confirmation. Create decision records with
+`yaw decisions record`; editing or deleting one here rebuilds the decision
+index.

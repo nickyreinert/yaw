@@ -72,7 +72,7 @@ function pageHtml(csrf) {
 // Resolves { server, port, url, token, close() }; `url` carries the start token, never log it.
 // `page`, `assets` and `get` let another local page (the dashboard, #172) reuse the same handshake and checks;
 // `get` maps a GET path under /api/ to a function returning JSON.
-export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api, page = pageHtml, assets: served = assets, get = {}, controlToken } = {}) {
+export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = true, onClose, api, page = pageHtml, assets: served = assets, get = {}, controlToken, onOpen } = {}) {
   let startToken = randomBytes(32).toString('hex');
   const session = randomBytes(32).toString('hex');
   const cookieName = `yaw_session_${randomBytes(8).toString('hex')}`;
@@ -104,13 +104,18 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     let url;
     try { url = new URL(req.url, `http://127.0.0.1:${bound}`); } catch { return fail(400, 'bad request'); }
     if (controlToken && req.method === 'POST' && ['/api/web/open', '/api/web/stop'].includes(url.pathname)) {
-      req.resume();
-      if (!same(req.headers['x-yaw-control'], controlToken)) return fail(403, 'invalid control token');
+      if (!same(req.headers['x-yaw-control'], controlToken)) { req.resume(); return fail(403, 'invalid control token'); }
+      // `yaw web` in another project folder names that folder, so the shared dashboard opens it.
+      let input = null;
+      if (onOpen && url.pathname === '/api/web/open' && String(req.headers['content-type'] ?? '').startsWith('application/json')) {
+        try { input = await readJson(req); } catch { return fail(400, 'bad request'); }
+      } else req.resume();
       if (url.pathname === '/api/web/stop') {
         res.writeHead(200, headers('application/json'));
         res.once('finish', () => close({ graceful: true }));
         return res.end('{"stopped":true}');
       }
+      try { if (input) onOpen(input); } catch { /* an unknown folder keeps the current default project */ }
       startToken = randomBytes(32).toString('hex');
       used = false;
       res.writeHead(200, headers('application/json'));

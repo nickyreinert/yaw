@@ -45,7 +45,11 @@ function activityChart(rows) {
   const labels = el('div', null, 'chart-labels'); labels.append(el('span', days[0]?.day || 'No activity'), el('span', days.at(-1)?.day || '')); wrap.append(labels); return wrap;
 }
 let active = 'overview', data, requestId = 0, group = 'sessions', sort = 'started', direction = 'desc', sessionPage = 1;
-let knowledgePage = 1, knowledgeKey = '', knowledgeRequest = 0, searchTimer, knowledgeLoaded = false;
+let knowledgePage = 1, knowledgeKey = '', knowledgeRequest = 0, searchTimer, knowledgeLoaded = false, editable = [];
+// The dashboard server can serve several projects; each tab names its own in every request.
+const TYPES = ['document', 'rule', 'preference', 'lesson', 'snippet'];
+let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
+const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
 const views = ['overview', 'setup', 'profiling', 'maintenance', 'tasks', 'knowledge', 'projects', 'notifications', 'code-map'];
 export function showView(name, focus = true) {
@@ -83,8 +87,8 @@ function overview(d) {
   $('workspace-actions').replaceChildren(project, activity);
   $('overview-projects').replaceChildren(all?.projects.length ? table(['Project', 'Sessions', 'Elapsed', 'Tokens', 'Last session'], all.projects.map((r) => [r.project, fmt(r.sessions), duration(r.minutes), r.tokens ? fmt(r.tokens) : '—', date(r.last)])) : el('p', 'No saved projects found. Collect session data explicitly under Global → Sessions.', 'muted'));
   $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Use Global → Sessions → Refresh saved session data.'));
-  if (mine?.sessions > mine.recent.length) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
-  if (all?.projectCount > all.projects.length) $('overview-projects').prepend(el('p', `Top ${all.projects.length} of ${all.projectCount} projects. The complete list is available through the Sessions project filter.`));
+  if (mine && mine.sessions > (mine.recent?.length ?? 0)) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
+  if (all && all.projectCount > (all.projects?.length ?? 0)) $('overview-projects').prepend(el('p', `Top ${all.projects.length} of ${all.projectCount} projects. The complete list is available through the Sessions project filter.`));
   const t = d.tasks;
   $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
 }
@@ -261,17 +265,72 @@ function renderRecord(record) {
   root.append(meta, el('h2', record.title), el('code', record.path, 'record-path'));
   const tools = el('div', null, 'record-tools'), content = el('div'); let source = false;
   const toggle = button('View source', () => { source = !source; toggle.textContent = source ? 'Rendered view' : 'View source'; content.replaceChildren(source ? el('pre', record.content) : markdown(record.content)); });
-  tools.append(toggle); content.append(markdown(record.content)); root.append(tools, content);
+  const edit = button('Edit', () => {
+    const area = el('textarea'); area.value = record.content; area.rows = 22; area.setAttribute('aria-label', `Edit ${record.title}`); area.className = 'record-editor';
+    const save = button('Save', () => saveRecord({ key: record.key, expected: record.hash, content: area.value }, record.key), 'primary');
+    tools.replaceChildren(save, button('Cancel', () => renderRecord(record))); content.replaceChildren(area); area.focus();
+  });
+  const remove = button('Delete', async () => {
+    if (!confirm(`Delete ${record.path}? This removes the file.`)) return;
+    try { const r = await api('knowledge-remove', { record: { key: record.key, expected: record.hash, confirm: true } }); knowledgeKey = ''; await loadKnowledge(); $('knowledge-status').textContent = r.message; }
+    catch (e) { knowledgeError(e); }
+  }, 'danger');
+  tools.append(toggle, edit, remove); content.append(markdown(record.content)); root.append(tools, content);
+}
+function knowledgeError(e) { $('knowledge-error').textContent = e.message; $('knowledge-error').hidden = false; }
+async function saveRecord(record, key) {
+  $('knowledge-error').hidden = true;
+  try { const r = await api('knowledge-save', { record }); knowledgeKey = r.key ?? key ?? ''; await loadKnowledge(); $('knowledge-status').textContent = r.message; }
+  catch (e) { knowledgeError(e); }
+}
+function newRecord() {
+  const root = $('knowledge-detail'); root.replaceChildren(el('h2', 'New knowledge record'));
+  const form = el('div', null, 'record-form'), fields = {};
+  const field = (name, title, node) => { const label = el('label', title); label.append(node); form.append(label); fields[name] = node; return node; };
+  const source = field('source', 'Where', el('select'));
+  for (const s of editable.filter((x) => x.create)) { const o = el('option', `${s.scope} · ${s.path}`); o.value = s.key; source.append(o); }
+  const type = field('type', 'Type', el('select'));
+  for (const t of TYPES) { const o = el('option', t); o.value = t; type.append(o); }
+  field('title', 'Title', el('input')).maxLength = 200;
+  field('namespace', 'Namespace (user records only)', el('input')).placeholder = 'personal';
+  field('tags', 'Tags (comma separated)', el('input'));
+  const body = field('body', 'Content (Markdown)', el('textarea')); body.rows = 14;
+  const sync = () => { fields.namespace.disabled = editable.find((x) => x.key === source.value)?.scope !== 'user'; };
+  source.addEventListener('change', sync); sync();
+  form.append(button('Create', () => saveRecord({ source: source.value, title: fields.title.value, type: type.value, body: body.value,
+    tags: fields.tags.value.split(',').map((t) => t.trim()).filter(Boolean), ...(fields.namespace.disabled ? {} : { namespace: fields.namespace.value || 'personal' }) }), 'primary'),
+  button('Cancel', () => loadKnowledge()));
+  root.append(el('p', 'Project records are files in this repository; user records live in your personal YAW data. Secrets are refused. ADRs are created with yaw decisions record.', 'small muted'), form);
+  fields.title.focus();
+}
+async function startProjects() {
+  const box = document.querySelector('.project-switch');
+  let list;
+  try { const res = await fetch('/api/projects'); if (!res.ok) return; list = await res.json(); } catch { return; }
+  if (!workspace || !list.projects.some((p) => p.root === workspace)) workspace = list.current ?? '';
+  const select = el('select'); select.id = 'project-select'; select.setAttribute('aria-label', 'Switch project');
+  for (const p of list.projects) { const o = el('option', p.name); o.value = p.root; o.title = p.root; select.append(o); }
+  select.value = workspace;
+  select.addEventListener('change', () => { workspace = select.value; sessionStorage.setItem('yaw-workspace', workspace); location.reload(); });
+  const add = el('details', null, 'project-add'), input = el('input'); add.append(el('summary', 'Add project folder'));
+  input.placeholder = '/path/to/project'; input.setAttribute('aria-label', 'Project folder path');
+  const status = el('span', '', 'small muted');
+  add.append(input, button('Add', async () => {
+    try { const r = await api('project-add', { path: input.value }); workspace = r.root; sessionStorage.setItem('yaw-workspace', workspace); location.reload(); }
+    catch (e) { status.textContent = e.message; }
+  }), status);
+  box.querySelector('.eyebrow').textContent = 'PROJECT';
+  box.querySelector('.eyebrow').after(select); box.append(add);
 }
 async function loadKnowledge() {
   const id = ++knowledgeRequest; $('knowledge-error').hidden = true; $('knowledge-status').textContent = 'Reading records…';
-  const params = new URLSearchParams({ scope: $('knowledge-scope').value, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: $('knowledge-type').value, page: String(knowledgePage) });
+  const params = scoped(new URLSearchParams({ scope: $('knowledge-scope').value, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: $('knowledge-type').value, page: String(knowledgePage) }));
   if (knowledgeKey) params.set('record', knowledgeKey);
   try {
     const res = await fetch(`/api/knowledge?${params}`), body = await res.json();
     if (id !== knowledgeRequest) return;
     if (!res.ok) throw new Error(body.error || 'Knowledge unavailable');
-    knowledgeLoaded = true;
+    knowledgeLoaded = true; editable = body.editable ?? [];
     fillOptions($('knowledge-namespace'), body.options.namespaces, 'All namespaces'); fillOptions($('knowledge-type'), body.options.types, 'All types');
     $('knowledge-status').textContent = `${countLabel(body.total, 'record')} · ${body.excluded} excluded${body.limited ? ' · Scan limit reached' : ''}`;
     const root = $('knowledge-list'); root.replaceChildren();
@@ -288,7 +347,7 @@ async function loadKnowledge() {
 }
 async function load(refresh = false) {
   const id = ++requestId; $('workspace-error').hidden = true; $('workspace-status').textContent = 'Reading saved session data…'; $('profile-results').setAttribute('aria-busy', 'true');
-  const params = new URLSearchParams({ sort, direction, page: String(sessionPage) });
+  const params = scoped(new URLSearchParams({ sort, direction, page: String(sessionPage) }));
   for (const key of ['project', 'agent', 'model', 'days']) params.set(key, $(`filter-${key}`).value);
   try {
     const res = await fetch(`/api/dashboard?${params}`, { headers: { accept: 'application/json' } }), body = await res.json();
@@ -318,17 +377,22 @@ export function startWorkspace() {
     knowledgePage = 1; knowledgeKey = ''; loadKnowledge();
   });
   $('knowledge-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); }, 200); });
+  $('knowledge-new')?.addEventListener('click', () => newRecord());
   window.addEventListener('hashchange', () => showView(location.hash.slice(1), false));
-  showView(location.hash.slice(1) || 'overview', false);
-  load();
-  loadPreferences().catch(reportError);
+  startProjects().finally(() => {
+    showView(location.hash.slice(1) || 'overview', false);
+    load();
+    loadPreferences().catch(reportError);
+  });
 }
 
 function reportError(e) {
   $('workspace-error').textContent = e.message; $('workspace-error').hidden = false;
 }
 async function api(path, input) {
-  const response = await fetch(`/api/${path}`, input === undefined ? {} : {
+  const query = input === undefined && workspace ? `?${scoped(new URLSearchParams())}` : '';
+  if (input !== undefined && workspace && path !== 'project-add') input = { ...input, workspace };
+  const response = await fetch(`/api/${path}${query}`, input === undefined ? {} : {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-yaw-token': document.querySelector('meta[name="yaw-csrf"]').content }, body: JSON.stringify(input),
   });
   const body = await response.json();

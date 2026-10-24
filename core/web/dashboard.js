@@ -17,6 +17,7 @@ import { knowledgeData } from './knowledge.js';
 import { parseTasks, tasksMode } from '../lib/tasks.js';
 import { startFormServer } from './form-server.js';
 import { realRoot } from '../../modules/sessions/lib/registry.js';
+import { projectSwitcher } from './projects.js';
 
 const asset = (name, type) => [`/${name}`, [type, readFileSync(new URL(`./assets/${name}`, import.meta.url))]];
 const DASHBOARD_ASSETS = new Map([
@@ -178,13 +179,18 @@ export async function dashboardData({ root, kitRoot, env, now, params }) {
   return { project, maintenance: section(() => maintenanceSection(root, kitRoot)), tasks: section(() => tasksSection(root)), globalTasks: saved.tasks ?? [], decisions, sessions, generated: (now ?? new Date()).toISOString() };
 }
 
+// One server serves every known YAW project: `root` is only the default; each request may name another workspace.
 export async function startDashboard({ root, kitRoot, env, port, signals, onClose, idleMs, controlToken }) {
-  const api = createWorkspaceApi({ root, kitRoot, env });
+  const projects = projectSwitcher({ env, root });
+  const api = createWorkspaceApi({ kitRoot, env, projects });
+  const at = (params) => projects.resolve(params.get('workspace'));
   return startFormServer({
     port, signals, onClose, idleMs, controlToken, page, assets: DASHBOARD_ASSETS, api,
+    onOpen: (input) => { if (input?.root !== undefined) projects.open(input.root); },
     get: {
-      '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
-      '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),
+      '/api/projects': () => projects.list(),
+      '/api/dashboard': (params) => dashboardData({ root: at(params), kitRoot, env, params }),
+      '/api/knowledge': (params) => knowledgeData({ root: at(params), kitRoot, env, params }),
     },
   });
 }

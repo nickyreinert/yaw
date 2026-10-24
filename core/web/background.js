@@ -4,17 +4,20 @@ import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, 
 import { join } from 'node:path';
 import { userDir } from '../lib/user-store.js';
 
+// `root === null` is the one shared dashboard server for all YAW projects; a folder root is a setup-form server.
+const stateName = (root) => root === null ? 'dashboard.json' : `${createHash('sha256').update(realpathSync(root)).digest('hex')}.json`;
+
 export function stateFile(root, env, create = false) {
   const dir = join(userDir(env), 'web');
   if (create) mkdirSync(dir, { recursive: true, mode: 0o700 });
   let st;
   try { st = lstatSync(dir); }
   catch (e) { if (e.code !== 'ENOENT') throw e; }
-  if (!st) return join(dir, `${createHash('sha256').update(realpathSync(root)).digest('hex')}.json`);
+  if (!st) return join(dir, stateName(root));
   if (!st.isDirectory() || st.isSymbolicLink() || (st.mode & 0o077)) {
     throw new Error('The YAW web state directory must be a private directory (0700), not a symlink');
   }
-  return join(dir, `${createHash('sha256').update(realpathSync(root)).digest('hex')}.json`);
+  return join(dir, stateName(root));
 }
 
 function openState(file, flags) {
@@ -67,14 +70,15 @@ function readState(file) {
 }
 
 // A failed connection can be stale state; never signal a PID from a state file.
-export async function backgroundRequest({ root, env, action = 'open' }) {
+export async function backgroundRequest({ root, env, action = 'open', body }) {
   const file = stateFile(root, env);
   const state = readState(file);
   if (!state) return null;
   let response;
   try {
     response = await fetch(`http://127.0.0.1:${state.port}/api/web/${action}`, {
-      method: 'POST', headers: { 'x-yaw-control': state.controlToken },
+      method: 'POST', headers: { 'x-yaw-control': state.controlToken, ...(body ? { 'content-type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(5000), redirect: 'error',
     });
   } catch (e) {
@@ -92,8 +96,8 @@ export async function backgroundRequest({ root, env, action = 'open' }) {
   return result;
 }
 
-export async function startBackground({ io }) {
-  const file = stateFile(io.cwd, io.env, true);
+export async function startBackground({ io, shared = false }) {
+  const file = stateFile(shared ? null : io.cwd, io.env, true);
   const fd = openState(file, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL);
   closeSync(fd);
   const controlToken = randomBytes(32).toString('hex');

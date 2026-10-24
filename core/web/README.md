@@ -23,14 +23,16 @@ Missing usage, cost and end times remain unknown; coverage accompanies the total
 
 ## Knowledge
 
-The browser reads existing Markdown from these fixed roots:
+The browser reads, creates, edits and deletes Markdown in these fixed roots (writes go through `core/lib/knowledge-store.js`, shared with `yaw knowledge`; ADR-0053 amendment):
 
 | Scope | Sources |
 | --- | --- |
 | User | `~/.yaw/knowledge/` (or `$YAW_HOME/knowledge/`) |
 | Project | `.decisions/` including details, `docs/knowledge/`, `docs/spec/` |
 
-User knowledge is not automatically injected into project context. The explicit User/All scopes browse the user's namespaces; the Project scope reads only the current project's sources. CLI retrieval and namespace permission behavior are unchanged. No source folder, index, format migration or record is created by viewing.
+User knowledge is not automatically injected into project context. The explicit User/All scopes browse the user's namespaces; the Project scope reads only the current project's sources. CLI retrieval and namespace permission behavior are unchanged. No source folder, index, format migration or record is created by viewing. Writes are explicit CSRF-protected actions (`knowledge-save`, `knowledge-remove`) that carry the opened content's SHA-256 (409 on a concurrent change), refuse links, secrets and non-Markdown targets, and write atomically. Decision records are edited here but created with `yaw decisions record`.
+
+The dashboard serves several projects from one server: every request names a `workspace`, resolved against known YAW projects (ADR-0050 amendment); unknown folders get 404.
 
 Titles come from the first heading or optional YAML frontmatter. ADR/notice metadata is recognized; optional `type`, `tags`, `status`, and `category` frontmatter supports plain rule/preference/lesson/snippet documents. A user record's first subfolder identifies its namespace. Search covers title, path, category, tags and content. Listing responses omit content; selecting a listed record fetches its body through an opaque source/relative-name key, never a caller-supplied filesystem path.
 
@@ -38,6 +40,6 @@ Reads reject symlinked roots/components and files, bind to checked file descript
 
 ## Verification
 
-Focused checks: `node --test test/knowledge.test.js test/session-profile.test.js test/dashboard.test.js test/form-ui.test.js test/web-background.test.js modules/sessions/tests/import.test.js`.
+Focused checks: `node --test test/knowledge.test.js test/knowledge-store.test.js test/session-profile.test.js test/dashboard.test.js test/form-ui.test.js test/web-background.test.js modules/sessions/tests/import.test.js`.
 
 Repository gate: `just check`. Keep its pre-existing adapter drift separate from web changes. Browser QA covers setup retention, sorting/filtering/pagination, source coverage, knowledge scope/search/reader, keyboard navigation, and narrow layouts.

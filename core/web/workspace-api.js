@@ -1,25 +1,30 @@
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
-import { collectAnalysis, localEndpoint } from '../lib/session-analysis.js';
+import { collectAnalysis, localEndpoint, scanSummary } from '../lib/session-analysis.js';
 import { realRoot } from '../../modules/sessions/lib/registry.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
 import { tasksSection } from './dashboard.js';
 import { FormError } from './form-model.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
+import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test'];
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add'];
 export const workspacePreferences = (env, root) => {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
   return { refreshOnLoad: doc[realRoot(root)]?.refreshOnLoad === true, endpoint: doc.endpoint ?? 'http://127.0.0.1:8000' };
 };
-export function createWorkspaceApi({ root, kitRoot, env }) {
+// `projects` (the dashboard's project switcher) resolves the `workspace` each request names; without it the API is
+// bound to `root`. Every action and read runs against that one resolved project.
+export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
   let running = false;
+  const rootOf = (value) => projects ? projects.resolve(value) : fixed;
   return {
     actions: WORKSPACE_ACTIONS,
     get: {
-      '/api/preferences': () => workspacePreferences(env, root),
-      '/api/notifications': () => notificationSettings({ root, env }),
-      '/api/code-map': () => {
+      '/api/preferences': (params) => workspacePreferences(env, rootOf(params?.get('workspace'))),
+      '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
+      '/api/code-map': (params) => {
+        const root = rootOf(params?.get('workspace'));
         const content = readProjectFile(root, 'docs/code-map.md');
         if (content && content.length > 256 * 1024) throw new FormError('Code map is larger than 256 KiB; use yaw map show');
         const text = content?.toString('utf8') ?? '';
@@ -31,6 +36,14 @@ export function createWorkspaceApi({ root, kitRoot, env }) {
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name === 'project-add') {
+        if (!projects) throw new FormError('Project switching is not available here', 404);
+        return projects.add(input.path);
+      }
+      const root = rootOf(input.workspace);
+      input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));
+      if (name === 'knowledge-save') return saveKnowledge({ root, kitRoot, env, input: input.record });
+      if (name === 'knowledge-remove') return removeKnowledge({ root, kitRoot, env, input: input.record });
       if (name === 'preferences') {
         if (typeof input.refreshOnLoad !== 'boolean') throw new FormError('Choose whether to refresh on load');
         let endpoint;
@@ -61,7 +74,7 @@ export function createWorkspaceApi({ root, kitRoot, env }) {
           endpoint: workspacePreferences(env, root).endpoint,
           tasksFor: (project) => { try { return tasksSection(project); } catch (e) { return { error: e.message }; } },
         });
-        return { ...result, message: `Saved ${result.sessions} session(s). ${name === 'evaluate' ? 'Local classifications included.' : 'No model was called.'}` };
+        return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? 'Local classifications included.' : 'No model was called.'}` };
       } catch (e) {
         throw new FormError(e.message);
       } finally { running = false; }

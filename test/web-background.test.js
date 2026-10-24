@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { stateFile, writeBackgroundLauncher, writeState } from '../core/web/background.js';
@@ -21,7 +21,7 @@ test('background web persists, reopens with a new link, and stops without signal
     const response = await fetch(url, { redirect: 'manual' });
     assert.equal(response.status, 303);
     const cookie = response.headers.get('set-cookie').split(';')[0];
-    const file = stateFile(root, env);
+    const file = stateFile(null, env);
     assert.equal(lstatSync(file).mode & 0o777, 0o600);
     assert.equal(lstatSync(join(env.HOME, '.yaw/web')).mode & 0o777, 0o700);
     assert.equal(await main(['web'], io), 0, stderr.text());
@@ -29,7 +29,7 @@ test('background web persists, reopens with a new link, and stops without signal
     assert.equal(new URL(url).port, new URL(original).port);
     assert.equal((await fetch(url, { redirect: 'manual' })).status, 303);
     assert.equal((await fetch(new URL('/', original), { headers: { cookie } })).status, 200, 'reopening does not invalidate existing tabs');
-    const launcher = writeBackgroundLauncher({ root, env, url });
+    const launcher = writeBackgroundLauncher({ root: null, env, url });
     assert.equal(lstatSync(launcher).mode & 0o777, 0o600);
     assert.equal(await main(['web', '--stop'], io), 0, stderr.text());
     for (let n = 0; n < 100 && existsSync(file); n++) await new Promise((r) => setTimeout(r, 10));
@@ -39,6 +39,31 @@ test('background web persists, reopens with a new link, and stops without signal
     assert.match(io.stdout.text(), /No background web server/);
   } finally {
     await main(['web', '--stop'], io);
+  }
+});
+
+test('yaw web in a second project joins the shared dashboard and selects that project', async () => {
+  const first = await makeProject({ modules: ['core'] }), second = await makeProject({ modules: ['core'] });
+  const env = { ...process.env, HOME: tmp('yaw-web-home-') };
+  let url;
+  const io = (cwd) => ({ cwd, env, kitRoot: KIT_ROOT, stdout: capture(), stderr: capture(), openBrowser: async (u) => { url = u; return true; } });
+  try {
+    assert.equal(await main(['web', '--background'], io(first)), 0);
+    const port = new URL(url).port;
+    const other = io(second);
+    assert.equal(await main(['web'], other), 0, other.stderr.text());
+    assert.equal(new URL(url).port, port, 'the running server is reused');
+    assert.match(other.stdout.text(), /any YAW project/);
+    const cookie = (await fetch(url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
+    const projects = await (await fetch(new URL('/api/projects', url), { headers: { cookie } })).json();
+    assert.equal(projects.current, realpathSync(second));
+    assert.deepEqual(projects.projects.map((p) => p.root).sort(), [realpathSync(first), realpathSync(second)].sort());
+    const firstData = await (await fetch(new URL(`/api/dashboard?workspace=${encodeURIComponent(first)}`, url), { headers: { cookie } })).json();
+    assert.equal(firstData.project.canonicalRoot, realpathSync(first));
+    const unknown = await fetch(new URL(`/api/dashboard?workspace=${encodeURIComponent(tmp('yaw-other-'))}`, url), { headers: { cookie } });
+    assert.equal(unknown.status, 404);
+  } finally {
+    await main(['web', '--stop'], io(first));
   }
 });
 

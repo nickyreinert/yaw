@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { enabledModules, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
-import { collectAnalysis, readAnalysis } from '../lib/session-analysis.js';
+import { collectAnalysis, readAnalysis, scanSummary } from '../lib/session-analysis.js';
 import { tasksSection } from '../web/dashboard.js';
 import { workspacePreferences } from '../web/workspace-api.js';
 import { realRoot } from '../../modules/sessions/lib/registry.js';
@@ -28,7 +28,7 @@ export async function sessions({ values, positionals, io }) {
       endpoint: values.endpoint ?? workspacePreferences(io.env, io.cwd).endpoint,
       tasksFor: (project) => { try { return tasksSection(project); } catch (e) { return { error: e.message }; } },
     });
-    io.stdout.write(`Saved ${result.sessions} session(s); collected ${result.collected}\n`);
+    io.stdout.write(`${scanSummary(result)} Collected ${result.collected}\n`);
     return 0;
   }
   // `import` (#174) also works in a project without YAW or without the sessions module: it only fills ~/.yaw/yaw.db.

@@ -21,6 +21,7 @@ import { hygiene, notify, statusline } from './comfort.js';
 import { sessionStart } from './team.js';
 import { presets } from './presets.js';
 import { web } from './web.js';
+import { knowledge } from './knowledge.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
@@ -45,6 +46,7 @@ export const COMMANDS = [
   { name: 'kickoff', args: '[import <plan.md> [--dry-run]]', summary: 'kickoff guidance: print the planning prompt for your idea, import the plan as tasks with model tier and effort', options: { 'dry-run': { type: 'boolean' } }, run: kickoff },
   { name: 'gh', args: '<init|labels|protect|branch|commit|pr|pr-status|release|project-add|issue> [...]', summary: 'GitHub scripts (github module; `just gh-*`, `just branch` ... call this); guarded actions need a person at a terminal to confirm', options: { ...yes, owner: { type: 'string' }, public: { type: 'boolean' }, approvals: { type: 'string' }, verify: { type: 'boolean' }, check: { type: 'string', multiple: true }, type: { type: 'string' }, scope: { type: 'string' }, task: { type: 'string' }, title: { type: 'string' }, ready: { type: 'boolean' }, status: { type: 'string' }, body: { type: 'string' }, priority: { type: 'string' }, estimate: { type: 'string' } }, run: gh },
   { name: 'decisions', args: '<recall|record|query|list|rebuild|check|taxonomy|seed> [...]', summary: 'decision journal: ADRs and notices in .decisions/ (decisions module; `just decisions ...` calls this)', options: { type: { type: 'string' }, kind: { type: 'string' }, category: { type: 'string' }, subcategory: { type: 'string' }, summary: { type: 'string' }, context: { type: 'string' }, decision: { type: 'string' }, consequences: { type: 'string' }, consideration: { type: 'string' }, importance: { type: 'string' }, status: { type: 'string' }, supersedes: { type: 'string', multiple: true }, scope: { type: 'string', multiple: true }, 'review-by': { type: 'string' }, tag: { type: 'string', multiple: true }, ref: { type: 'string', multiple: true }, issue: { type: 'string' }, text: { type: 'string' }, path: { type: 'string', multiple: true }, keywords: { type: 'string' } }, run: decisions },
+  { name: 'knowledge', args: '<list|show|add|edit|remove> [record|title] [...]', summary: 'add, edit and delete knowledge: personal (--global, ~/.yaw/knowledge) or this project (docs/knowledge, docs/spec with --spec, .decisions)', options: { ...yes, global: { type: 'boolean' }, project: { type: 'boolean' }, spec: { type: 'boolean' }, namespace: { type: 'string' }, type: { type: 'string' }, tag: { type: 'string', multiple: true }, body: { type: 'string' }, file: { type: 'string' }, query: { type: 'string' } }, run: knowledge },
   { name: 'map', args: '<update|check|show> [area|path-prefix]', summary: 'code map: refresh docs/code-map.md and the local index, check it (read-only), show an area (code-map module; `just map ...` calls this)', options: {}, run: map },
   { name: 'sessions', args: '<find|for|resume|list|current|handoff|import|scan|evaluate|analytics> [...]', summary: 'session registry and explicit saved analytics: scan history, evaluate with local Laya, or read saved analytics (no automatic scan)', options: { all: { type: 'boolean' }, days: { type: 'string' }, endpoint: { type: 'string' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' }, 'dry-run': { type: 'boolean' } }, run: sessions },
   { name: 'session-start', args: '', summary: 'team mode: fetch, safe fast-forward, my issues and pull requests (team module; `just start` calls this)', options: {}, run: sessionStart },
@@ -56,7 +58,7 @@ export const COMMANDS = [
 
 export const HELP_GROUPS = [
   { title: 'Project setup and maintenance', names: ['init', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
-  { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'map', 'sessions'] },
+  { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'sessions'] },
   { title: 'Monitoring and collaboration', names: ['web', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
   { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
