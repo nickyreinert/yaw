@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
 import { add, remove, status, update, UsageError } from './commands.js';
 import { init } from './init.js';
+import { edit } from './edit.js';
 import { doctor } from './doctor.js';
 import { selfUninstall, selfUpdate } from './self.js';
 import { createPrompter } from './prompt.js';
@@ -23,30 +24,29 @@ import { web } from './web.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
-// The phase-1 command list (ADR-0019). Commands without `run` are planned for a later step.
+// The phase-1 command list (ADR-0019). Help and hook are dispatched separately.
 export const COMMANDS = [
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--skip-verify] [--force]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, 'skip-verify': { type: 'boolean' }, force: { type: 'boolean' }, ...yes }, run: init },
   { name: 'web', args: '[--background | --stop] [--force]', summary: 'open the local web interface: the dashboard (sessions, tasks, decisions) in a YAW project, the setup form elsewhere; --background keeps it running, --stop stops it', options: { force: { type: 'boolean' }, background: { type: 'boolean' }, stop: { type: 'boolean' } }, run: web },
-  { name: 'update', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
+  { name: 'apply', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from saved answers and the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
+  { name: 'update', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 'alias for apply: re-render managed files', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
+  { name: 'edit', args: '[<section|question.id> ...] [--web] [--list] [--skip-verify]', summary: 'review saved setup answers in the terminal or browser; optionally limit the interview to sections or questions', options: { web: { type: 'boolean' }, list: { type: 'boolean' }, 'skip-verify': { type: 'boolean' } }, run: edit },
   { name: 'remove', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'remove a module and exactly its files', options: { ...yes, strategy: { type: 'string' } }, run: remove },
   { name: 'status', args: '', summary: 'show modules and files with their state', options: {}, run: status },
   { name: 'doctor', args: '', summary: 'check the kit, the manifest and the tools', options: {}, run: doctor },
   { name: 'self-update', args: '[--tag <tag> | --channel main]', summary: 'switch the installed kit to a newer tag', options: { tag: { type: 'string' }, channel: { type: 'string' } }, run: selfUpdate },
   { name: 'self-uninstall', args: '[--yes]', summary: 'remove the installed kit and the yaw link', options: { ...yes }, run: selfUninstall },
   { name: 'help', args: '[<command>]', summary: 'show this help', options: {} },
-  { name: 'apply', step: 3, summary: 'apply .yaw/answers.yaml again', guidance: 'Use yaw update to re-render an initialized project; the separate apply handler is not implemented.' },
   { name: 'add', args: '<module> [--yes] [--strategy keep|take|merge]', summary: 'add a module, asking only its questions', options: { ...yes, strategy: { type: 'string' } }, run: add },
   { name: 'hook', args: '<event> --agent claude|codex|copilot --module <module>', summary: 'hook entry point for coding agents (reads the payload on stdin; always exits 0)', options: {} },
   { name: 'sync', args: '--check', summary: 'check that agent adapter files match their source (fails on drift)', options: { check: { type: 'boolean' } }, run: sync },
   { name: 'agents', args: '', summary: 'compatibility matrix of the enabled modules and agents', options: {}, run: agents },
   { name: 'task', args: '<list|next|start|log|done|new|sync> [...]', summary: 'task ledger helpers (tasks module; `just task ...` calls this)', options: { resume: { type: 'string' }, progress: { type: 'string' }, model: { type: 'string' }, effort: { type: 'string' } }, run: task },
   { name: 'kickoff', args: '[import <plan.md> [--dry-run]]', summary: 'kickoff guidance: print the planning prompt for your idea, import the plan as tasks with model tier and effort', options: { 'dry-run': { type: 'boolean' } }, run: kickoff },
-  { name: 'config', step: 5, summary: 'edit project settings through the CLI', guidance: 'No config editor exists. A schema for knowledge namespaces is defined, but runtime settings loading/saving is not implemented; current project setup is stored in .yaw/answers.yaml.' },
   { name: 'gh', args: '<init|labels|protect|branch|commit|pr|pr-status|release|project-add|issue> [...]', summary: 'GitHub scripts (github module; `just gh-*`, `just branch` ... call this); guarded actions need a person at a terminal to confirm', options: { ...yes, owner: { type: 'string' }, public: { type: 'boolean' }, approvals: { type: 'string' }, verify: { type: 'boolean' }, check: { type: 'string', multiple: true }, type: { type: 'string' }, scope: { type: 'string' }, task: { type: 'string' }, title: { type: 'string' }, ready: { type: 'boolean' }, status: { type: 'string' }, body: { type: 'string' }, priority: { type: 'string' }, estimate: { type: 'string' } }, run: gh },
   { name: 'decisions', args: '<recall|record|query|list|rebuild|check|taxonomy|seed> [...]', summary: 'decision journal: ADRs and notices in .decisions/ (decisions module; `just decisions ...` calls this)', options: { type: { type: 'string' }, kind: { type: 'string' }, category: { type: 'string' }, subcategory: { type: 'string' }, summary: { type: 'string' }, context: { type: 'string' }, decision: { type: 'string' }, consequences: { type: 'string' }, consideration: { type: 'string' }, importance: { type: 'string' }, status: { type: 'string' }, supersedes: { type: 'string', multiple: true }, scope: { type: 'string', multiple: true }, 'review-by': { type: 'string' }, tag: { type: 'string', multiple: true }, ref: { type: 'string', multiple: true }, issue: { type: 'string' }, text: { type: 'string' }, path: { type: 'string', multiple: true }, keywords: { type: 'string' } }, run: decisions },
   { name: 'map', args: '<update|check|show> [area|path-prefix]', summary: 'code map: refresh docs/code-map.md and the local index, check it (read-only), show an area (code-map module; `just map ...` calls this)', options: {}, run: map },
-  { name: 'sessions', args: '<find|for|resume|list|current|handoff|import> [...]', summary: 'agent session registry: find, link and resume sessions, import past sessions of any project (sessions module; `just sessions ...` calls this)', options: { all: { type: 'boolean' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' }, 'dry-run': { type: 'boolean' } }, run: sessions },
-  { name: 'session', step: 5, summary: 'rename the current agent session', guidance: 'Native agent-session renaming is not implemented. yaw sessions manages YAW registry records, not agent conversation names.' },
+  { name: 'sessions', args: '<find|for|resume|list|current|handoff|import|scan|evaluate|analytics> [...]', summary: 'session registry and explicit saved analytics: scan history, evaluate with local Laya, or read saved analytics (no automatic scan)', options: { all: { type: 'boolean' }, days: { type: 'string' }, endpoint: { type: 'string' }, title: { type: 'string' }, agent: { type: 'string' }, session: { type: 'string' }, 'dry-run': { type: 'boolean' } }, run: sessions },
   { name: 'session-start', args: '', summary: 'team mode: fetch, safe fast-forward, my issues and pull requests (team module; `just start` calls this)', options: {}, run: sessionStart },
   { name: 'hygiene', args: '[status|on|off] [--all]', summary: 'session hygiene hints: show the state, switch them on or off (comfort module)', options: { all: { type: 'boolean' } }, run: hygiene },
   { name: 'notify', args: '[status|test|send] [--status done|input|failed] [--minutes N] [--summary text]', summary: 'notifications after long runs: show the channels, send a test or a message (comfort module)', options: { status: { type: 'string' }, minutes: { type: 'string' }, summary: { type: 'string' } }, run: notify },
@@ -55,7 +55,7 @@ export const COMMANDS = [
 ];
 
 export const HELP_GROUPS = [
-  { title: 'Project setup and maintenance', names: ['init', 'presets', 'status', 'update', 'add', 'remove', 'agents'] },
+  { title: 'Project setup and maintenance', names: ['init', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'map', 'sessions'] },
   { title: 'Monitoring and collaboration', names: ['web', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
@@ -63,7 +63,6 @@ export const HELP_GROUPS = [
 ];
 
 export function usage() {
-  const planned = COMMANDS.filter((c) => c.step);
   const lines = [
     'usage: yaw <command> [options]',
     '       yaw --version',
@@ -76,10 +75,6 @@ export function usage() {
       }),
       '',
     ]),
-    'Not implemented (placeholders):',
-    ...planned.map((c) => `  ${c.name.padEnd(15)} ${c.summary}`),
-    '',
-    'Placeholders have no command handlers; yaw help <command> explains the available alternatives.',
     'yaw help <command> shows its options.',
   ];
   return `${lines.join('\n')}\n`;
@@ -124,15 +119,11 @@ export async function main(argv, io = {}) {
       ctx.stderr.write(`yaw: unknown command "${rest[0]}"\n\n${usage()}`);
       return 1;
     }
-    ctx.stdout.write(target ? (target.step ? `yaw ${target.name}: not implemented. ${target.guidance}\n` : commandUsage(target)) : usage());
+    ctx.stdout.write(target ? commandUsage(target) : usage());
     return 0;
   }
   // The hook entry point parses its own arguments and never fails (ADR-0007): no usage, no stderr.
   if (command.name === 'hook') return runHook(rest, { ...ctx, stdin: io.stdin ?? process.stdin });
-  if (!command.run) {
-    ctx.stderr.write(`yaw ${command.name}: not implemented. ${command.guidance}\n`);
-    return 1;
-  }
   let parsed;
   try {
     parsed = parseArgs({ args: rest, options: { help: { type: 'boolean', short: 'h' }, ...command.options }, allowPositionals: true, strict: true });

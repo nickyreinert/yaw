@@ -1,9 +1,10 @@
 // The user folder ~/.yaw/ (Y-7.2, ADR-0043, doc 02 §5): user profile, saved setups ("presets"), history.jsonl.
 // Created only after the user opted in; files 0600, folders 0700; answers only, never secrets (doc 08).
 
-import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { parse, stringify, YamlError } from './yaml.js';
 import { formatError } from './schema.js';
 import { schemas } from '../render/kit.js';
@@ -208,4 +209,30 @@ export function readUserProfile(env) {
 
 export function deletePreset(env, name) {
   rmSync(existingPreset(env, name));
+}
+
+export function readUserData(env, name) {
+  if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('Invalid user data name');
+  const dir = userDataDir(env);
+  directory(dir);
+  const file = join(dir, name);
+  return existingStat(file) ? JSON.parse(read(file)) : null;
+}
+
+export function writeUserData(env, name, value) {
+  if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('Invalid user data name');
+  const dir = userDataDir(env);
+  directory(dir, true);
+  const file = join(dir, name), temp = `${file}.${randomUUID()}.tmp`;
+  existingStat(file);
+  try {
+    write(temp, `${JSON.stringify(value)}\n`);
+    renameSync(temp, file);
+  } finally { rmSync(temp, { force: true }); }
+}
+
+function userDataDir(env) {
+  const dir = env.YAW_HOME || userDir(env);
+  if (!isAbsolute(dir) || /[\u0000-\u001f\u007f]/.test(dir)) throw new Error('YAW user data requires an absolute YAW_HOME / HOME');
+  return dir;
 }

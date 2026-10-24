@@ -36,7 +36,7 @@ import { PLAIN } from './style.js';
 const WEB = 'web';
 
 // Ask for the profile; the suggestion is the default. Without one the user must choose. -> name | WEB
-async function chooseProfile({ prompter, profiles, suggestion }) {
+export async function chooseProfile({ prompter, profiles, suggestion }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Stack profile')}\n`);
   profiles.forEach((p, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${p.name === suggestion ? s.green(s.bold(p.name)) : p.name} - ${p.summary}\n`));

@@ -73,6 +73,7 @@ export function ntfyRequest(payload, ntfy) {
   } catch {
     return null;
   }
+
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(server.hostname);
   if (!(server.protocol === 'https:' || (server.protocol === 'http:' && local)) || server.username || server.password || (server.pathname !== '/' && server.pathname !== '')) return null;
   return {
@@ -82,17 +83,37 @@ export function ntfyRequest(payload, ntfy) {
   };
 }
 
+export function notificationRequests(payload, config, env) {
+  const requests = [];
+  const ntfy = ntfyRequest(payload, config.ntfy);
+  if (ntfy) requests.push({ ...ntfy, channel: 'ntfy' });
+  const telegram = config.telegram;
+  if (telegram?.enabled) {
+    const token = env[telegram.tokenEnv], chat = env[telegram.chatIdEnv];
+    if (typeof token === 'string' && /^\d+:[A-Za-z0-9_-]{20,}$/.test(token) &&
+      typeof chat === 'string' && /^-?\d+$/.test(chat)) {
+      requests.push({
+        channel: 'telegram', url: `https://api.telegram.org/bot${token}/sendMessage`,
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: line(payload) }),
+      });
+    }
+  }
+  return requests;
+}
+
 // Fire and forget: a detached node process posts the request and prints nothing. The payload goes in argv (it
 // holds no secret); the child reads the topic from the personal file itself, so it never shows up in `ps`.
 export function sendDetached(payload, env, spawnFn = spawn) {
   const home = env.YAW_HOME || env.HOME;
   if (!home) return false;
   try {
+    const telegram = readPersonal(env).config.notify?.telegram;
+    const credentials = Object.fromEntries([telegram?.tokenEnv, telegram?.chatIdEnv].filter((name) => name && env[name]).map((name) => [name, env[name]]));
     const child = spawnFn(process.execPath, ['--no-warnings', SEND_JS, JSON.stringify(payload)], {
       cwd: env.HOME || undefined,
       detached: true,
       stdio: 'ignore',
-      env: { PATH: env.PATH ?? '', HOME: env.HOME ?? '', ...(env.YAW_HOME ? { YAW_HOME: env.YAW_HOME } : {}) },
+      env: { PATH: env.PATH ?? '', HOME: env.HOME ?? '', ...(env.YAW_HOME ? { YAW_HOME: env.YAW_HOME } : {}), ...credentials },
     });
     child.unref();
     return true;
@@ -121,7 +142,7 @@ export function notifyTurn({ event, root, env, status, now = new Date(event.ts),
 
   const task = activeTasks(realRoot(root))[0] ?? null;
   const payload = buildPayload({ project: realRoot(root), task: task?.ref ?? null, status, minutes, summary: task?.title ?? null });
-  if (personal.notify?.ntfy && ntfyRequest(payload, personal.notify.ntfy)) sendDetached(payload, env, spawnFn);
+  if (personal.notify?.telegram?.enabled || (personal.notify?.ntfy && ntfyRequest(payload, personal.notify.ntfy))) sendDetached(payload, env, spawnFn);
 
   if (cfg.terminal === 'off') return null;
   // Claude takes an escape sequence; Codex has only the user message

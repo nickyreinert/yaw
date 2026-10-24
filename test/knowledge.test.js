@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { knowledgeData } from '../core/web/knowledge.js';
-import { localHistory, mergeHistory } from '../core/web/local-history.js';
+import { mergeHistory } from '../core/web/local-history.js';
+import { collectAnalysis } from '../core/lib/session-analysis.js';
 import { dashboardData, startDashboard } from '../core/web/dashboard.js';
 import { registryFile } from '../modules/sessions/lib/registry.js';
 import { existsSync } from 'node:fs';
@@ -47,16 +48,18 @@ test('global metadata merges by session ID and preserves hooked title, project, 
   const rows = mergeHistory([old], [local]); assert.equal(rows.length, 1); assert.equal(rows[0].title, old.title); assert.equal(rows[0].project, '/root'); assert.equal(rows[0].ended, old.ended); assert.equal(rows[0].tokens_in, 1200);
 });
 
-test('global dashboard discovers native history outside the current project without creating a registry', async () => {
+test('global dashboard only shows native history after an explicit scan, without creating a registry', async () => {
   const f = fixture(), path = join(f.env.CODEX_HOME, 'sessions/2026/10/24/rollout-other.jsonl');
   put(path, [
     { type: 'session_meta', timestamp: '2026-10-24T08:00:00Z', payload: { id: 'other', cwd: '/another/project' } },
     { type: 'event_msg', timestamp: '2026-10-24T09:00:00Z', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 1200, output_tokens: 100 } } } },
   ].map(JSON.stringify).join('\n'));
-  const d = await dashboardData({ ...f, params: new URLSearchParams({ history: 'local' }) });
+  assert.deepEqual((await dashboardData({ ...f, params: new URLSearchParams({ history: 'local', 'refresh-history': '1' }) })).sessions, { available: false });
+  await collectAnalysis({ ...f, all: true });
+  const d = await dashboardData(f);
   assert.equal(d.sessions.all.sessions, 1); assert.equal(d.sessions.profiling.recent[0].project, '/another/project'); assert.equal(d.sessions.profiling.summary.tokensIn, 1200);
   assert.equal(existsSync(registryFile(f.env)), false);
-  assert.ok((await localHistory(f.env)).every((r) => !Object.hasOwn(r, 'transcript')));
+  assert.doesNotMatch(JSON.stringify(d), /rollout-other/);
 });
 
 test('knowledge API and brand asset require the existing dashboard session', async (t) => {

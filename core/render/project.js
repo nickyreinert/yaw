@@ -83,16 +83,19 @@ function syncProposalModules(root, modules, answers) {
 
 // Render `modules` and reconcile the project with the result; writes files, bases and the manifest.
 // Used by update (same modules), remove (one fewer) and, later, add (one more).
-export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, ...options }) {
-  const manifest = requireManifest(root);
+export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, reconfigure = false, ...options }) {
+  let manifest = requireManifest(root);
   checkKitNotOlder(manifest, kitRoot);
+  if (reconfigure) {
+    manifest = { ...manifest, profiles: answers.doc.proposal.profiles, agents: answers.doc.answers['user.agents'], preset: answers.doc.mode };
+  }
   answers = syncProposalModules(root, modules, answers);
   const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules, answersDoc: answers?.doc });
   const version = kitVersion(kitRoot);
   // New answers (yaw add) are written only after the render succeeded; the answers entry gets the new hash.
   if (answers) writeAtomic(root, ANSWERS, answers.text);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
-  if (removing === 'tasks' && manifest.modules.tasks?.mode === 'github' &&
+  if ((removing === 'tasks' || (reconfigure && !modules.includes('tasks'))) && manifest.modules.tasks?.mode === 'github' &&
     result.report.some((r) => r.path === 'TASKS.md' && r.action === 'released')) {
     const ignore = readProjectFile(root, '.gitignore')?.toString('utf8') ?? '';
     if (!ignore.split(/\r?\n/).some((line) => ['/TASKS.md', 'TASKS.md'].includes(line.trim()))) {
@@ -104,8 +107,10 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
 
   const nextModules = {};
   const answerMap = (answers?.doc ?? readAnswers(root)).answers;
-  for (const m of modules) nextModules[m] = moduleEntry(m, manifest.modules[m], answerMap, modules);
-  for (const [m, entry] of Object.entries(manifest.modules)) if (!entry.enabled && m !== removing) nextModules[m] = entry;
+  for (const m of modules) nextModules[m] = moduleEntry(m, reconfigure ? { ...manifest.modules[m], enabled: true } : manifest.modules[m], answerMap, modules);
+  for (const [m, entry] of Object.entries(manifest.modules)) {
+    if (!entry.enabled && m !== removing && (!reconfigure || !modules.includes(m))) nextModules[m] = entry;
+  }
 
   if (modules.length === 0) {
     deleteManifest(root);
@@ -136,6 +141,23 @@ export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules, ans
 
 export function enabledModules(manifest) {
   return Object.entries(manifest.modules).filter(([, e]) => e.enabled).map(([m]) => m);
+}
+
+export async function editProject({ root, kitRoot = KIT_ROOT, answers }) {
+  const doc = parseAnswers(answers.text);
+  if (JSON.stringify(doc) !== JSON.stringify(answers.doc)) throw new ProjectError('edited answers do not match their document');
+  const modules = doc.proposal?.modules;
+  if (!modules?.includes('core') || !doc.proposal.profiles?.length || !doc.answers['user.agents']?.length) {
+    throw new ProjectError('edited setup needs core, stack profiles and agents');
+  }
+  checkDependencies({ kitRoot, modules });
+  const previous = readProjectFile(root, ANSWERS);
+  try {
+    return await applyModules({ root, kitRoot, modules, answers, reconfigure: true, strategy: 'keep' });
+  } catch (e) {
+    if (previous !== null) writeAtomic(root, ANSWERS, previous);
+    throw e;
+  }
 }
 
 export function updateProject({ root, kitRoot = KIT_ROOT, ...options }) {

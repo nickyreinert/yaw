@@ -1,32 +1,44 @@
 <div align="center">
-  <img src="website/assets/yaw-shark.svg" alt="YAW's friendly shark mascot" width="108">
+  <img src="docs/assets/yaw-shark.svg" alt="YAW's friendly shark mascot" width="108">
 
   # YAW
 
-  **A better starting point for coding agents.**
+  **The workspace around your coding agents.**
 
-  Turn a project folder into a workspace with clear instructions, repeatable commands and the tools your agents need. Review the proposed files before YAW writes them.
+  Set up a project, turn an idea into tasks, carry decisions across sessions, and see the work in a local dashboard. YAW writes reviewable files and works with Claude Code, Codex and Copilot CLI.
 
-  [Get started](#get-started) · [See the setup](#see-the-setup) · [Full guide](docs/getting-started.md)
+  [Get started](#get-started) · [Explore the features](#what-yaw-does) · [Launch page](website/) · [Full guide](docs/getting-started.md)
 </div>
 
 ## Why YAW?
 
-Coding agents work better when the project tells them how to work. YAW gives each session a shared starting point and gives you control over what goes into the repo.
+Coding agents work better when the project tells them how to work and where to resume. YAW connects that shared context with planning, task tracking, session history and optional comfort features. Start with Quick, or choose Full and tailor the modules.
 
-- **A clear handoff:** project instructions in `AGENTS.md`, plus adapters for the agents you select.
-- **A useful dev loop:** reusable `just` commands for setup and checks.
-- **Only what you need:** choose Quick or Full, then add or remove modules as the project grows.
-- **Inspectable files:** see the proposed setup before applying it; keep your edits when updating managed files.
-- **Continuity:** tasks and optional decision records help work survive the next session.
+- **Agent-aware setup:** shared `AGENTS.md` instructions and adapters for the agents you select. Support varies by feature and agent.
+- **Files you control:** preview the proposal before applying it. YAW preserves your edits when updating managed files.
+- **A repeatable dev loop:** generated `just` commands for setup and checks, with optional hooks, skills, code maps and GitHub workflows.
+- **Continuity:** local or GitHub tasks, decisions, handoffs and session links help the next session pick up the work.
 
 YAW is a zero-runtime-dependency Node.js CLI. It works locally on macOS and Linux, or on Windows through WSL.
 
+## What YAW does
+
+| Need | YAW feature |
+| --- | --- |
+| Turn an idea into work | `yaw kickoff` prints a project-aware planning prompt. Save the plan and use `yaw kickoff import <plan.md>` to create tasks with model and effort hints. |
+| Track tasks your way | Keep `TASKS.md` locally, use GitHub issues, or link both. Optional team mode checks issue links in commits and pull requests; GitHub issue forms and planning skills provide structure. |
+| Remember decisions and knowledge | Record decisions and risks, recall relevant records at task start, and browse project and personal Markdown knowledge in a read-only local dashboard. |
+| Understand agent sessions | Explicitly scan local Claude Code, Codex and Copilot CLI history, then review session counts, lengths and timing. Optional local Laya classification groups outcomes and failure types; it is experimental and requires your own local service. |
+| Know when attention is needed | Optional comfort hooks can send Telegram notifications after long runs. Personal preferences live outside the repo; bot credentials stay in your environment. |
+| Resume across agents | A session registry, handoff skill and links from tasks, decisions, commits and files help find earlier work. |
+
+Run `yaw web` for the local dashboard. Its overview stays scoped to the current workspace; global projects, sessions and tasks have separate views. Opening it reads saved results. Transcript scanning and Laya classification require explicit actions unless you choose the refresh-on-load scan setting. See the [dashboard guide](docs/workspace-dashboard.md) for coverage, privacy and setup details.
+
 ## See the setup
 
-<img src="website/assets/setup-preview.svg" alt="Illustrated preview of the local YAW setup form, with setup choices and a live summary" width="800">
+<img src="docs/assets/setup-screenshot.png" alt="YAW's local browser setup form showing Quick and Full setup, project sections, and a live summary" width="800">
 
-*Illustrated preview of `yaw init --web`. The form runs locally and shows the files before you apply them.*
+*The actual `yaw init --web` form. It runs locally and previews files before you apply them.*
 
 The terminal flow is just as direct: `yaw init` asks about the project, suggests a profile, lets you choose Quick or Full, and reviews the files before writing them. You can continue the terminal interview in the browser at any question.
 
@@ -42,10 +54,13 @@ yaw init
 
 Prefer to inspect the installer first? The [full guide](docs/getting-started.md) has download and checksum steps, platform notes, and the complete command reference.
 
-After setup, use `yaw status` to see what YAW manages, `yaw update` to reconcile it, and `yaw web` for the local project dashboard.
+After setup, use `yaw status` to see what YAW manages, `yaw apply` to reconcile it (`yaw update` remains an alias), and `yaw web` for the local dashboard. Run `yaw edit` to review saved answers in the terminal or browser, `yaw edit --web` to open the editor directly, or `yaw edit user` to review one interview section (`yaw edit --list` lists sections).
+
+For day-to-day work, try `yaw kickoff`, `yaw task next`, and `yaw sessions analytics`. Add modules later with `yaw add <module>`; the [full guide](docs/getting-started.md) explains Quick, Full and maintenance.
 
 ## Explore
 
 - [Launch page](website/) — standalone static site, ready to move to its own repository.
 - [Full getting started guide](docs/getting-started.md) — installation, Quick and Full, maintenance and safety details.
+- [Workspace dashboard](docs/workspace-dashboard.md) — workspace/global views, explicit session analytics, local Laya classification and Telegram settings.
 - [Project concept](KICK-OFF.md) — design goals and technical background.

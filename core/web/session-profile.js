@@ -42,6 +42,10 @@ export function profileSessions(rows, params = new URLSearchParams(), now = new 
     usageKnown: list.filter((r) => known(r.tokens_in) || known(r.tokens_out)).length,
     costKnown: list.filter((r) => known(r.cost_usd)).length,
     durationKnown: list.filter((r) => r.ended && Number.isFinite(Date.parse(r.started)) && Date.parse(r.ended) >= Date.parse(r.started)).length,
+    measured: list.filter((r) => r.metrics).length,
+    prompts: list.reduce((n, r) => n + (r.metrics?.prompts ?? 0), 0),
+    answers: list.reduce((n, r) => n + (r.metrics?.answers ?? 0), 0),
+    answerChars: list.reduce((n, r) => n + (r.metrics?.answerChars ?? 0), 0),
   });
   const group = (key) => {
     const groups = new Map();
@@ -58,9 +62,22 @@ export function profileSessions(rows, params = new URLSearchParams(), now = new 
     const day = new Date(r.started).toISOString().slice(0, 10);
     days.set(day, (days.get(day) ?? 0) + 1);
   }
+  const histogram = (values, bounds) => bounds.map((bound, i) => ({
+    label: i === bounds.length - 1 ? `> ${bounds[i - 1]}` : i === 0 ? `≤ ${bound}` : `${bounds[i - 1]}–${bound}`,
+    count: values.filter((v) => v > (bounds[i - 1] ?? -Infinity) && v <= bound).length,
+  }));
   return {
     filters, sort, direction, pagination: { page: currentPage, pages, pageSize, total: selected.length }, summary: summarize(selected), models: group('model'), agents: group('agent'), projects: group('project'),
     activity: [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, sessions]) => ({ day, sessions })),
+    outcomes: selected.reduce((out, r) => {
+      for (const [label, count] of Object.entries(r.evaluation?.counts?.outcome ?? {})) out[label] = (out[label] ?? 0) + count;
+      return out;
+    }, {}),
+    charts: {
+      duration: histogram(selected.filter((r) => r.ended).map(duration), [5, 15, 30, 60, Infinity]),
+      answerLength: histogram(selected.filter((r) => r.metrics?.answers).map((r) => r.metrics.answerChars / r.metrics.answers), [200, 1000, 3000, 10000, Infinity]),
+      combined: selected.filter((r) => r.metrics && r.ended).slice(0, 200).map((r) => ({ id: r.id, minutes: duration(r), answers: r.metrics.answers })),
+    },
     options: Object.fromEntries(['project', 'agent', 'model'].map((key) => [key, [...new Set(rows.map((r) => r[key] || 'Unknown'))].sort()])),
     recent: sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((r) => ({
       id: r.id, project: r.project, agent: r.agent, model: r.model || 'Unknown', title: r.title,
@@ -68,6 +85,7 @@ export function profileSessions(rows, params = new URLSearchParams(), now = new 
       tokensIn: known(r.tokens_in) ? number(r.tokens_in) : null,
       tokensOut: known(r.tokens_out) ? number(r.tokens_out) : null,
       costUsd: known(r.cost_usd) ? number(r.cost_usd) : null,
+      metrics: r.metrics ?? null, evaluation: r.evaluation ?? null,
       source: r.source === 'local' ? 'Local history' : r.source === 'import' ? 'Imported' : 'Hook',
     })),
   };

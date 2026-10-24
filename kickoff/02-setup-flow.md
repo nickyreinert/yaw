@@ -43,6 +43,14 @@ There are two choices (ADR-0032). Standard is merged into Full; `standard` stays
 
 Quick is a baseline, not a limit: `yaw add <module>` later adds a module and asks only that module's questions (ADR-0023). The mode records the **starting depth** chosen at `yaw init`; adding modules does not change it, and the installed modules are read from the manifest, not from the mode.
 
+### Reviewing an existing setup
+
+`yaw apply` re-renders managed files from saved answers and the installed kit; `yaw update` remains an alias with the same `--yes`, `--strategy`, `--restore` and `--forget` flags.
+
+`yaw edit` reruns the interview using saved answers as defaults. Choose terminal or browser at entry, use `w` during a question or at profile selection, or run `yaw edit --web` directly. `yaw edit user` reviews one section; multiple sections or individual question IDs such as `yaw edit idea.text` are accepted. `yaw edit --list` lists sections. Unrelated answers are preserved, and both lanes preview before asking to apply changes. User-owned and user-edited files are kept; missing managed files are not restored implicitly.
+
+Full editing can change setup depth, profiles and agents. Installed modules remain selected unless explicitly changed in the full browser editor; changing depth alone in the CLI does not add modules. Section editing cannot change depth, profiles or module selection. Verification runs after apply unless `--skip-verify` is supplied. If another process changes saved answers or the manifest while editing, reopen the editor rather than overwriting that change. This edits `.yaw/answers.yaml`, not the deferred knowledge-namespace config schema.
+
 ## 3. Two lanes, one schema
 
 Both lanes render the same question schema (`interview/base.yaml` + `modules/*/module.yaml#questions`), so they cannot drift.
@@ -68,7 +76,7 @@ The idea goes into `README.md` (#171): without a README, init writes one (`# Pro
 Each server uses a distinct cookie name, avoiding collisions between tabs for different YAW instances. Cookies still travel to other servers on the same loopback host; only run trusted local servers. A consumed one-time link works again only when the browser already has that server's valid session. Otherwise run `yaw web` for a new login link. Background credentials and the browser launcher are private files under `~/.yaw/web/` (0700 directory, 0600 files); stop removes them. Private `.log` files there retain server errors for diagnosis. This is a user process, not a boot service: after a reboot start it again.
 
 - Binds to `127.0.0.1` only, random port, shuts down after apply or 30 min idle (timer reset by authenticated requests; Ctrl+C also stops it). No external assets (works offline, no tracking; `Content-Security-Policy: default-src 'self'`).
-- Token (Y-7.3, ADR-0044): the URL carries a one-time start token; the first request with it is answered with a redirect to `/` and an HttpOnly, SameSite=Strict session cookie, and the token is dead. Requests without the cookie are refused. Host must be `127.0.0.1:<port>` or `localhost:<port>` and a present Origin must match (DNS rebinding). Every POST also needs the header `X-YAW-Token` (the page gets the value embedded); GET never changes project or saved-setup state. Only the one-time browser link is printed to the terminal; no answers or request bodies are logged.
+- Token (Y-7.3, ADR-0044): the URL carries a one-time start token. Browser navigation sets an HttpOnly, SameSite=Strict session cookie on a minimal same-origin login page, then a same-origin script replaces the URL with `/`. This avoids excluding the Strict cookie on a redirect chain from the private launcher file; the token is dead and leaves the address/history. Non-browser clients receive a 303 redirect. Requests without the cookie are refused. Host must be `127.0.0.1:<port>` or `localhost:<port>` and a present Origin must match (DNS rebinding). Every POST also needs the header `X-YAW-Token` (the page gets the value embedded); GET never changes project or saved-setup state. Only the one-time browser link is printed to the terminal; no answers or request bodies are logged.
 - Single page, left sidebar = sections with completion state, right = **live summary** (profile, modules, files to be generated, est. footprint).
 - Modules as toggle cards; unchecking a module hides its questions immediately.
 - Each question: label, one-line hint, collapsible "Why this matters" and "Example" blocks (layperson), keyboard-first navigation (expert).

@@ -1,6 +1,6 @@
 import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 
-import { startWorkspace } from './workspace.js';
+import { showView, startWorkspace } from './workspace.js';
 
 const $ = (id) => document.getElementById(id);
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
@@ -191,7 +191,7 @@ function renderModules() {
     const card = element('div', undefined, { class: 'module-card' });
     const label = element('label');
     const input = element('input', undefined, { type: 'checkbox', id: `module-${m.name}` });
-    input.checked = selected.includes(m.name); input.disabled = m.name === 'core';
+    input.checked = selected.includes(m.name); input.disabled = m.name === 'core' || Boolean(catalog.editing && catalog.sections.length);
     label.append(input, document.createTextNode(`${m.name}${m.name === 'core' ? ' (required)' : ''}`));
     card.append(label, element('p', m.description));
     if (m.depends.length) card.append(element('p', `Requires: ${m.depends.join(', ')}`));
@@ -260,7 +260,7 @@ function update() {
       const body = await (await request('preview')).json();
       if (current !== revision) return;
       lastPreview = body; summary(body); actions(true);
-      status('Preview only. Unreviewed questions use the documented defaults.');
+      status(catalog.editing ? 'Preview only. Saved answers and user-edited files are preserved until you confirm.' : 'Preview only. Unreviewed questions use the documented defaults.');
     } catch (e) {
       if (current !== revision) return;
       if (e.message === 'Choose a stack profile; no single profile matches these answers') {
@@ -319,14 +319,14 @@ async function apply() {
   } catch (e) { error(e.message); status(started ? 'Apply did not complete successfully. Inspect the project before retrying.' : 'Apply was rejected before it started. Fix the error and review again.'); }
   finally {
     secretValues = null;
-    if (started) status(`${$('status').textContent} The local server closes after apply; restart yaw init only if the project is still uninitialized.`);
+    if (started) status(`${$('status').textContent} The local server closes after apply; ${catalog.editing ? 'run yaw edit to review again.' : 'restart yaw init only if the project is still uninitialized.'}`);
     else {
       busy = false; $('setup').inert = false; actions(Boolean(lastPreview));
     }
   }
 }
 function loadState(next) {
-  state = next;
+  state = catalog.editing ? { ...next, modules: next.modules ?? catalog.initial.modules } : next;
   visitedSteps.clear();
   document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
   $('profile').value = state.profile;
@@ -337,6 +337,18 @@ async function start() {
   const body = await response.json();
   if (!response.ok) throw new Error(body.error);
   catalog = body;
+  if (catalog.editing) {
+    document.title = 'YAW edit setup';
+    $('prefill').append(element('option', 'Current project setup', { value: 'current' }));
+    $('prefill').value = 'current';
+    if (catalog.sections.length) {
+      const selected = (q) => catalog.sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
+      catalog.questions = catalog.questions.map((q) => selected(q) ? q : { ...q, editHidden: true });
+      for (const id of ['profile', 'reset-modules', 'prefill', 'load']) $(id).disabled = true;
+      document.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = true; });
+    }
+    catalog.questions = catalog.questions.map((q) => Object.hasOwn(catalog.initial.answers, q.id) ? { ...q, default: catalog.initial.answers[q.id] } : q);
+  }
   for (const id of ['save-dialog', 'apply-dialog']) installDialogCancellation($(id));
   for (const p of catalog.profiles) $('profile').append(element('option', `${p.name} — ${p.summary}`, { value: p.name }));
   if (catalog.hasUserProfile) $('prefill').append(element('option', 'Saved user preferences', { value: 'profile' }));
@@ -354,13 +366,19 @@ async function start() {
   });
   $('setup').addEventListener('submit', (e) => e.preventDefault());
   document.querySelectorAll('input[name=mode]').forEach((input) => input.addEventListener('change', () => {
-    state.mode = input.value; state.modules = null; update();
+    state.mode = input.value;
+    if (!catalog.editing) state.modules = null;
+    update();
   }));
   $('profile').addEventListener('change', () => { state.profile = $('profile').value; update(); });
-  $('reset-modules').addEventListener('click', () => { state.modules = null; update(); });
+  $('reset-modules').addEventListener('click', () => {
+    state.modules = catalog.editing ? defaultModules(catalog.modules, catalog.questions, state.answers, state.mode) : null;
+    update();
+  });
   $('load').addEventListener('click', async () => {
     try {
-      if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, profile: '', modules: null });
+      if ($('prefill').value === 'current') loadState(catalog.initial);
+      else if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, profile: '', modules: null });
       else {
         const [kind, name] = $('prefill').value.split(':');
         loadState(await (await request('prefill', { kind, ...(name ? { name } : {}) })).json());
@@ -389,7 +407,11 @@ async function start() {
     if ($('apply-dialog').returnValue === 'apply') apply();
     else $('secret-fields').replaceChildren();
   });
-  if (catalog.handoff) {
+  if (catalog.editing) {
+    loadState(catalog.handoff ?? catalog.initial);
+    status('Editing the current project. Saved answers are prefilled; user-edited files will be kept.');
+    showView('setup', false);
+  } else if (catalog.handoff) {
     loadState({ profile: '', modules: null, ...catalog.handoff });
     status('Continued from the terminal: your answers so far are filled in. Nothing is written until Apply.');
   } else update();

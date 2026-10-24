@@ -1,6 +1,5 @@
-// Local dashboard (#172): `yaw web` in a YAW project. Read-only: project, tasks, decisions and session stats
-// (this project and all projects in ~/.yaw/yaw.db). Served by the form server's handshake (ADR-0044), so the
-// same one-time token, cookie, host and origin checks apply; there is no POST route.
+// Local dashboard (#172), with explicit authenticated workspace actions and saved session analytics.
+// The form server's handshake, cookie, Host/Origin and CSRF checks also protect workspace actions.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -10,10 +9,14 @@ import { enabledModules, readAnswers, fileStates } from '../render/project.js';
 import { kitVersion } from '../render/kit.js';
 import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { profileSessions } from './session-profile.js';
-import { localHistory, mergeHistory } from './local-history.js';
+import { readProjectFile } from '../render/files.js';
+import { mergeHistory } from './local-history.js';
+import { readAnalysis } from '../lib/session-analysis.js';
+import { createWorkspaceApi } from './workspace-api.js';
 import { knowledgeData } from './knowledge.js';
 import { parseTasks, tasksMode } from '../lib/tasks.js';
 import { startFormServer } from './form-server.js';
+import { realRoot } from '../../modules/sessions/lib/registry.js';
 
 const asset = (name, type) => [`/${name}`, [type, readFileSync(new URL(`./assets/${name}`, import.meta.url))]];
 const DASHBOARD_ASSETS = new Map([
@@ -21,8 +24,9 @@ const DASHBOARD_ASSETS = new Map([
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
+  asset('yaw-wordmark.svg', 'image/svg+xml'),
 ]);
-const page = () => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8');
+const page = (csrf) => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8').replace('YAW_CSRF', csrf);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const minutes = (row) => {
@@ -42,7 +46,7 @@ function section(fn) {
 
 function projectSection(root) {
   const manifest = readManifest(root);
-  if (!manifest) return { name: basename(root), root, initialized: false, modules: [], profiles: [], agents: [] };
+  if (!manifest) return { name: basename(root), root, canonicalRoot: realRoot(root), initialized: false, modules: [], profiles: [], agents: [] };
   const doc = readAnswers(root) ?? {};
   const answers = doc.answers ?? {};
   const modules = enabledModules(manifest);
@@ -50,6 +54,7 @@ function projectSection(root) {
     name: basename(root),
     initialized: true,
     root,
+    canonicalRoot: realRoot(root),
     kit: manifest.kit,
     mode: doc.mode ?? null,
     idea: typeof answers['idea.text'] === 'string' ? answers['idea.text'] : '',
@@ -60,10 +65,11 @@ function projectSection(root) {
   };
 }
 
-function tasksSection(root) {
-  const file = join(root, 'TASKS.md');
-  if (!existsSync(file)) return { available: false };
-  const ledger = parseTasks(readFileSync(file, 'utf8'), { file: 'TASKS.md' });
+export function tasksSection(root) {
+  const content = readProjectFile(root, 'TASKS.md');
+  if (!content) return { available: false };
+  if (content.length > 1024 * 1024) throw new Error('Task ledger exceeds 1 MiB');
+  const ledger = parseTasks(content.toString('utf8'), { file: 'TASKS.md' });
   return {
     available: true,
     readOnly: ledger.readOnly,
@@ -92,9 +98,9 @@ export async function sessionsSection(root, kitRoot, env, now = new Date(), para
     rows: db.prepare('SELECT id, agent, project, title, started, ended, branch, pr, model, tokens_in, tokens_out, cost_usd, source FROM sessions ORDER BY started DESC').all(),
     links: db.prepare('SELECT session_id, kind, COUNT(*) AS n FROM session_links GROUP BY session_id, kind').all(),
   })) : null;
-  const global = params?.get('history') === 'local';
-  if (!stored && !global) return { available: false };
-  const rows = global ? mergeHistory(stored?.rows ?? [], await localHistory(env, { refresh: params.get('refresh-history') === '1' })) : stored.rows;
+  const saved = readAnalysis(env);
+  if (!stored && !saved.collected) return { available: false };
+  const rows = mergeHistory(stored?.rows ?? [], saved.rows);
   const project = registry.realRoot(root);
     // No registry strings become markup or commands. Profiling reads the registry only, never transcripts.
     for (const row of rows) for (const key of ['title', 'branch', 'model']) row[key] = registry.clean(row[key]);
@@ -138,7 +144,7 @@ export async function sessionsSection(root, kitRoot, env, now = new Date(), para
     }
     return {
       available: true,
-      history: { local: global, registered: stored?.rows.length ?? 0 },
+      history: { local: Boolean(saved.collected), collected: saved.collected, registered: stored?.rows.length ?? 0 },
       profiling: profileSessions(rows, params, now),
       project: {
         ...summarize(mine),
@@ -169,12 +175,14 @@ export async function dashboardData({ root, kitRoot, env, now, params }) {
     decisionsSection(root, kitRoot).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
     sessionsSection(root, kitRoot, env, now, params).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
   ]);
-  return { project, maintenance: section(() => maintenanceSection(root, kitRoot)), tasks: section(() => tasksSection(root)), decisions, sessions, generated: (now ?? new Date()).toISOString() };
+  const saved = section(() => readAnalysis(env));
+  return { project, maintenance: section(() => maintenanceSection(root, kitRoot)), tasks: section(() => tasksSection(root)), globalTasks: saved.tasks ?? [], decisions, sessions, generated: (now ?? new Date()).toISOString() };
 }
 
 export async function startDashboard({ root, kitRoot, env, port, signals, onClose, idleMs, controlToken }) {
+  const api = createWorkspaceApi({ root, kitRoot, env });
   return startFormServer({
-    port, signals, onClose, idleMs, controlToken, page, assets: DASHBOARD_ASSETS,
+    port, signals, onClose, idleMs, controlToken, page, assets: DASHBOARD_ASSETS, api,
     get: {
       '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
       '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),

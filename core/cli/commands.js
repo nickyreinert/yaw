@@ -59,7 +59,7 @@ function parseStrategy(value) {
   return value;
 }
 
-export async function update({ values, positionals, io }) {
+export async function apply({ values, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   const strategy = parseStrategy(values.strategy);
   const interactive = !values.yes && io.prompter.interactive;
@@ -74,10 +74,12 @@ export async function update({ values, positionals, io }) {
     restore: new Set(values.restore ?? []),
     forget: new Set(values.forget ?? []),
   });
-  io.stdout.write(`yaw update (kit ${before} -> ${result.manifest.kit})\n`);
+  io.stdout.write(`yaw apply (kit ${before} -> ${result.manifest.kit})\n`);
   printReport(io.stdout, result);
   return result.conflicts.length > 0 ? 1 : 0;
 }
+
+export const update = apply;
 
 // yaw add <module>: only this module's questions; a missing dependency is reported, not installed.
 export async function add({ values, positionals, io }) {

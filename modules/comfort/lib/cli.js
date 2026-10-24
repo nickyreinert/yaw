@@ -9,6 +9,7 @@ import { buildPayload, line, ntfyRequest, STATUSES, terminalSequence } from './n
 import { hygieneMuted, projectKey, readSwitch, writeSwitch } from './state.js';
 import { statusLine } from './statusline.js';
 import { activeTasks } from '../../sessions/lib/registry.js';
+import { deliverNotifications } from './settings.js';
 
 export class ComfortUsageError extends Error {}
 
@@ -75,6 +76,7 @@ export async function runNotify({ args, values, io }) {
     say(io, `notifications: ${features.includes('notifications') ? 'on' : 'off'}; only after runs of at least ${cfg.minutes} min`);
     say(io, `terminal: ${cfg.terminal}`);
     say(io, `ntfy: ${configured ? `configured (${new URL(ntfy.server ?? 'https://ntfy.sh').host})` : ntfy ? 'configured but invalid (topic or server)' : 'not configured'}`);
+    say(io, `telegram: ${cfg.telegram?.enabled ? 'enabled (credentials from environment)' : 'not configured'}; personal settings: yaw web → Notifications`);
     if (personal.error) say(io, `personal file unusable: ${personal.error}`);
     return 0;
   }
@@ -90,6 +92,11 @@ export async function runNotify({ args, values, io }) {
 
   say(io, `notification: ${line(payload)}`);
   if (cfg.terminal !== 'off' && io.stdout.isTTY) io.stdout.write(terminalSequence(cfg.terminal, payload));
+  if (cfg.telegram?.enabled) {
+    const channels = await deliverNotifications({ payload, config: cfg, env: io.env });
+    say(io, `sent: ${channels.join(', ')}`);
+    return 0;
+  }
   if (configured) {
     const problem = await post(ntfyRequest(payload, ntfy));
     say(io, problem ? `ntfy: failed, ${problem}` : 'ntfy: sent');

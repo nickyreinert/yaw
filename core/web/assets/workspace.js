@@ -47,7 +47,7 @@ function activityChart(rows) {
 let active = 'overview', data, requestId = 0, group = 'sessions', sort = 'started', direction = 'desc', sessionPage = 1;
 let knowledgePage = 1, knowledgeKey = '', knowledgeRequest = 0, searchTimer, knowledgeLoaded = false;
 const setup = document.body.dataset.mode === 'setup';
-const views = ['overview', 'setup', 'profiling', 'maintenance', 'tasks', 'knowledge'];
+const views = ['overview', 'setup', 'profiling', 'maintenance', 'tasks', 'knowledge', 'projects', 'notifications', 'code-map'];
 export function showView(name, focus = true) {
   if (name === 'decisions') name = 'knowledge';
   if (!views.includes(name) || name === 'setup' && !setup) name = 'overview';
@@ -56,28 +56,37 @@ export function showView(name, focus = true) {
   document.querySelectorAll('[data-route]').forEach((node) => {
     if (node.dataset.route === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current');
   });
-  $('breadcrumb').textContent = { overview: 'Overview', setup: 'Project setup', profiling: 'Sessions', maintenance: 'Maintenance', tasks: 'Tasks', knowledge: 'Knowledge' }[name];
+  $('breadcrumb').textContent = { overview: 'Workspace overview', setup: 'Project setup', profiling: 'Global sessions', maintenance: 'Maintenance', tasks: 'Global tasks', knowledge: 'Knowledge', projects: 'Global projects', notifications: 'Notifications', 'code-map': 'Workspace code map' }[name];
   history.replaceState(null, '', `#${name}`);
   if (focus) { document.querySelector(`[data-view="${name}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
   if (name === 'knowledge' && !knowledgeLoaded) loadKnowledge();
+  if (name === 'notifications') loadNotifications().catch(reportError);
+  if (name === 'code-map') loadMap().catch(reportError);
 }
 function overview(d) {
-  const p = d.project, all = d.sessions.available ? d.sessions.all : null;
+  const p = d.project, mine = d.sessions.available ? d.sessions.project : null, all = d.sessions.available ? d.sessions.all : null;
   $('project-name').textContent = p.name ?? 'Project'; $('project-path').textContent = p.root ?? 'Unavailable';
   $('project-state').textContent = p.error ? 'Read error' : p.initialized ? 'Configured' : 'Not configured';
   $('overview-warning').textContent = p.error || '';
   const metrics = $('overview-metrics'); metrics.replaceChildren();
-  metrics.append(metric('Sessions', all ? fmt(all.sessions) : '—'), metric('Projects', all ? fmt(all.projectCount) : '—'),
-    metric('Agents', all ? fmt(Object.keys(all.byAgent).length) : '—'), metric('Reported tokens', all?.tokens ? fmt(all.tokens) : '—'),
-    metric('Elapsed time', all ? duration(all.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
+  metrics.append(metric('Workspace sessions', mine ? fmt(mine.sessions) : '—'),
+    metric('Agents', mine ? fmt(Object.keys(mine.byAgent).length) : '—'), metric('Reported tokens', mine?.tokens ? fmt(mine.tokens) : '—'),
+    metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
   project.append(action(p.initialized ? 'Maintenance →' : 'Configure project →', p.initialized ? 'maintenance' : 'setup', true));
   const activity = card('Activity', 'Last 30 active days · UTC');
-  activity.append(activityChart(d.sessions.available ? Object.entries(all.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
-  activity.append(action('Browse sessions →', 'profiling'), action('Browse knowledge →', 'knowledge'));
+  activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
+  activity.append(button('Browse workspace sessions →', () => {
+    $('filter-project').value = p.canonicalRoot; sessionPage = 1; showView('profiling'); load();
+  }), action('Browse knowledge →', 'knowledge'));
   $('workspace-actions').replaceChildren(project, activity);
-  $('overview-projects').replaceChildren(all?.projects.length ? table(['Project', 'Sessions', 'Elapsed', 'Tokens', 'Last session'], all.projects.slice(0, 8).map((r) => [r.project, fmt(r.sessions), duration(r.minutes), r.tokens ? fmt(r.tokens) : '—', date(r.last)])) : el('p', 'No local sessions found.', 'muted'));
+  $('overview-projects').replaceChildren(all?.projects.length ? table(['Project', 'Sessions', 'Elapsed', 'Tokens', 'Last session'], all.projects.map((r) => [r.project, fmt(r.sessions), duration(r.minutes), r.tokens ? fmt(r.tokens) : '—', date(r.last)])) : el('p', 'No saved projects found. Collect session data explicitly under Global → Sessions.', 'muted'));
+  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Use Global → Sessions → Refresh saved session data.'));
+  if (mine?.sessions > mine.recent.length) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
+  if (all?.projectCount > all.projects.length) $('overview-projects').prepend(el('p', `Top ${all.projects.length} of ${all.projectCount} projects. The complete list is available through the Sessions project filter.`));
+  const t = d.tasks;
+  $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
 }
 function comparisonTable(title, rows) {
   const columns = [
@@ -98,15 +107,66 @@ function comparisonTable(title, rows) {
 }
 function profiling(d) {
   const root = $('profile-results'); root.replaceChildren();
-  if (!d.sessions.available) { root.append(card('No sessions', d.sessions.error || 'No registry or local history found.')); return; }
+  if (!d.sessions.available) { root.append(card('No saved sessions', d.sessions.error || 'No registry or saved scan found. Explicitly refresh saved session data to collect history.')); return; }
   const p = d.sessions.profiling, v = p.summary;
-  for (const key of ['project', 'agent', 'model']) fillOptions($(`filter-${key}`), p.options[key], `All ${key === 'project' ? 'projects' : key === 'agent' ? 'agents' : 'models'}`);
-  $('history-source').textContent = d.sessions.history?.local ? 'Claude Code · Codex · Copilot · Registry + local history' : 'YAW registry';
+  for (const key of ['project', 'agent', 'model']) {
+    const options = key === 'project' ? [...new Set([...p.options[key], d.project.canonicalRoot])].filter(Boolean).sort() : p.options[key];
+    fillOptions($(`filter-${key}`), options, `All ${key === 'project' ? 'projects' : key === 'agent' ? 'agents' : 'models'}`);
+  }
+  $('history-source').textContent = d.sessions.history?.local ? 'Claude Code · Codex · Copilot CLI · Registry + saved analytics' : 'YAW registry';
   const metrics = el('div', null, 'metrics');
   metrics.append(metric('Sessions', fmt(v.sessions), countLabel(p.projects.length, 'project')), metric('Elapsed', duration(v.minutes), `${v.durationKnown}/${v.sessions} end times`),
     metric('Tokens', v.usageKnown ? fmt(v.tokensIn + v.tokensOut) : '—', `${v.usageKnown}/${v.sessions} usage coverage`), metric('Reported cost', v.costKnown ? money(v.costUsd) : '—', `${v.costKnown}/${v.sessions} cost coverage`));
   root.append(metrics);
+  if (v.measured) {
+    root.append(card('Message insights', `${v.measured} measured sessions · ${fmt(v.prompts)} prompts · ${fmt(v.answers)} answers · ${v.answers ? Math.round(v.answerChars / v.answers).toLocaleString() : '—'} characters per answer (weighted mean).`));
+    const insights = card('Lengths & response timing');
+    insights.append(table(['Session', 'Prompts / answers', 'Answer characters median / p95', 'Response seconds median / p95', 'Coverage'],
+      p.recent.filter((r) => r.metrics).map((r) => {
+        const m = r.metrics, seconds = (v) => v === null ? '—' : (v / 1000).toFixed(1);
+        return [r.id, `${m.prompts} / ${m.answers}`, `${m.medianAnswerChars ?? '—'} / ${m.p95AnswerChars ?? '—'}`,
+          `${seconds(m.medianResponseMs)} / ${seconds(m.p95ResponseMs)}`, m.limited ? 'Partial (reader limit)' : `${m.responseSamples} timed responses`];
+      })));
+    root.append(insights);
+    const combined = card('Session length and answer volume (current page)');
+    combined.append(table(['Session', 'Elapsed min', 'Answers', 'Answer characters', 'Tokens in / out'], p.recent.filter((r) => r.metrics).map((r) =>
+      [r.id, r.minutes ?? '—', r.metrics.answers, r.metrics.answerChars, `${r.tokensIn ?? '—'} / ${r.tokensOut ?? '—'}`])));
+    root.append(combined);
+  }
+  if (Object.keys(p.outcomes ?? {}).length) {
+    const results = card('Experimental turn outcomes', 'Local Laya predictions, not verified task success. Low-confidence results are unknown.');
+    for (const [label, count] of Object.entries(p.outcomes)) {
+      const row = el('p', `${label}: ${count} `), bar = el('meter');
+      bar.min = 0; bar.max = Math.max(1, ...Object.values(p.outcomes)); bar.value = count;
+      bar.setAttribute('aria-label', label); row.append(bar); results.append(row);
+    }
+    const labels = (counts) => Object.entries(counts ?? {}).map(([label, count]) => `${label}: ${count}`).join(', ') || '—';
+    results.append(table(['Session', 'Classified / skipped', 'Outcome', 'Sentiment', 'Behaviour', 'Failures', 'Evaluated'], p.recent.filter((r) => r.evaluation).map((r) =>
+      [r.id, `${r.evaluation.classified} / ${r.evaluation.skipped}`, ...['outcome', 'sentiment', 'behaviour', 'failure'].map((key) => labels(r.evaluation.counts[key])), date(r.evaluation.evaluated)])));
+    root.append(results);
+  }
   const chart = card('Activity'); chart.append(activityChart(p.activity)); root.append(chart);
+  for (const [key, title] of [['duration', 'Session duration distribution (minutes)'], ['answerLength', 'Mean answer length distribution (characters per session)']]) {
+    const histogram = card(title);
+    for (const bin of p.charts?.[key] ?? []) {
+      const row = el('p', `${bin.label}: ${bin.count} `), meter = el('meter');
+      meter.min = 0; meter.max = Math.max(1, v.sessions); meter.value = bin.count;
+      meter.setAttribute('aria-label', `${title}: ${bin.label}`); row.append(meter); histogram.append(row);
+    }
+    root.append(histogram);
+  }
+  if (p.charts?.combined.length) {
+    const plot = card('Elapsed minutes × answer count', 'Up to 200 measured sessions in the selected scope; elapsed time includes idle time.');
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 600 220'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Session elapsed minutes on the horizontal axis, answer count on the vertical axis');
+    const maxX = Math.max(1, ...p.charts.combined.map((r) => r.minutes)), maxY = Math.max(1, ...p.charts.combined.map((r) => r.answers));
+    for (const r of p.charts.combined) {
+      const dot = document.createElementNS(ns, 'circle'), title = document.createElementNS(ns, 'title');
+      dot.setAttribute('cx', 20 + r.minutes / maxX * 560); dot.setAttribute('cy', 200 - r.answers / maxY * 180); dot.setAttribute('r', 4); dot.setAttribute('fill', 'currentColor');
+      title.textContent = `${r.id}: ${r.minutes} minutes, ${r.answers} answers`; dot.append(title); svg.append(dot);
+    }
+    plot.append(svg, el('p', `Horizontal: 0–${maxX} min · Vertical: 0–${maxY} answers`)); root.append(plot);
+  }
   const tabs = el('nav', null, 'data-tabs'); tabs.setAttribute('aria-label', 'Session views');
   for (const [key, label] of [['sessions', 'Sessions'], ['agents', 'Agents'], ['projects', 'Projects'], ['models', 'Models']]) {
     const b = button(`${label} ${key === 'sessions' ? v.sessions : p[key].length}`, () => { group = key; profiling(data); });
@@ -137,14 +197,26 @@ function maintenance(d) {
     root.append(el('p', `Kit ${m.kit} · Project pin ${m.pinned} · ${m.excluded} secret files excluded · Checks not run`, 'small muted'));
     root.append(table(['File', 'Module', 'State', 'Ownership'], m.files.map((f) => [f.path, f.module, f.state, f.managed ? 'Managed' : 'User'])));
   }
-  const commands = card('Commands'); commands.append(command('yaw doctor\nyaw status\nyaw update\nyaw add <module>\njust check')); root.append(commands);
+  const commands = card('Commands'); commands.append(command('yaw doctor\nyaw status\nyaw apply\nyaw edit\nyaw add <module>\njust check')); root.append(commands);
 }
 function tasks(d) {
-  const root = $('tasks-body'), t = d.tasks; root.replaceChildren();
-  if (!t.available) { root.append(el('p', t.error || 'No TASKS.md.', 'muted')); return; }
-  if (t.readOnly) root.append(el('p', 'GitHub mirror · just task sync', 'small muted'));
-  root.append(el('h2', `Active (${t.active.length})`), table(['Task', 'Title', 'Status', 'Progress'], t.active.map((r) => [r.id, r.title, r.status, r.progress === undefined ? '—' : `${r.progress}%`])),
-    el('h2', `Backlog (${t.backlog.length})`), table(['Task', 'Title', 'Note'], t.backlog.map((r) => [r.id, r.title, r.note])));
+  const root = $('tasks-body'); root.replaceChildren();
+  const snapshots = [...(d.globalTasks ?? []).filter((t) => t.project !== d.project.canonicalRoot), { project: d.project.canonicalRoot, ...d.tasks }];
+  const filter = el('select'); filter.setAttribute('aria-label', 'Filter tasks by project');
+  fillOptions(filter, snapshots.map((t) => t.project).sort(), 'All projects');
+  const results = el('div');
+  const render = () => {
+    results.replaceChildren();
+    for (const t of snapshots.filter((t) => !filter.value || t.project === filter.value)) {
+      const group = card(t.project);
+      if (!t.available) group.append(el('p', t.error || 'No task ledger found.'));
+      else group.append(table(['Task', 'Title', 'Status / note', 'Progress'], [...t.active, ...t.backlog].map((r) =>
+        [r.id, r.title, r.status ?? r.note, r.progress === undefined ? '—' : `${r.progress}%`])));
+      results.append(group);
+    }
+  };
+  filter.addEventListener('change', render);
+  root.append(el('p', 'Other workspaces use task snapshots from the last explicit session scan; only discovered project roots are read.'), filter, results); render();
 }
 function fillOptions(select, options, label) {
   const value = select.value; select.replaceChildren(); const all = el('option', label); all.value = ''; select.append(all);
@@ -215,14 +287,14 @@ async function loadKnowledge() {
   } catch (e) { if (id !== knowledgeRequest) return; $('knowledge-error').textContent = e.message; $('knowledge-error').hidden = false; $('knowledge-status').textContent = 'Read failed'; renderRecord(null); }
 }
 async function load(refresh = false) {
-  const id = ++requestId; $('workspace-error').hidden = true; $('workspace-status').textContent = 'Scanning local session metadata…'; $('profile-results').setAttribute('aria-busy', 'true');
-  const params = new URLSearchParams({ history: 'local', sort, direction, page: String(sessionPage) });
+  const id = ++requestId; $('workspace-error').hidden = true; $('workspace-status').textContent = 'Reading saved session data…'; $('profile-results').setAttribute('aria-busy', 'true');
+  const params = new URLSearchParams({ sort, direction, page: String(sessionPage) });
   for (const key of ['project', 'agent', 'model', 'days']) params.set(key, $(`filter-${key}`).value);
-  if (refresh) params.set('refresh-history', '1');
   try {
     const res = await fetch(`/api/dashboard?${params}`, { headers: { accept: 'application/json' } }), body = await res.json();
     if (id !== requestId) return; if (!res.ok) throw new Error(body.error || 'Workspace unavailable');
     data = body; overview(data); profiling(data); maintenance(data); tasks(data);
+    $('analysis-status').textContent = body.sessions.history?.collected ? `Last scan: ${date(body.sessions.history.collected)}. Page refresh reads saved results only.` : 'No saved scan. Use Refresh saved session data to collect.';
     $('workspace-status').textContent = `Updated ${date(data.generated)}`;
   } catch (e) {
     if (id !== requestId) return; $('workspace-error').textContent = `${e.message}. Check yaw web and refresh.`; $('workspace-error').hidden = false;
@@ -234,11 +306,87 @@ export function startWorkspace() {
   for (const key of ['project', 'agent', 'model', 'days']) $(`filter-${key}`).addEventListener('change', () => { sessionPage = 1; load(); });
   $('reset-filters').addEventListener('click', () => { for (const key of ['project', 'agent', 'model']) $(`filter-${key}`).value = ''; $('filter-days').value = 'all'; sessionPage = 1; load(); });
   $('refresh').addEventListener('click', () => { load(true); if (active === 'knowledge') loadKnowledge(); });
+  $('scan-history').addEventListener('click', () => collect(false).catch(reportError));
+  $('classify-history').addEventListener('click', () => {
+    if (confirm('Read conversation text in the selected scan scope and date range and send eligible turns to local Laya? No hosted API is used. This can take time.')) collect(true).catch(reportError);
+  });
+  $('save-analysis-settings').addEventListener('click', () => savePreferences().catch(reportError));
+  $('refresh-on-load').addEventListener('change', () => savePreferences().catch(reportError));
+  $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
   for (const key of ['scope', 'namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => {
     if (key === 'scope') { $('knowledge-namespace').value = ''; $('knowledge-type').value = ''; }
     knowledgePage = 1; knowledgeKey = ''; loadKnowledge();
   });
   $('knowledge-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); }, 200); });
   window.addEventListener('hashchange', () => showView(location.hash.slice(1), false));
-  showView(location.hash.slice(1) || 'overview', false); load();
+  showView(location.hash.slice(1) || 'overview', false);
+  load();
+  loadPreferences().catch(reportError);
+}
+
+function reportError(e) {
+  $('workspace-error').textContent = e.message; $('workspace-error').hidden = false;
+}
+async function api(path, input) {
+  const response = await fetch(`/api/${path}`, input === undefined ? {} : {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-yaw-token': document.querySelector('meta[name="yaw-csrf"]').content }, body: JSON.stringify(input),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+  return body;
+}
+async function savePreferences() {
+  const result = await api('preferences', { refreshOnLoad: $('refresh-on-load').checked, endpoint: $('laya-endpoint').value });
+  $('analysis-status').textContent = result.message;
+}
+async function loadPreferences() {
+  const prefs = await api('preferences');
+  $('refresh-on-load').checked = prefs.refreshOnLoad;
+  $('laya-endpoint').value = prefs.endpoint;
+  if (prefs.refreshOnLoad) await collect(false, true);
+}
+async function collect(classify, all = $('scan-scope').value === 'all') {
+  const buttons = [$('scan-history'), $('classify-history')]; buttons.forEach((b) => { b.disabled = true; });
+  $('analysis-status').textContent = classify ? 'Classifying eligible turns with local Laya…' : 'Reading local history and saving aggregates…';
+  try {
+    if (classify) await savePreferences();
+    const result = await api(classify ? 'evaluate' : 'collect', { all, days: $('filter-days').value, confirm: classify });
+    await load(); $('analysis-status').textContent = result.message;
+  } finally { buttons.forEach((b) => { b.disabled = false; }); }
+}
+async function loadMap() {
+  const map = await api('code-map');
+  $('map-content').textContent = map.content || 'No saved code map. Enable it here with yaw add code-map, then run yaw map update.';
+  $('map-areas').replaceChildren(table(['Area', 'Paths', 'Entry points', 'Tests', 'Related areas', 'Decisions'], map.areas.map((a) =>
+    [a.title, a.paths.join(', '), a.entry.join(', '), a.tests.join(', '), a.relates.join(', '), a.adrs.join(', ')])));
+}
+async function loadNotifications() {
+  const cfg = await api('notifications'), root = $('notification-settings'); root.replaceChildren();
+  root.append(el('p', cfg.installed ? 'Comfort is enabled in this workspace. These notification settings are personal and shared across all comfort-enabled projects.' : 'Comfort is not enabled here. Run yaw add comfort in this workspace. Quick keeps it optional; Full includes it by default.'));
+  const fields = {};
+  const field = (name, title, type, value) => {
+    const label = el('label', title), input = el('input'); input.type = type;
+    if (type === 'checkbox') input.checked = value; else input.value = value;
+    label.append(input); root.append(label); fields[name] = input; return input;
+  };
+  field('enabled', 'Enable notifications (personal setting)', 'checkbox', cfg.enabled);
+  field('minutes', 'Minimum run length in minutes', 'number', cfg.minutes);
+  const terminal = el('select'); terminal.setAttribute('aria-label', 'Terminal channel');
+  for (const name of ['osc9', 'osc777', 'off']) { const o = el('option', name); o.value = name; terminal.append(o); }
+  terminal.value = cfg.terminal; root.append(el('p', 'Terminal channel'), terminal);
+  field('telegram', 'Enable Telegram', 'checkbox', cfg.telegram.enabled);
+  field('tokenEnv', 'Bot token environment variable NAME (not the token)', 'text', cfg.telegram.tokenEnv);
+  field('chatIdEnv', 'Chat ID environment variable NAME (not the ID)', 'text', cfg.telegram.chatIdEnv);
+  root.append(el('p', `Telegram environment: ${cfg.telegramReady ? 'configured' : 'not configured'}. Enter credentials in your shell before starting yaw web; never paste them here. Restart an existing background server to pick up environment changes. ntfy: ${cfg.ntfyConfigured ? 'configured in comfort.yaml' : 'not configured'}.`));
+  const status = el('p', cfg.delivery ? `Last background delivery: ${cfg.delivery.ok ? 'sent' : 'failed'} · ${date(cfg.delivery.date)}` : '');
+  root.append(button('Save personal settings', async () => {
+    try {
+      const result = await api('notifications', { enabled: fields.enabled.checked, minutes: Number(fields.minutes.value), terminal: terminal.value,
+        telegram: { enabled: fields.telegram.checked, tokenEnv: fields.tokenEnv.value, chatIdEnv: fields.chatIdEnv.value } });
+      status.textContent = result.message;
+    } catch (e) { reportError(e); }
+  }), button('Send test notification', async () => {
+    if (!confirm('Send a test notification through the configured remote channels?')) return;
+    try { status.textContent = (await api('notification-test', { confirm: true })).message; } catch (e) { reportError(e); }
+  }), status);
 }

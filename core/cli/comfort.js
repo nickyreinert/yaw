@@ -10,7 +10,7 @@ const MAX_STDIN = 256 * 1024;
 
 async function lib(io) {
   const manifest = requireManifest(io.cwd);
-  if (!enabledModules(manifest).includes('comfort')) throw new UsageError('the comfort module is not installed; run: yaw add comfort');
+  if (!enabledModules(manifest).includes('comfort')) throw new UsageError('the comfort module is not installed in this project; run: yaw add comfort here to enable it (optional in Quick, included by default in Full). Notification settings are personal and shared across comfort-enabled projects; configure them in yaw web');
   return import(pathToFileURL(join(io.kitRoot, 'modules', 'comfort', 'lib', 'cli.js')).href);
 }
 

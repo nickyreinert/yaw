@@ -10,6 +10,8 @@ import { formatError } from '../../../core/lib/schema.js';
 import { schemas } from '../../../core/render/kit.js';
 import { readAnswers } from '../../../core/render/project.js';
 import { yawHome } from '../../../core/hooks/dispatch.js';
+import { readUserData } from '../../../core/lib/user-store.js';
+import { validateNotifications } from './settings.js';
 
 export const FEATURES = ['hygiene', 'status-line', 'notifications'];
 export const DEFAULT_FEATURES = ['hygiene', 'status-line'];
@@ -39,6 +41,20 @@ export function readSmallFile(file, max = MAX_BYTES) {
 
 // -> { config, error }: the validated personal file ({} when it does not exist) or the reason it is unusable.
 export function readPersonal(env) {
+  const result = readPersonalFile(env);
+  if (result.error) return result;
+  try {
+    const saved = readUserData(env, 'notification-settings.json');
+    if (!saved) return result;
+    validateNotifications(saved);
+    const config = result.config;
+    return { ...result, config: { ...config, notificationEnabled: saved.enabled, notify: { ...config.notify, minutes: saved.minutes, terminal: saved.terminal, telegram: saved.telegram } } };
+  } catch {
+    return { config: {}, error: 'Saved personal notification settings are unreadable or invalid' };
+  }
+}
+
+function readPersonalFile(env) {
   const home = homeDir(env);
   if (home === null) return { config: {}, error: 'no absolute YAW_HOME / HOME' };
   const file = join(home, 'comfort.yaml');
@@ -77,7 +93,11 @@ export function resolveFeatures({ root, personal }) {
   } catch { /* no answers file: defaults */ }
   const team = (answers['idea.team'] ?? 'solo') !== 'solo';
   const valid = (list) => Array.isArray(list) && list.every((f) => FEATURES.includes(f));
-  if (valid(personal.features)) return { features: personal.features, source: 'personal', team };
-  if (!team && valid(answers['user.comfort'])) return { features: answers['user.comfort'], source: 'project', team };
-  return { features: DEFAULT_FEATURES, source: 'default', team };
+  const selected = valid(personal.features) ? { features: personal.features, source: 'personal', team }
+    : !team && valid(answers['user.comfort']) ? { features: answers['user.comfort'], source: 'project', team }
+      : { features: DEFAULT_FEATURES, source: 'default', team };
+  if (typeof personal.notificationEnabled !== 'boolean') return selected;
+  const features = selected.features.filter((f) => f !== 'notifications');
+  if (personal.notificationEnabled) features.push('notifications');
+  return { ...selected, features };
 }

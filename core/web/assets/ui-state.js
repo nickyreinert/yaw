@@ -36,7 +36,7 @@ export function effectiveAnswers(questions, given, mode) {
 export function visibleQuestions(questions, given, mode, modules) {
   const selected = questions.filter((q) => modules.includes(q.owner));
   const answers = effectiveAnswers(selected, given, mode);
-  return selected.filter((q) => asksIn(q, mode) && matches(q.when, answers) &&
+  return selected.filter((q) => !q.editHidden && asksIn(q, mode) && matches(q.when, answers) &&
     !(answers['user.expertise'] === 'layperson' && q.mode === 'F'));
 }
 export function defaultModules(definitions, questions, given, mode) {

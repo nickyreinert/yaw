@@ -50,6 +50,22 @@ test('form server: the start token works once', () => withServer(async (s) => {
   assert.equal((await fetch(s.url, { redirect: 'manual' })).status, 403);
 }));
 
+test('form server: browser launch commits a same-origin page before navigating with the Strict cookie', () => withServer(async (s) => {
+  const login = await raw(s.port, `GET /?t=${s.token} HTTP/1.1\r\nHost: 127.0.0.1:${s.port}\r\nSec-Fetch-Mode: navigate\r\nConnection: close\r\n\r\n`);
+  assert.match(login, /^HTTP\/1\.1 200/);
+  assert.match(login, /HttpOnly; SameSite=Strict/);
+  assert.match(login, /content-security-policy: default-src 'self'/);
+  assert.match(login, /referrer-policy: no-referrer/);
+  assert.match(login, /src="\/login.js"/);
+  const cookie = login.match(/set-cookie: ([^;]+)/)[1];
+  const script = await fetch(`${base(s)}/login.js`, { headers: { cookie } });
+  assert.equal(script.status, 200);
+  assert.equal(await script.text(), "location.replace('/');\n");
+  assert.equal((await fetch(`${base(s)}/login.js`)).status, 403);
+  assert.equal((await fetch(`${base(s)}/`, { headers: { cookie } })).status, 200);
+  assert.equal((await fetch(s.url, { redirect: 'manual' })).status, 403);
+}));
+
 test('form server: an authenticated browser can revisit its consumed login link', () => withServer(async (s) => {
   const { cookie } = await session(s);
   assert.equal((await fetch(s.url, { redirect: 'manual', headers: { cookie } })).status, 303);

@@ -29,14 +29,14 @@ test('help lists every phase-1 command; no arguments prints help too', () => {
 
 test('the phase-1 command list is fixed (ADR-0019)', () => {
   assert.deepEqual(COMMANDS.map((c) => c.name), [
-    'init', 'web', 'update', 'remove', 'status', 'doctor', 'self-update', 'self-uninstall', 'help',
-    'apply', 'add', 'hook', 'sync', 'agents', 'task', 'kickoff', 'config', 'gh', 'decisions', 'map', 'sessions', 'session', 'session-start', 'hygiene', 'notify', 'statusline', 'presets',
+    'init', 'web', 'apply', 'update', 'edit', 'remove', 'status', 'doctor', 'self-update', 'self-uninstall', 'help',
+    'add', 'hook', 'sync', 'agents', 'task', 'kickoff', 'gh', 'decisions', 'map', 'sessions', 'session-start', 'hygiene', 'notify', 'statusline', 'presets',
   ]);
 });
 
-test('help groups every implemented command exactly once and labels placeholders honestly', () => {
+test('help groups every command exactly once without placeholders', () => {
   const names = HELP_GROUPS.flatMap((group) => group.names);
-  const built = COMMANDS.filter((c) => !c.step).map((c) => c.name);
+  const built = COMMANDS.map((c) => c.name);
   assert.equal(new Set(names).size, names.length);
   assert.deepEqual([...names].sort(), built.sort());
   const output = yaw([]).stdout;
@@ -44,11 +44,22 @@ test('help groups every implemented command exactly once and labels placeholders
     assert.ok(output.includes(`${group.title}:\n`));
     for (const name of group.names) assert.equal(output.match(new RegExp(`^  ${name} `, 'gm')).length, 1);
   }
-  assert.match(output, /Not implemented \(placeholders\):/);
-  assert.doesNotMatch(output, /coming later in phase 1|\(step [35]\)/);
-  assert.match(yaw(['help', 'apply']).stdout, /not implemented.*yaw update/);
-  assert.match(yaw(['help', 'config']).stdout, /No config editor/);
-  assert.match(yaw(['help', 'session']).stdout, /Native agent-session renaming is not implemented/);
+  assert.doesNotMatch(output, /placeholder|not implemented|coming later in phase 1|\(step [35]\)/i);
+});
+
+test('deferred commands are absent from help and use ordinary unknown-command errors', () => {
+  for (const name of ['config', 'session']) {
+    for (const args of [[], ['--help'], ['-h'], ['help']]) {
+      assert.doesNotMatch(yaw(args).stdout, new RegExp(`^  ${name} `, 'm'));
+    }
+    for (const args of [[name], [name, '--help'], ['help', name]]) {
+      const r = yaw(args);
+      assert.equal(r.status, 1);
+      assert.equal(r.stdout, '');
+      assert.match(r.stderr, new RegExp(`unknown command "${name}"`));
+      assert.doesNotMatch(r.stderr, /placeholder|not implemented/i);
+    }
+  }
 });
 
 test('unknown command exits 1 with usage on stderr', () => {
@@ -59,13 +70,10 @@ test('unknown command exits 1 with usage on stderr', () => {
   assert.match(r.stderr, /^usage: yaw <command> \[options\]$/m);
 });
 
-test('unknown option and planned commands exit 1', () => {
+test('unknown option and invalid strategy exit 1', () => {
   const opt = yaw(['update', '--frob']);
   assert.equal(opt.status, 1);
   assert.match(opt.stderr, /usage: yaw update/);
-  const planned = yaw(['config']);
-  assert.equal(planned.status, 1);
-  assert.match(planned.stderr, /not implemented.*No config editor/);
   assert.equal(yaw(['update', '--strategy', 'yolo'], { cwd: tmp() }).status, 1);
 });
 

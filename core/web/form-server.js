@@ -11,11 +11,13 @@ export const CSRF_HEADER = 'x-yaw-token';
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 export const MAX_JSON_BYTES = 256 * 1024;
 const assets = new Map([
+  ['/login.js', ['text/javascript; charset=utf-8', Buffer.from("location.replace('/');\n")]],
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
   ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],
   ['/yaw-shark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-shark.svg', import.meta.url))]],
+  ['/yaw-wordmark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-wordmark.svg', import.meta.url))]],
 ]);
 
 async function readJson(req) {
@@ -121,6 +123,11 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
       if (!authenticated && (used || !same(url.searchParams.get('t'), startToken))) return fail(403, 'invalid token; run yaw web for a new login link');
       used = true;
       resetIdle();
+      // Commit a same-origin document before navigating, so Strict cookies survive file-launcher navigation.
+      if (req.headers['sec-fetch-mode'] === 'navigate') {
+        res.writeHead(200, { ...headers('text/html; charset=utf-8'), 'set-cookie': setCookie });
+        return res.end('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Opening YAW</title><script src="/login.js" defer></script></head><body><a href="/">Continue to YAW</a></body></html>');
+      }
       res.writeHead(303, { location: '/', 'set-cookie': setCookie, 'cache-control': 'no-store', 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
       return res.end();
     }
@@ -128,12 +135,12 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     res.setHeader('set-cookie', setCookie);
     resetIdle(); // only an authenticated request keeps the server alive
     if (req.method === 'GET' || req.method === 'HEAD') {
-      const asset = served.get(url.pathname);
+      const asset = url.pathname === '/login.js' ? assets.get(url.pathname) : served.get(url.pathname);
       if (url.pathname === '/' || asset) {
         res.writeHead(200, { 'content-type': asset?.[0] ?? 'text/html; charset=utf-8', 'content-security-policy': CSP, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
         return res.end(req.method === 'HEAD' ? undefined : asset?.[1] ?? page(session));
       }
-      if (api && url.pathname === '/api/bootstrap') {
+      if (api?.bootstrap && url.pathname === '/api/bootstrap') {
         try { return json(200, api.bootstrap(), req.method === 'HEAD'); }
         catch (e) { return error(e); }
       }
@@ -147,7 +154,8 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     if (req.method === 'POST') {
       // State changes: custom header (a cross-site form cannot set it) carrying the secret, plus the cookie above.
       if (!same(req.headers[CSRF_HEADER], session)) return fail(403, 'missing or invalid csrf header');
-      if (!api || !['preview', 'diff', 'draft', 'preset', 'prefill', 'apply'].some((p) => url.pathname === `/api/${p}`)) {
+      if (!api || !['preview', 'diff', 'draft', 'preset', 'prefill', 'apply', ...(api.actions ?? [])].some((p) => url.pathname === `/api/${p}`) ||
+        (url.pathname === '/api/apply' && !api.apply)) {
         req.resume();
         return fail(404, 'not found');
       }

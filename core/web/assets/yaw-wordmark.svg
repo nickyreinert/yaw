@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 119 42" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="letter" x1="0" y1="0" x2="0" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffef7"/>
+      <stop offset="1" stop-color="#ccebe5"/>
+    </linearGradient>
+  </defs>
+  <!-- The inset teal edges give the angular strokes a little depth at small sizes. -->
+  <g stroke="#52bfc2" stroke-width="6" stroke-linecap="square" stroke-linejoin="bevel" opacity=".58" transform="translate(1.6 1.6)">
+    <path d="M4 5 19 21 34 5M19 21v16"/>
+    <path d="M41 37 57 5 73 37M47 26h20"/>
+    <path d="M80 5 87 37 97 19 107 37 114 5"/>
+  </g>
+  <g stroke="url(#letter)" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="bevel">
+    <path d="M4 5 19 21 34 5M19 21v16"/>
+    <path d="M41 37 57 5 73 37M47 26h20"/>
+    <path d="M80 5 87 37 97 19 107 37 114 5"/>
+  </g>
+  <g stroke="#fffef7" stroke-width=".9" opacity=".6" stroke-linecap="square">
+    <path d="M4 4 19 20 34 4M57 4 73 36M80 4 87 36 97 18 107 36 114 4"/>
+  </g>
+</svg>

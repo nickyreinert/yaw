@@ -1,37 +1,45 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YAW dashboard</title><link rel="stylesheet" href="/app.css"><script type="module" src="/dashboard.js"></script></head><body data-mode="dashboard">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="yaw-csrf" content="YAW_CSRF"><title>YAW dashboard</title><link rel="stylesheet" href="/app.css"><script type="module" src="/dashboard.js"></script></head><body data-mode="dashboard">
   <a class="skip" href="#overview-title">Skip to content</a>
   <aside class="sidebar">
-    <a class="brand" href="#overview"><img src="/yaw-shark.svg" width="38" height="38" alt=""><span>YAW<span class="brand-dot">.</span><span class="brand-caption">LOCAL WORKSPACE</span></span></a>
+    <a class="brand" href="#overview" aria-label="YAW overview"><img src="/yaw-shark.svg" width="38" height="38" alt=""><img class="brand-wordmark" src="/yaw-wordmark.svg" width="92" height="34" alt="YAW"></a>
     <div class="project-switch"><span class="eyebrow">CURRENT FOLDER</span><strong id="project-name">Local project</strong><span id="project-state" class="small muted">Reading project…</span></div>
     <nav aria-label="Workspace">
       <span class="nav-label">WORKSPACE</span>
       <button type="button" data-route="overview"><span aria-hidden="true">◫</span> Overview</button>
 
       <button type="button" data-route="maintenance"><span aria-hidden="true">⊞</span> Maintenance</button>
-      <span class="nav-label">DATA</span>
-      <button type="button" data-route="profiling"><span aria-hidden="true">▥</span> Sessions <span class="nav-tag">GLOBAL</span></button>
+      <button type="button" data-route="notifications">Notifications</button>
+      <button type="button" data-route="code-map">Code map</button>
+      <span class="nav-label">GLOBAL</span>
+      <button type="button" data-route="projects">Projects</button>
+      <button type="button" data-route="profiling"><span aria-hidden="true">▥</span> Sessions</button>
       <button type="button" data-route="tasks"><span aria-hidden="true">☷</span> Tasks</button>
+      <span class="nav-label">KNOWLEDGE</span>
       <button type="button" data-route="knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
     </nav>
-    <div class="sidebar-footer"><span class="local-dot"></span> Local only<p>127.0.0.1</p><code>yaw web</code></div>
   </aside>
   <div class="workspace">
     <header class="topbar"><div>Workspace <span aria-hidden="true">/</span> <strong id="breadcrumb">Overview</strong></div><div class="topbar-actions"><span class="local-badge"><span class="local-dot"></span> Local workspace</span><button type="button" id="refresh" aria-label="Refresh workspace data">↻ <span>Refresh</span></button></div></header>
     <main class="content">
       <p id="workspace-error" role="alert" class="warn" hidden></p>
       <section data-view="overview" class="view">
-        <div class="page-heading"><h1 id="overview-title" tabindex="-1">Overview</h1><span id="overview-intro" class="small muted">All local sessions · Current project</span></div>
+        <div class="page-heading"><h1 id="overview-title" tabindex="-1">Overview</h1><span id="overview-intro" class="small muted">Current workspace only</span></div>
         <p id="overview-warning" class="warn"></p><div id="overview-metrics" class="metrics"></div>
         <div id="workspace-actions" class="overview-grid"></div>
-        <article class="card"><div class="section-heading"><h2>Projects</h2><button type="button" data-route="profiling">All sessions →</button></div><div id="overview-projects"></div></article>
+        <article class="card"><h2>Workspace sessions</h2><div id="workspace-sessions"></div></article>
+        <article class="card"><h2>Workspace tasks</h2><div id="workspace-tasks"></div></article>
         <div class="folder-line"><span class="eyebrow">PROJECT</span><code id="project-path"></code></div>
       </section>
+      <section data-view="projects" class="view" hidden><h1 tabindex="-1">Global projects</h1><p>Projects found in saved session scans and the YAW registry. No filesystem crawl on page load.</p><div id="overview-projects"></div></section>
+      <section data-view="notifications" class="view" hidden><h1 tabindex="-1">Notifications</h1><div id="notification-settings"></div></section>
+      <section data-view="code-map" class="view" hidden><h1 tabindex="-1">Workspace code map</h1><p>Only the current workspace. Updates are explicit: <code>yaw map update</code>; validate with <code>yaw map check</code>.</p><button type="button" id="map-refresh">Read saved map</button><div id="map-areas"></div><pre id="map-content"></pre></section>
       <section data-view="profiling" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Sessions</h1><span id="history-source" class="small muted">Registry + local history · All projects</span></div>
         <div class="filters card"><label>Project<select id="filter-project"><option value="">All projects</option></select></label><label>Agent<select id="filter-agent"><option value="">All agents</option></select></label><label>Model<select id="filter-model"><option value="">All models</option></select></label><label>Period<select id="filter-days"><option value="all" selected>All history</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label><button type="button" id="reset-filters">Reset</button></div>
+        <div class="card"><h2>Collect &amp; classify</h2><p>Saved results only until you explicitly scan. Scanning reads local message records for aggregate lengths and timing; message text is not saved. Classification sends turn text only to local Laya, never a hosted API.</p><label>Scan scope<select id="scan-scope"><option value="current">Current workspace</option><option value="all">All discovered workspaces</option></select></label><button type="button" id="scan-history">Refresh saved session data</button><label><input type="checkbox" id="refresh-on-load"> Refresh session data whenever this web interface reloads (all discovered workspaces; no model)</label><label>Local Laya address<input id="laya-endpoint" value="http://127.0.0.1:8000" type="url"></label><button type="button" id="save-analysis-settings">Save preferences</button><button type="button" id="classify-history">Classify sessions with local Laya</button><p id="analysis-status" role="status"></p></div>
         <div id="profile-results" aria-live="polite"></div>
-        <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Claude Code, Codex, Copilot local history + YAW registry. Metadata only; no import required. Scan cache: 60 seconds; Refresh rescans. Scan limit: 20,000 files per agent. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Activity uses UTC days.</p><p>Outcome scoring, cache breakdowns, tool failures, and OpenTelemetry are not collected.</p></details>
+        <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Explicit scans support Claude Code, Codex and Copilot CLI local history. No scan on page load unless you enable refresh-on-load. Scan limit: 20,000 files per agent; analysis limit: 64 MiB and 2,000 text messages per transcript. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Response time is prompt-to-first-recorded-answer, not network latency. Activity uses UTC days. Classification is experimental, can be wrong, and never runs automatically. Oversized turns are skipped rather than truncated.</p></details>
       </section>
       <section data-view="knowledge" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Knowledge</h1><span class="small muted">User + project records · Read-only</span></div>
@@ -41,7 +49,7 @@
         <details class="data-notes"><summary>Sources</summary><div id="knowledge-sources"></div></details>
       </section>
       <section data-view="maintenance" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Maintenance</h1><span class="small muted">Current project · File state &amp; kit version</span></div><div id="maintenance-body"></div></section>
-      <section data-view="tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">Current project · TASKS.md</span></div><div id="tasks-body" class="card"></div></section>
+      <section data-view="tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">Global snapshots · Filter by project</span></div><div id="tasks-body" class="card"></div></section>
       <footer class="content-footer"><span id="workspace-status" role="status">Loading workspace…</span><span>YAW</span></footer>
     </main>
   </div>

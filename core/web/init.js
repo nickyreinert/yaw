@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFormModel, assertSafe, FormError } from './form-model.js';
 import { startFormServer } from './form-server.js';
-import { initProject } from '../render/project.js';
+import { editProject, initProject } from '../render/project.js';
 import { readManifest } from '../render/manifest.js';
 import { writeAtomic } from '../render/files.js';
 import { kitVersion } from '../render/kit.js';
@@ -14,17 +14,22 @@ import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
+import { createWorkspaceApi, WORKSPACE_ACTIONS } from './workspace-api.js';
 
 export const DRAFT = '.yaw/draft.yaml';
 
 // handoff: answers given so far in the terminal (#162), shown prefilled; never written before apply.
-export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null }) {
-  const model = createFormModel({ root, kitRoot, env });
+export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null, edit = false, sections = [] }) {
+  const model = createFormModel({ root, kitRoot, env, edit, sections });
+  const workspace = createWorkspaceApi({ root, kitRoot, env });
   const ensureNew = () => {
+    if (edit) return model.assertUnchanged();
     if (readManifest(root)) throw new FormError('This project is already initialized; use yaw update', 409);
   };
   return {
+    actions: WORKSPACE_ACTIONS,
     get: {
+      ...workspace.get,
       '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
       '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),
     },
@@ -42,6 +47,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       return prepared;
     },
     async action(name, input) {
+      if (WORKSPACE_ACTIONS.includes(name)) return workspace.action(name, input);
       if (name === 'prefill') {
         if (!input || typeof input !== 'object' || Array.isArray(input) ||
           Object.keys(input).some((k) => !['kind', 'name'].includes(k))) throw new FormError('Invalid prefill request');
@@ -80,7 +86,9 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       assertSafe(prepared.doc.answers, kitRoot);
       const output = { write: (text) => emit({ type: 'log', text: String(text) }) };
       emit({ type: 'log', text: 'Applying confirmed setup…\n' });
-      const result = await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });
+      const result = edit
+        ? await editProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc } })
+        : await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });
       printReport(output, result);
       emit({ type: 'log', text: 'Wrote .yaw/answers.yaml and .yaw/manifest.json\n' });
       const saved = writeEnvSecrets(root, model.secretCatalog(prepared).names, prepared.secretValues);
@@ -131,8 +139,8 @@ export function openBrowser(target, env) {
   });
 }
 
-export async function initWeb({ io, skipVerify, verify, handoff }) {
-  const api = createFormApi({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, verify, skipVerify, stderr: io.stderr, handoff });
+export async function initWeb({ io, skipVerify, verify, handoff, edit = false, sections = [] }) {
+  const api = createFormApi({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, verify, skipVerify, stderr: io.stderr, handoff, edit, sections });
   let finish;
   const done = new Promise((r) => { finish = r; });
   let exitCode = 1;
@@ -147,12 +155,17 @@ export async function initWeb({ io, skipVerify, verify, handoff }) {
   };
   let launcher;
   const server = await startFormServer({ api, onClose: () => { launcher?.remove(); finish(exitCode); } });
-  io.stdout.write(`YAW setup (local only). Open this one-time link:\n${server.url}\nNothing is written until Save draft, Save as preset, or Apply. Ctrl+C stops the server.\n`);
+  io.stdout.write(`YAW ${edit ? 'edit' : 'setup'} (local only). Open this one-time link:\n${server.url}\nNothing is written until Save draft, Save as preset, or Apply. Ctrl+C stops the server.\n`);
   let opened;
-  if (io.openBrowser) opened = await io.openBrowser(server.url, io.env);
-  else {
-    launcher = writeLauncher(server.url);
-    opened = await openBrowser(launcher.file, io.env);
+  try {
+    if (io.openBrowser) opened = await io.openBrowser(server.url, io.env);
+    else {
+      launcher = writeLauncher(server.url);
+      opened = await openBrowser(launcher.file, io.env);
+    }
+  } catch (e) {
+    await server.close();
+    throw e;
   }
   if (!opened) io.stdout.write('Browser could not be opened automatically; open the link above manually.\n');
   return done;

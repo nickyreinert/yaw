@@ -273,6 +273,18 @@ Status: **implemented, awaiting the user's ADR review** (PR #87). All 24 example
 
 ### Step 2 — Kit skeleton, install, update
 
+Dashboard follow-up: workspace-only Overview; separate Global Projects, Sessions
+and filtered task snapshots; personal/current-workspace Knowledge; workspace
+notification and saved code-map panels; redundant sidebar footer removed.
+Explicit `yaw sessions scan|evaluate|analytics` and matching authenticated web
+actions persist aggregate analytics. Refresh-on-load is opt-in; local Laya
+multilingual classification is experimental and always manual. Telegram uses
+environment-only credentials and personal JSON preferences, preserving optional
+per-project comfort enablement. Limits and separate-service setup are documented
+in `docs/workspace-dashboard.md`; no model installation or live inference/delivery
+is performed by this implementation. VS Code chat-history coverage, active-work
+time estimation and per-project notification overrides remain deferred.
+
 Status: **implemented and locally verified**; hosted kit-ci remains deferred (PR #89). Install → init (core only) → update → remove passes in `test/install.test.js`; the second install is a no-op; shellcheck is clean. Full local tests pass on macOS Node 22.13.0/24.22.1 and Linux Node 22.13.1/24.22.1 containers (the offline Linux suites have documented skips). The clean Linux tag-install smoke also passes.
 
 | ID | Title | Type | Prio | Depends | Acceptance criteria |
@@ -413,13 +425,18 @@ User-reported setup usability items #162–#176, fixed and closed locally on `fi
 
 ## 4. Remaining open points
 
-### Unimplemented CLI placeholders
+### Setup command follow-up and deferred CLI ideas
 
-The command table still reserves `apply`, `config` and `session`, but none has a handler. They are not completed work or missing tool installations. General help lists them separately as unimplemented, and their individual help describes the current alternatives and limits (ADR-0019):
+Revised by user decision on 2026-10-24 before launch (ADR-0019):
 
-- `apply`: a standalone command to reapply answers is missing; `yaw update` already re-renders an initialized project's managed files.
-- `config`: `config.schema.json` already defines knowledge namespaces, but the settings editor and runtime `.yaw/config.yaml` loading/saving are not implemented. Current project setup is stored in `.yaw/answers.yaml`.
+- `apply`: the primary name for re-rendering managed files from saved answers and the installed kit; `update` remains an alias with identical reconciliation options.
+- `edit`: review an initialized project's saved interview answers, in the terminal or browser. With no arguments rerun the interview; section or question-ID arguments limit editing. Both lanes use current answers as defaults, preview before confirmation, preserve unrelated answers and user-edited files, and keep installed modules unless explicitly changed in the full browser editor. The full editor can change depth, profiles and agents; section editing cannot change depth, profiles or modules. Stale editors must be reopened before applying.
+- `config`: remains removed, not an alias for `edit`. The existing schema's knowledge namespaces and runtime `.yaw/config.yaml` settings remain deferred; project setup uses `.yaw/answers.yaml`.
 - `session`: native agent-session renaming and its agent-specific integrations are missing. `yaw sessions` manages registry records; a registry title is not a native agent-session rename.
+
+`config` and `session` have no reserved CLI names or compatibility messages. Native session renaming is deferred.
+
+Browser login follow-up (ADR-0044): browser navigations commit a minimal same-origin login document before replacing the token URL with `/`. This keeps the HttpOnly, SameSite=Strict cookie working after navigation through the private launcher file; non-browser clients retain the 303 handshake. No token enters browser-launch process arguments.
 
 ### Original planning questions
 

@@ -6,8 +6,8 @@ import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { suggestProfiles } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
-import { checkDependencies, parseAnswers, renderInit, selectModules, ANSWERS, ProjectError } from '../render/project.js';
-import { MANIFEST, readProjectFile, resolveInside } from '../render/files.js';
+import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
+import { MANIFEST, hashContent, readProjectFile, resolveInside } from '../render/files.js';
 import { parse, stringify } from '../lib/yaml.js';
 import { secretFindings, listPresets, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
 import { envFileExists, envNames } from '../lib/env-secrets.js';
@@ -29,7 +29,10 @@ export function assertSafe(answers, kitRoot) {
   if (findings.length) throw new FormError('An answer looks like a secret. Remove it; this form does not accept or save secrets.');
 }
 
-export function createFormModel({ root, kitRoot, env }) {
+export function createFormModel({ root, kitRoot, env, edit = false, sections = [] }) {
+  const manifest = edit ? requireManifest(root) : null;
+  const original = edit ? readAnswers(root) : null;
+  const originalText = edit ? readProjectFile(root, ANSWERS).toString('utf8') : null;
   const definitions = readdirSync(join(kitRoot, 'modules')).filter((n) => hasModule(kitRoot, n)).sort()
     .map((n) => loadModule(kitRoot, n));
   definitions.sort((a, b) => a.name === 'core' ? -1 : b.name === 'core' ? 1 : a.name.localeCompare(b.name));
@@ -38,6 +41,22 @@ export function createFormModel({ root, kitRoot, env }) {
   const byId = new Map(questions.map((q) => [q.id, q]));
   const profiles = listProfiles(kitRoot);
   const owner = new Map(definitions.flatMap((d) => (d.questions ?? []).map((q) => [q.id, d.name])));
+  const editableQuestions = edit ? questions.filter((q) => enabledModules(manifest).includes(owner.get(q.id) ?? 'core')) : questions;
+  const sectionNames = [...new Set(editableQuestions.map((q) => q.id.split('.')[0]))];
+  for (const section of sections) {
+    if (!sectionNames.includes(section) && !editableQuestions.some((q) => q.id === section)) throw new FormError(`Unknown interview section or question "${section}"; choose ${sectionNames.join(', ')}`);
+  }
+  const editable = (q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
+  const initial = edit ? {
+    mode: original.mode, answers: original.answers, profile: manifest.profiles[0], modules: enabledModules(manifest),
+  } : null;
+
+  function assertUnchanged() {
+    if (edit && (readProjectFile(root, ANSWERS)?.toString('utf8') !== originalText ||
+      JSON.stringify(requireManifest(root)) !== JSON.stringify(manifest))) {
+      throw new FormError('Project setup changed since this editor opened; restart yaw edit before applying', 409);
+    }
+  }
 
   function validateGiven(given) {
     assertSafe(given, kitRoot);
@@ -53,29 +72,44 @@ export function createFormModel({ root, kitRoot, env }) {
       }
     }
   }
+  if (edit) validateGiven(original.answers);
 
   function normalize(input) {
+    assertUnchanged();
     if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'profile', 'modules', 'consent', 'saveProfile'].includes(k))) {
       throw new FormError('Expected a setup object with mode, answers, profile and optional modules');
     }
     if (!['quick', 'full', 'standard'].includes(input.mode)) throw new FormError('Choose Quick or Full');
-    const given = input.answers ?? {};
+    let given = input.answers ?? {};
     validateGiven(given);
+    if (edit) {
+      if (sections.length && Object.entries(given).some(([id, value]) => !editable(byId.get(id)) &&
+        JSON.stringify(value) !== JSON.stringify(original.answers[id]))) {
+        throw new FormError('An answer is outside the selected interview sections; run yaw edit without sections');
+      }
+      if (sections.length && (input.mode !== original.mode ||
+        (input.profile && input.profile !== initial.profile) ||
+        (input.modules != null && JSON.stringify(input.modules) !== JSON.stringify(initial.modules)))) {
+        throw new FormError('Section editing cannot change setup depth, profiles or module selection; run yaw edit without sections');
+      }
+      given = { ...original.answers, ...Object.fromEntries(Object.entries(given).filter(([id]) => editable(byId.get(id)))) };
+    }
     // Same ordering as runInterview: asked questions, then mode-defaulted questions.
     const normalizeFor = (qs) => {
-      const answers = {};
+      const answers = edit ? { ...original.answers } : {};
       const defaulted = [];
       for (const asked of [true, false]) for (const q of qs) {
+        if (edit && !editable(q)) continue;
         if (asksIn(q.mode, input.mode) !== asked || !whenMatches(q.when, answers)) continue;
-        const use = asked && !(answers['user.expertise'] === 'layperson' && q.mode === 'F') && Object.hasOwn(given, q.id);
+        const use = Object.hasOwn(given, q.id) && (edit || (asked && !(answers['user.expertise'] === 'layperson' && q.mode === 'F')));
         answers[q.id] = use ? given[q.id] : q.default;
         if (!use) defaulted.push(q.id);
       }
-      return { answers: Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted };
+      return { answers: edit ? answers : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted };
     };
     const facts = deriveFacts(normalizeFor(questions).answers);
     let modules = input.modules;
-    if (modules === undefined || modules === null) modules = selectModules({ kitRoot, mode: input.mode, facts });
+    if (modules === undefined || modules === null) modules = edit ? initial.modules : selectModules({ kitRoot, mode: input.mode, facts });
     if (!Array.isArray(modules) || modules.length > names.length || new Set(modules).size !== modules.length ||
       !modules.includes('core') || modules.some((n) => !names.includes(n))) throw new FormError('Invalid module selection; core is required');
     modules = names.filter((n) => modules.includes(n));
@@ -89,10 +123,11 @@ export function createFormModel({ root, kitRoot, env }) {
     const { answers, defaulted } = normalizeFor(answerQuestions);
     assertSafe(answers, kitRoot);
     const { suggestion } = suggestProfiles(profiles, deriveFacts(answers));
-    const profile = input.profile || suggestion;
+    const profile = input.profile || (edit ? initial.profile : suggestion);
     if (!profiles.some((p) => p.name === profile)) throw new FormError('Choose a stack profile; no single profile matches these answers');
     const p = profiles.find((p) => p.name === profile);
-    const doc = { mode: input.mode, answers, proposal: { status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: [profile], modules } };
+    const chosenProfiles = edit && profile === initial.profile ? manifest.profiles : [profile];
+    const doc = { ...(original ?? {}), mode: input.mode, answers, proposal: { ...(original?.proposal ?? {}), status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: chosenProfiles, modules } };
     const text = stringify(doc);
     try { parseAnswers(text); }
     catch (e) {
@@ -103,25 +138,42 @@ export function createFormModel({ root, kitRoot, env }) {
   }
 
   function secretCatalog(result, rendered = null) {
-    const { desired } = rendered ?? renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
+    const { desired } = rendered ?? render(result);
     const example = readProjectFile(root, '.env.example') ?? desired.get('.env.example')?.content;
     return { names: envNames(example?.toString('utf8') ?? ''), existingFile: envFileExists(root) };
   }
 
+  function render(result) {
+    return edit
+      ? renderProject({ root, kitRoot, manifest: { ...manifest, profiles: result.doc.proposal.profiles }, answersDoc: result.doc, modules: result.modules })
+      : renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
+  }
+
   function preview(input, diff = false) {
     const result = normalize(input);
-    const { desired } = renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
+    const { desired } = render(result);
     // Noninteractive init never overwrites an existing module output, even when its template differs.
-    const files = [...desired].map(([path, d]) => ({
-      path, bytes: Buffer.byteLength(d.content), managed: d.managed !== false,
-      action: existsSync(resolveInside(root, path)) ? 'kept' : 'create',
-    }));
+    const files = [...desired].map(([path, d]) => {
+      const current = readProjectFile(root, path);
+      const entry = manifest?.files.find((f) => f.path === path);
+      const action = !edit ? (existsSync(resolveInside(root, path)) ? 'kept' : 'create')
+        : current === null ? (entry ? 'missing' : 'create')
+          : d.managed === false || entry?.managed === false ? 'kept'
+            : entry && hashContent(current) === entry.hash ? (hashContent(d.content) === entry.hash ? 'kept' : 'update') : 'kept';
+      return { path, bytes: Buffer.byteLength(d.content), managed: d.managed !== false, action };
+    });
+    if (edit) for (const entry of manifest.files) {
+      if (entry.path === ANSWERS || desired.has(entry.path)) continue;
+      const current = readProjectFile(root, entry.path);
+      files.push({ path: entry.path, bytes: null, managed: entry.managed,
+        action: entry.managed && current !== null && hashContent(current) === entry.hash ? 'delete' : 'kept' });
+    }
     files.push({ path: ANSWERS, bytes: Buffer.byteLength(result.text), managed: true, action: 'write' });
     files.push({ path: MANIFEST, bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
-    const visible = result.selected.filter((q) => asksIn(q.mode, result.doc.mode) &&
-      !(expertise === 'layperson' && q.mode === 'F') && whenMatches(q.when, result.doc.answers)).map((q) => q.id);
+    const visible = result.selected.filter((q) => (sections.length || (asksIn(q.mode, result.doc.mode) &&
+      !(expertise === 'layperson' && q.mode === 'F'))) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
     const output = {
       mode: result.doc.mode, profile: result.profile, suggestion: result.suggestion ?? null,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, visible, files,
@@ -136,8 +188,8 @@ export function createFormModel({ root, kitRoot, env }) {
       const changes = [...desired].map(([path, d]) => [path, d.content]);
       changes.push([ANSWERS, result.text]);
       output.diff = changes.map(([path, next]) => {
-        if (path !== ANSWERS && files.find((f) => f.path === path).action === 'kept') {
-          return `Kept unchanged: ${path} (existing file; init does not overwrite it).\n`;
+        if (path !== ANSWERS && ['kept', 'missing'].includes(files.find((f) => f.path === path).action)) {
+          return `Kept unchanged: ${path} (${edit ? 'user-owned, edited, unchanged or missing file' : 'existing file; init does not overwrite it'}).\n`;
         }
         // No secret-file reads. .env.example is a generated names-only template.
         if (/(^|\/)\.env/.test(path)) return `--- ${path}\n+++ ${path}\n(template omitted; secret files are never read)\n`;
@@ -146,7 +198,8 @@ export function createFormModel({ root, kitRoot, env }) {
           return `--- ${path}\n+++ ${path}\n(existing content looks like a secret; diff omitted)\n`;
         }
         return fullFileDiff(path, current?.toString('utf8') ?? '', String(next));
-      }).filter(Boolean).join('\n') + '\nManifest and base copies are generated bookkeeping at apply time.\n';
+      }).filter(Boolean).join('\n') + (edit ? files.filter((f) => f.action === 'delete').map((f) => fullFileDiff(f.path, readProjectFile(root, f.path).toString('utf8'), '')).join('\n') : '') +
+        '\nManifest and base copies are generated bookkeeping at apply time.\n';
     }
     return output;
   }
@@ -191,15 +244,16 @@ export function createFormModel({ root, kitRoot, env }) {
           const file = join(kitRoot, 'interview', 'help', `${q.help}.md`);
           if (existsSync(file)) help = readFileSync(file, 'utf8').trim();
         }
-        return { ...q, owner: owner.get(q.id) ?? 'core', helpText: help };
+        return { ...q, ...(edit && sections.length && editable(q) ? { mode: 'Q' } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
       }),
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),
       hasUserProfile: existsSync(join(userDir(env), 'user-profile.yaml')),
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
+      ...(edit ? { editing: true, sections, initial, sectionNames } : {}),
     };
   }
-  return { bootstrap, normalize, preview, prefill, definitions, secretCatalog };
+  return { bootstrap, normalize, preview, prefill, definitions, secretCatalog, initial, sectionNames, assertUnchanged };
 }
 
 // A valid unified diff with whole-file context, deliberately in memory (no scratch files).
