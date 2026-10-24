@@ -69,4 +69,50 @@ test('NO_COLOR and a scripted prompter keep the plain output; typed replies stil
   prompter.close();
   assert.doesNotMatch(t.text(), /\u001b\[(1|2|3\d)m/);
   assert.match(t.text(), / {6}1\) a\n {6}2\) b\n/);
+  assert.doesNotMatch(t.text(), /w\) Continue in the browser/);
+});
+
+test('the browser entry is visible for every question type and accepts w or web', async () => {
+  for (const type of ['choice', 'multi', 'text', 'boolean', 'number']) {
+    for (const reply of ['w', ' W ', 'web', 'WEB']) {
+      let shown = '';
+      const prompter = {
+        show: (text) => { shown += text; },
+        ask: async (_, keys) => {
+          assert.equal(keys.choices.at(-1), 'w');
+          return reply;
+        },
+      };
+      const q = { id: 'idea.test', label: 'Test?', type, mode: 'Q', default: '' };
+      if (type === 'choice' || type === 'multi') q.choices = ['a', 'b'];
+      const result = await runInterview({ questions: [q], mode: 'quick', prompter, allowWeb: true });
+      assert.deepEqual(result, { answers: {}, defaulted: [], web: true });
+      assert.match(shown, / {6}w\) Continue in the browser\n/);
+      assert.doesNotMatch(shown, /3\) Continue in the browser/);
+    }
+  }
+});
+
+test('arrow keys can select the browser entry without changing the default', async () => {
+  const t = tty();
+  const prompter = createPrompter({ input: t.input, output: t.output, env: { NO_COLOR: '1' } });
+  const questions = [{ id: 'x', label: 'Pick?', type: 'choice', mode: 'Q', choices: ['a', 'b'], default: 'a' }];
+  try {
+    const running = runInterview({ questions, mode: 'quick', prompter, allowWeb: true });
+    await new Promise((r) => setImmediate(r));
+    t.input.write('\u001b[A\r');
+    assert.deepEqual(await running, { answers: {}, defaulted: [], web: true });
+    assert.match(t.text(), /w\) Continue in the browser/);
+  } finally {
+    prompter.close();
+  }
+});
+
+test('w is still a text answer outside init', async () => {
+  const result = await runInterview({
+    questions: [{ id: 'idea.test', label: 'Test?', type: 'text', mode: 'Q', default: '' }],
+    mode: 'quick',
+    prompter: { show() {}, ask: async () => 'w' },
+  });
+  assert.deepEqual(result.answers, { 'idea.test': 'w' });
 });

@@ -286,18 +286,20 @@ test('interview: "web" at a question continues in the browser form with the answ
   const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
   process.emit('SIGINT');
   await running;
-  assert.match(asked[0], /Setup depth \[quick\] \(web\) > $/);
-  assert.match(asked[1], /\(\? help, skip, web\) > $/);
+  assert.match(asked[0], /Setup depth \[quick\] > $/);
+  assert.match(asked[1], /\(\? help, skip\) > $/);
+  assert.match(prompter.shown.join(''), / {2}w\) Continue in the browser\n/);
+  assert.match(prompter.shown.join(''), / {6}w\) Continue in the browser\n/);
   assert.deepEqual(boot.handoff, { mode: 'quick', answers: { 'user.agents': ['codex'], 'user.expertise': 'intermediate' }, profile: '' });
   assert.match(stdout.text(), /Continuing in the browser with your answers so far; nothing was written\./);
   assert.deepEqual(readdirSync(dir), []);
 });
 
-test('setup depth "web" opens the form at once, with an empty hand-off (#162)', async () => {
+test('setup depth "w" opens the form at once, with an empty hand-off (#162)', async () => {
   const dir = tmp('yaw-proj-');
   let url;
   const running = main(['init'], {
-    cwd: dir, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, stdout: capture(), stderr: capture(), prompter: scripted(['WEB']),
+    cwd: dir, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, stdout: capture(), stderr: capture(), prompter: scripted(['W']),
     openBrowser: async (u) => { url = u; return true; },
   });
   for (let i = 0; i < 100 && !url; i++) await new Promise((r) => setTimeout(r, 20));

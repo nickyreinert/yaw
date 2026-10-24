@@ -4,7 +4,7 @@
 //   Enter   takes the default (counts as answered)
 //   skip    takes the default and lists the question as "default" in the summary
 //   ?       shows the help text
-//   web     (yaw init only) continues in the browser form with the answers so far (#162)
+//   w / web (yaw init only) continues in the browser form with the answers so far (#162)
 // Questions of a mode that is not asked, and nothing else, are defaulted the same way. The engine only
 // returns answers; writing them is the caller's job after the user confirmed.
 
@@ -161,7 +161,7 @@ const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expert
 
 // questions: all questions of the enabled modules (base first). mode: quick | standard | full.
 // known: answers that already exist; only used to evaluate `when`, never returned.
-// allowWeb: the reply "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
+// allowWeb: "w" or "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
 // -> { answers, defaulted: string[] }  (answers hold every question whose `when` holds, defaults included)
 export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, allowWeb = false }) {
   const answers = {};
@@ -178,7 +178,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     for (const q of questions) if (Object.hasOwn(answers, q.id)) out[q.id] = answers[q.id];
     return out;
   };
-  const options = allowWeb ? '? help, skip, web' : '? help, skip';
+  const options = '? help, skip';
   const style = prompter.style ?? PLAIN;
   for (let b = 0; b < batches.length; b++) {
     const batch = batches[b];
@@ -193,13 +193,15 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
       }
       number++;
       prompter.show(`${render(q, number, total, expertise, style)}\n`);
+      if (allowWeb) prompter.show(`      ${style.cyan('w)')} Continue in the browser\n`);
       // Up and down move through the available choices, starting from the default (#163).
       const values = (q.choices ?? []).filter(available).map(choiceValue);
+      if (allowWeb) values.push('w');
       const keys = { choices: values, start: values.findIndex((v) => isDefault(q, v)) };
       if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
       for (;;) {
         const reply = await prompter.ask(`      [${style.green(formatDefault(q))}] ${style.dim(`(${options})`)} > `, keys);
-        if (allowWeb && reply.trim().toLowerCase() === 'web') return { answers: ordered(), defaulted, web: true };
+        if (allowWeb && ['w', 'web'].includes(reply.trim().toLowerCase())) return { answers: ordered(), defaulted, web: true };
         const r = parseReply(q, reply);
         if (r.help) {
           prompter.show(`\n${helpText(q, kitRoot)}\n\n`);

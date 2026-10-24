@@ -39,12 +39,13 @@ async function chooseProfile({ prompter, profiles, suggestion }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Stack profile')}\n`);
   profiles.forEach((p, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${p.name === suggestion ? s.green(s.bold(p.name)) : p.name} - ${p.summary}\n`));
+  prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   prompter.show(suggestion ? `  Suggested from your answers: ${suggestion}\n` : '  No single profile matches your answers; choose one.\n');
-  const keys = { choices: profiles.map((p) => p.name), start: profiles.findIndex((p) => p.name === suggestion) };
+  const keys = { choices: [...profiles.map((p) => p.name), 'w'], start: profiles.findIndex((p) => p.name === suggestion) };
   for (;;) {
-    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${s.green(suggestion)}]` : ''} ${s.dim('(web)')} > `, keys)).trim();
+    const reply = (await prompter.ask(`  Profile${suggestion ? ` [${s.green(suggestion)}]` : ''} > `, keys)).trim();
     if (reply === '' && suggestion) return suggestion;
-    if (reply.toLowerCase() === WEB) return WEB;
+    if (['w', WEB].includes(reply.toLowerCase())) return WEB;
     const hit = profiles.find((p, i) => p.name === reply || String(i + 1) === reply);
     if (hit) return hit.name;
     prompter.show(`  choose one of: ${profiles.map((p) => p.name).join(', ')}\n`);
@@ -57,12 +58,13 @@ async function chooseMode({ prompter }) {
   prompter.show(`\n${s.bold('Setup depth')}\n`);
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
   prompter.show(`  ${s.cyan('2)')} full  - long-lived product: the tooling that applies to the project, all questions\n`);
+  prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   for (;;) {
-    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] ${s.dim('(web)')} > `, { choices: ['quick', 'full'], start: 0 })).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'full', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'full') return 'full';
-    if (reply === WEB) return WEB;
-    prompter.show('  choose quick or full\n');
+    if (['w', WEB].includes(reply)) return WEB;
+    prompter.show('  choose quick, full or w to continue in the browser\n');
   }
 }
 
@@ -202,7 +204,7 @@ export async function init({ values, positionals, io }) {
     }
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
-    io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", web continues in the browser). Nothing is written until you confirm.\n');
+    io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", w continues in the browser). Nothing is written until you confirm.\n');
     const mode = await chooseMode({ prompter: io.prompter });
     if (mode === WEB) return handOff({ io, values, mode: 'quick' });
     // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
