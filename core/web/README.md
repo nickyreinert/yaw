@@ -4,12 +4,13 @@
 
 | Area | Data / controls |
 | --- | --- |
-| Overview | Global session/project/agent counts, reported tokens, elapsed time, current-project task count, configuration, activity, project table |
+| Overview | Current workspace: session counts, reported tokens, elapsed time, task count, configuration, activity |
 | Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
-| Sessions | Global registry + native Claude Code/Codex/Copilot history; project/agent/model/period filters; sortable session columns; Agents/Projects/Models comparisons; pagination |
-| Knowledge | User/project scopes; full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
-| Maintenance | Non-secret manifest file states, kit pin, terminal commands; no recipe execution |
-| Tasks | Current project's active tasks and backlog |
+| Sessions | Workspace (project filter locked) and Global; registry + native Claude Code/Codex/Copilot history; project/agent/model/period filters; sortable session columns; Agents/Projects/Models comparisons; pagination |
+| Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
+| Settings | Interview (`yaw edit` in the browser: preview, then apply), Files (YAW-written files by purpose, read-only Form/Raw drawer), Notifications |
+| Tasks | Workspace `TASKS.md`; Global task snapshots with a project filter |
+| Code map | Saved map; shown only when the code-map module is enabled |
 
 ## Sessions
 
@@ -43,3 +44,12 @@ Reads reject symlinked roots/components and files, bind to checked file descript
 Focused checks: `node --test test/knowledge.test.js test/knowledge-store.test.js test/session-profile.test.js test/dashboard.test.js test/form-ui.test.js test/web-background.test.js modules/sessions/tests/import.test.js`.
 
 Repository gate: `just check`. Keep its pre-existing adapter drift separate from web changes. Browser QA covers setup retention, sorting/filtering/pagination, source coverage, knowledge scope/search/reader, keyboard navigation, and narrow layouts.
+
+## Settings
+
+`core/web/settings.js` backs the Settings view (ADR-0050 amendment). GET `/api/settings` lists `manifest.files` plus `.yaw/answers.yaml` and `.yaw/manifest.json`, grouped by purpose; knowledge, decision, task and code-map files are left to their own views, and `.env*` and secret-rule matches are never listed. GET `/api/settings/file?path=` only serves a listed path (no-follow read, 128 KiB cap). `.yaw/base/` is shown as an expandable folder (at most 500 files, symlinks skipped).
+
+Writes are CSRF-protected actions that carry the SHA-256 of the content they started from (409 on a concurrent change):
+
+- `taxonomy-save` validates `.decisions/taxonomy.json`, requires a keyword for each new pair, and refuses removing or renaming a pair still used by a decision (409, listing the IDs).
+- `interview-preview` renders the `yaw edit` plan and diff (capped at 256 KiB) without writing; `interview-apply` applies it through `editProject` with the keep strategy. Only one apply runs at a time.

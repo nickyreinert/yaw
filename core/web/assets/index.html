@@ -8,15 +8,16 @@
       <span class="nav-label">WORKSPACE</span>
       <button type="button" data-route="overview"><span aria-hidden="true">◫</span> Overview</button>
       <button type="button" data-route="setup"><span aria-hidden="true">↗</span> Project setup</button>
-      <button type="button" data-route="maintenance"><span aria-hidden="true">⊞</span> Maintenance</button>
-      <button type="button" data-route="notifications">Notifications</button>
-      <button type="button" data-route="code-map">Code map</button>
+      <button type="button" data-route="sessions"><span aria-hidden="true">▥</span> Sessions</button>
+      <button type="button" data-route="settings"><span aria-hidden="true">⊞</span> Settings</button>
+      <button type="button" data-route="knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
+      <button type="button" data-route="workspace-tasks"><span aria-hidden="true">☷</span> Tasks</button>
+      <button type="button" data-route="code-map" hidden><span aria-hidden="true">⌗</span> Code map</button>
       <span class="nav-label">GLOBAL</span>
-      <button type="button" data-route="projects">Projects</button>
+      <button type="button" data-route="projects"><span aria-hidden="true">▤</span> Projects</button>
       <button type="button" data-route="profiling"><span aria-hidden="true">▥</span> Sessions</button>
       <button type="button" data-route="tasks"><span aria-hidden="true">☷</span> Tasks</button>
-      <span class="nav-label">KNOWLEDGE</span>
-      <button type="button" data-route="knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
+      <button type="button" data-route="global-knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
     </nav>
   </aside>
   <div class="workspace">
@@ -50,7 +51,15 @@
   <aside class="plan-panel" aria-labelledby="summary-title"><h2 id="summary-title">File plan</h2><div id="summary" aria-live="polite"></div><p class="small muted">Preview only. Save or apply explicitly to write files.</p></aside></div>
 </section>
       <section data-view="projects" class="view" hidden><h1 tabindex="-1">Global projects</h1><p>Projects found in saved session scans and the YAW registry. No filesystem crawl on page load.</p><div id="overview-projects"></div></section>
-      <section data-view="notifications" class="view" hidden><h1 tabindex="-1">Notifications</h1><div id="notification-settings"></div></section>
+      <section data-view="settings" id="settings-view" class="view" hidden>
+        <div class="page-heading"><h1 tabindex="-1">Settings</h1><span class="small muted">This workspace · Interview answers, YAW files, notifications</span></div>
+        <nav id="settings-tabs" class="editor-tabs" aria-label="Settings views"><button type="button" data-tab="interview">Interview</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button></nav>
+        <div id="settings-interview"></div>
+        <div id="settings-files" hidden></div>
+        <div id="settings-notifications" class="card" hidden><h2>Notifications</h2><div id="notification-settings"></div></div>
+        <aside id="settings-detail" aria-label="File preview" tabindex="-1" hidden></aside>
+      </section>
+      <section data-view="workspace-tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">This workspace · <code>TASKS.md</code></span></div><div id="workspace-task-list" class="card"></div></section>
       <section data-view="code-map" class="view" hidden><h1 tabindex="-1">Workspace code map</h1><p>Only the current workspace. Updates are explicit: <code>yaw map update</code>; validate with <code>yaw map check</code>.</p><button type="button" id="map-refresh">Read saved map</button><div id="map-areas"></div><pre id="map-content"></pre></section>
       <section data-view="profiling" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Sessions</h1><span id="history-source" class="small muted">Registry + local history · All projects</span></div>
@@ -60,32 +69,14 @@
         <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Explicit scans support Claude Code, Codex and Copilot CLI local history. No scan on page load unless you enable refresh-on-load. Scan limit: 20,000 files per agent; analysis reads the first 64 MiB and 2,000 text messages per transcript and marks longer ones as limited; unreadable files are skipped and counted. Unchanged transcripts are reused from the last scan, so rescans only read new or changed files. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Response time is prompt-to-first-recorded-answer, not network latency. Activity uses UTC days. Classification is experimental, can be wrong, and never runs automatically. Oversized turns are skipped rather than truncated.</p></details>
       </section>
       <section data-view="knowledge" class="view" hidden>
-        <div class="page-heading"><h1 tabindex="-1">Knowledge</h1><span class="small muted">User + project records</span><button type="button" id="knowledge-new" class="primary">+ New record</button></div>
-        <div class="filters knowledge-filters card"><label class="knowledge-search">Search<input id="knowledge-search" type="search" placeholder="Title, content, tags…" maxlength="200"></label><label>Scope<select id="knowledge-scope"><option value="all">All scopes</option><option value="user">User</option><option value="project">Project</option></select></label><label>Namespace<select id="knowledge-namespace"><option value="">All namespaces</option></select></label><label>Type<select id="knowledge-type"><option value="">All types</option></select></label></div>
+        <div class="page-heading"><h1 id="knowledge-title" tabindex="-1">Knowledge</h1><span id="knowledge-intro" class="small muted">This workspace · Knowledge records and decisions</span><button type="button" id="knowledge-categories">Decision categories</button><button type="button" id="knowledge-new" class="primary">+ New record</button></div>
+        <div class="filters knowledge-filters card"><label class="knowledge-search">Search<input id="knowledge-search" type="search" placeholder="Title, content, tags…" maxlength="200"></label><label>Namespace<select id="knowledge-namespace"><option value="">All namespaces</option></select></label><label>Type<select id="knowledge-type"><option value="">All types</option></select></label></div>
         <p id="knowledge-status" class="small muted" role="status"></p><p id="knowledge-error" class="warn" role="alert" hidden></p>
         <div class="knowledge-layout"><div id="knowledge-list" class="card"></div><article id="knowledge-detail" class="card"><p class="muted">Select a record.</p></article></div>
         <details class="data-notes"><summary>Sources</summary><div id="knowledge-sources"></div></details>
       </section>
-      <section data-view="maintenance" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Maintenance</h1><span class="small muted">Current project · File state &amp; kit version</span></div><div id="maintenance-body"></div></section>
       <section data-view="tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">Global snapshots · Filter by project</span></div><div id="tasks-body" class="card"></div></section>
       <footer class="content-footer"><span id="workspace-status" role="status">Loading workspace…</span><span>YAW</span></footer>
     </main>
   </div>
-  <dialog id="save-dialog" aria-labelledby="save-title">
-    <form method="dialog">
-      <h2 id="save-title">Save this setup?</h2>
-      <p>Writes answers only to your user folder (~/.yaw/presets/) and adds a history entry. No secrets. This permission is only for this save.</p>
-      <label><input id="save-consent" type="checkbox"> I explicitly agree to save this preset and history entry.</label>
-      <label><input id="save-profile" type="checkbox"> Also save my user preferences to ~/.yaw/user-profile.yaml.</label>
-      <button value="cancel">Cancel</button><button id="save-confirm" value="save">Save this time</button>
-    </form>
-  </dialog>
-  <dialog id="apply-dialog" aria-labelledby="apply-title">
-    <form method="dialog">
-      <h2 id="apply-title">Apply these files?</h2>
-      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. If any new secret value is saved, automatic verification is skipped because project recipes could read .env; review those recipes before running them. This does not save a preset or user profile.</p>
-      <div id="secret-fields" hidden></div>
-      <button value="cancel">Cancel</button><button value="apply">Apply now</button>
-    </form>
-  </dialog>
 <noscript>Run yaw in a terminal, or enable JavaScript to use this local workspace.</noscript></body></html>

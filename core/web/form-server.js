@@ -16,6 +16,7 @@ const assets = new Map([
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
   ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],
+  ['/settings-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/settings-view.js', import.meta.url))]],
   ['/yaw-shark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-shark.svg', import.meta.url))]],
 ]);
 

@@ -7,8 +7,13 @@ import { tasksSection } from './dashboard.js';
 import { FormError } from './form-model.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
 import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
+import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
+import { ProjectError } from '../render/project.js';
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add'];
+// Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
+const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
+
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply'];
 export const workspacePreferences = (env, root) => {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
   return { refreshOnLoad: doc[realRoot(root)]?.refreshOnLoad === true, endpoint: doc.endpoint ?? 'http://127.0.0.1:8000' };
@@ -23,6 +28,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
     get: {
       '/api/preferences': (params) => workspacePreferences(env, rootOf(params?.get('workspace'))),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
+      '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
+      '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
+      '/api/taxonomy': (params) => userError(() => taxonomyData({ root: rootOf(params?.get('workspace')), kitRoot })),
+      '/api/interview': (params) => userError(() => interviewData({ root: rootOf(params?.get('workspace')), kitRoot, env })),
       '/api/code-map': (params) => {
         const root = rootOf(params?.get('workspace'));
         const content = readProjectFile(root, 'docs/code-map.md');
@@ -43,6 +52,13 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       const root = rootOf(input.workspace);
       input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));
       if (name === 'knowledge-save') return saveKnowledge({ root, kitRoot, env, input: input.record });
+      if (name === 'taxonomy-save') return userError(() => saveTaxonomy({ root, kitRoot, input }));
+      if (name === 'interview-preview') return userError(() => interviewPreview({ root, kitRoot, env, input }));
+      if (name === 'interview-apply') {
+        if (running) throw new FormError('Another workspace action is running', 409);
+        running = true;
+        try { return await userError(() => interviewApply({ root, kitRoot, env, input })); } finally { running = false; }
+      }
       if (name === 'knowledge-remove') return removeKnowledge({ root, kitRoot, env, input: input.record });
       if (name === 'preferences') {
         if (typeof input.refreshOnLoad !== 'boolean') throw new FormError('Choose whether to refresh on load');

@@ -10,17 +10,38 @@ server with changed environment variables.
 
 ## Scope and controls
 
-- **Overview** contains only the current workspace's sessions, tasks and setup.
-- **Global / Projects, Sessions, Tasks** provides cross-workspace overviews.
-  Sessions and tasks have project filters.
-- **Knowledge** shows your personal (global) knowledge and the selected
-  workspace's knowledge, never another workspace's. Use **+ New record**, and
-  **Edit** / **Delete** on a selected record. The same works in the terminal
-  with `yaw knowledge` (see below).
-- **Notifications** edits personal notification preferences. The comfort module
-  must be enabled in each workspace where its hooks should run.
-- **Code map** reads this workspace's saved map. Run `yaw map update` to regenerate
-  it and `yaw map check` to check it; opening the page does neither.
+The sidebar has two groups. **Workspace** covers only the selected workspace:
+
+- **Overview**: this workspace's sessions, tasks and setup.
+- **Sessions**: the session browser, locked to this workspace.
+- **Settings** has three tabs:
+  - **Interview**: the same questions as `yaw edit`, with your saved answers,
+    setup depth, stack profile and modules. **Preview changes** lists every
+    file that would change, with a diff; **Apply** writes them (files you
+    edited yourself are kept). Apply is enabled only after a preview of the
+    current answers, and is refused if `.yaw/answers.yaml` changed on disk.
+  - **Files**: the files YAW wrote here, grouped by purpose (agent
+    instructions, hooks and agent settings, recipes, YAW records). Click a file
+    to read it in a panel pinned to the bottom: **Form** shows structured
+    content (hooks table, recipes, YAW blocks versus your own text), **Raw**
+    the source. Files are read-only here; `.env*` and secret files are never
+    listed. Change tracking is git's job.
+  - **Notifications**: personal notification preferences. The comfort module
+    must be enabled in each workspace where its hooks should run.
+- **Knowledge**: this workspace's knowledge records and decisions. Use
+  **+ New record**, and **Edit** / **Delete** on a selected record.
+  **Decision categories** edits `.decisions/taxonomy.json` (Form or Raw JSON);
+  a category pair still used by a decision cannot be removed or renamed.
+  `#knowledge/decisions` opens the list filtered to decisions.
+- **Tasks**: this workspace's `TASKS.md`.
+- **Code map** (only when the code-map module is enabled) reads the saved map.
+  Run `yaw map update` to regenerate it and `yaw map check` to check it;
+  opening the page does neither.
+
+**Global** spans workspaces: **Projects**, **Sessions** and **Tasks** (with
+project filters), and **Knowledge** for your personal records in
+`~/.yaw/knowledge`. Other workspaces' knowledge is never shown. The same
+knowledge operations work in the terminal with `yaw knowledge` (see below).
 
 ## Explicit collection
 
@@ -34,7 +55,7 @@ yaw sessions analytics           # read saved current-workspace results
 yaw sessions analytics --all     # read all saved results
 ```
 
-The web equivalent is **Global / Sessions / Refresh saved session data**.
+The web equivalent is **Sessions / Refresh saved session data**.
 Choose current or all discovered workspaces and a date range. Results persist
 in `~/.yaw/session-analysis.json` (`YAW_HOME` overrides the directory), with
 private file permissions. Only metadata, aggregate lengths/timing, a content

@@ -1,3 +1,4 @@
+import { createSettings, taxonomyEditor } from './settings-view.js';
 // Text-node rendering only. Registry and Markdown content are never parsed as HTML or executed.
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -51,21 +52,46 @@ const TYPES = ['document', 'rule', 'preference', 'lesson', 'snippet'];
 let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
 const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
-const views = ['overview', 'setup', 'profiling', 'maintenance', 'tasks', 'knowledge', 'projects', 'notifications', 'code-map'];
-export function showView(name, focus = true) {
-  if (name === 'decisions') name = 'knowledge';
-  if (!views.includes(name) || name === 'setup' && !setup) name = 'overview';
+// Routes; workspace Sessions and both Knowledge pages reuse one section with a locked scope.
+const views = ['overview', 'setup', 'sessions', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'projects', 'profiling', 'tasks', 'global-knowledge'];
+const SECTIONS = { sessions: 'profiling', 'global-knowledge': 'knowledge' };
+const ALIASES = { decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'settings/notifications' };
+const TITLES = { overview: 'Workspace overview', setup: 'Project setup', sessions: 'Workspace sessions', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
+  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', projects: 'Global projects', profiling: 'Global sessions', tasks: 'Global tasks', 'global-knowledge': 'Global knowledge' };
+let settings, knowledgeScope = 'project', pendingType = null, sessionsLocked = false;
+export function showView(route, focus = true) {
+  route = ALIASES[route] ?? route;
+  let [name, sub] = String(route).split('/');
+  if (!views.includes(name) || name === 'setup' && !setup) { name = 'overview'; sub = undefined; }
   active = name;
-  document.querySelectorAll('[data-view]').forEach((node) => { node.hidden = node.dataset.view !== name; });
+  const section = SECTIONS[name] ?? name;
+  document.querySelectorAll('[data-view]').forEach((node) => { node.hidden = node.dataset.view !== section; });
   document.querySelectorAll('[data-route]').forEach((node) => {
     if (node.dataset.route === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current');
   });
-  $('breadcrumb').textContent = { overview: 'Workspace overview', setup: 'Project setup', profiling: 'Global sessions', maintenance: 'Maintenance', tasks: 'Global tasks', knowledge: 'Knowledge', projects: 'Global projects', notifications: 'Notifications', 'code-map': 'Workspace code map' }[name];
-  history.replaceState(null, '', `#${name}`);
-  if (focus) { document.querySelector(`[data-view="${name}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
-  if (name === 'knowledge' && !knowledgeLoaded) loadKnowledge();
-  if (name === 'notifications') loadNotifications().catch(reportError);
+  $('breadcrumb').textContent = TITLES[name];
+  if (name === 'settings') { sub = settings.show(sub); if (sub === 'notifications') loadNotifications().catch(reportError); } else { settings?.hide(); if (name !== 'knowledge') sub = undefined; }
+  if (name === 'knowledge' && sub !== 'decisions') sub = undefined;
+  history.replaceState(null, '', `#${sub ? `${name}/${sub}` : name}`);
+  if (focus) { document.querySelector(`[data-view="${section}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
+  if (name === 'sessions' || name === 'profiling') lockSessions(name === 'sessions');
+  if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null);
   if (name === 'code-map') loadMap().catch(reportError);
+}
+function lockSessions(locked) {
+  if (locked === sessionsLocked) return;
+  sessionsLocked = locked; sessionPage = 1;
+  $('filter-project').value = ''; $('scan-scope').value = locked ? 'current' : $('scan-scope').value;
+  if (data) load();
+}
+function openKnowledge(scope, type) {
+  const changed = scope !== knowledgeScope || type;
+  knowledgeScope = scope;
+  $('knowledge-title').textContent = scope === 'project' ? 'Knowledge' : 'Global knowledge';
+  $('knowledge-intro').textContent = scope === 'project' ? 'This workspace · Knowledge records and decisions' : 'Your personal records in ~/.yaw/knowledge · shared by all projects';
+  $('knowledge-categories').hidden = scope !== 'project';
+  if (changed) { knowledgePage = 1; knowledgeKey = ''; $('knowledge-namespace').value = ''; $('knowledge-type').value = ''; pendingType = type; loadKnowledge(); }
+  else if (!knowledgeLoaded) loadKnowledge();
 }
 function overview(d) {
   const p = d.project, mine = d.sessions.available ? d.sessions.project : null, all = d.sessions.available ? d.sessions.all : null;
@@ -78,19 +104,20 @@ function overview(d) {
     metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
-  project.append(action(p.initialized ? 'Maintenance →' : 'Configure project →', p.initialized ? 'maintenance' : 'setup', true));
+  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'setup', true));
+  document.querySelector('[data-route="code-map"]').hidden = !p.modules?.includes('code-map');
   const activity = card('Activity', 'Last 30 active days · UTC');
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
-  activity.append(button('Browse workspace sessions →', () => {
-    $('filter-project').value = p.canonicalRoot; sessionPage = 1; showView('profiling'); load();
-  }), action('Browse knowledge →', 'knowledge'));
+  activity.append(action('Browse workspace sessions →', 'sessions'), action('Browse knowledge →', 'knowledge'));
   $('workspace-actions').replaceChildren(project, activity);
-  $('overview-projects').replaceChildren(all?.projects.length ? table(['Project', 'Sessions', 'Elapsed', 'Tokens', 'Last session'], all.projects.map((r) => [r.project, fmt(r.sessions), duration(r.minutes), r.tokens ? fmt(r.tokens) : '—', date(r.last)])) : el('p', 'No saved projects found. Collect session data explicitly under Global → Sessions.', 'muted'));
-  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Use Global → Sessions → Refresh saved session data.'));
+  $('overview-projects').replaceChildren(all?.projects.length ? table(['Project', 'Sessions', 'Elapsed', 'Tokens', 'Last session'], all.projects.map((r) => [r.project, fmt(r.sessions), duration(r.minutes), r.tokens ? fmt(r.tokens) : '—', date(r.last)])) : el('p', 'No saved projects found. Collect session data explicitly under Sessions.', 'muted'));
+  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Sessions and use Refresh saved session data.'));
   if (mine && mine.sessions > (mine.recent?.length ?? 0)) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
   if (all && all.projectCount > (all.projects?.length ?? 0)) $('overview-projects').prepend(el('p', `Top ${all.projects.length} of ${all.projectCount} projects. The complete list is available through the Sessions project filter.`));
   const t = d.tasks;
   $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
+  $('workspace-task-list').replaceChildren(t.available ? table(['Task', 'Title', 'Status / note', 'Progress'], [...t.active, ...t.backlog].map((r) =>
+    [r.id, r.title, r.status ?? r.note, r.progress === undefined ? '—' : `${r.progress}%`])) : el('p', t.error || 'No task ledger (TASKS.md) in this workspace.', 'muted'));
 }
 function comparisonTable(title, rows) {
   const columns = [
@@ -111,12 +138,15 @@ function comparisonTable(title, rows) {
 }
 function profiling(d) {
   const root = $('profile-results'); root.replaceChildren();
+  $('filter-project').disabled = sessionsLocked;
+  if (sessionsLocked && d.project.canonicalRoot) { fillOptions($('filter-project'), [d.project.canonicalRoot], 'All projects'); $('filter-project').value = d.project.canonicalRoot; }
   if (!d.sessions.available) { root.append(card('No saved sessions', d.sessions.error || 'No registry or saved scan found. Explicitly refresh saved session data to collect history.')); return; }
   const p = d.sessions.profiling, v = p.summary;
   for (const key of ['project', 'agent', 'model']) {
     const options = key === 'project' ? [...new Set([...p.options[key], d.project.canonicalRoot])].filter(Boolean).sort() : p.options[key];
     fillOptions($(`filter-${key}`), options, `All ${key === 'project' ? 'projects' : key === 'agent' ? 'agents' : 'models'}`);
   }
+  if (sessionsLocked) $('filter-project').value = d.project.canonicalRoot ?? '';
   $('history-source').textContent = d.sessions.history?.local ? 'Claude Code · Codex · Copilot CLI · Registry + saved analytics' : 'YAW registry';
   const metrics = el('div', null, 'metrics');
   metrics.append(metric('Sessions', fmt(v.sessions), countLabel(p.projects.length, 'project')), metric('Elapsed', duration(v.minutes), `${v.durationKnown}/${v.sessions} end times`),
@@ -190,18 +220,6 @@ function profiling(d) {
     container.append(node, pager(p.pagination.page, p.pagination.pages, countLabel(v.sessions, 'session'), (page) => { sessionPage = page; load(); }));
   } else container.append(comparisonTable({ agents: 'Agent', projects: 'Project', models: 'Model' }[group], p[group]));
   root.append(container);
-}
-function maintenance(d) {
-  const root = $('maintenance-body'); root.replaceChildren(); const m = d.maintenance;
-  if (m.error) root.append(card('Read error', m.error, 'warn'));
-  else if (!m.available) { root.append(card('Project not configured')); if (setup) root.append(action('Configure project →', 'setup', true)); }
-  else {
-    const count = (state) => m.files.filter((f) => f.state === state).length;
-    const metrics = el('div', null, 'metrics'); metrics.append(metric('Files', m.files.length), metric('Edited', count('edited')), metric('Missing', count('missing')), metric('Conflicts', count('conflict'))); root.append(metrics);
-    root.append(el('p', `Kit ${m.kit} · Project pin ${m.pinned} · ${m.excluded} secret files excluded · Checks not run`, 'small muted'));
-    root.append(table(['File', 'Module', 'State', 'Ownership'], m.files.map((f) => [f.path, f.module, f.state, f.managed ? 'Managed' : 'User'])));
-  }
-  const commands = card('Commands'); commands.append(command('yaw doctor\nyaw status\nyaw apply\nyaw edit\nyaw add <module>\njust check')); root.append(commands);
 }
 function tasks(d) {
   const root = $('tasks-body'); root.replaceChildren();
@@ -288,7 +306,9 @@ function newRecord() {
   const form = el('div', null, 'record-form'), fields = {};
   const field = (name, title, node) => { const label = el('label', title); label.append(node); form.append(label); fields[name] = node; return node; };
   const source = field('source', 'Where', el('select'));
-  for (const s of editable.filter((x) => x.create)) { const o = el('option', `${s.scope} · ${s.path}`); o.value = s.key; source.append(o); }
+  const sources = editable.filter((x) => x.create && x.scope === knowledgeScope);
+  if (!sources.length) { root.append(el('p', knowledgeScope === 'project' ? 'This workspace has no writable knowledge folder.' : 'No personal knowledge folder is writable.', 'muted')); return; }
+  for (const s of sources) { const o = el('option', `${s.scope} · ${s.path}`); o.value = s.key; source.append(o); }
   const type = field('type', 'Type', el('select'));
   for (const t of TYPES) { const o = el('option', t); o.value = t; type.append(o); }
   field('title', 'Title', el('input')).maxLength = 200;
@@ -300,7 +320,7 @@ function newRecord() {
   form.append(button('Create', () => saveRecord({ source: source.value, title: fields.title.value, type: type.value, body: body.value,
     tags: fields.tags.value.split(',').map((t) => t.trim()).filter(Boolean), ...(fields.namespace.disabled ? {} : { namespace: fields.namespace.value || 'personal' }) }), 'primary'),
   button('Cancel', () => loadKnowledge()));
-  root.append(el('p', 'Project records are files in this repository; user records live in your personal YAW data. Secrets are refused. ADRs are created with yaw decisions record.', 'small muted'), form);
+  root.append(el('p', knowledgeScope === 'project' ? 'Project records are files in this repository. Secrets are refused. ADRs are created with yaw decisions record.' : 'Personal records live in ~/.yaw/knowledge and are shared by all your projects. Secrets are refused.', 'small muted'), form);
   fields.title.focus();
 }
 async function startProjects() {
@@ -324,14 +344,15 @@ async function startProjects() {
 }
 async function loadKnowledge() {
   const id = ++knowledgeRequest; $('knowledge-error').hidden = true; $('knowledge-status').textContent = 'Reading records…';
-  const params = scoped(new URLSearchParams({ scope: $('knowledge-scope').value, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: $('knowledge-type').value, page: String(knowledgePage) }));
+  const params = scoped(new URLSearchParams({ scope: knowledgeScope, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: pendingType ?? $('knowledge-type').value, page: String(knowledgePage) }));
   if (knowledgeKey) params.set('record', knowledgeKey);
   try {
     const res = await fetch(`/api/knowledge?${params}`), body = await res.json();
     if (id !== knowledgeRequest) return;
     if (!res.ok) throw new Error(body.error || 'Knowledge unavailable');
     knowledgeLoaded = true; editable = body.editable ?? [];
-    fillOptions($('knowledge-namespace'), body.options.namespaces, 'All namespaces'); fillOptions($('knowledge-type'), body.options.types, 'All types');
+    fillOptions($('knowledge-namespace'), body.options.namespaces, 'All namespaces'); fillOptions($('knowledge-type'), [...new Set([...body.options.types, ...(pendingType ? [pendingType] : [])])], 'All types');
+    if (pendingType) { $('knowledge-type').value = pendingType; pendingType = null; }
     $('knowledge-status').textContent = `${countLabel(body.total, 'record')} · ${body.excluded} excluded${body.limited ? ' · Scan limit reached' : ''}`;
     const root = $('knowledge-list'); root.replaceChildren();
     for (const r of body.entries) {
@@ -349,10 +370,13 @@ async function load(refresh = false) {
   const id = ++requestId; $('workspace-error').hidden = true; $('workspace-status').textContent = 'Reading saved session data…'; $('profile-results').setAttribute('aria-busy', 'true');
   const params = scoped(new URLSearchParams({ sort, direction, page: String(sessionPage) }));
   for (const key of ['project', 'agent', 'model', 'days']) params.set(key, $(`filter-${key}`).value);
+  if (sessionsLocked) params.set('project', data?.project.canonicalRoot ?? '');
   try {
     const res = await fetch(`/api/dashboard?${params}`, { headers: { accept: 'application/json' } }), body = await res.json();
     if (id !== requestId) return; if (!res.ok) throw new Error(body.error || 'Workspace unavailable');
-    data = body; overview(data); profiling(data); maintenance(data); tasks(data);
+    // The first load learns the workspace root; reload once so workspace Sessions is scoped.
+    if (sessionsLocked && body.project.canonicalRoot && params.get('project') !== body.project.canonicalRoot) { data = body; return load(); }
+    data = body; overview(data); profiling(data); tasks(data);
     $('analysis-status').textContent = body.sessions.history?.collected ? `Last scan: ${date(body.sessions.history.collected)}. Page refresh reads saved results only.` : 'No saved scan. Use Refresh saved session data to collect.';
     $('workspace-status').textContent = `Updated ${date(data.generated)}`;
   } catch (e) {
@@ -364,7 +388,11 @@ export function startWorkspace() {
   document.querySelectorAll('[data-route]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.route)));
   for (const key of ['project', 'agent', 'model', 'days']) $(`filter-${key}`).addEventListener('change', () => { sessionPage = 1; load(); });
   $('reset-filters').addEventListener('click', () => { for (const key of ['project', 'agent', 'model']) $(`filter-${key}`).value = ''; $('filter-days').value = 'all'; sessionPage = 1; load(); });
-  $('refresh').addEventListener('click', () => { load(true); if (active === 'knowledge') loadKnowledge(); });
+  $('refresh').addEventListener('click', () => {
+    load(true);
+    if (active === 'knowledge' || active === 'global-knowledge') loadKnowledge();
+    if (active === 'settings') { settings.reset(); showView(location.hash.slice(1), false); }
+  });
   $('scan-history').addEventListener('click', () => collect(false).catch(reportError));
   $('classify-history').addEventListener('click', () => {
     if (confirm('Read conversation text in the selected scan scope and date range and send eligible turns to local Laya? No hosted API is used. This can take time.')) collect(true).catch(reportError);
@@ -372,10 +400,10 @@ export function startWorkspace() {
   $('save-analysis-settings').addEventListener('click', () => savePreferences().catch(reportError));
   $('refresh-on-load').addEventListener('change', () => savePreferences().catch(reportError));
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
-  for (const key of ['scope', 'namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => {
-    if (key === 'scope') { $('knowledge-namespace').value = ''; $('knowledge-type').value = ''; }
-    knowledgePage = 1; knowledgeKey = ''; loadKnowledge();
-  });
+  for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
+  $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
+  settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => showView(`settings/${tab}`, false) });
+  document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => showView(`settings/${b.dataset.tab}`, false)));
   $('knowledge-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); }, 200); });
   $('knowledge-new')?.addEventListener('click', () => newRecord());
   window.addEventListener('hashchange', () => showView(location.hash.slice(1), false));
@@ -388,6 +416,12 @@ export function startWorkspace() {
 
 function reportError(e) {
   $('workspace-error').textContent = e.message; $('workspace-error').hidden = false;
+}
+async function get(path, params = {}) {
+  const query = scoped(new URLSearchParams(params)).toString();
+  const response = await fetch(`/api/${path}${query ? `?${query}` : ''}`), body = await response.json();
+  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+  return body;
 }
 async function api(path, input) {
   const query = input === undefined && workspace ? `?${scoped(new URLSearchParams())}` : '';

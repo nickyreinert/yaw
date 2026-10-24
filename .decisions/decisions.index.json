@@ -1547,6 +1547,10 @@
         },
         {
           "type": "code",
+          "path": "core/web/settings.js"
+        },
+        {
+          "type": "code",
           "path": "core/cli/next-steps.js"
         }
       ],

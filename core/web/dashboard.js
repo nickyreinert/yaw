@@ -5,9 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readManifest } from '../render/manifest.js';
-import { enabledModules, readAnswers, fileStates } from '../render/project.js';
-import { kitVersion } from '../render/kit.js';
-import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
+import { enabledModules, readAnswers } from '../render/project.js';
 import { profileSessions } from './session-profile.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
@@ -24,6 +22,8 @@ const DASHBOARD_ASSETS = new Map([
   asset('dashboard.js', 'text/javascript; charset=utf-8'),
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
+  asset('settings-view.js', 'text/javascript; charset=utf-8'),
+  asset('ui-state.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
 ]);
 const page = (csrf) => readFileSync(new URL('./assets/dashboard.html', import.meta.url), 'utf8').replace('YAW_CSRF', csrf);
@@ -158,17 +158,6 @@ export async function sessionsSection(root, kitRoot, env, now = new Date(), para
     };
 }
 
-function maintenanceSection(root, kitRoot) {
-  const manifest = readManifest(root);
-  if (!manifest) return { available: false, kit: kitVersion(kitRoot) };
-  const doc = readAnswers(root) ?? {};
-  const rules = loadRules({ kitRoot, profiles: doc.proposal?.profiles ?? [] });
-  // Never inspect secret files, even if a hand-edited manifest lists one.
-  const safe = { ...manifest, files: manifest.files.filter((f) => !/^\.env/.test(basename(f.path)) && !secretRule(rules, f.path)) };
-  const files = fileStates(root, safe).map(({ path, module, managed, state }) => ({ path, module, managed, state }));
-  return { available: true, kit: kitVersion(kitRoot), pinned: manifest.kit, files, excluded: manifest.files.length - files.length };
-}
-
 export async function dashboardData({ root, kitRoot, env, now, params }) {
   const project = section(() => projectSection(root));
   const [decisions, sessions] = await Promise.all([
@@ -176,7 +165,7 @@ export async function dashboardData({ root, kitRoot, env, now, params }) {
     sessionsSection(root, kitRoot, env, now, params).catch((e) => ({ error: String(e.message ?? e).split('\n')[0] })),
   ]);
   const saved = section(() => readAnalysis(env));
-  return { project, maintenance: section(() => maintenanceSection(root, kitRoot)), tasks: section(() => tasksSection(root)), globalTasks: saved.tasks ?? [], decisions, sessions, generated: (now ?? new Date()).toISOString() };
+  return { project, tasks: section(() => tasksSection(root)), globalTasks: saved.tasks ?? [], decisions, sessions, generated: (now ?? new Date()).toISOString() };
 }
 
 // One server serves every known YAW project: `root` is only the default; each request may name another workspace.
