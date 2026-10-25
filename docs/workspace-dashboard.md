@@ -175,6 +175,10 @@ private file permissions. Only metadata, aggregate lengths/timing, a content
 fingerprint, task snapshots and classification counts are saved: no conversation
 text or transcript paths.
 
+If Refresh reports a request error, check the browser's network panel and
+ad-blocker log. Extensions such as uBlock Origin can block the dashboard's
+local requests; allow the local dashboard site and retry.
+
 **Auto**, next to Refresh, is off by default and is a personal setting
 (`~/.yaw/web-preferences.json`). When it is on, opening a Sessions page runs
 Refresh once per page load with that page's scope. It never classifies. With

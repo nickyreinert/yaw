@@ -299,7 +299,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const busy = Boolean(job.busy), endpoint = prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000';
     return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' },
       h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
-        title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast.` },
+        title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
       job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
       h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when a Sessions page opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Sessions' : 'all workspaces here, only the open one on Workspace → Sessions'}). A personal setting; it never classifies.` },
         h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
@@ -310,6 +310,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function collectStatus() {
     const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
     return h('p', { class: `gfilter-status small${job.error ? ' error-text' : ' muted'}`, role: 'status' }, job.message || last,
+      job.error && job.busy === null && !job.classify
+        ? ' If the browser blocked the request, check your ad blocker (for example uBlock Origin), allow this local dashboard, then retry.'
+        : null,
       job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
   }
   async function saveAuto(on) {
