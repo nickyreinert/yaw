@@ -57,7 +57,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   // ---------- data ----------
   function prepare(body) {
     data = body; NOW = Date.now();
-    const roots = [...new Set([...(body.rows ?? []).map((r) => r.project), ...body.tasks.map((t) => t.project)])].filter((p) => typeof p === 'string' && p.startsWith('/')).sort();
+    const roots = [...new Set([...(body.rows ?? []).map((r) => r.project), ...(body.tasks ?? []).map((t) => t.project), ...(body.projects ?? [])])]
+      .filter((p) => typeof p === 'string' && p.startsWith('/')).sort();
     // The shared folder of the innermost projects is the drill-down root, so a project in a parent folder (like the
     // home folder) does not flatten the tree; such projects sit next to the top folders. One project drills from its parent.
     const parts = roots.filter((p) => !roots.some((q) => q.startsWith(`${p}/`))).map((p) => p.split('/').filter(Boolean));

@@ -206,7 +206,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
     }
     function error(e) {
       if (!(e instanceof FormError)) api?.failed?.(e);
-      return json(e instanceof FormError ? e.status : 500, { error: e instanceof FormError ? e.message : 'Setup failed. No success was recorded; check the terminal and project state.' });
+      return json(e instanceof FormError ? e.status : 500, { error: e instanceof FormError ? e.message : 'Setup failed. The operation did not complete successfully; check the terminal output and inspect the project state before retrying.' });
     }
   });
 
