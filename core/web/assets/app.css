@@ -258,6 +258,11 @@ td { font-variant-numeric: tabular-nums; }
 .project-add summary { cursor: pointer; }
 .project-add input { font-size: .74rem; padding: 6px 8px; }
 .project-add button { margin-top: 6px; font-size: .72rem; padding: 4px 10px; }
+.interview-heading { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.interview-heading .focus-toggle { margin-left: auto; }
+body.interview-focus .sidebar, body.interview-focus .topbar { display: none; }
+body.interview-focus .workspace { margin-left: 0; }
+body.interview-focus .content { max-width: 1450px; }
 .record-tools { display: flex; gap: 8px; flex-wrap: wrap; }
 button.danger { color: #9b2c2c; border-color: #e3b5b5; }
 button.danger:hover { background: #fbeaea; }

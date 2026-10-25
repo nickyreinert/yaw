@@ -134,8 +134,8 @@ export function source(text) {
 
 // ------------------------------------------------------------------------------- settings view
 
-export function createSettings({ api, get, report, refresh, go }) {
-  let tab = 'interview', files = null, open = new Set(), selected = null, interview = null, state = null, previewed = null;
+export function createSettings({ api, get, report, refresh, go, openSetup }) {
+  let tab = 'interview', files = null, open = new Set(), selected = null, interview = null, state = null, previewed = null, interviewStarted = false;
   const drawer = $('settings-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -146,13 +146,13 @@ export function createSettings({ api, get, report, refresh, go }) {
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
     for (const id of ['interview', 'files', 'review']) $(`settings-${id}`).hidden = id !== tab;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
-    if (tab === 'interview' && !interview) loadInterview().catch(report);
+    if (tab === 'interview' && !interview && !interviewStarted) showInterviewEntry();
     if (tab === 'files' && !files) loadFiles().catch(report);
     if (tab === 'review') loadReview().catch(report);
     return tab;
   }
   function hide() { if (!drawer.hidden) closeDrawer(); }
-  function reset() { files = null; interview = null; state = null; previewed = null; }
+  function reset() { files = null; interview = null; state = null; previewed = null; interviewStarted = false; }
 
   // Review prompts --------------------------------------------------------------------------------------
   async function loadReview() {
@@ -218,6 +218,18 @@ export function createSettings({ api, get, report, refresh, go }) {
   }
 
   // Interview -----------------------------------------------------------------------------------------
+  function showInterviewEntry() {
+    const root = $('settings-interview'), card = el('div', null, 'card');
+    card.append(el('h2', 'Interview'), el('p', openSetup
+      ? 'Continue the setup interview with the answers you have already entered.'
+      : 'Review your saved answers and preview file changes before applying them.'));
+    card.append(button('Start interview →', () => {
+      interviewStarted = true;
+      if (openSetup) openSetup();
+      else loadInterview().catch(report);
+    }, 'primary'));
+    root.replaceChildren(card);
+  }
   async function loadInterview() {
     interview = await get('interview'); previewed = null;
     const init = interview.available ? interview.initial : null;

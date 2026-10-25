@@ -58,12 +58,19 @@ const views = ['overview', 'setup', 'sessions', 'settings', 'knowledge', 'worksp
 const SECTIONS = { 'global-sessions': 'sessions', 'global-knowledge': 'knowledge' };
 const ALIASES = { decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
   profiling: 'global-sessions', tasks: 'global-tasks', projects: 'global' };
-const TITLES = { overview: 'Workspace overview', setup: 'Project setup', sessions: 'Workspace sessions', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
+const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', sessions: 'Workspace sessions', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
   'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-sessions': 'Global sessions', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
 const GLOBAL_VIEWS = ['global', 'global-sessions', 'global-tasks', 'sessions'];
 let settings, globalView, globalSettings, knowledgeScope = 'project', pendingType = null, shown = '';
 const replace = (url) => { if (url !== location.hash) history.replaceState(null, '', url); shown = location.hash; };
+function setInterviewFocus(on) {
+  document.body.classList.toggle('interview-focus', on);
+  document.querySelectorAll('.focus-toggle').forEach((button) => {
+    button.setAttribute('aria-pressed', String(on));
+    button.textContent = on ? 'Exit focus mode' : 'Focus mode';
+  });
+}
 export function showView(hash, focus = true) {
   let [route, query = ''] = String(hash).split('?');
   route = ALIASES[route] ?? route;
@@ -75,10 +82,13 @@ export function showView(hash, focus = true) {
   const section = SECTIONS[name] ?? name;
   document.querySelectorAll('[data-view]').forEach((node) => { node.hidden = node.dataset.view !== section; });
   document.querySelectorAll('[data-route]').forEach((node) => {
-    if (node.dataset.route === name) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current');
+    if (node.dataset.route === (name === 'setup' ? 'settings' : name)) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current');
   });
   $('breadcrumb').textContent = TITLES[name];
   if (name === 'settings') sub = settings.show(sub); else settings?.hide();
+  const interviewView = name === 'setup' || name === 'settings' && sub === 'interview';
+  document.querySelectorAll('.focus-toggle').forEach((button) => { button.hidden = !interviewView || !button.closest(`[data-view="${section}"]`); });
+  if (!interviewView) setInterviewFocus(false);
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
   if (name === 'global-settings' && sub === 'files' && new URLSearchParams(query).get('file')) sub = `files?file=${encodeURIComponent(new URLSearchParams(query).get('file'))}`;
@@ -112,7 +122,7 @@ function overview(d) {
     metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
-  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : setup ? 'setup' : 'settings/interview', true));
+  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'settings/interview', true));
   document.querySelector('[data-route="code-map"]').hidden = !p.modules?.includes('code-map');
   const activity = card('Activity', 'Last 30 active days · UTC');
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
@@ -264,6 +274,7 @@ async function load() {
   }
 }
 export function startWorkspace() {
+  document.querySelectorAll('.focus-toggle').forEach((button) => button.addEventListener('click', () => setInterviewFocus(!document.body.classList.contains('interview-focus'))));
   document.querySelectorAll('[data-route]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.route)));
   $('refresh').addEventListener('click', () => {
     load();
@@ -275,7 +286,7 @@ export function startWorkspace() {
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
   $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
-  settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(`settings/${tab}`) });
+  settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(`settings/${tab}`), openSetup: setup ? () => navigate('setup') : null });
   globalView = createGlobal({ get, api, report: reportError, openProject, replace, afterCollect: () => load() });
   globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications,
     onFile: (path) => { if (path) navigate(`global-settings/files?file=${encodeURIComponent(path)}`); else replace('#global-settings/files'); } });
@@ -286,7 +297,7 @@ export function startWorkspace() {
   window.addEventListener('popstate', onHistory);
   window.addEventListener('hashchange', onHistory);
   startProjects().finally(() => {
-    showView(location.hash.slice(1) || 'overview', false);
+    showView(location.hash.slice(1) || (setup ? 'setup' : 'overview'), false);
     load();
   });
 }
