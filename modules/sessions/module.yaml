@@ -4,6 +4,7 @@ name: sessions
 description: Registry of agent sessions (title from the active task, tasks, commits, files) in ~/.yaw/yaw.db, an Agent-Session trailer on `just commit`, the /handoff skill, `yaw sessions find / for / resume`, and `yaw sessions import` for past sessions.
 title: Session history
 group: memory
+short: "Which session did which task and commit"
 what: "Remembers which agent session worked on which task, commits and files, so you can find and resume them. Also imports your past sessions."
 adds:
   - "Registry of which session worked on which task and commit"

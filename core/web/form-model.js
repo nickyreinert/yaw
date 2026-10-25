@@ -242,7 +242,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return {
       kit: kitVersion(kitRoot),
       profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
-      modules: definitions.map(({ name, title, group, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
+      modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
       gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
         let help = '';

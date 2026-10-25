@@ -3,6 +3,7 @@ name: github
 description: GitHub recipes, issue forms and planning skills, a PR template and .yaw/github.yaml; configured task Project and epic milestone updates need guarded confirmation.
 title: GitHub workflow
 group: github
+short: "Issue forms, PR template, planning skills"
 what: "Issue forms, a pull-request template and planning skills, so the agent can turn a plan into issues."
 adds:
   - "Issue forms: feature, bug, chore, spike, epic"

@@ -192,8 +192,8 @@ test('expertise: each level is recorded; the level changes how the interview is 
   }
   const shown = (level) => runs[level].prompter.shown.join('');
   // layperson: help of a question is shown without asking; F questions take their default
-  assert.match(shown('layperson'), /It goes into AGENTS.md as one line/);
-  assert.doesNotMatch(shown('expert'), /It goes into AGENTS.md as one line/);
+  assert.match(shown('layperson'), /Goes into AGENTS.md as one line/);
+  assert.doesNotMatch(shown('expert'), /Goes into AGENTS.md as one line/);
   assert.equal(runs.layperson.doc.answers['team.session-context'], true);
   assert.doesNotMatch(shown('layperson'), /Tell the agent the active issue/);
   assert.match(shown('intermediate'), /Tell the agent the active issue/);

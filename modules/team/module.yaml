@@ -6,6 +6,7 @@ name: team
 description: "Team mode: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
 title: Team rules
 group: github
+short: "No change without an issue"
 what: "No change without an issue; the agent is told your open issues and pull requests at session start."
 adds:
   - "Rule: no change without an issue"

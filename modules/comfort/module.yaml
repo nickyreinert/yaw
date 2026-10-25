@@ -5,6 +5,7 @@ name: comfort
 description: "Comfort features that cost no model tokens: session hygiene hints, a Claude status line (task, context, cache, last `just check`) and notifications after long runs; personal, switchable with `yaw hygiene`."
 title: Comfort
 group: comfort
+short: "Status line, hints, notifications"
 what: "Small personal helpers: a status line, context hints (\"context is 80% full: run /handoff\") and notifications after long runs (terminal, ntfy, Telegram)."
 adds:
   - "Status line in Claude Code: task, context, cache, last check"

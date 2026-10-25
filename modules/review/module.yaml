@@ -4,11 +4,19 @@ name: review
 description: "Review sub-agents for quality, business logic, UI/UX and feature fit: `just review <kind>` on request, a user-visible hint at the end of a session, and an optional pre-push gate (`yaw review gate`) that runs the required reviewers headless through the agent CLI and warns or blocks. Prompts are layered: project `.yaw/review/`, your blueprint `~/.yaw/review/`, kit default `prompts/`."
 title: Review agents
 group: quality
+short: "Read-only reviewers, optional push gate"
 what: "Sub-agents that look at a change from a non-technical angle. They only read and report; they never edit. Run them on request, get a hint when work is done, or make them the gate before a push."
 adds:
   - "Four read-only review agents: quality, business logic, UI / UX, feature fit"
   - "Optional gate before git push"
   - "Hint when a task is done"
+details:
+  - "Reviewers only read and report; they never edit"
+  - "Run on request, as a hint when work is done, or as a gate before git push"
+  - "Gate: runs the 'Required before push' reviewers headless via your agent CLI (claude -p, codex exec, copilot -p)"
+  - "Warn: shows findings and asks to confirm; an agent push stops and names the override (YAW_REVIEW=skip git push)"
+  - "Block: the push stays stopped until findings are fixed; reviewed commits are not reviewed again"
+  - "Tokens are used only when a review runs; results are cached per commit"
 example: { when: "You push 3 commits", run: "git push", then: "quality and business-logic reviewers run first; findings stop or warn before the push." }
 cost: "Reviews use model tokens only when they run; results are cached per commit. The push gate needs git and an agent CLI (claude, codex or copilot)."
 depends: [core]

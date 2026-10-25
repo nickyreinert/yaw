@@ -1,4 +1,4 @@
-import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
+import { choiceValue, choiceLabel, available, asksIn, matches, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 
 import { showView, startWorkspace, setInterviewDone } from './workspace.js';
 import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
@@ -136,7 +136,7 @@ function buildQuestions() {
       for (const c of q.choices) {
         const value = choiceValue(c);
         input = element('input', undefined, { type: 'checkbox', value, name: q.id, id: `${id}-${value}` });
-        input.disabled = !available(c);
+        input.disabled = !available(c); if (!available(c)) input.dataset.unavailable = '1';
         const l = element('label'); l.append(input, document.createTextNode(`${choiceLabel(c)}${available(c) ? '' : ' — phase 3, not available yet'}`));
         node.append(l); inputs.push(input);
       }
@@ -244,7 +244,12 @@ function renderModules() {
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(),
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
-    questionNodes: (name) => [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && !c.node.hidden).map((c) => c.node),
+    // Options are always there so a card keeps its size; they are greyed out while the module is off.
+    questionNodes: (name, on) => {
+      const everything = effectiveAnswers(catalog.questions, state.answers, state.mode);
+      return [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && (on ? !c.node.hidden : asksIn(c.q, state.mode) && matches(c.q.when, everything)))
+        .map((c) => { c.node.hidden = false; c.inputs.forEach((i) => { i.disabled = !on || sectionEditing() || i.dataset.unavailable === '1'; }); return c.node; });
+    },
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
     onAnswer: (id, value) => { state.answers[id] = value; update(); },
     onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); },

@@ -3,6 +3,7 @@ name: standards
 description: Baseline coding, security, testing, review and git standards in docs/standards.md, plus the stack overlay from the profile.
 title: Coding standards
 group: basics
+short: "Short coding standards the agent follows"
 what: "A short docs/standards.md the agent follows: tests, reviews, git style, plus the rules of your stack."
 adds:
   - "docs/standards.md: tests, reviews, git style"

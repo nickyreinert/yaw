@@ -4,6 +4,7 @@ name: decisions
 description: Decision journal in .decisions/ (ADRs and security / business-logic / privacy notices), local recall at task start, a user-visible recall note per prompt, and the ID and index check in just check.
 title: Decision journal
 group: memory
+short: "Journal of why things are the way they are"
 what: "Records why things are the way they are (.decisions/) and reminds the agent when a task touches an earlier decision."
 adds:
   - ".decisions/ journal: decisions and risk notices"

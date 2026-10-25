@@ -3,6 +3,7 @@ name: tasks
 description: Task ledger in TASKS.md (local), GitHub issues with a generated read-only TASKS.md (GitHub), or both linked; `just task` recipes, session-start re-injection of the active task and a resume-point reminder.
 title: Task list
 group: memory
+short: "Task list the agent sees at session start"
 what: "TASKS.md (or GitHub issues). The agent is told the active task at every session start."
 adds:
   - "TASKS.md task list (or GitHub issues)"
@@ -17,7 +18,7 @@ questions:
     mode: Q
     type: boolean
     label: Use GitHub for the repo?
-    hint: No keeps Git local (including a remote in another folder), uses local tasks and skips GitHub-specific modules.
+    hint: "No: git and tasks stay local; GitHub modules are skipped."
     default: true
   # GitHub teams use issues; teams without GitHub use the local ledger. Without GitHub the mode is local (#166),
   # so the question is hidden and init says why.

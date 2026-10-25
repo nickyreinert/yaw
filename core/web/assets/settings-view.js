@@ -1,6 +1,6 @@
 // Settings (Interview | Files | Review prompts) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
-import { available, choiceLabel, choiceValue, defaultModules, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
+import { asksIn, available, choiceLabel, choiceValue, defaultModules, matches, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
 import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 
@@ -202,7 +202,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const root = $('settings-files'); root.replaceChildren();
     if (!files) return;
     if (!files.available) { root.append(el('p', 'This folder has no YAW setup. Run yaw init here.', 'muted')); return; }
-    root.append(el('p', `Files YAW writes into this workspace, grouped by purpose. Knowledge, decisions, tasks and the code map have their own pages. Change tracking is git's job.${files.excluded ? ` ${files.excluded} secret file(s) hidden.` : ''}`, 'small muted'));
+    root.append(el('p', `Files YAW writes here, grouped by purpose. Knowledge, decisions, tasks and the code map have their own pages.${files.excluded ? ` ${files.excluded} secret file(s) hidden.` : ''}`, 'small muted'));
     const cols = el('div', null, 'settings-groups');
     for (const g of files.groups) {
       const box = el('section', null, 'card settings-group'), head = el('div', null, 'settings-group-head');
@@ -247,9 +247,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   // Interview -----------------------------------------------------------------------------------------
   function showInterviewEntry() {
     const root = $('settings-interview'), card = el('div', null, 'card');
-    card.append(el('h2', 'Interview'), el('p', openSetup
-      ? 'Continue the setup interview with the answers you have already entered.'
-      : 'Review your saved answers and preview file changes before applying them.'));
+    card.append(el('h2', 'Interview'), el('p', openSetup ? 'Continue with the answers you entered.' : 'Review saved answers and preview file changes.'));
     card.append(button('Start interview →', () => {
       interviewStarted = true;
       if (openSetup) openSetup();
@@ -269,13 +267,13 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const root = $('settings-interview'); root.replaceChildren();
     if (!interview.available) { root.append(el('p', interview.message ?? 'This folder has no YAW setup. Run yaw init here.', 'muted')); return; }
     root.append(el('p', interview.fresh
-      ? 'First setup of this folder: the same interview as yaw init. Pick your stack and modules, preview the files, then Apply. Nothing is written before Apply.'
-      : 'The same interview as yaw edit. Saved answers are filled in; nothing is written until you preview and apply. Files you edited yourself are kept.', 'small muted'));
+      ? 'First setup of this folder · pick stack and modules, preview, then Apply · nothing is written before Apply'
+      : 'Saved answers are filled in · nothing is written until you preview and Apply · files you edited are kept', 'small muted'));
     if (interview.folder?.confirm) {
       const f = interview.folder, warn = el('div', null, 'card'), l = el('label'), box = el('input');
       box.type = 'checkbox'; box.checked = state.confirmFolder; box.addEventListener('change', () => { state.confirmFolder = box.checked; changed(); });
       l.append(box, document.createTextNode(' Set up YAW in this folder anyway'));
-      warn.append(el('p', `This folder is not empty (${f.entries} entries${f.repos ? `, ${f.repos} of them Git repositories` : ''}) and is not a Git repository or YAW project. YAW writes AGENTS.md, a justfile, .yaw/ and more into it.${f.repos ? ' It looks like a folder of projects; add one project folder instead.' : ''}`, 'warn'), l);
+      warn.append(el('p', `Not empty (${f.entries} entries${f.repos ? `, ${f.repos} git repositories` : ''}), no git repository, no YAW project. YAW writes AGENTS.md, a justfile and .yaw/ here.${f.repos ? ' Looks like a folder of projects: add one project folder instead.' : ''}`, 'warn'), l);
       root.append(warn);
     }
     const setup = el('div', null, 'card interview-setup');
@@ -293,7 +291,14 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     // Questions of module cards are asked inside the card, under the module switch.
     const visible = new Set(visibleQuestions(interview.questions, state.answers, state.mode, state.modules).map((q) => q.id));
     const cardQuestions = new Map();
-    for (const q of interview.questions.filter((x) => visible.has(x.id) && isInline(x))) cardQuestions.set(q.owner, [...(cardQuestions.get(q.owner) ?? []), question(q)]);
+    const everything = effectiveAnswers(interview.questions, state.answers, state.mode);
+    for (const q of interview.questions.filter((x) => isInline(x))) {
+      const on = state.modules.includes(q.owner);
+      if (on ? !visible.has(q.id) : !(asksIn(q, state.mode) && matches(q.when, everything))) continue;
+      const node = question(q);
+      if (!on) node.querySelectorAll('input,select,textarea').forEach((i) => { i.disabled = true; });
+      cardQuestions.set(q.owner, [...(cardQuestions.get(q.owner) ?? []), node]);
+    }
     // "Use GitHub for the repo?" and "create a git repository" lead the Git & GitHub group.
     const groupIntro = new Map();
     for (const q of interview.questions.filter((x) => visible.has(x.id) && GROUP_INTRO.has(x.id))) {

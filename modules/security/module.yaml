@@ -3,6 +3,7 @@ name: security
 description: Denies reading .env and secret files and guards destructive commands (rm -rf, force push, prod deploy).
 title: Safety guard
 group: basics
+short: "Blocks secret reads and destructive commands"
 what: "Stops agents from reading secrets and from running destructive commands unless you run them yourself."
 adds:
   - "Blocks agents from reading secret files (.env, keys)"

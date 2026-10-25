@@ -118,7 +118,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   function status(text) { const s = $('gs-status'); if (s) s.textContent = text; }
   function renderInterview() {
     const root = $('gs-interview'); root.replaceChildren();
-    root.append(el('p', `Your defaults for every new project: yaw init starts with them. Stored in ${profile.path}${profile.exists ? '' : ' (not created yet)'}; existing projects keep their own answers. Nothing is written until you preview and apply.`, 'small muted'));
+    root.append(el('p', `Defaults for every new project · stored in ${profile.path}${profile.exists ? '' : ' (not created yet)'} · existing projects keep their own answers · nothing is written until Apply`, 'small muted'));
     const box = el('section', null, 'card interview-section'); box.append(el('h2', 'About you'));
     for (const q of profile.questions) box.append(question(q));
     if (!profile.questions.length) box.append(el('p', 'This kit asks no personal questions.', 'muted'));

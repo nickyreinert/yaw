@@ -3,6 +3,7 @@ name: core
 description: AGENTS.md, CLAUDE.md, .gitignore, justfile and the manifest.
 title: Project rules
 group: basics
+short: "Rules file every agent reads, justfile, .gitignore"
 what: "One rules file every agent reads (AGENTS.md, CLAUDE.md), a justfile with check and test recipes, and a .gitignore."
 adds:
   - "AGENTS.md and CLAUDE.md: one rules file for every agent"

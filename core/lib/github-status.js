@@ -49,7 +49,7 @@ export function githubStatus({ root, env = process.env, run = spawnSync }) {
 export function githubHint(status) {
   return status.ready
     ? 'GitHub check: gh is installed and logged in.'
-    : `GitHub check: ${status.reasons.join('; ')}. Yes still works; the GitHub steps wait until this is fixed. No keeps tasks local.`;
+    : `GitHub check: ${status.reasons.join('; ')}. Yes still works; the GitHub steps wait. No keeps tasks local.`;
 }
 
 // The questions with the GitHub check as the runtime status of tasks.use-github.

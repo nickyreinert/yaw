@@ -1,1 +1,5 @@
-This sets how the agent handles uncertainty during ordinary work. It does not override tool permissions, security rules, or your approval for restricted actions. Choose Ask often if you prefer frequent check-ins, Ask on risky or ambiguous steps for a balance, or Act and report when the request is clear.
+- How the agent handles uncertainty in ordinary work
+- It does not override tool permissions, security rules or your approval for restricted actions
+- Ask often: frequent check-ins
+- Ask on risky or ambiguous steps: a balance
+- Act and report: when the request is clear

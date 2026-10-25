@@ -3,11 +3,12 @@
 // Shared by the setup form (app.js) and Settings → Interview (settings-view.js).
 
 export const GROUPS = [
-  ['basics', 'The basics', 'Recommended for every project. Only the project rules are required.'],
-  ['memory', 'Remember the work', 'So you and the agent can pick up where you left off, even days later.'],
-  ['quality', 'Reviews', 'Reviewers check what a linter cannot: the meaning of a change.'],
-  ['github', 'Git & GitHub', 'Everything about git in one place: the repository, commit checks and, when the project lives on GitHub, checks, issues and team rules.'],
-  ['comfort', 'Comfort', 'Personal helpers on your machine: status line, hints and notifications (terminal, ntfy, Telegram). No model tokens.'],
+  // Git & GitHub first: the answers there decide which other modules apply.
+  ['github', 'Git & GitHub', 'Repository, commit checks and, on GitHub, issues and team rules.'],
+  ['basics', 'The basics', 'Recommended for every project.'],
+  ['memory', 'Remember the work', 'Pick up where you left off.'],
+  ['quality', 'Reviews', 'Reviewers check what a linter cannot.'],
+  ['comfort', 'Comfort', 'Personal helpers on your machine; no model tokens.'],
 ];
 export const REVIEWERS = [
   ['quality', 'Quality', 'Readability, naming, duplication, missing tests and error handling: what a linter cannot judge.', '"parseDate swallows errors; add a test for an empty string."'],
@@ -71,7 +72,7 @@ export function choiceField({ name, id, choices, value, disabled = false, descri
   }
   const longest = Math.max(...list.map((c) => c.label.length));
   const inputs = list.map((c) => el('input', { type: 'radio', name, value: c.value, id: `${id}-${c.value}`, checked: c.value === String(value),
-    disabled: disabled || c.disabled, 'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
+    disabled: disabled || c.disabled, 'data-unavailable': c.disabled ? '1' : null, 'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
   const node = el('div', { class: `radios${list.length > 3 || longest > 26 ? ' stacked' : ''}`, role: 'radiogroup', 'aria-label': label },
     ...list.map((c, i) => el('label', {}, inputs[i], ` ${c.label}${c.disabled ? ' (not available yet)' : ''}`)));
   return { node, inputs };
@@ -128,29 +129,23 @@ export function renderStack(root, ctx) {
 
   const profile = profileFor(ctx.profiles, lang, host);
   const result = el('div', { class: `stack-result${profile ? (profile.stack.basic ? ' basic' : '') : ' invalid'}`, role: 'status' });
-  const needs = (p) => el('p', { class: 'needs', text: `Needs ${p.requires?.length ? p.requires.join(', ') : 'nothing extra'} on your computer. YAW does not install it; yaw doctor tells you what is missing.` });
+  const needs = (p) => el('li', { text: `Needs ${p.requires?.length ? p.requires.join(', ') : 'nothing extra'} on your computer (yaw doctor checks)` });
   if (profile && !profile.stack.basic) {
     result.append(
       el('h3', { text: `Your stack: ${profile.title}` }),
-      el('p', { class: 'small muted', text: `${langName(lang)} · ${hostName(host)} → tailored stack ` }, el('code', { text: profile.name })),
-      el('p', { text: profile.summary }),
-      needs(profile),
-      el('p', { class: 'small muted', text: 'Adds its checks to `just check` and a stack section to docs/standards.md.' }));
+      el('ul', {}, el('li', { text: profile.summary }), needs(profile), el('li', { text: 'Adds its checks to just check and docs/standards.md' })),
+      el('p', { class: 'small muted' }, `${langName(lang)} · ${hostName(host)} → `, el('code', { text: profile.name })));
   } else if (profile) {
     result.append(
       el('h3', { text: `Your stack: ${langName(lang)} · ${hostName(host)} (basic)` }),
-      el('p', { class: 'small muted', text: 'No tailored YAW profile for this pair yet, so YAW uses the standard tools of the language:' }),
-      el('ul', {}, el('li', { text: profile.summary }), HOST_EXTRA[host] ? el('li', { text: HOST_EXTRA[host] }) : null),
-      needs(profile),
-      el('p', { class: 'small muted', text: 'You can tighten the checks later in the justfile and docs/standards.md.' }));
+      el('ul', {}, el('li', { text: `No tailored profile yet; standard tools: ${profile.summary}` }), HOST_EXTRA[host] ? el('li', { text: HOST_EXTRA[host] }) : null, needs(profile),
+        el('li', { text: 'Tighten the checks later in the justfile and docs/standards.md' })));
   } else {
     const other = hosts.filter((h) => fit(lang, h.value) !== 'none').map((h) => hostName(h.value));
     const here = langs.filter((l) => fit(l.value, host) !== 'none').map((l) => langName(l.value));
     result.append(
       el('h3', { text: `${langName(lang)} does not run on ${hostName(host)}` }),
-      el('p', { class: 'small', text: `${langName(lang)} works with: ${other.join(', ') || 'nothing yet'}.` }),
-      el('p', { class: 'small', text: `${hostName(host)} works with: ${here.join(', ') || 'nothing yet'}.` }),
-      el('p', { class: 'small', text: 'Choose another language or place to continue.' }));
+      el('ul', {}, el('li', { text: `${langName(lang)} runs on: ${other.join(', ') || 'nothing yet'}` }), el('li', { text: `${hostName(host)} runs: ${here.join(', ') || 'nothing yet'}` })));
   }
   root.replaceChildren(
     el('h3', { class: 'stack-step', text: `1 · ${langQ.label}` }), langRow,
@@ -188,52 +183,47 @@ export function renderModuleGroups(root, ctx) {
 // Cards that show their "?" panel (kept across redraws).
 const expanded = new Set();
 
-// Every card reads the same way: switch and title, what it is, its options, warnings, then the "?" with the
-// addendum (what it adds to AGENTS.md, what it uses). Compact view keeps head, options and warnings; the rest
-// shows as a tooltip on hover or focus.
+// Every card reads the same way: switch and title, one short line, its options, warnings, then the "?" with
+// everything else (description, example, cost, notes for the agent, dependencies). A card never changes size when
+// it is switched: its options are always there, greyed out while the module is off. Compact view drops the short
+// line and the "?"; the same text shows as a tooltip on hover or focus.
 function moduleCard(m, ctx, selected, hasGit) {
   const on = selected.has(m.name);
   const required = m.name === 'core';
   const notes = [];
-  if (m.appliesTo?.usesGitHub && !ctx.usesGitHub) notes.push('needs GitHub (answer "Use GitHub" with yes)');
+  if (m.appliesTo?.usesGitHub && !ctx.usesGitHub) notes.push('needs GitHub: answer Yes above');
   if (m.name === 'git-hooks' && !hasGit) notes.push('needs a git repository');
   const input = el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
-  const questions = on ? (ctx.questionNodes?.(m.name) ?? []) : [];
+  const questions = ctx.questionNodes?.(m.name, on) ?? [];
   const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' || questions.length ? ' wide' : ''}` },
     el('label', { class: 'module-head' }, input, el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));
 
-  const description = () => [
-    el('p', { class: 'what', text: m.what ?? m.description }),
-    ...(m.example ? [el('p', { class: 'example' }, el('span', { class: 'muted', text: `${m.example.when} ` }), m.example.run ? el('code', { text: m.example.run }) : null, el('span', { text: ` → ${m.example.then}` }))] : []),
+  const more = () => [
+    ...(m.details?.length ? [el('ul', {}, ...m.details.map((d) => el('li', { text: d })))] : [el('p', { class: 'small', text: m.what ?? m.description })]),
+    ...(m.example ? [el('p', { class: 'example small' }, el('span', { class: 'muted', text: `${m.example.when} ` }), m.example.run ? el('code', { text: m.example.run }) : null, el('span', { text: ` → ${m.example.then}` }))] : []),
     ...(m.cost ? [el('p', { class: 'cost small muted', text: m.cost })] : []),
-  ];
-  const addendum = () => [
     ...(m.rules?.length ? [el('p', { class: 'small', text: `Adds ${m.rules.length} note${m.rules.length === 1 ? '' : 's'} for the agent (AGENTS.md):` }), el('ul', {}, ...m.rules.map((r) => el('li', { text: r })))] : []),
     ...(m.depends?.length && !required ? [el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` })] : []),
   ];
-  const extra = addendum();
 
-  if (ctx.compact) {
-    card.append(el('div', { class: 'card-tip', role: 'tooltip' }, ...description(), ...extra));
-  } else {
-    card.append(el('div', { class: 'card-desc' }, ...description()));
-  }
+  if (ctx.compact) card.append(el('div', { class: 'card-tip', role: 'tooltip' }, ...more()));
+  else card.append(el('p', { class: 'what', text: m.short ?? m.what ?? m.description }));
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (m.name === 'review') card.append(reviewerGrid(ctx, on, hasGit));
   for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
-  if (!ctx.compact && extra.length) {
+  if (!ctx.compact) {
     const open = expanded.has(m.name);
-    const more = el('div', { class: 'card-more', id: `more-${m.name}`, hidden: !open }, ...extra);
+    const panel = el('div', { class: 'card-more', id: `more-${m.name}`, hidden: !open }, ...more());
     const help = el('button', { type: 'button', class: 'help-button', 'aria-expanded': String(open), 'aria-controls': `more-${m.name}`, 'aria-label': `More about ${m.title ?? m.name}`, text: '?',
       onclick: () => {
-        const now = more.hidden;
-        more.hidden = !now; help.setAttribute('aria-expanded', String(now));
+        const now = panel.hidden;
+        panel.hidden = !now; help.setAttribute('aria-expanded', String(now));
         if (now) expanded.add(m.name); else expanded.delete(m.name);
       } });
-    card.append(el('div', { class: 'card-foot' }, help), more);
+    card.append(el('div', { class: 'card-foot' }, help), panel);
   }
   return card;
 }
@@ -242,26 +232,17 @@ function reviewerGrid(ctx, on, hasGit) {
   const trig = (k) => ctx.answers[`quality.review-${k}`] ?? ctx.questions.find((q) => q.id === `quality.review-${k}`)?.default ?? 'off';
   const grid = el('div', { class: 'reviewers' });
   for (const [k, title, what, example] of REVIEWERS) {
-    const id = `review-${k}`;
-    const { node: select } = choiceField({ name: `review-trigger-${k}`, id, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
+    const { node: select } = choiceField({ name: `review-trigger-${k}`, id: `review-${k}`, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
       choices: TRIGGERS.map(([value, label]) => ({ value, label: value === 'push' && !hasGit ? `${label} (needs git)` : label, disabled: value === 'push' && !hasGit })),
       onChange: (value) => ctx.onAnswer(`quality.review-${k}`, value) });
-    grid.append(el('div', { class: `reviewer${trig(k) === 'off' ? ' off' : ''}` },
-      el('strong', { text: title }), el('p', { class: 'small what', text: what }),
-      el('p', { class: 'small muted example', text: example }), select));
-  }
-  const wrap = el('div', {}, grid);
-  if (!hasGit) {
-    wrap.append(el('div', { class: 'gate muted' }, el('small', { text: 'No git repository: reviews run only on request or as a hint when a task is done. Create the git repository (next to "Use GitHub for the repo?", or later with yaw edit) to get the push gate.' })));
-    return wrap;
+    grid.append(el('div', { class: `reviewer${trig(k) === 'off' ? ' off' : ''}`, title: `${what} ${example}` }, el('strong', { text: title }), select));
   }
   const gated = REVIEWERS.some(([k]) => trig(k) === 'push');
+  if (!hasGit) return el('div', {}, grid, el('div', { class: 'gate muted' }, el('small', { text: 'The push gate needs a git repository.' })));
   const gate = ctx.answers['quality.review-gate'] ?? 'warn';
-  const radio = (value, label) => el('label', {}, el('input', { type: 'radio', name: 'review-gate', value, checked: gate === value, disabled: !on || !gated || ctx.readOnly,
+  const radio = (value, label, tip) => el('label', { title: tip }, el('input', { type: 'radio', name: 'review-gate', value, checked: gate === value, disabled: !on || !gated || ctx.readOnly,
     onchange: () => ctx.onAnswer('quality.review-gate', value) }), ` ${label}`);
-  wrap.append(el('div', { class: `gate${gated ? '' : ' muted'}` }, el('b', { text: 'Push gate' }), radio('warn', 'Warn and push anyway'), radio('block', 'Block the push'),
-    el('small', { text: gated
-      ? '`git push` starts every "Required before push" reviewer on the commits being pushed, headless through your agent\'s CLI (claude -p, codex exec, copilot -p). All positive: the push goes through. Findings: Warn shows them and asks you to confirm; when an agent pushes there is no terminal, so the push stops and names the override (YAW_REVIEW=skip git push). Block stops the push until they are fixed. Reviewed commits are not reviewed again.'
-      : 'Set a reviewer to "Required before push" to use the gate.' })));
-  return wrap;
+  return el('div', {}, grid, el('div', { class: `gate${gated ? '' : ' muted'}` }, el('b', { text: 'Push gate' }),
+    radio('warn', 'Warn', 'Show findings and ask before pushing'), radio('block', 'Block', 'Stop the push until findings are fixed'),
+    ...(gated ? [] : [el('small', { text: 'Set a reviewer to "Required before push" to use it.' })])));
 }

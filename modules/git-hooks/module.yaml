@@ -3,6 +3,7 @@ name: git-hooks
 description: lefthook pre-commit (format, lint, gitleaks scan of the staged changes) installed with `just hooks-install`; git runs it for every agent and for you.
 title: Checks before every commit
 group: github
+short: "Format, lint and secret scan before each commit"
 what: "Formats, lints and scans the staged changes for secrets on every commit, for you and every agent."
 adds:
   - "Formatting, linting and a secret scan before every commit"
