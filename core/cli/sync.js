@@ -5,6 +5,7 @@ import { hashContent, readProjectFile } from '../render/files.js';
 import { isAdapterPath } from '../render/agents.js';
 import { enabledModules, renderProject, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
+import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 
 // -> [{ path, problem }] (empty: no drift)
 export function adapterDrift({ root, kitRoot }) {
@@ -30,6 +31,18 @@ export function adapterDrift({ root, kitRoot }) {
 }
 
 export async function sync({ values, positionals, io }) {
+  if (!values.check) {
+    const [action = 'status', ...extra] = positionals;
+    if (extra.length) throw new UsageError('Unexpected sync arguments');
+    const args = { env: io.env, kitRoot: io.kitRoot, name: values.name, resolution: values.resolve };
+    let result;
+    if (action === 'setup') result = configureSync({ ...args, target: values.folder, github: values.github, scopes: values.scopes?.split(',') });
+    else if (action === 'run') result = runSync(args);
+    else if (action === 'status') result = syncStatus({ env: io.env, selected: values.device });
+    else throw new UsageError('Use sync setup, run, status or --check');
+    io.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return result.conflicts?.length ? 2 : 0;
+  }
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   if (!values.check) throw new UsageError('phase 1 has only yaw sync --check; yaw update re-renders the adapter files');
   const drift = adapterDrift({ root: io.cwd, kitRoot: io.kitRoot });

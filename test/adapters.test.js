@@ -98,9 +98,10 @@ test('yaw sync --check: passes when in sync, fails on an edited copy, a missing 
   assert.equal(r.code, 1);
   assert.match(r.out, /^drift: \.agents\/skills\/greet\/SKILL\.md is no longer rendered by any enabled module; fix: yaw update$/m);
 
-  // phase 1: --check only; outside a project: error
-  assert.equal((await yaw(['sync'], { cwd: root, kitRoot })).code, 1);
-  assert.match((await yaw(['sync'], { cwd: root, kitRoot })).err, /only yaw sync --check; yaw update re-renders/);
+  // Bare sync now reports portable data-sync status; the drift check still needs a project.
+  const syncStatus = await yaw(['sync'], { cwd: root, kitRoot });
+  assert.equal(syncStatus.code, 0);
+  assert.equal(typeof JSON.parse(syncStatus.out).configured, 'boolean');
   assert.equal((await yaw(['sync', '--check'], { cwd: tmp('yaw-empty-'), kitRoot })).code, 1);
 });
 
