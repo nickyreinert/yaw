@@ -43,6 +43,7 @@ async function serverFixture(t, extra = {}) {
 test('web model: schema catalogue, local help, ownership and phase-3 choices', () => {
   const f = fixture(), m = createFormModel(f), c = m.bootstrap();
   assert.equal(c.questions[0].id, 'user.agents');
+  assert.deepEqual(c.questions[0].choices.map((x) => x.value), ['claude', 'codex', 'copilot', 'gemini']);
   assert.ok(c.questions[0].choices.find((x) => x.value === 'gemini').phase > 1);
   assert.match(c.questions[0].helpText, /agent/i);
   assert.ok(c.questions.some((q) => q.owner === 'team'));

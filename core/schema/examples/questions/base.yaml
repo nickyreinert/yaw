@@ -12,9 +12,6 @@ questions:
       - { value: codex, label: Codex }
       - { value: copilot, label: Copilot }
       - { value: gemini, label: Gemini CLI (enterprise / API key), phase: 3 }
-      - { value: antigravity, label: Antigravity CLI, phase: 3 }
-      - { value: pi, label: Pi, phase: 3 }
-      - { value: hermes, label: Hermes, phase: 3 }
     default: [claude]
   - id: user.expertise
     ref: "0.1"

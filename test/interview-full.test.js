@@ -150,12 +150,13 @@ test('agents: each of Claude, Codex and Copilot is selectable alone and together
   }
 });
 
-test('agents: the others are shown as phase 3, are refused, and the interview finishes with a valid agent', async () => {
+test('agents: only Gemini is shown as unavailable, and the interview finishes with a valid agent', async () => {
   const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': ['gemini', 'codex'] });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers['user.agents'], ['codex']);
   const shown = r.prompter.shown.join('');
-  for (const a of ['gemini', 'antigravity', 'pi', 'hermes']) assert.match(shown, new RegExp(`\\) ${a} .*\\(phase 3, not available yet\\)`));
+  assert.match(shown, /\) gemini .*\(phase 3, not available yet\)/);
+  for (const a of ['antigravity', 'pi', 'hermes']) assert.doesNotMatch(shown, new RegExp(`\\) ${a} `));
   assert.match(shown, /"Gemini CLI \(enterprise \/ API key\)" is not available yet/);
 });
 
