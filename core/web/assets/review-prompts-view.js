@@ -8,7 +8,7 @@ const SOURCE = { project: 'This project', global: 'Your blueprint', kit: 'Kit de
 export function renderReviewPrompts(root, { data, scope, api, load, report }) {
   root.replaceChildren();
   if (scope === 'project' && !data.enabled) {
-    root.append(el('p', 'Review agents are off in this project. Turn on "Review agents" on the Interview tab, then adjust their prompts here.', 'muted'));
+    root.append(el('p', 'Review agents are off in this project. Turn on "Review agents" on the Project tab (Settings), then adjust their prompts here.', 'muted'));
     return;
   }
   root.append(el('p', scope === 'project'

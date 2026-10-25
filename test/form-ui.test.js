@@ -615,3 +615,16 @@ test('planning chat: the prompt carries the answers so far, the reply fills idea
   assert.match(readFileSync(join(f.root, 'docs/plan/kickoff.md'), 'utf8'), /Create the booking form/);
   assert.match(readFileSync(join(f.root, 'TASKS.md'), 'utf8'), /Create the booking form/);
 });
+
+test('settings UI: one Sync tab, Project/Defaults tabs, page and sidebar search on both pages', () => {
+  const dir = join(KIT_ROOT, 'core/web/assets');
+  for (const name of ['index.html', 'dashboard.html']) {
+    const page = readFileSync(join(dir, name), 'utf8');
+    assert.equal(page.match(/data-tab="sync"/g).length, 1, `${name}: one Sync tab`);
+    assert.match(page, /id="gs-sync"/);
+    assert.match(page, /data-tab="interview">Project</);
+    assert.match(page, /data-tab="interview">Defaults</);
+    for (const id of ['side-search', 'side-results', 'side-nav', 'settings-search', 'gs-search', 'global-settings-view']) assert.match(page, new RegExp(`id="${id}"`), `${name}: ${id}`);
+  }
+  assert.ok(!readFileSync(join(dir, 'global-settings-view.js'), 'utf8').includes("button('Sync'"));
+});

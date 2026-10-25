@@ -1,4 +1,4 @@
-// Global Settings: Interview (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
+// Global Settings: Defaults (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { available, choiceLabel, choiceValue } from './ui-state.js';
@@ -33,8 +33,6 @@ function formView(value, depth = 0) {
 export function createGlobalSettings({ api, get, report, notifications, onFile }) {
   let tab = 'interview', classifier = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
   const drawer = $('global-detail');
-  const syncTab = button('Sync', () => { location.hash = '#global-settings/sync'; });
-  syncTab.dataset.tab = 'sync'; $('global-settings-tabs').append(syncTab);
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 

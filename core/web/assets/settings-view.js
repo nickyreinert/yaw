@@ -1,4 +1,4 @@
-// Settings (Interview | Files | Review prompts) and the decision-category editor. Text nodes only: file content,
+// Settings (Project | Files | Review prompts | Kickoff) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
 import { asksIn, available, choiceLabel, choiceValue, defaultModules, matches, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
 import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
@@ -20,6 +20,10 @@ export function grid(head, rows) {
   wrap.append(t); return wrap;
 }
 const code = (t) => el('code', t);
+// The interview as tabs, in the order of the setup wizard. A question belongs to the pane of its group.
+export const PANES = [['start', 'Starting point'], ['user', 'About you'], ['idea', 'Your project'], ['stack', 'Stack & standards'], ['workflow', 'Your workflow']];
+const PANE_OF = { user: 'user', idea: 'idea', arch: 'stack', quality: 'stack' };
+export const paneOf = (id) => PANE_OF[id.split('.')[0]] ?? 'workflow';
 const pills = (list, cls = '') => { const s = el('span'); for (const x of list) s.append(el('span', x, `pill ${cls}`)); return s; };
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
 export function tabs(items, onPick, current) {
@@ -64,8 +68,8 @@ const VIEWS = {
       [code(x.path), pills([x.module]), x.fragments?.length ? pills(x.fragments.map((y) => y.module)) : '', x.managed ? 'YAW keeps it current' : 'Yours after the first write'])));
   },
   answers(text, v, ctx) {
-    v.append(el('p', 'These answers drive the generated files. Change them on the Interview tab: Preview shows every file that would change, Apply writes them.', 'small muted'));
-    if (ctx?.openInterview) v.append(button('Edit on the Interview tab →', ctx.openInterview, 'primary'));
+    v.append(el('p', 'These answers drive the generated files. Change them on the Project tab: Preview shows every file that would change, Apply writes them.', 'small muted'));
+    if (ctx?.openInterview) v.append(button('Edit on the Project tab →', ctx.openInterview, 'primary'));
     const rows = [];
     let section = '';
     for (const line of text.split('\n')) {
@@ -154,18 +158,20 @@ export function kickoffCard({ guide, prompt }) {
 
 export function createSettings({ api, get, report, refresh, go, openSetup }) {
   let tab = 'interview', files = null, open = new Set(), selected = null, interview = null, state = null, previewed = null, interviewStarted = false;
+  let pane = PANES[0][0], guided = false, repane = null;
   const drawer = $('settings-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden && !drawer.contains(document.activeElement)) closeDrawer(); });
 
-  function show(name) {
+  function show(name, params) {
+    const section = params?.get('section');
+    if (PANES.some(([id]) => id === section)) { pane = section; repane?.(); }
     tab = ['interview', 'files', 'review', 'kickoff'].includes(name) ? name : 'interview';
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
     for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== tab;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
-    // Inside `yaw init` the entry card continues the wizard; in a set-up project the questions show right away.
-    if (tab === 'interview' && !interview && !interviewStarted) { if (openSetup) showInterviewEntry(); else { interviewStarted = true; loadInterview().catch(report); } }
+    if (tab === 'interview' && !interview && !interviewStarted) { interviewStarted = true; loadInterview().catch(report); }
     if (tab === 'kickoff') loadKickoff().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);
     if (tab === 'review') loadReview().catch(report);
@@ -240,21 +246,11 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const form = () => { const v = el('div', null, 'file-view'); try { VIEWS[k](file.content, v, { openInterview: () => { closeDrawer(); go('interview'); } }); } catch (e) { v.append(el('p', `Not readable as ${k}: ${e.message}. Use Raw.`, 'warn')); } return v; };
     const pick = (id) => { press(nav, id); pane.replaceChildren(id === 'form' ? form() : source(file.content)); };
     const nav = tabs([['form', 'Form', !k], ['raw', 'Raw']], pick);
-    nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : file.editable ? 'Edit on the Interview tab' : 'Read-only · yaw apply refreshes it', 'small muted'));
+    nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : file.editable ? 'Edit on the Project tab' : 'Read-only · yaw apply refreshes it', 'small muted'));
     drawer.append(nav, pane); pick(k ? 'form' : 'raw'); drawer.querySelector('.drawer-bar button').focus();
   }
 
   // Interview -----------------------------------------------------------------------------------------
-  function showInterviewEntry() {
-    const root = $('settings-interview'), card = el('div', null, 'card');
-    card.append(el('h2', 'Interview'), el('p', openSetup ? 'Continue with the answers you entered.' : 'Review saved answers and preview file changes.'));
-    card.append(button('Start interview →', () => {
-      interviewStarted = true;
-      if (openSetup) openSetup();
-      else loadInterview().catch(report);
-    }, 'primary'));
-    root.replaceChildren(card);
-  }
   async function loadInterview() {
     interview = await get('interview'); previewed = null;
     const init = interview.available ? interview.initial : null;
@@ -316,14 +312,30 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
       onPreset: (kind) => { state.modules = defaultModules(interview.modules, interview.questions, state.answers, kind); changed(true); },
     });
     const modCard = el('section', null, 'card interview-section'); modCard.append(el('h2', 'What YAW adds to your project'), modsBox);
-    root.append(setup, stackCard, modCard);
+    // Cards sit in tabs named like the steps of the setup wizard; searching shows them all (see search.js).
+    const cards = [['start', setup], ['stack', stackCard], ['workflow', modCard]];
     const sections = new Map();
     const titles = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
     for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id) && !isInline(x) && !GROUP_INTRO.has(x.id))) {
       const key = q.id.split('.')[0];
-      if (!sections.has(key)) { const s = el('section', null, 'card interview-section'); s.append(el('h2', titles[key] ?? key)); sections.set(key, s); root.append(s); }
+      if (!sections.has(key)) { const s = el('section', null, 'card interview-section'); s.append(el('h2', titles[key] ?? key)); sections.set(key, s); cards.push([paneOf(q.id), s]); }
       sections.get(key).append(question(q));
     }
+    const present = PANES.filter(([id]) => cards.some(([p]) => p === id));
+    cards.sort((a, b) => PANES.findIndex(([id]) => id === a[0]) - PANES.findIndex(([id]) => id === b[0]));
+    if (!present.some(([id]) => id === pane)) pane = present[0][0];
+    const first = present[0][0], last = present.at(-1)[0];
+    const nav = tabs(present, (id) => { pane = id; repane(); }, pane); nav.classList.add('pane-nav'); nav.setAttribute('aria-label', 'Project settings sections');
+    nav.append(button(guided ? 'Leave interview' : 'Start interview →', () => {
+      if (openSetup) { openSetup(); return; }
+      guided = !guided; pane = first; renderInterview();
+    }, guided ? '' : 'primary'));
+    nav.lastChild.title = openSetup ? 'Walk through the setup questions step by step' : guided ? 'Back to all settings' : 'Walk through the questions one section at a time';
+    const foot = el('div', null, 'wizard-footer pane-foot'), back = button('← Back', () => step(-1)), next = button('Continue →', () => step(1), 'primary');
+    foot.append(back, next);
+    function step(by) { const at = present.findIndex(([id]) => id === pane); pane = present[Math.max(0, Math.min(present.length - 1, at + by))][0]; repane(); window.scrollTo({ top: 0, behavior: 'instant' }); }
+    root.append(nav);
+    for (const [p, node] of cards) { node.dataset.pane = p; root.append(node); }
     const actions = el('div', null, 'interview-actions'), status = el('p', '', 'small muted'); status.id = 'interview-status'; status.setAttribute('role', 'status');
     const blocked = interview.folder?.confirm && !state.confirmFolder;
     const apply = button(interview.fresh ? 'Set up project' : 'Apply', () => applyInterview().catch(fail), 'primary'); apply.id = 'interview-apply'; apply.disabled = blocked || !stackValid || !previewed || previewed.state !== fingerprint();
@@ -331,7 +343,14 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     if (!stackValid) status.textContent = 'This language does not run there; pick another pair under Your stack.';
     actions.append(previewButton, apply, button('Reset', () => loadInterview().catch(report)), status);
     const out = el('div'); out.id = 'interview-preview';
-    root.append(actions, out);
+    root.append(foot, actions, out);
+    repane = () => {
+      press(nav, pane);
+      for (const [p, node] of cards) node.classList.toggle('interview-pane-off', p !== pane);
+      foot.hidden = !guided; back.disabled = pane === first; next.hidden = pane === last;
+      actions.hidden = out.hidden = guided && pane !== last;
+    };
+    repane();
     if (previewed) renderPreview(previewed.result);
   }
   function question(q) {

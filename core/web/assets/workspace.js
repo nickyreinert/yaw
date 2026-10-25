@@ -1,4 +1,5 @@
-import { createSettings, taxonomyEditor } from './settings-view.js';
+import { PANES, createSettings, paneOf, taxonomyEditor } from './settings-view.js';
+import { attachPageSearch, attachSidebarSearch } from './search.js';
 import { createGlobal } from './global-view.js';
 import { createGlobalSettings } from './global-settings-view.js';
 import { pickFolder } from './folder-picker.js';
@@ -63,7 +64,7 @@ const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', 
   'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-sessions': 'Global sessions', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
 const GLOBAL_VIEWS = ['global', 'global-sessions', 'global-tasks', 'sessions'];
-let settings, globalView, globalSettings, knowledgeScope = 'project', pendingType = null, shown = '';
+let settings, globalView, globalSettings, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
 const replace = (url) => { if (url !== location.hash) history.replaceState(null, '', url); shown = location.hash; };
 function setInterviewFocus(on) {
   document.body.classList.toggle('interview-focus', on);
@@ -88,12 +89,14 @@ export function showView(hash, focus = true) {
     if (node.dataset.route === (name === 'setup' ? 'settings' : name)) node.setAttribute('aria-current', 'page'); else node.removeAttribute('aria-current');
   });
   $('breadcrumb').textContent = TITLES[name];
-  if (name === 'settings') sub = settings.show(sub); else settings?.hide();
+  const params = new URLSearchParams(query);
+  if (name === 'settings') sub = settings.show(sub, params); else settings?.hide();
   const interviewView = name === 'setup' || name === 'settings' && sub === 'interview';
   document.querySelectorAll('.focus-toggle').forEach((button) => { button.hidden = !interviewView || !button.closest(`[data-view="${section}"]`); });
   if (name === 'setup' && setup) setInterviewFocus(true);
   else if (!interviewView) setInterviewFocus(false);
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
+  if (params.has('q') && pageSearch[name]) pageSearch[name].set(params.get('q'), { scroll: true });
   if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
   if (name === 'global-settings' && sub === 'files' && new URLSearchParams(query).get('file')) sub = `files?file=${encodeURIComponent(new URLSearchParams(query).get('file'))}`;
   if (GLOBAL_VIEWS.includes(name)) globalView.show(name, query);
@@ -331,12 +334,52 @@ export function startWorkspace() {
   document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(`global-settings/${b.dataset.tab}`)));
   $('knowledge-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); }, 200); });
   $('knowledge-new')?.addEventListener('click', () => newRecord());
+  pageSearch = {
+    settings: attachPageSearch({ input: $('settings-search'), root: $('settings-view'), status: $('settings-search-status') }),
+    'global-settings': attachPageSearch({ input: $('gs-search'), root: $('global-settings-view'), status: $('gs-search-status') }),
+  };
+  attachSidebarSearch({ input: $('side-search'), results: $('side-results'), nav: $('side-nav'), entries: searchEntries,
+    open: (entry, q) => navigate(`${entry.route}${entry.route.includes('?') ? '&' : '?'}q=${encodeURIComponent(q)}`) });
   window.addEventListener('popstate', onHistory);
   window.addEventListener('hashchange', onHistory);
   startProjects().finally(() => {
     showView(location.hash.slice(1) || (setup ? 'setup' : 'overview'), false);
     load();
   });
+}
+
+// What the sidebar search looks through: the pages, the settings tabs and, once the setup data has loaded, every
+// question and module of the project and of your defaults.
+const SETTINGS_TABS = [
+  ['settings', 'interview', 'Project', 'answers interview stack language modules depth setup preview apply'],
+  ['settings', 'files', 'Files', 'generated files agents.md claude.md justfile hooks manifest recipes'],
+  ['settings', 'review', 'Review prompts', 'review agents quality logic ux feature prompt blueprint'],
+  ['settings', 'kickoff', 'Kickoff', 'plan planning prompt first steps'],
+  ['global-settings', 'interview', 'Defaults', 'about you personal defaults new projects presets'],
+  ['global-settings', 'files', 'Files', '~/.yaw presets profile read-only'],
+  ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
+  ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
+  ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],
+  ['global-settings', 'sync', 'Sync', 'devices folder nas github repository statistics presets merge conflicts'],
+];
+async function searchEntries() {
+  const out = [];
+  let group = '';
+  for (const node of document.querySelectorAll('#side-nav > *')) {
+    if (node.classList.contains('nav-label')) { group = node.textContent.trim(); continue; }
+    if (node.dataset.route) out.push({ title: node.lastChild.textContent.trim(), trail: group[0] + group.slice(1).toLowerCase(), route: node.dataset.route, text: '' });
+  }
+  for (const [page, tab, title, text] of SETTINGS_TABS) out.push({ title, trail: `${page === 'settings' ? 'Workspace' : 'Global'} › Settings`, route: `${page}/${tab}`, text });
+  const [project, mine] = await Promise.all([get('interview').catch(() => null), get('global/profile').catch(() => null)]);
+  const pane = (id) => PANES.find(([p]) => p === paneOf(id))[1];
+  if (project?.available) {
+    for (const q of project.questions) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: `Workspace › Settings › Project › ${pane(q.id)}`, route: `settings/interview?section=${paneOf(q.id)}`,
+      text: [q.id, q.hint, ...(q.choices ?? []).map((c) => typeof c === 'object' ? `${c.value} ${c.label ?? ''}` : c)].filter(Boolean).join(' · ') });
+    for (const m of project.modules ?? []) out.push({ title: m.title ?? m.name, trail: 'Workspace › Settings › Project › Your workflow', route: 'settings/interview?section=workflow', text: [m.name, m.description, m.summary].filter(Boolean).join(' · ') });
+  }
+  for (const q of mine?.questions ?? []) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: 'Global › Settings › Defaults', route: 'global-settings/interview',
+    text: [q.id, q.hint, ...(q.choices ?? []).map((c) => typeof c === 'object' ? `${c.value} ${c.label ?? ''}` : c)].filter(Boolean).join(' · ') });
+  return out;
 }
 
 function reportError(e) {

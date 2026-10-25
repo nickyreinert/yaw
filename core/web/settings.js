@@ -36,7 +36,7 @@ const ABOUT = {
   '.codex/hooks.json': 'Registers YAW hooks with Codex. Codex asks you to trust them once with /hooks.',
   '.yaw/bin/yaw-hook': 'Launcher every agent hook calls; finds the installed YAW and runs the hook.',
   justfile: 'Project recipes (just check, just test …). Imports the YAW recipe files.',
-  [ANSWERS]: 'Your interview answers. Change them on the Interview tab; Apply re-renders the files that depend on them.',
+  [ANSWERS]: 'Your interview answers. Change them on the Project tab; Apply re-renders the files that depend on them.',
   [MANIFEST]: 'Which files YAW wrote, from which module, and the kit version used.',
   [BASE_DIR]: 'Copies of what YAW last wrote. yaw apply compares against them so your own edits survive a merge.',
 };
@@ -149,7 +149,7 @@ const answersHash = (root) => { const doc = readRegular(root, ANSWERS); return h
 // answers hash the browser opened, or null for a first setup; either way a change on disk meanwhile is a 409.
 function editModel({ root, kitRoot, env, expected }) {
   const fresh = !readManifest(root);
-  if (expected !== undefined && expected !== (fresh ? null : answersHash(root))) throw new FormError('The setup changed on disk; reload the Interview tab', 409);
+  if (expected !== undefined && expected !== (fresh ? null : answersHash(root))) throw new FormError('The setup changed on disk; reload the Project tab', 409);
   try { return createFormModel({ root, kitRoot, env, edit: !fresh }); }
   catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
 }

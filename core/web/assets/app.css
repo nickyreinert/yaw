@@ -580,3 +580,31 @@ pre.kickoff-prompt { max-height: none; overflow: visible; font-size: .76rem; }
 a.chip { text-decoration: none; border: 1px solid var(--line); background: #fff; font-size: .82rem; }
 a.chip:hover { border-color: var(--accent); background: var(--wash); }
 .ok-text { color: #1e7a4c; font-weight: 600; }
+/* Quick search: sidebar box and results, page search in the heading row, filtered and highlighted settings */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.side-search { margin: 4px 0 12px; }
+.side-search input[type=search] { margin: 0; background: #ffffff14; border-color: #ffffff2e; color: #f2f6f2; font-size: .84rem; padding: 8px 10px; }
+.side-search input::placeholder { color: #a8d0ca; }
+.side-search input:focus { background: #ffffff24; outline: 2px solid #67cdd0; outline-offset: 1px; }
+.side-results { display: grid; gap: 4px; }
+.search-result { display: grid; gap: 2px; text-align: left; border: 0; border-radius: 7px; background: transparent; color: #bacac2; padding: 8px 10px; font-weight: 400; font-size: .8rem; }
+.search-result:hover, .search-result:focus-visible { background: #31565e; color: #fff; }
+.search-result strong { font-weight: 600; color: #fff; }
+.search-trail { font-size: .66rem; letter-spacing: .04em; color: #8fb5ae; }
+.search-preview { font-size: .72rem; line-height: 1.35; overflow-wrap: anywhere; }
+.search-none { color: #a8d0ca; font-size: .8rem; padding: 6px 10px; }
+mark.search-hit { background: #ffd966; color: #1d2d2a; border-radius: 3px; padding: 0 2px; box-shadow: 0 0 0 1px #e0b83a; }
+.heading-row { flex: 1 0 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.heading-row h1 { flex: 0 1 auto; margin: 0 0 .1rem; }
+.page-search { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.page-search input[type=search] { margin: 0; width: 17rem; max-width: 60vw; font-size: .84rem; }
+.page-search #settings-search-status, .page-search #gs-search-status { min-width: 4.5rem; text-align: right; }
+.search-miss { display: none !important; }
+.interview-pane-off { display: none; }
+.searching .interview-pane-off { display: grid; }
+.searching .interview-setup.interview-pane-off { display: block; }
+.searching .pane-nav, .searching .pane-foot { display: none; }
+.pane-nav > button:last-child:not([data-mode]) { margin-left: auto; }
+.pane-foot[hidden] { display: none; }
+@media (max-width: 760px) { .sidebar .side-search { margin: 10px 0 0; } .side-results { margin-top: 10px; } .page-search { margin-left: 0; width: 100%; } .page-search input[type=search] { width: 100%; max-width: none; } }
+.interview-actions[hidden], #interview-preview[hidden] { display: none; }
