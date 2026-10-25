@@ -64,7 +64,7 @@ test('dashboard data: a missing registry is reported and never created; a broken
   assert.equal(data.project.name.length > 0, true);
 });
 
-test('dashboard server: same handshake as the form, read-only API, no POST routes', async () => {
+test('dashboard server: same authenticated handshake as the form without serving setup-form assets', async () => {
   const root = await makeProject({ modules: ['core'] });
   const s = await startDashboard({ root, kitRoot: KIT_ROOT, env: home(), signals: false });
   try {
@@ -86,27 +86,33 @@ test('dashboard server: same handshake as the form, read-only API, no POST route
   }
 });
 
-test('yaw web: the dashboard in a YAW project, the setup form elsewhere; listed in help', async () => {
+test('yaw web: the dashboard opens without a setup prompt in an uninitialized project folder', async () => {
   const root = await makeProject({ modules: ['core'] });
   const env = home();
-  const run = async (cwd) => {
+  const run = async (cwd, prompter) => {
     const stdout = capture();
     let url;
-    const running = main(['web'], { cwd, env, kitRoot: KIT_ROOT, stdout, stderr: capture(), openBrowser: async (u) => { url = u; return true; } });
+    const running = main(['web'], { cwd, env, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter, openBrowser: async (u) => { url = u; return true; } });
     for (let i = 0; i < 50 && !url; i++) await new Promise((r) => setTimeout(r, 20));
     const cookie = (await fetch(url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
     const title = (await (await fetch(new URL('/', url), { headers: { cookie } })).text()).match(/<title>(.*)<\/title>/)[1];
     process.emit('SIGINT');
-    assert.equal(await running, title === 'YAW dashboard' ? 0 : 1);
+    assert.equal(await running, 0);
     return { title, out: stdout.text() };
   };
   const dash = await run(root);
   assert.equal(dash.title, 'YAW dashboard');
   assert.match(dash.out, /YAW dashboard \(local only\)\. Switch projects/);
-  const form = await run(tmp('yaw-empty-'));
-  assert.equal(form.title, 'YAW setup');
-  assert.match(form.out, /opens the setup form/);
+  const parent = tmp('yaw-projects-');
+  mkdirSync(join(parent, 'project-one', '.git'), { recursive: true });
+  mkdirSync(join(parent, 'project-two', '.git'), { recursive: true });
+  const asked = [];
+  const prompter = { interactive: true, ask: async (question) => { asked.push(question); return 'n'; } };
+  const web = await run(parent, prompter);
+  assert.equal(web.title, 'YAW dashboard');
+  assert.match(web.out, /opening the dashboard without changing files/);
+  assert.deepEqual(asked, [], 'yaw web does not ask to initialize a folder of projects');
   const help = capture();
   await main(['help'], { cwd: root, env, kitRoot: KIT_ROOT, stdout: help, stderr: capture() });
-  assert.match(help.text(), /^ {2}web {2,}open the local web interface/m);
+  assert.match(help.text(), /^ {2}web {2,}open the local dashboard/m);
 });

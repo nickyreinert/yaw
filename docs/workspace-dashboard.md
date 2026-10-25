@@ -1,12 +1,15 @@
 # Workspace dashboard, notifications and session analysis
 
-Run `yaw web` in a YAW workspace. `yaw web --background` keeps one shared
-dashboard server for all your YAW workspaces: running `yaw web` in another
-workspace reopens that server with the workspace selected. Switch workspaces in
-the sidebar's **Project** list; each browser tab keeps its own choice. Use
-**Add project folder** to add a workspace you have not opened yet; only folders
-with a YAW setup are accepted. Use `yaw web --stop` before restarting the
-server with changed environment variables.
+Run `yaw web` in any folder. It opens the dashboard without writing files or
+starting setup; in an uninitialized folder, use **Workspace → Settings →
+Interview** (or **Configure project** on the Overview) when you are ready to
+configure it. `yaw web --background` keeps one shared dashboard server for all
+your YAW workspaces: running `yaw web` in another workspace reopens that
+server with the workspace selected. Switch workspaces in the sidebar's
+**Project** list; each browser tab keeps its own choice. Use **Add project
+folder** to add a workspace you have not opened yet; only folders with a YAW
+setup are accepted. Use `yaw web --stop` before restarting the server with
+changed environment variables.
 
 ## Scope and controls
 
@@ -16,8 +19,8 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
 - **Sessions**: the session browser, locked to this workspace.
 - **Settings** has three tabs:
   - **Interview**: the same questions as `yaw edit`, with your saved answers,
-    setup depth, stack and modules. In a folder without YAW (the **Configure
-    project** button on the Overview), it is the first setup instead: empty
+    setup depth, stack and modules. In a folder without YAW, it is the first
+    setup instead: empty
     answers, **Set up project** writes the files; a folder that is not empty
     needs a confirmation first, and your home folder is refused. **Preview changes** lists every
     file that would change, with a diff; **Apply** writes them (files you

@@ -67,8 +67,9 @@ test('yaw web in a second project joins the shared dashboard and selects that pr
   }
 });
 
-test('background web also serves setup in an empty folder; mutually exclusive flags are rejected', async () => {
+test('background web opens the dashboard in an uninitialized folder without writing files; flags remain exclusive', async () => {
   const root = tmp('yaw-web-project-');
+  writeFileSync(join(root, 'existing.txt'), 'keep');
   const env = { ...process.env, HOME: tmp('yaw-web-home-') };
   let url;
   const stderr = capture();
@@ -80,7 +81,12 @@ test('background web also serves setup in an empty folder; mutually exclusive fl
     const response = await fetch(url, { redirect: 'manual' });
     const cookie = response.headers.get('set-cookie').split(';')[0];
     const page = await (await fetch(new URL('/', url), { headers: { cookie } })).text();
-    assert.match(page, /<title>YAW setup/);
+    assert.match(page, /<title>YAW dashboard/);
+    const interview = await (await fetch(new URL('/api/interview', url), { headers: { cookie } })).json();
+    assert.equal(interview.fresh, true);
+    assert.equal(interview.folder.confirm, true);
+    assert.equal(existsSync(join(root, '.yaw/manifest.json')), false, 'opening the dashboard does not initialize the folder');
+    assert.equal(readFileSync(join(root, 'existing.txt'), 'utf8'), 'keep');
   } finally {
     assert.equal(await main(['web', '--stop'], io), 0);
   }
@@ -139,34 +145,27 @@ test('stale state is reported and removed, but a refused control request preserv
   assert.equal(existsSync(file), false);
 });
 
-test('background setup changes to a dashboard on the same port after Apply', async () => {
+test('background dashboard refuses unconfirmed initialization in a non-empty folder', async () => {
   const root = tmp('yaw-web-project-');
+  writeFileSync(join(root, 'existing.txt'), 'keep');
   const env = { HOME: tmp('yaw-web-home-'), PATH: '/nonexistent' };
   let url;
   const io = { cwd: root, env, kitRoot: KIT_ROOT, stdout: capture(), stderr: capture(), openBrowser: async (u) => { url = u; return true; } };
   try {
     assert.equal(await main(['web', '--background'], io), 0, io.stderr.text());
-    const original = url;
     const login = await fetch(url, { redirect: 'manual' });
     const cookie = login.headers.get('set-cookie').split(';')[0];
     const html = await (await fetch(new URL('/', url), { headers: { cookie } })).text();
     const csrf = html.match(/name="yaw-csrf" content="([a-f0-9]+)"/)[1];
-    const response = await fetch(new URL('/api/apply', url), {
+    const response = await fetch(new URL('/api/interview-apply', url), {
       method: 'POST',
       headers: { cookie, 'x-yaw-token': csrf, 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'quick', answers: { 'idea.text': 'Example tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, modules: ['core'] }),
     });
-    const events = (await response.text()).trim().split('\n').map((line) => JSON.parse(line));
-    assert.equal(response.status, 200, JSON.stringify(events));
-    assert.equal(events.at(-1).type, 'done');
-    // Wait for the private state to reflect the new listener before reopening.
-    await new Promise((r) => setTimeout(r, 100));
-    assert.equal(await main(['web'], io), 0, io.stderr.text());
-    assert.equal(new URL(url).port, new URL(original).port);
-    const dashboardLogin = await fetch(url, { redirect: 'manual' });
-    const dashboardCookie = dashboardLogin.headers.get('set-cookie').split(';')[0];
-    const dashboard = await (await fetch(new URL('/', url), { headers: { cookie: dashboardCookie } })).text();
-    assert.match(dashboard, /<title>YAW dashboard/);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /confirm that YAW may write/);
+    assert.equal(existsSync(join(root, '.yaw/manifest.json')), false);
+    assert.equal(readFileSync(join(root, 'existing.txt'), 'utf8'), 'keep');
   } finally {
     await main(['web', '--stop'], io);
   }

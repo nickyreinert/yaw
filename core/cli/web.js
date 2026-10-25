@@ -1,12 +1,10 @@
-// `yaw web` (#172): the local web interface. In a YAW project it opens the dashboard, one shared server for all YAW
-// projects with a project switcher; in a folder without YAW it opens the setup form (same as `yaw init --web`).
+// `yaw web` (#172): the local dashboard, including for folders without YAW setup. First-time setup is available
+// through Workspace → Settings → Interview; opening the dashboard itself never writes to the folder.
 
 import { readManifest } from '../render/manifest.js';
 import { startDashboard } from '../web/dashboard.js';
-import { initWeb, openBrowser, writeLauncher } from '../web/init.js';
+import { openBrowser, writeLauncher } from '../web/init.js';
 import { UsageError } from './commands.js';
-import { verifyProject } from './init.js';
-import { guardFolder } from './folder-guard.js';
 import { syncShortcut } from './sync.js';
 import { backgroundRequest, startBackground, writeBackgroundLauncher } from '../web/background.js';
 
@@ -43,12 +41,7 @@ export async function web({ values = {}, positionals, io }) {
     else if (existing) return openBackground(existing, io, root);
   }
   if (!project) {
-    io.stdout.write('No YAW setup in this folder yet, so yaw web opens the setup form (same as yaw init --web).\n');
-    if (!(await guardFolder({ root: io.cwd, io, force: values.force }))) {
-      io.stdout.write('cancelled; nothing was written\n');
-      return 1;
-    }
-    if (!values.background) return initWeb({ io, verify: verifyProject });
+    io.stdout.write('No YAW setup in this folder yet; opening the dashboard without changing files. Use Workspace → Settings → Interview to configure this folder.\n');
   }
   if (values.background) return openBackground(await startBackground({ io, shared: project }), io, project ? null : io.cwd);
   let finish;

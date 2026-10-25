@@ -4,7 +4,7 @@ import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, 
 import { join } from 'node:path';
 import { userDir } from '../lib/user-store.js';
 
-// `root === null` is the one shared dashboard server for all YAW projects; a folder root is a setup-form server.
+// `root === null` is the shared dashboard server for YAW projects; a folder root is a per-folder dashboard server.
 const stateName = (root) => root === null ? 'dashboard.json' : `${createHash('sha256').update(realpathSync(root)).digest('hex')}.json`;
 
 export function stateFile(root, env, create = false) {
