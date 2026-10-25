@@ -432,7 +432,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
         num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),
     }[state.table]();
-    fill($('ss-browse'), sub, h('article', { class: 'card' }, body), data.limited ? h('p', { class: 'small muted' }, `Showing the newest ${fmt(data.rows.length)} of ${fmt(data.total)} sessions.`) : null);
+    fill($('ss-browse'), sub, h('article', { class: 'card' }, body), data.limited ? h('p', { class: 'small muted' }, `Showing the newest ${fmt(data.rows.length)} of ${fmt(data.total)} sessions.`) : null,
+      data.undated ? h('p', { class: 'small muted' }, `${fmt(data.undated)} session${data.undated === 1 ? ' has' : 's have'} no start time and cannot be charted. For synced sessions, update YAW on the other device and sync there again.`) : null);
   }
 
   // ---------- Global tasks ----------

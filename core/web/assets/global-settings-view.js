@@ -60,7 +60,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
 
   async function loadSync() {
     const data = await get('global/sync'), root = $('gs-sync'); root.replaceChildren();
-    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets and personal interview defaults in both directions. No transcripts, credentials or workspace folders are transferred. Refresh Sessions locally before syncing to include recent statistics.'));
+    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets and personal interview defaults in both directions. No transcripts, credentials or workspace folders are transferred. Refresh Sessions locally before syncing to include recent statistics. Sessions from your other devices then appear on the Sessions pages as "synced · device"; a device needs this YAW version and one sync to share start times.'));
     const field = (title, value = '') => {
       const label = el('label', title), input = document.createElement('input');
       input.value = value; label.append(input); root.append(label); return input;

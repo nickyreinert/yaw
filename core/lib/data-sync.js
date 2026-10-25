@@ -12,7 +12,13 @@ const hash = (v) => createHash('sha256').update(v).digest('hex');
 const canonical = (v) => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x);
 const equal = (a, b) => canonical(a ?? null) === canonical(b ?? null);
 const NUMBERS = ['tokens_in', 'tokens_out', 'cost_usd', 'prompts', 'answers', 'promptChars', 'answerChars'];
+// Per-session figures that place a session on a chart (never summed in the totals) and its two plain labels.
+const EXTRA = ['started', 'minutes', 'medianAnswerChars', 'p95AnswerChars', 'medianResponseMs', 'p95ResponseMs'];
+const LABELS = ['agent', 'model'];
+const LABEL_RE = /^[\p{L}\p{N} _.:\/@+()-]{1,80}$/u;
 const SCOPES = ['settings', 'presets', 'statistics'];
+export const sessionKey = (id) => hash(String(id));
+const finite = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
 // Check every component before opening, including parent directories. Missing leaves are allowed.
 function safe(path) {
@@ -103,11 +109,17 @@ function localRecords(env, scopes, kitRoot) {
 // Per-session numerical summaries, keyed without workspace paths. Counts are never added to old snapshots.
 function statistics(env) {
   return (readUserData(env, 'session-analysis.json')?.rows ?? []).filter((r) => typeof r.id === 'string' && r.id.length > 0).map((r) => {
-    const row = { key: hash(String(r.id)) };
+    const row = { key: sessionKey(r.id) };
     for (const k of NUMBERS) {
       const v = r[k] ?? r.metrics?.[k];
-      row[k] = typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+      row[k] = finite(v) ? v : null;
     }
+    // Start time, length and response figures let another device chart this session; no title, project or path.
+    const started = Date.parse(r.started), ended = Date.parse(r.ended);
+    const extra = { started, minutes: Number.isFinite(ended) && ended >= started ? Math.round((ended - started) / 60000) : null,
+      medianAnswerChars: r.metrics?.medianAnswerChars, p95AnswerChars: r.metrics?.p95AnswerChars, medianResponseMs: r.metrics?.medianResponseMs, p95ResponseMs: r.metrics?.p95ResponseMs };
+    for (const k of EXTRA) row[k] = finite(extra[k]) ? extra[k] : null;
+    for (const k of LABELS) row[k] = typeof r[k] === 'string' && LABEL_RE.test(r[k]) ? r[k] : null;
     return row;
   });
 }
@@ -129,7 +141,10 @@ function validateVault(v, kitRoot) {
     if (!/^[a-f0-9-]{36}$/.test(id) || !d || !Array.isArray(d.rows) || d.rows.length > 100000 || Object.keys(d).some((k) => !['name', 'updated', 'rows'].includes(k)) || !Number.isFinite(Date.parse(d.updated))) throw new Error('Invalid device statistics');
     label(d.name);
     for (const r of d.rows) {
-      if (!/^[a-f0-9]{64}$/.test(r.key) || Object.keys(r).some((k) => k !== 'key' && !NUMBERS.includes(k)) || NUMBERS.some((k) => r[k] !== null && (typeof r[k] !== 'number' || !Number.isFinite(r[k]) || r[k] < 0))) throw new Error('Invalid numeric summary');
+      // Rows written by older versions have no EXTRA or label fields; they still count in the totals.
+      if (!/^[a-f0-9]{64}$/.test(r.key) || Object.keys(r).some((k) => k !== 'key' && ![...NUMBERS, ...EXTRA, ...LABELS].includes(k)) ||
+        [...NUMBERS, ...EXTRA].some((k) => r[k] !== undefined && r[k] !== null && !finite(r[k])) ||
+        LABELS.some((k) => r[k] !== undefined && r[k] !== null && !(typeof r[k] === 'string' && LABEL_RE.test(r[k])))) throw new Error('Invalid numeric summary');
     }
   }
   return v;
@@ -145,6 +160,19 @@ function totals(devices, selected) {
     }
   }
   return { sessions: rows.size, ...Object.fromEntries(NUMBERS.map((k) => [k, [...rows.values()].some((r) => r[k] !== null) ? [...rows.values()].reduce((s, r) => s + (r[k] ?? 0), 0) : null])) };
+}
+// Sessions other devices contributed, for the Sessions pages: the most complete copy of each, none of this device's own.
+export function syncedSessions(env) {
+  const state = readUserData(env, 'sync-state.json'), me = readUserData(env, 'sync-device.json')?.id;
+  const rows = new Map();
+  for (const [id, d] of Object.entries(state?.devices ?? {}).sort()) {
+    if (id === me) continue;
+    for (const row of d.rows ?? []) {
+      const old = rows.get(row.key);
+      if (!old || (row.prompts ?? 0) + (row.answers ?? 0) > (old.prompts ?? 0) + (old.answers ?? 0)) rows.set(row.key, { ...row, device: d.name });
+    }
+  }
+  return [...rows.values()];
 }
 export function syncStatus({ env, selected } = {}) {
   const cfg = readUserData(env, 'sync-config.json');

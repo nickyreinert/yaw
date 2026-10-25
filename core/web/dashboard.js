@@ -10,6 +10,7 @@ import { sessionRows } from './session-rows.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
 import { readAnalysis } from '../lib/session-analysis.js';
+import { sessionKey, syncedSessions } from '../lib/data-sync.js';
 import { createWorkspaceApi } from './workspace-api.js';
 import { knowledgeData } from './knowledge.js';
 import { parseTasks, tasksMode } from '../lib/tasks.js';
@@ -112,6 +113,21 @@ async function history(kitRoot, env) {
   return { registry, stored, saved, rows };
 }
 
+// Sessions from other synced devices as registry-like rows. Their identity is the hash, there is no title, branch or
+// project; the device name stands in for the project so they can be filtered and split like any other.
+function syncedRows(env, own) {
+  let list = [];
+  try { list = syncedSessions(env); } catch { return []; }
+  const iso = (ms) => Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+  return list.filter((s) => !own.has(s.key)).map((s) => ({
+    id: `synced:${s.key.slice(0, 24)}`, agent: s.agent || 'Unknown', project: `synced · ${s.device}`, model: s.model || 'Unknown', title: '', branch: '', source: 'synced',
+    started: iso(s.started), ended: s.started != null && s.minutes != null ? iso(s.started + s.minutes * 60000) : null,
+    tokens_in: s.tokens_in, tokens_out: s.tokens_out, cost_usd: s.cost_usd,
+    metrics: s.prompts == null && s.answers == null ? null : { prompts: s.prompts, answers: s.answers, promptChars: s.promptChars, answerChars: s.answerChars,
+      medianAnswerChars: s.medianAnswerChars, p95AnswerChars: s.p95AnswerChars, medianResponseMs: s.medianResponseMs, p95ResponseMs: s.p95ResponseMs },
+  }));
+}
+
 // Every known session as compact rows for the Sessions and Global views; the browser filters and charts them.
 export async function sessionsData({ root, kitRoot, env, projects }) {
   const h = await history(kitRoot, env);
@@ -120,11 +136,12 @@ export async function sessionsData({ root, kitRoot, env, projects }) {
   const live = section(() => tasksSection(root));
   const tasks = [...(saved.tasks ?? []).filter((t) => t.project !== current), ...(live.available ? [{ project: current, ...live }] : [])];
   const known = projects ? projects.list().projects.map((p) => p.root) : [];
-  if (!h) return { available: false, current, tasks, projects: known, history: { collected: saved.collected ?? null } };
+  const synced = syncedRows(env, new Set((h?.rows ?? []).map((r) => sessionKey(r.id))));
+  if (!h && !synced.length) return { available: false, current, tasks, projects: known, history: { collected: saved.collected ?? null } };
   return {
     available: true, current, tasks, projects: known,
-    history: { local: Boolean(h.saved.collected), collected: h.saved.collected, registered: h.stored?.rows.length ?? 0 },
-    ...sessionRows(h.rows),
+    history: { local: Boolean(h?.saved.collected), collected: h?.saved.collected ?? null, registered: h?.stored?.rows.length ?? 0, synced: synced.length },
+    ...sessionRows([...(h?.rows ?? []), ...synced]),
   };
 }
 

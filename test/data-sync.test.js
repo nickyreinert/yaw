@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, realpathSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { configureSync, runSync, syncStatus } from '../core/lib/data-sync.js';
+import { configureSync, runSync, syncStatus, syncedSessions } from '../core/lib/data-sync.js';
 import { writeUserData } from '../core/lib/user-store.js';
 import { main } from '../core/cli/main.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { startFormServer } from '../core/web/form-server.js';
+import { sessionsData } from '../core/web/dashboard.js';
 
 const kitRoot = resolve('.');
 function pair(scopes) {
@@ -151,4 +152,30 @@ test('--sync shortcut: a new machine joins the sync folder and gets the presets 
   assert.match(out, /Synced portable settings and presets with/);
   assert.match(readFileSync(join(fresh.HOME, '.yaw/presets/work.yaml'), 'utf8'), /user.language: en/);
   assert.throws(() => syncShortcut({ spec: join(target, 'missing'), io: { env: { HOME: join(fresh.HOME, 'x') }, kitRoot, cwd: process.cwd(), stdout: { write() {} } } }), /--sync .*does not exist/);
+});
+
+test('sessions of another device reach the Sessions data with start time, agent and device, never path or title', async () => {
+  const { target, a, b, run } = pair(['statistics']);
+  const row = (id, agent, started) => ({ id, project: '/private/project', title: 'Do not export', agent, model: 'opus', started, ended: '2026-10-01T10:30:00Z', tokens_in: 5, metrics: { prompts: 2, answers: 3 } });
+  writeUserData(b, 'session-analysis.json', { rows: [row('claude:one', 'claude', '2026-10-01T10:00:00Z'), row('codex:two', 'codex', '2026-10-02T10:00:00Z')] });
+  writeUserData(a, 'session-analysis.json', { rows: [row('codex:two', 'codex', '2026-10-02T10:00:00Z')], collected: '2026-10-03T00:00:00Z' });
+  run(b); run(a);
+  assert.equal(syncedSessions(a).length, 2);
+  const exported = readFileSync(join(target, 'yaw-sync.json'), 'utf8');
+  for (const text of ['/private/', 'Do not export', 'claude:one']) assert.equal(exported.includes(text), false);
+  const data = await sessionsData({ root: a.HOME, kitRoot, env: a });
+  // codex:two exists on both devices: counted once, as the local copy
+  assert.equal(data.rows.length, 2);
+  const synced = data.rows.filter((r) => r.source === 'synced');
+  assert.equal(synced.length, 1);
+  assert.deepEqual([synced[0].agent, synced[0].project, synced[0].minutes, synced[0].model], ['claude', 'synced · PC', 30, 'opus']);
+  assert.equal(data.history.synced, 1);
+});
+test('a vault written by an older version (rows without start time) is still accepted', () => {
+  const { target, a, run } = pair(['statistics']);
+  run(a);
+  const file = join(target, 'yaw-sync.json'), vault = JSON.parse(readFileSync(file, 'utf8'));
+  vault.devices['11111111-1111-1111-1111-111111111111'] = { name: 'Mac', updated: new Date().toISOString(), rows: [{ key: 'a'.repeat(64), tokens_in: null, prompts: 1, answers: 2 }] };
+  writeFileSync(file, JSON.stringify(vault));
+  assert.equal(run(a).totals.sessions, 1);
 });
