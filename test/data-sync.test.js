@@ -179,3 +179,40 @@ test('a vault written by an older version (rows without start time) is still acc
   writeFileSync(file, JSON.stringify(vault));
   assert.equal(run(a).totals.sessions, 1);
 });
+
+test('global knowledge syncs both ways, with deletions; secrets, links and other files stay local', () => {
+  const { target, a, b, run } = pair(['knowledge']);
+  const dir = (env) => join(env.HOME, '.yaw/knowledge'); mkdirSync(join(dir(a), 'team'), { recursive: true });
+  writeFileSync(join(dir(a), 'team/style.md'), '# Style\nShort sentences.\n');
+  writeFileSync(join(dir(a), 'notes.txt'), 'not markdown');
+  writeFileSync(join(dir(a), 'leak.md'), '# Leak\nAKIAIOSFODNN7EXAMPLE and -----BEGIN RSA PRIVATE KEY-----\n');
+  symlinkSync(join(dir(a), 'notes.txt'), join(dir(a), 'link.md'));
+  run(a); run(b);
+  assert.equal(readFileSync(join(dir(b), 'team/style.md'), 'utf8'), '# Style\nShort sentences.\n');
+  for (const name of ['notes.txt', 'leak.md', 'link.md']) assert.throws(() => readFileSync(join(dir(b), name)), /ENOENT/);
+  const vault = readFileSync(join(target, 'yaw-sync.json'), 'utf8');
+  for (const text of ['AKIA', 'notes.txt', 'link.md']) assert.equal(vault.includes(text), false);
+  unlinkSync(join(dir(b), 'team/style.md')); run(b); run(a);
+  assert.throws(() => readFileSync(join(dir(a), 'team/style.md')), /ENOENT/);
+});
+
+test('task snapshots sync as folder name plus items, appear on the other device only when the scope is on', async () => {
+  const { target, a, b, run } = pair(['tasks']);
+  const snapshot = { project: '/private/work/Shop', available: true, active: [{ id: 'T-001', issue: 4, title: 'Build cart', status: 'IN PROGRESS', progress: 40 }], backlog: [{ id: 'T-002', issue: null, title: 'Pay', note: 'later' }] };
+  writeUserData(b, 'session-analysis.json', { rows: [], tasks: [snapshot, { project: '/x/empty', available: false }] });
+  run(b); run(a);
+  assert.equal(readFileSync(join(target, 'yaw-sync.json'), 'utf8').includes('/private'), false);
+  const data = await sessionsData({ root: a.HOME, kitRoot, env: a });
+  const t = data.tasks.find((x) => x.project === 'synced · PC · Shop');
+  assert.equal(t.active[0].title, 'Build cart'); assert.equal(t.backlog[0].note, 'later');
+  assert.equal(data.tasks.length, 1);
+  // scope off: nothing is shown
+  configureSync({ env: a, target, scopes: ['presets'] });
+  assert.equal((await sessionsData({ root: a.HOME, kitRoot, env: a })).tasks.length, 0);
+});
+
+test('tasks and knowledge are opt-in', () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'yaw-sync-'))), target = join(root, 'NAS'); mkdirSync(target);
+  assert.deepEqual(configureSync({ env: { HOME: root }, target }).config.scopes, ['settings', 'presets', 'statistics']);
+  assert.throws(() => configureSync({ env: { HOME: join(root, 'x') }, target, scopes: ['nope'] }), /Scopes/);
+});

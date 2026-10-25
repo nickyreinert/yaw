@@ -6,8 +6,12 @@
 //   Claude Code  ~/.claude/projects/<encoded project path>/<session>.jsonl   ($CLAUDE_CONFIG_DIR)
 //   Codex        ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl                ($CODEX_HOME)
 //   Copilot CLI  ~/.copilot/session-state/<session>/{workspace.yaml,events.jsonl}
+//   Gemini CLI   ~/.gemini/tmp/<project folder or sha256 of its path>/chats/session-*.json
+//
+// Each agent's folder is a "source" (Global settings → Sessions): the defaults below, or the paths the user chose.
 
 import { createReadStream, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { isAbsolute, join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { NATIVE_ID, clean, realRoot, resumeCommand, sessionId } from './registry.js';
@@ -170,8 +174,7 @@ export async function readClaude(file, project) {
   return session({ agent: 'claude', native, cwd, branch, usage, cost, transcript: file });
 }
 
-async function claude(env, project, reuse) {
-  const base = env.CLAUDE_CONFIG_DIR || join(env.HOME ?? '', '.claude');
+async function claude(base, project, reuse) {
   const projects = join(base, 'projects');
   if (!isDir(base) || !isDir(projects)) return [];
   const dirs = project === null ? list(projects).filter((n) => isDir(join(projects, n))).map((n) => join(projects, n)) : [join(projects, claudeFolder(project))];
@@ -233,8 +236,7 @@ function codexFiles(dir, depth = 0, out = []) {
   return out;
 }
 
-async function codex(env, project, reuse) {
-  const base = env.CODEX_HOME || join(env.HOME ?? '', '.codex');
+async function codex(base, project, reuse) {
   if (!isDir(base) || !isDir(join(base, 'sessions'))) return [];
   const found = [];
   for (const file of codexFiles(join(base, 'sessions'))) {
@@ -294,9 +296,9 @@ export async function readCopilot(dir, project) {
   return session({ agent: 'copilot', native, cwd, branch, usage, cost: null, transcript: isFile(events) ? events : null });
 }
 
-async function copilot(env, project, reuse) {
-  const base = join(env.HOME ?? '', '.copilot', 'session-state');
-  if (!isDir(join(env.HOME ?? '', '.copilot')) || !isDir(base)) return [];
+async function copilot(home, project, reuse) {
+  const base = join(home, 'session-state');
+  if (!isDir(home) || !isDir(base)) return [];
   const found = [];
   for (const name of list(base).slice(0, MAX_FILES)) {
     const dir = join(base, name);
@@ -306,15 +308,119 @@ async function copilot(env, project, reuse) {
   return found;
 }
 
-// ------------------------------------------------------------------------------------------ import
+// ------------------------------------------------------------------------------------------ Gemini CLI
 
-const READERS = { claude, codex, copilot };
+const sha = (text) => createHash('sha256').update(text).digest('hex');
+const MAX_GEMINI = 64 * 1024 * 1024;
 
-export async function findSessions({ env, root, agents = Object.keys(READERS), allProjects = false, reuse }) {
+// One chat file is a single JSON document. Message text is dropped here; only times, model and token counts are kept.
+export function readGemini(file, project, cwd) {
+  let chat;
+  try {
+    const st = lstatSync(file);
+    if (!st.isFile() || st.size > MAX_GEMINI) return null;
+    chat = JSON.parse(readFileSync(file, 'utf8'));
+  } catch { return null; }
+  if (!chat || typeof chat !== 'object' || !Array.isArray(chat.messages)) return null;
+  const native = typeof chat.sessionId === 'string' ? chat.sessionId : null;
+  if (!inProject(cwd, project) || !NATIVE_ID.test(native ?? '')) return null;
+  const usage = new Usage();
+  usage.time(chat.startTime); usage.time(chat.lastUpdated);
+  for (const m of chat.messages) {
+    if (!m || typeof m !== 'object') continue;
+    if (m.type === 'user' || m.type === 'gemini') usage.time(m.timestamp);
+    if (m.type !== 'gemini') continue;
+    const t = m.tokens && typeof m.tokens === 'object' ? m.tokens : {};
+    usage.model(m.model, num(t.output) + 1);
+    usage.tokensIn += num(t.input) + num(t.cached);
+    usage.tokensOut += num(t.output) + num(t.thoughts);
+  }
+  if (usage.first === null) return null;
+  return session({ agent: 'gemini', native, cwd, branch: null, usage, cost: null, transcript: file });
+}
+
+// A chat folder is named after the project, or after the sha256 of the project path. `.project_root` says which;
+// without it the folder only belongs to a project whose path hashes to its name (a project we were asked about or know).
+async function gemini(base, project, reuse, known = []) {
+  const tmp = join(base, 'tmp');
+  if (!isDir(base) || !isDir(tmp)) return [];
+  const byHash = new Map([...known, ...(project ? [project] : [])].map((p) => [sha(p), p]));
+  const found = [];
+  let inspected = 0;
+  for (const name of list(tmp)) {
+    const chats = join(tmp, name, 'chats');
+    if (!isDir(chats)) continue;
+    let cwd = null;
+    try { cwd = readFileSync(join(tmp, name, '.project_root'), 'utf8').trim().split('\n')[0]; } catch { /* hashed folder */ }
+    cwd = isAbsolute(cwd ?? '') ? cwd : byHash.get(name) ?? null;
+    if (!cwd) continue;
+    for (const file of list(chats).filter((n) => /^session-.*\.json$/.test(n)).map((n) => join(chats, n))) {
+      if (inspected++ >= MAX_FILES) return found;
+      await readOne(found, file, fileStamp(file), project, reuse, async () => readGemini(file, project, cwd));
+    }
+  }
+  return found;
+}
+
+// ------------------------------------------------------------------------------------------ sources + import
+
+const READERS = { claude, codex, copilot, gemini };
+export const FORMATS = { claude: 'Claude Code', codex: 'Codex', copilot: 'Copilot CLI', gemini: 'Gemini CLI' };
+
+// Where each agent keeps its history unless the user says otherwise: [agent, folder, note].
+export function defaultSources(env) {
+  const home = env.HOME ?? '';
+  return [
+    { agent: 'claude', path: env.CLAUDE_CONFIG_DIR || join(home, '.claude'), note: env.CLAUDE_CONFIG_DIR ? 'CLAUDE_CONFIG_DIR' : 'default' },
+    { agent: 'codex', path: env.CODEX_HOME || join(home, '.codex'), note: env.CODEX_HOME ? 'CODEX_HOME' : 'default' },
+    { agent: 'copilot', path: join(home, '.copilot'), note: 'default' },
+    { agent: 'gemini', path: join(home, '.gemini'), note: 'default' },
+  ];
+}
+
+// Other places the same histories turn up (XDG location, Flatpak or Snap apps, Windows folders seen from WSL). Only folders that exist are suggested.
+export function suggestedSources(env) {
+  const home = env.HOME ?? '', out = [];
+  const apps = list(join(home, '.var', 'app')).map((a) => join(home, '.var', 'app', a));
+  const wsl = list('/mnt/c/Users').map((u) => join('/mnt/c/Users', u));
+  const places = [[join(home, '.config', 'claude'), 'claude', 'XDG config folder'], ...apps.flatMap((a) => [[join(a, '.claude'), 'claude', 'Flatpak app'], [join(a, '.codex'), 'codex', 'Flatpak app'], [join(a, '.gemini'), 'gemini', 'Flatpak app']]),
+    ...wsl.flatMap((u) => [[join(u, '.claude'), 'claude', 'Windows folder'], [join(u, '.codex'), 'codex', 'Windows folder'], [join(u, '.gemini'), 'gemini', 'Windows folder']])];
+  for (const [path, agent, note] of places) if (isDir(path)) out.push({ agent, path, note });
+  return out;
+}
+
+// How many history files a source holds (bounded); null when the folder does not exist. Used by the settings page only.
+export function probeSource({ agent, path }) {
+  if (!isDir(path)) return null;
+  let n = 0;
+  const walk = (dir, depth, match) => {
+    for (const name of list(dir)) {
+      if (n >= MAX_FILES) return;
+      const p = join(dir, name);
+      if (depth > 0 && isDir(p)) walk(p, depth - 1, match);
+      else if (match(name) && isFile(p)) n++;
+    }
+  };
+  if (agent === 'claude') for (const d of list(join(path, 'projects'))) walk(join(path, 'projects', d), 0, (f) => f.endsWith('.jsonl'));
+  else if (agent === 'codex') walk(join(path, 'sessions'), 3, (f) => /^rollout-.*\.jsonl$/.test(f));
+  else if (agent === 'copilot') { for (const d of list(join(path, 'session-state'))) if (n < MAX_FILES && isFile(join(path, 'session-state', d, 'workspace.yaml'))) n++; }
+  else if (agent === 'gemini') for (const d of list(join(path, 'tmp'))) walk(join(path, 'tmp', d, 'chats'), 0, (f) => /^session-.*\.json$/.test(f));
+  return n;
+}
+
+// `sources`: [{ agent, path }] chosen by the user; default is each agent's usual folder. `known`: project folders to
+// recognise hashed Gemini folders by. The same session found through two sources is returned once.
+export async function findSessions({ env, root, agents = Object.keys(READERS), allProjects = false, reuse, sources, known = [] }) {
   const project = allProjects ? null : realRoot(root);
-  const all = [];
-  for (const agent of agents) all.push(...(await READERS[agent](env, project, reuse)));
-  return all.sort((a, b) => a.started.localeCompare(b.started));
+  const list_ = (sources ?? defaultSources(env)).filter((s) => agents.includes(s.agent) && READERS[s.agent]);
+  const all = new Map();
+  for (const source of list_) {
+    for (const s of await READERS[source.agent](source.path, project, reuse, known)) {
+      const id = s.reused ? s.reused.id : `${s.agent}:${s.native}`;
+      if (!all.has(id) || (s.ended ?? '') > (all.get(id).ended ?? '')) all.set(id, s);
+    }
+  }
+  return [...all.values()].sort((a, b) => a.started.localeCompare(b.started));
 }
 
 // Insert new sessions; refresh usage and the end time of known ones. Hook-recorded fields (title, branch,

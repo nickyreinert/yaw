@@ -84,6 +84,7 @@ const FILES = [
   ]],
   ['Presets', []],
   ['Collected data', [
+    ['session-sources.json', 'data', 'The folders Sessions › Refresh reads (Global settings → Sessions).'],
     ['session-analysis.json', 'data', 'Saved session scan: counts, lengths and timing; never message text.'],
     ['history.jsonl', 'user', 'Setup history: one line per saved yaw init.'],
     ['notification-delivery.json', 'data', 'Last notification deliveries, used to avoid duplicates.'],

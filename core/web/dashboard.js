@@ -10,7 +10,7 @@ import { sessionRows } from './session-rows.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
 import { readAnalysis } from '../lib/session-analysis.js';
-import { sessionKey, syncedSessions } from '../lib/data-sync.js';
+import { sessionKey, syncedSessions, syncedTasks } from '../lib/data-sync.js';
 import { createWorkspaceApi } from './workspace-api.js';
 import { knowledgeData } from './knowledge.js';
 import { parseTasks, tasksMode } from '../lib/tasks.js';
@@ -134,7 +134,9 @@ export async function sessionsData({ root, kitRoot, env, projects }) {
   const current = realRoot(root);
   const saved = h?.saved ?? readAnalysis(env);
   const live = section(() => tasksSection(root));
-  const tasks = [...(saved.tasks ?? []).filter((t) => t.project !== current), ...(live.available ? [{ project: current, ...live }] : [])];
+  let other = [];
+  try { other = syncedTasks(env).map((t) => ({ project: `synced · ${t.device} · ${t.name}`, available: true, active: t.active.map((i) => ({ ...i, id: i.id ?? '—' })), backlog: t.backlog })); } catch { /* snapshots are optional */ }
+  const tasks = [...(saved.tasks ?? []).filter((t) => t.project !== current), ...(live.available ? [{ project: current, ...live }] : []), ...other];
   const known = projects ? projects.list().projects.map((p) => p.root) : [];
   const synced = syncedRows(env, new Set((h?.rows ?? []).map((r) => sessionKey(r.id))));
   if (!h && !synced.length) return { available: false, current, tasks, projects: known, history: { collected: saved.collected ?? null } };

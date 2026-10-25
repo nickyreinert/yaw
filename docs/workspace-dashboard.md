@@ -98,12 +98,12 @@ yaw sync status
 ```
 
 Configure the same destination on the other device with a different name,
-such as `PC`. Use `--scopes settings,presets,statistics` during setup to select
-what participates. Setup does not exchange data; sync is manual. Device names
+such as `PC`. Use `--scopes settings,presets,statistics,tasks,knowledge` during setup to select
+what participates (`tasks` and `knowledge` are off unless you list them). Setup does not exchange data; sync is manual. Device names
 can be changed with `yaw sync run --name "Work laptop"`; identity stays stable.
 Do not copy `sync-device.json` between installations.
 
-Settings means personal interview defaults; presets means saved setups. Local
+Settings means personal interview defaults; presets means saved setups; statistics adds the other device's sessions to the Sessions pages; tasks adds its Global → Tasks snapshots (project folder name, task ids, titles, status); knowledge syncs the Markdown records in `~/.yaw/knowledge` both ways, deletions included (links, secret-looking files and files over 128 KiB stay local). Local
 path, folder, directory, endpoint, host, URL and root answer fields stay local.
 Other answers and preset descriptions are user-authored content: review them
 before publishing. Existing workspaces are not reconfigured. Credential files,
@@ -306,3 +306,11 @@ over 128 KiB. If the file changed since you opened it, the save stops instead of
 overwriting. Deleting asks for confirmation. Create decision records with
 `yaw decisions record`; editing or deleting one here rebuilds the decision
 index.
+
+## Session folders
+
+Global → Settings → Sessions lists the folders `Refresh` reads: Claude Code, Codex, Copilot CLI and Gemini CLI
+histories. The usual folder of each agent is the default; the page suggests other places that exist on this machine
+(XDG config, Flatpak, WSL) and lets you edit, disable, remove or add folders, each with the format of the tool that
+wrote it. The choice is saved in `~/.yaw/session-sources.json`; `yaw sessions import` uses it too. Cursor, Antigravity
+and VS Code Copilot Chat keep sessions in databases or binary formats and cannot be added yet.

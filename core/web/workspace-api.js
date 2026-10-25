@@ -1,6 +1,7 @@
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
-import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSettings, collectAnalysis, probeClassifier, scanSummary } from '../lib/session-analysis.js';
+import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSettings, collectAnalysis, probeClassifier, readAnalysis, scanSummary } from '../lib/session-analysis.js';
+import { resetSources, saveSources, sourcesData } from '../lib/session-sources.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
 import { sessionsData, tasksSection } from './dashboard.js';
 import { readManifest } from '../render/manifest.js';
@@ -20,7 +21,7 @@ import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -31,12 +32,19 @@ export function webPreferences(env) {
 const savePreferences = (env, change) => writeUserData(env, 'web-preferences.json', { ...(readUserData(env, 'web-preferences.json') ?? {}), ...change });
 // `projects` (the dashboard's project switcher) resolves the `workspace` each request names; without it the API is
 // bound to `root`. Every action and read runs against that one resolved project.
+// The saved sources plus how many sessions the last scan found per agent.
+const sourcesView = (env, data = sourcesData(env)) => {
+  const found = {};
+  for (const r of readAnalysis(env).rows) found[r.agent] = (found[r.agent] ?? 0) + 1;
+  return { ...data, found };
+};
 export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
   let running = false;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
   return {
     actions: WORKSPACE_ACTIONS,
     get: {
+      '/api/global/session-sources': () => sourcesView(env),
       '/api/global/sync': (params) => syncStatus({ env, selected: params?.get('device') }),
       '/api/sessions': (params) => sessionsData({ root: rootOf(params?.get('workspace')), kitRoot, env, projects }),
       '/api/global/profile': () => profileData({ kitRoot, env }),
@@ -77,6 +85,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name === 'session-sources-save' || name === 'session-sources-reset') {
+        try { return sourcesView(env, name === 'session-sources-save' ? saveSources(env, input.sources) : resetSources(env)); }
+        catch (e) { throw new FormError(e.message); }
+      }
       if (name === 'sync-setup' || name === 'sync-run') {
         try { return name === 'sync-setup' ? configureSync({ env, target: input.target, github: input.github, name: input.name, scopes: input.scopes }) : runSync({ env, kitRoot, resolution: input.resolution, name: input.name }); }
         catch (e) { throw new FormError(e.message); }

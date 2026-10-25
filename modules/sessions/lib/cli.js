@@ -7,6 +7,7 @@ import { THRESHOLD, cosine, embed } from '../../../core/lib/retrieval.js';
 import { existsSync } from 'node:fs';
 import { AGENTS, SESSION_ID, clean, currentSession, realRoot, recordSession, registryFile, resumeCommand, withRegistry } from './registry.js';
 import { findSessions, importSessions } from './import.js';
+import { effectiveSources } from '../../../core/lib/session-sources.js';
 
 export const VERBS = ['find', 'for', 'resume', 'list', 'current', 'handoff', 'import'];
 export const USAGE = [
@@ -15,9 +16,9 @@ export const USAGE = [
   '       yaw sessions resume <id>                    print the command that resumes a session (it is not run)',
   '       yaw sessions list [--all]                   the latest sessions',
   '       yaw sessions current                        the session id `just commit` puts into the Agent-Session trailer',
-  '       yaw sessions handoff [--title "T-012 title"] [--agent claude|codex|copilot] [--session <id>]',
+  '       yaw sessions handoff [--title "T-012 title"] [--agent claude|codex|copilot|gemini] [--session <id>]',
   '                                                   record this session in the registry (the /handoff skill calls it)',
-  '       yaw sessions import [--dry-run] [--agent claude|codex|copilot]',
+  '       yaw sessions import [--dry-run] [--agent claude|codex|copilot|gemini]',
   '                                                   load past sessions of this folder from the agents\' local history',
   '--all searches every project, not only this one. YAW_SESSION=<id> overrides the current session.',
 ].join('\n');
@@ -101,7 +102,7 @@ function handoff(db, ctx, values) {
   if (values.agent !== undefined && !AGENTS.includes(values.agent)) throw new SessionsUsageError(`--agent must be one of ${AGENTS.join(', ')}`);
   id ??= currentSession({ db, root, env, now });
   if (id === null) {
-    if (!values.agent) throw new SessionsUsageError('no current session in the registry (hooks did not run); pass --agent claude|codex|copilot');
+    if (!values.agent) throw new SessionsUsageError('no current session in the registry (hooks did not run); pass --agent claude|codex|copilot|gemini');
     id = `${values.agent}:handoff-${now.toISOString().replace(/\D/g, '').slice(0, 14)}`;
   }
   const [agent, native] = [id.slice(0, id.indexOf(':')), id.slice(id.indexOf(':') + 1)];
@@ -146,7 +147,7 @@ export async function runImport({ args = [], values = {}, io }) {
   if (values.agent !== undefined && !AGENTS.includes(values.agent)) throw new SessionsUsageError(`--agent must be one of ${AGENTS.join(', ')}`);
   const env = io.env ?? process.env;
   const dryRun = Boolean(values['dry-run']);
-  const found = await findSessions({ env, root: io.root, agents: values.agent ? [values.agent] : AGENTS });
+  const found = await findSessions({ env, root: io.root, agents: values.agent ? [values.agent] : AGENTS, sources: effectiveSources(env) });
   // A dry run never creates the registry: without one every session would be new.
   const results = dryRun && !existsSync(registryFile(env)) ? importSessions(null, io.root, found, { dryRun }) : withRegistry(env, (db) => {
     db.exec('BEGIN');
@@ -169,6 +170,6 @@ export async function runImport({ args = [], values = {}, io }) {
   }
   const project = realRoot(io.root);
   out.write(`sessions import: ${results.length} session(s) of ${project} found; ${counts.new} new, ${counts.updated} updated, ${counts.unchanged} unchanged${dryRun ? '; nothing was written (--dry-run)' : ''}\n`);
-  if (results.length === 0) out.write('Looked in ~/.claude/projects, ~/.codex/sessions and ~/.copilot/session-state for sessions started in this folder.\n');
+  if (results.length === 0) out.write('Looked in ~/.claude/projects, ~/.codex/sessions, ~/.copilot/session-state and ~/.gemini/tmp (or the folders chosen under Global settings → Sessions) for sessions started in this folder.\n');
   return 0;
 }

@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { userDir, userDataDir, readUserData, writeUserData, secretFindings } from './user-store.js';
 import { parse, stringify } from './yaml.js';
 import { schemas } from '../render/kit.js';
+import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const canonical = (v) => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x);
@@ -16,7 +17,12 @@ const NUMBERS = ['tokens_in', 'tokens_out', 'cost_usd', 'prompts', 'answers', 'p
 const EXTRA = ['started', 'minutes', 'medianAnswerChars', 'p95AnswerChars', 'medianResponseMs', 'p95ResponseMs'];
 const LABELS = ['agent', 'model'];
 const LABEL_RE = /^[\p{L}\p{N} _.:\/@+()-]{1,80}$/u;
-const SCOPES = ['settings', 'presets', 'statistics'];
+const SCOPES = ['settings', 'presets', 'statistics', 'tasks', 'knowledge'];
+// A global knowledge record is a Markdown file below ~/.yaw/knowledge, at most five levels deep.
+const PART = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+const KNOWLEDGE_KEY = (key) => typeof key === 'string' && key.startsWith('knowledge/') && key.length <= 310 && /\.md$/i.test(key) && key.split('/').length <= 6 && key.split('/').every((p) => PART.test(p));
+const MAX_RECORD = 128 * 1024, MAX_TASK_PROJECTS = 500, MAX_TASK_ITEMS = 500;
+const scopeOf = (key) => key.startsWith('presets/') ? 'presets' : key.startsWith('knowledge/') ? 'knowledge' : 'settings';
 export const sessionKey = (id) => hash(String(id));
 const finite = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
@@ -61,9 +67,10 @@ function device(env, name) {
   if (!old || name !== undefined) writeUserData(env, 'sync-device.json', d);
   return d;
 }
-export function configureSync({ env, target, github, name, scopes = SCOPES }) {
+// Tasks and knowledge hold your own text, so they are opt-in.
+export function configureSync({ env, target, github, name, scopes = ['settings', 'presets', 'statistics'] }) {
   if (Boolean(target) === Boolean(github)) throw new Error('Choose a folder or a GitHub repository');
-  if (!Array.isArray(scopes) || !scopes.length || scopes.some((s) => !SCOPES.includes(s))) throw new Error('Scopes: settings,presets,statistics');
+  if (!Array.isArray(scopes) || !scopes.length || scopes.some((s) => !SCOPES.includes(s))) throw new Error(`Scopes: ${SCOPES.join(',')}`);
   if (github && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(github)) throw new Error('GitHub repository must be owner/repository');
   if (target && (typeof target !== 'string' || !isAbsolute(target) || !lstatSync(safe(target)).isDirectory())) throw new Error('Choose an existing absolute folder (mount your NAS first)');
   device(env, name);
@@ -75,8 +82,14 @@ export function configureSync({ env, target, github, name, scopes = SCOPES }) {
 }
 
 function portable(key, value, kitRoot) {
-  if (key !== 'settings/profile' && !/^presets\/[a-z0-9][a-z0-9-]*$/.test(key)) throw new Error('Unknown portable record');
+  if (key !== 'settings/profile' && !/^presets\/[a-z0-9][a-z0-9-]*$/.test(key) && !KNOWLEDGE_KEY(key)) throw new Error('Unknown portable record');
   if (value === null) return null;
+  if (key.startsWith('knowledge/')) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((k) => k !== 'text') || typeof value.text !== 'string' || !value.text.trim() ||
+      value.text.includes('\0') || Buffer.byteLength(value.text) > MAX_RECORD) throw new Error('Invalid knowledge record');
+    if (secretValueRule(loadRules({ kitRoot }), value.text)) throw new Error('Sync refused secret-looking data');
+    return { text: value.text };
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid portable record');
   const preset = key.startsWith('presets/');
   if (key !== 'settings/profile' && !/^presets\/[a-z0-9][a-z0-9-]*$/.test(key)) throw new Error('Unknown portable record');
@@ -88,6 +101,27 @@ function portable(key, value, kitRoot) {
   if (secretFindings({ answers: doc.answers, kitRoot }).length || secretFindings({ answers: { 'user.description': doc.description ?? '' }, kitRoot }).length) throw new Error('Sync refused secret-looking data');
   return doc;
 }
+// ~/.yaw/knowledge/**/*.md as portable records. Links, secret-looking names and text, and oversized files stay local.
+function localKnowledge(env, kitRoot) {
+  const out = {}, rules = loadRules({ kitRoot }), root = safe(join(userDir(env), 'knowledge'));
+  const walk = (rel, depth) => {
+    let names = [];
+    try { names = readdirSync(join(root, rel)).sort(); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
+    for (const name of names) {
+      if (!PART.test(name)) continue;
+      const child = rel ? `${rel}/${name}` : name, path = join(root, child);
+      let st; try { st = lstatSync(path); } catch { continue; }
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) { if (depth < 4) walk(child, depth + 1); continue; }
+      if (!st.isFile() || !/\.md$/i.test(name) || st.size > MAX_RECORD || Object.keys(out).length >= 1000) continue;
+      let text; try { text = read(path); } catch { continue; }
+      if (text === null || !text.trim() || text.includes('\0') || secretValueRule(rules, text)) continue;
+      out[`knowledge/${child}`] = { text };
+    }
+  };
+  walk('', 0);
+  return out;
+}
 function localRecords(env, scopes, kitRoot) {
   const out = {};
   if (scopes.includes('settings')) {
@@ -95,6 +129,7 @@ function localRecords(env, scopes, kitRoot) {
     out['settings/profile'] = text === null ? null : portable('settings/profile', parse(text), kitRoot);
     if (out['settings/profile'] && !Object.keys(out['settings/profile'].answers).length) out['settings/profile'] = null;
   }
+  if (scopes.includes('knowledge')) Object.assign(out, localKnowledge(env, kitRoot));
   if (scopes.includes('presets')) {
     const dir = safe(join(userDir(env), 'presets'));
     let names = [];
@@ -138,8 +173,9 @@ function validateVault(v, kitRoot) {
   if (!v || v.version !== 1 || !v.records || !v.devices || Array.isArray(v.records) || Array.isArray(v.devices) || Object.keys(v).some((k) => !['version', 'records', 'devices'].includes(k))) throw new Error('Unsupported sync vault');
   for (const [k, value] of Object.entries(v.records)) v.records[k] = portable(k, value, kitRoot);
   for (const [id, d] of Object.entries(v.devices)) {
-    if (!/^[a-f0-9-]{36}$/.test(id) || !d || !Array.isArray(d.rows) || d.rows.length > 100000 || Object.keys(d).some((k) => !['name', 'updated', 'rows'].includes(k)) || !Number.isFinite(Date.parse(d.updated))) throw new Error('Invalid device statistics');
+    if (!/^[a-f0-9-]{36}$/.test(id) || !d || !Array.isArray(d.rows) || d.rows.length > 100000 || Object.keys(d).some((k) => !['name', 'updated', 'rows', 'tasks'].includes(k)) || !Number.isFinite(Date.parse(d.updated))) throw new Error('Invalid device statistics');
     label(d.name);
+    if (d.tasks !== undefined) validTasks(d.tasks, kitRoot);
     for (const r of d.rows) {
       // Rows written by older versions have no EXTRA or label fields; they still count in the totals.
       if (!/^[a-f0-9]{64}$/.test(r.key) || Object.keys(r).some((k) => k !== 'key' && ![...NUMBERS, ...EXTRA, ...LABELS].includes(k)) ||
@@ -148,6 +184,35 @@ function validateVault(v, kitRoot) {
     }
   }
   return v;
+}
+// Task snapshots: the project's folder name (never its path) with the ledger's active and backlog items.
+const text = (v, max = 300) => typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, max) : null;
+function cleanTasks(list, kitRoot) {
+  const rules = loadRules({ kitRoot }), out = [];
+  for (const t of Array.isArray(list) ? list : []) {
+    if (!t?.available || typeof t.project !== 'string' || out.length >= MAX_TASK_PROJECTS) continue;
+    const name = t.project.split('/').filter(Boolean).pop()?.replace(/[^\p{L}\p{N} _.-]/gu, '-').slice(0, 64);
+    if (!name) continue;
+    const item = (i, extra) => ({ id: text(i?.id, 40), issue: typeof i?.issue === 'number' || typeof i?.issue === 'string' ? (typeof i.issue === 'number' ? i.issue : text(i.issue, 40)) : null, title: text(i?.title), [extra]: extra === 'progress' ? (Number.isFinite(i?.progress) && i.progress >= 0 && i.progress <= 100 ? i.progress : null) : text(i?.note), ...(extra === 'progress' ? { status: text(i?.status, 80) } : {}) });
+    const active = (t.active ?? []).slice(0, MAX_TASK_ITEMS).map((i) => item(i, 'progress')), backlog = (t.backlog ?? []).slice(0, MAX_TASK_ITEMS).map((i) => item(i, 'note'));
+    if (secretValueRule(rules, JSON.stringify([active, backlog]))) continue;
+    out.push({ name, active, backlog });
+  }
+  return out;
+}
+const TASK_KEYS = { active: ['id', 'issue', 'title', 'progress', 'status'], backlog: ['id', 'issue', 'title', 'note'] };
+function validTasks(list, kitRoot) {
+  if (!Array.isArray(list) || list.length > MAX_TASK_PROJECTS) throw new Error('Invalid task snapshots');
+  const rules = loadRules({ kitRoot });
+  for (const t of list) {
+    if (!t || typeof t !== 'object' || Object.keys(t).some((k) => !['name', 'active', 'backlog'].includes(k))) throw new Error('Invalid task snapshots');
+    label(t.name);
+    for (const kind of ['active', 'backlog']) {
+      if (!Array.isArray(t[kind]) || t[kind].length > MAX_TASK_ITEMS) throw new Error('Invalid task snapshots');
+      for (const i of t[kind]) if (!i || typeof i !== 'object' || Object.keys(i).some((k) => !TASK_KEYS[kind].includes(k)) || Object.values(i).some((v) => v !== null && typeof v !== 'string' && typeof v !== 'number')) throw new Error('Invalid task snapshots');
+    }
+    if (secretValueRule(rules, JSON.stringify(t))) throw new Error('Sync refused secret-looking data');
+  }
 }
 function totals(devices, selected) {
   const rows = new Map();
@@ -163,6 +228,7 @@ function totals(devices, selected) {
 }
 // Sessions other devices contributed, for the Sessions pages: the most complete copy of each, none of this device's own.
 export function syncedSessions(env) {
+  if (!readUserData(env, 'sync-config.json')?.scopes?.includes('statistics')) return [];
   const state = readUserData(env, 'sync-state.json'), me = readUserData(env, 'sync-device.json')?.id;
   const rows = new Map();
   for (const [id, d] of Object.entries(state?.devices ?? {}).sort()) {
@@ -173,6 +239,12 @@ export function syncedSessions(env) {
     }
   }
   return [...rows.values()];
+}
+// Task snapshots of other devices' projects: [{ device, name, active, backlog }]
+export function syncedTasks(env) {
+  if (!readUserData(env, 'sync-config.json')?.scopes?.includes('tasks')) return [];
+  const state = readUserData(env, 'sync-state.json'), me = readUserData(env, 'sync-device.json')?.id;
+  return Object.entries(state?.devices ?? {}).sort().filter(([id]) => id !== me).flatMap(([, d]) => (d.tasks ?? []).map((t) => ({ device: d.name, ...t })));
 }
 export function syncStatus({ env, selected } = {}) {
   const cfg = readUserData(env, 'sync-config.json');
@@ -211,7 +283,7 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
     const vault = validateVault(json(file, { version: 1, records: {}, devices: {} }), kitRoot);
     const state = readUserData(env, 'sync-state.json') ?? { base: {} };
     const local = localRecords(env, cfg.scopes, kitRoot);
-    const enabled = (key) => cfg.scopes.includes(key.startsWith('presets/') ? 'presets' : 'settings');
+    const enabled = (key) => cfg.scopes.includes(scopeOf(key));
     const subset = (obj) => Object.fromEntries(Object.entries(obj).filter(([k]) => enabled(k)));
     const merged = mergeRecords(local, subset(vault.records), subset(state.base ?? {}), resolution);
     if (merged.conflicts.length) {
@@ -219,7 +291,9 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
       return { ...syncStatus({ env }), message: 'Conflicts need a choice; no portable records were changed.' };
     }
     Object.assign(vault.records, merged.records);
-    if (cfg.scopes.includes('statistics')) vault.devices[d.id] = { name: d.name, updated: new Date().toISOString(), rows: statistics(env) };
+    const stats = cfg.scopes.includes('statistics'), tasks = cfg.scopes.includes('tasks');
+    if (stats || tasks) vault.devices[d.id] = { name: d.name, updated: new Date().toISOString(), rows: stats ? statistics(env) : [], ...(tasks ? { tasks: cleanTasks(readUserData(env, 'session-analysis.json')?.tasks, kitRoot) } : {}) };
+    else delete vault.devices[d.id];
     if (!equal(local, localRecords(env, cfg.scopes, kitRoot))) throw new Error('Local settings changed during sync; retry');
     // Publish before applying incoming changes. Failed publication leaves local files and the merge base intact.
     validateVault(vault, kitRoot);
@@ -231,13 +305,14 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
     }
     if (!equal(local, localRecords(env, cfg.scopes, kitRoot))) throw new Error('Local settings changed during sync; retry');
     for (const [key, value] of Object.entries(merged.records)) {
-      const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : `${key}.yaml`);
+      const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : key.startsWith('knowledge/') ? join(...key.split('/')) : `${key}.yaml`);
       if (value === null) {
         const previous = read(path);
         const paths = Object.fromEntries(Object.entries(previous ? parse(previous)?.answers ?? {} : {}).filter(([k]) => /(path|folder|directory|endpoint|host|url|root)$/i.test(k)));
         if (key === 'settings/profile' && Object.keys(paths).length) write(path, stringify({ answers: paths }));
         else { safe(path); try { unlinkSync(path); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
       }
+      else if (key.startsWith('knowledge/')) write(path, value.text);
       else {
         const doc = structuredClone(value);
         // Keep local path answers while applying the portable portion.
@@ -246,7 +321,7 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
         write(path, stringify(doc));
       }
     }
-    writeUserData(env, 'sync-state.json', { base: { ...(state.base ?? {}), ...merged.records }, devices: cfg.scopes.includes('statistics') ? vault.devices : {}, lastSync: new Date().toISOString(), conflicts: [] });
+    writeUserData(env, 'sync-state.json', { base: { ...(state.base ?? {}), ...merged.records }, devices: stats || tasks ? vault.devices : {}, lastSync: new Date().toISOString(), conflicts: [] });
     return { ...syncStatus({ env }), message: 'Sync complete.' };
   } finally {
     if (remoteLock) rmdirSync(remoteLock);

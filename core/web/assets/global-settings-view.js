@@ -7,7 +7,7 @@ import { RADIO_MAX, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification', 'review', 'sync'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'sessions', 'review', 'sync'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -44,6 +44,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (tab === 'notifications') loadNotifications().catch(report);
     if (tab === 'classification') loadClassifier().catch(report);
     if (tab === 'review') loadReview().catch(report);
+    if (tab === 'sessions') loadSessions().catch(report);
     if (tab === 'sync') loadSync().catch(report);
     const file = tab === 'files' ? new URLSearchParams(query).get('file') ?? '' : '';
     if (tab === 'files') (files ? Promise.resolve() : loadFiles()).then(() => { if (file && file !== selected) openFile(file); else if (!file && selected) closeDrawer(); else renderFiles(); }).catch(report);
@@ -58,9 +59,70 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     renderReviewPrompts($('gs-review'), { data, scope: 'global', api, load: loadReview });
   }
 
+  // Session sources ---------------------------------------------------------------------------------------
+  async function loadSessions() {
+    const data = await get('global/session-sources'), root = $('gs-sessions');
+    let list = data.sources.map((s) => ({ ...s })), dirty = false;
+    const msg = el('p', '', 'small muted'); msg.setAttribute('role', 'status');
+    const say = (t, bad) => { msg.textContent = t; msg.className = bad ? 'warn' : 'small muted'; };
+    const formatSelect = (value) => {
+      const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Format');
+      for (const [id, name] of Object.entries(data.formats)) { const o = document.createElement('option'); o.value = id; o.textContent = name; sel.append(o); }
+      sel.value = value; return sel;
+    };
+    const draw = () => {
+      root.replaceChildren(el('h2', 'Session folders'),
+        el('p', 'Where YAW reads your agents\' session history. Sessions › Refresh scans exactly these folders (nothing is scanned by itself) and keeps only counts, times and model names, never message text. Each folder needs the format of the tool that wrote it; the VS Code extensions of Claude Code and Codex write to the same folders as their command lines.', 'small muted'));
+      const rows = el('div', null, 'source-rows');
+      list.forEach((s, i) => {
+        const row = el('div', null, 'source-row'), on = document.createElement('input'), path = document.createElement('input'), fmt = formatSelect(s.agent);
+        on.type = 'checkbox'; on.checked = s.enabled; on.setAttribute('aria-label', 'Read this folder');
+        path.value = s.path; path.setAttribute('aria-label', 'Folder'); path.spellcheck = false;
+        on.addEventListener('change', () => { s.enabled = on.checked; dirty = true; });
+        fmt.addEventListener('change', () => { s.agent = fmt.value; s.files = undefined; dirty = true; });
+        path.addEventListener('input', () => { s.path = path.value; s.files = undefined; dirty = true; });
+        const count = s.files === null ? 'folder not found' : s.files === undefined ? 'save to count' : `${s.files} history file${s.files === 1 ? '' : 's'}`;
+        const browse = button('Browse…', async () => { const c = await pickFolder({ list: (p) => get('browse', p ? { path: p } : {}), start: path.value, title: 'Choose a session folder' }); if (c) { path.value = c; s.path = c; s.files = undefined; dirty = true; draw(); } });
+        row.append(on, fmt, path, el('span', count, s.files === null ? 'small warn-text' : 'small muted'), browse, button('Remove', () => { list.splice(i, 1); dirty = true; draw(); }, 'danger'));
+        rows.append(row);
+      });
+      if (!list.length) rows.append(el('p', 'No folders: a scan finds nothing. Add one below or reset to the defaults.', 'warn'));
+      root.append(rows);
+      const addRow = el('div', null, 'source-row'), newFmt = formatSelect('claude'), newPath = document.createElement('input');
+      newPath.placeholder = '/absolute/path/to/the/agent/folder'; newPath.setAttribute('aria-label', 'New folder'); newPath.spellcheck = false;
+      const add = (agent, path) => { if (!path) return; list.push({ agent, path, enabled: true }); dirty = true; draw(); };
+      addRow.append(el('span', '+'), newFmt, newPath, el('span'), button('Browse…', async () => { const c = await pickFolder({ list: (p) => get('browse', p ? { path: p } : {}), start: newPath.value, title: 'Choose a session folder' }); if (c) newPath.value = c; }), button('Add', () => add(newFmt.value, newPath.value.trim())));
+      root.append(addRow);
+      if (data.suggestions.length) {
+        root.append(el('h3', 'Found on this machine'), el('p', 'Other places that look like agent histories.', 'small muted'));
+        const sug = el('div', null, 'source-rows');
+        for (const s of data.suggestions.filter((x) => !list.some((l) => l.agent === x.agent && l.path === x.path))) {
+          const row = el('div', null, 'source-row');
+          row.append(el('span', '+'), el('span', data.formats[s.agent]), code(s.path), el('span', `${s.files} history file${s.files === 1 ? '' : 's'} · ${s.note}`, 'small muted'), el('span'), button('Add', () => add(s.agent, s.path)));
+          sug.append(row);
+        }
+        root.append(sug);
+      }
+      const found = Object.entries(data.formats).map(([id, name]) => `${name}: ${data.found[id] ?? 0}`).join(' · ');
+      root.append(el('p', `Sessions in the last scan: ${found}.`, 'small muted'),
+        el('p', 'Not readable yet: Cursor and Antigravity (databases / binary chats) and VS Code Copilot Chat. Their folders cannot be added.', 'small muted'));
+      const bar = el('div', null, 'interview-actions');
+      bar.append(button('Save folders', async () => {
+        try { Object.assign(data, await api('session-sources-save', { sources: list.map(({ agent, path, enabled }) => ({ agent, path, enabled })) })); list = data.sources.map((s) => ({ ...s })); dirty = false; draw(); say('Saved. Press Refresh on a Sessions page to scan them.'); }
+        catch (e) { say(e.message, true); }
+      }, 'primary'), button('Reset to defaults', async () => {
+        if (!confirm('Forget your folders and use each agent\'s usual folder again?')) return;
+        try { Object.assign(data, await api('session-sources-reset', {})); list = data.sources.map((s) => ({ ...s })); dirty = false; draw(); say('Back to the defaults.'); } catch (e) { say(e.message, true); }
+      }), msg);
+      root.append(bar);
+      if (dirty) say('Unsaved changes.');
+    };
+    draw();
+  }
+
   async function loadSync() {
     const data = await get('global/sync'), root = $('gs-sync'); root.replaceChildren();
-    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets and personal interview defaults in both directions. No transcripts, credentials or workspace folders are transferred. Refresh Sessions locally before syncing to include recent statistics. Sessions from your other devices then appear on the Sessions pages as "synced · device"; a device needs this YAW version and one sync to share start times.'));
+    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets, personal defaults and, if you tick them, task snapshots and global knowledge in both directions. No transcripts, passwords or workspace folders are transferred; task and knowledge text is, so tick those only for a destination you trust (the files are plain text). Refresh Sessions locally before syncing to include recent statistics. Sessions from your other devices then appear on the Sessions pages as "synced · device"; a device needs this YAW version and one sync to share start times.'));
     const field = (title, value = '') => {
       const label = el('label', title), input = document.createElement('input');
       input.value = value; label.append(input); root.append(label); return input;
@@ -74,9 +136,11 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const folderRow = el('div', null, 'inline-control'); folder.parentNode.append(folderRow); folderRow.append(folder, browse);
     const github = field('Or private GitHub repository (owner/repository)', data.config?.github ?? '');
     const scopes = [];
-    for (const key of ['settings', 'presets', 'statistics']) {
-      const label = el('label', ` ${key}`), input = document.createElement('input'); input.type = 'checkbox';
-      input.checked = data.config ? data.config.scopes.includes(key) : true;
+    const SCOPE_TEXT = { settings: 'Personal defaults (About you answers)', presets: 'Presets', statistics: 'Session statistics (counts, times, model names; shown on the Sessions pages)',
+      tasks: 'Tasks (the Global → Tasks snapshots: project folder name, task ids, titles and status)', knowledge: 'Global knowledge (Markdown records in ~/.yaw/knowledge)' };
+    for (const key of ['settings', 'presets', 'statistics', 'tasks', 'knowledge']) {
+      const label = el('label', ` ${SCOPE_TEXT[key]}`), input = document.createElement('input'); input.type = 'checkbox';
+      input.checked = data.config ? data.config.scopes.includes(key) : !['tasks', 'knowledge'].includes(key);
       label.prepend(input); root.append(label); scopes.push([key, input]);
     }
     const run = async (resolution) => {

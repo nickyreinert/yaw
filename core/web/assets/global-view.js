@@ -38,7 +38,7 @@ const FILTERS = ['path', 'project', 'agent', 'model', 'period', 'from', 'to', 's
 const KEYS = { global: FILTERS, 'global-sessions': [...FILTERS, 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
-const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a' };
+const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a', gemini: '#8a5bb5' };
 const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes']];
 const TABLE_IDS = { folders: 'folders-s' };
 

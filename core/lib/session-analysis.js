@@ -1,10 +1,11 @@
-import { createReadStream, constants, openSync, closeSync, fstatSync } from 'node:fs';
+import { createReadStream, constants, openSync, closeSync, fstatSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { findSessions } from '../../modules/sessions/lib/import.js';
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
+import { effectiveSources } from './session-sources.js';
 
 export const LABELS = {
   outcome: ['fulfilled', 'partially', 'not_fulfilled', 'abandoned', 'unknown'],
@@ -32,8 +33,26 @@ export function messageOf(agent, o) {
   return null;
 }
 
+// Gemini CLI keeps one JSON document per chat; `content` is a string or a list of { text } parts.
+function geminiTurns(file) {
+  const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.size > 64 * 1024 * 1024) throw new Error('Session analysis reads regular transcript files only');
+    const chat = JSON.parse(readFileSync(fd, 'utf8'));
+    const messages = [];
+    for (const m of Array.isArray(chat?.messages) ? chat.messages : []) {
+      const role = m?.type === 'user' ? 'user' : m?.type === 'gemini' ? 'assistant' : null;
+      const text = typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m.content.map((p) => p?.text ?? '').join('\n') : '';
+      if (role && text) messages.push({ role, text, time: m.timestamp });
+    }
+    return { messages, limited: false };
+  } finally { closeSync(fd); }
+}
+
 export async function readTurns(file, agent) {
   if (!file) return { messages: [], limited: false };
+  if (agent === 'gemini') return geminiTurns(file);
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   const messages = [], seen = new Map();
   let input;
@@ -210,7 +229,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
     const row = saved.get(sourceKey(path));
     return row?.stamp === stamp && row.reader === READER ? { reused: row, cwd: row.project, started: row.started } : null;
   };
-  const sessions = (await findSessions({ env, root, allProjects: all, reuse })).filter((s) => Date.parse(s.started) >= since);
+  const sessions = (await findSessions({ env, root, allProjects: all, reuse, sources: effectiveSources(env), known: [...new Set(old.rows.map((r) => r.project))] })).filter((s) => Date.parse(s.started) >= since);
   const rows = [];
   let reused = 0, skipped = 0, limited = 0;
   for (const s of sessions) {

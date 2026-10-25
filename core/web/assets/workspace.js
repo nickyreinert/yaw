@@ -359,6 +359,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'files', 'Files', '~/.yaw presets profile read-only'],
   ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
   ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
+  ['global-settings', 'sessions', 'Sessions', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],
   ['global-settings', 'sync', 'Sync', 'devices folder nas github repository statistics presets merge conflicts'],
 ];

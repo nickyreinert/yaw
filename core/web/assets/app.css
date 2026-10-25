@@ -608,3 +608,10 @@ mark.search-hit { background: #ffd966; color: #1d2d2a; border-radius: 3px; paddi
 .pane-foot[hidden] { display: none; }
 @media (max-width: 760px) { .sidebar .side-search { margin: 10px 0 0; } .side-results { margin-top: 10px; } .page-search { margin-left: 0; width: 100%; } .page-search input[type=search] { width: 100%; max-width: none; } }
 .interview-actions[hidden], #interview-preview[hidden] { display: none; }
+/* Session folders (Global settings → Sessions) */
+.source-rows { display: grid; gap: 6px; margin: 10px 0; }
+.source-row { display: grid; grid-template-columns: 1.6rem 9rem minmax(12rem, 1fr) 11rem auto auto; gap: 8px; align-items: center; }
+.source-row input:not([type=checkbox]), .source-row select { margin: 0; }
+.source-row code { overflow-wrap: anywhere; }
+.warn-text { color: #9b2c2c; }
+@media (max-width: 900px) { .source-row { grid-template-columns: 1.6rem 1fr; } .source-row > * { min-width: 0; } }

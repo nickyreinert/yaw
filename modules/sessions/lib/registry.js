@@ -13,9 +13,9 @@ import { yawHome } from '../../../core/hooks/dispatch.js';
 
 export class RegistryError extends Error {}
 
-export const AGENTS = ['claude', 'codex', 'copilot'];
+export const AGENTS = ['claude', 'codex', 'copilot', 'gemini'];
 export const NATIVE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-export const SESSION_ID = /^(claude|codex|copilot):[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+export const SESSION_ID = /^(claude|codex|copilot|gemini):[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 export const TASK_REF = /^(T-\d{1,6}|#\d{1,9})$/;
 const TRAILER_KEY = 'Agent-Session';
 const ACTIVE_WINDOW_MS = 4 * 60 * 60 * 1000; // a session counts as "current" for 4 h after its last hook
@@ -236,7 +236,7 @@ export function snapshot(root, env) {
 
 export function resumeCommand(agent, nativeId) {
   if (!NATIVE_ID.test(nativeId)) throw new RegistryError('the session id has an unexpected form');
-  return { claude: `claude --resume ${nativeId}`, codex: `codex resume ${nativeId}`, copilot: `copilot --resume ${nativeId}` }[agent];
+  return { claude: `claude --resume ${nativeId}`, codex: `codex resume ${nativeId}`, copilot: `copilot --resume ${nativeId}`, gemini: `gemini --resume ${nativeId}` }[agent];
 }
 
 export const sessionId = (agent, native) => (AGENTS.includes(agent) && typeof native === 'string' && NATIVE_ID.test(native) ? `${agent}:${native}` : null);

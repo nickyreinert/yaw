@@ -644,7 +644,7 @@ test('0700 never follows a link, never touches a foreign or user-chosen director
 test('helpers: ids, branch tasks, resume commands, control characters', () => {
   assert.equal(sessionId('claude', 'abc-1'), 'claude:abc-1');
   for (const bad of ['', '../x', 'a b', 'a;b', '-x', 'x'.repeat(200), null, 5]) assert.equal(sessionId('claude', bad), null, String(bad));
-  assert.equal(sessionId('gemini', 'abc'), null);
+  assert.equal(sessionId('cursor', 'abc'), null);
   assert.equal(branchTask('feat/T-012-invite'), 'T-012');
   assert.equal(branchTask('fix/034-crash'), '#34');
   assert.equal(branchTask('main'), null);
