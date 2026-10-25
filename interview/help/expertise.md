@@ -1,0 +1,1 @@
+This changes how much background the agent gives and which interview questions are asked. Choose layperson for more explanation and fewer advanced setup questions, intermediate for a balanced amount, or expert to skip basic explanations. It does not change security rules or what the agent can access.

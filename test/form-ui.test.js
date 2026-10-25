@@ -67,6 +67,12 @@ test('web model: schema catalogue, local help, ownership and phase-3 choices', (
   assert.deepEqual(c.questions[0].choices.map((x) => x.value), ['claude', 'codex', 'copilot', 'gemini']);
   assert.ok(c.questions[0].choices.find((x) => x.value === 'gemini').phase > 1);
   assert.match(c.questions[0].helpText, /agent/i);
+  assert.match(c.questions.find((q) => q.id === 'user.expertise').helpText, /does not change security rules/i);
+  assert.match(c.questions.find((q) => q.id === 'user.autonomy').helpText, /does not override tool permissions/i);
+  assert.match(c.questions.find((q) => q.id === 'user.comfort').helpText, /optional helpers for you while coding/i);
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  assert.match(css, /#setup #wrap-q-user-comfort > label \{ display: flex; width: 100%/);
+  assert.match(css, /#setup #wrap-q-user-comfort \{ grid-template-columns: 1fr; \}/);
   assert.ok(c.questions.some((q) => q.owner === 'team'));
   assert.match(c.agents.copilot.note, /recall/);
   assert.ok(c.profiles.some((p) => p.name === 'node-cli'));

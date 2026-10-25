@@ -1,0 +1,1 @@
+These are optional helpers for you while coding, not extra abilities for the agent. Session hygiene hints suggest when to hand off or clear a long conversation; the status line shows context and recent checks; notifications tell you when a long run finishes. They run on your machine, use no model tokens, and can be changed later.

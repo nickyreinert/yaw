@@ -21,6 +21,7 @@ questions:
     mode: Q
     type: choice
     label: Your experience with software development?
+    help: expertise
     choices: [layperson, intermediate, expert]
     default: intermediate
   - id: user.language
@@ -36,6 +37,7 @@ questions:
     mode: Q
     type: choice
     label: How often should the agent ask before acting?
+    help: autonomy
     choices:
       - { value: ask-often, label: Ask often }
       - { value: ask-risky, label: Ask on risky or ambiguous steps }
