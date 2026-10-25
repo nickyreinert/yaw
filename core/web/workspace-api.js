@@ -12,12 +12,13 @@ import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settings
 import { ProjectError } from '../render/project.js';
 import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
+import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -34,6 +35,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
   return {
     actions: WORKSPACE_ACTIONS,
     get: {
+      '/api/global/sync': (params) => syncStatus({ env, selected: params?.get('device') }),
       '/api/sessions': (params) => sessionsData({ root: rootOf(params?.get('workspace')), kitRoot, env, projects }),
       '/api/global/profile': () => profileData({ kitRoot, env }),
       '/api/global/presets': () => presetsData({ env }),
@@ -66,6 +68,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name === 'sync-setup' || name === 'sync-run') {
+        try { return name === 'sync-setup' ? configureSync({ env, target: input.target, github: input.github, name: input.name, scopes: input.scopes }) : runSync({ env, kitRoot, resolution: input.resolution, name: input.name }); }
+        catch (e) { throw new FormError(e.message); }
+      }
       if (name === 'project-add') {
         if (!projects) throw new FormError('Project switching is not available here', 404);
         return projects.add(input.path);

@@ -5,7 +5,7 @@ import { available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification', 'review'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'review', 'sync'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -31,6 +31,8 @@ function formView(value, depth = 0) {
 export function createGlobalSettings({ api, get, report, notifications, onFile }) {
   let tab = 'interview', classifier = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
   const drawer = $('global-detail');
+  const syncTab = button('Sync', () => { location.hash = '#global-settings/sync'; });
+  syncTab.dataset.tab = 'sync'; $('global-settings-tabs').append(syncTab);
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
@@ -42,6 +44,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (tab === 'notifications') loadNotifications().catch(report);
     if (tab === 'classification') loadClassifier().catch(report);
     if (tab === 'review') loadReview().catch(report);
+    if (tab === 'sync') loadSync().catch(report);
     const file = tab === 'files' ? new URLSearchParams(query).get('file') ?? '' : '';
     if (tab === 'files') (files ? Promise.resolve() : loadFiles()).then(() => { if (file && file !== selected) openFile(file); else if (!file && selected) closeDrawer(); else renderFiles(); }).catch(report);
     else hide();
@@ -53,6 +56,50 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   async function loadReview() {
     const data = await get('global/review-prompts');
     renderReviewPrompts($('gs-review'), { data, scope: 'global', api, load: loadReview });
+  }
+
+  async function loadSync() {
+    const data = await get('global/sync'), root = $('gs-sync'); root.replaceChildren();
+    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets and personal interview defaults in both directions. No transcripts, credentials or workspace folders are transferred. Refresh Sessions locally before syncing to include recent statistics.'));
+    const field = (title, value = '') => {
+      const label = el('label', title), input = document.createElement('input');
+      input.value = value; label.append(input); root.append(label); return input;
+    };
+    const name = field('Device name', data.device?.name ?? '');
+    const folder = field('Existing folder (including a mounted NAS)', data.config?.target ?? '');
+    const github = field('Or private GitHub repository (owner/repository)', data.config?.github ?? '');
+    const scopes = [];
+    for (const key of ['settings', 'presets', 'statistics']) {
+      const label = el('label', ` ${key}`), input = document.createElement('input'); input.type = 'checkbox';
+      input.checked = data.config ? data.config.scopes.includes(key) : true;
+      label.prepend(input); root.append(label); scopes.push([key, input]);
+    }
+    const run = async (resolution) => {
+      const result = await api('sync-run', { name: name.value || undefined, resolution });
+      await loadSync(); root.append(el('p', result.message, 'small muted'));
+    };
+    root.append(button('Save sync settings', async () => {
+      try {
+        await api('sync-setup', { name: name.value || undefined, target: folder.value || undefined, github: github.value || undefined, scopes: scopes.filter(([, input]) => input.checked).map(([key]) => key) });
+        await loadSync();
+      } catch (e) { report(e); }
+    }));
+    if (data.configured) root.append(button('Sync now', () => run().catch(report), 'primary'));
+    root.append(el('p', data.lastSync ? `Last successful sync: ${new Date(data.lastSync).toLocaleString()}` : 'No successful sync yet.', 'small muted'));
+    if (data.conflicts.length) {
+      root.append(el('p', `Conflicting records: ${data.conflicts.join(', ')}. Choose which version to keep for these conflicts.`, 'warn'),
+        button('Keep local conflicts', () => run('local').catch(report)), button('Keep remote conflicts', () => run('remote').catch(report)));
+    }
+    const filter = document.createElement('select'); filter.setAttribute('aria-label', 'Statistics device');
+    for (const [id, text] of [['', 'All devices'], ...data.devices.map((d) => [d.id, `${d.name}${d.local ? ' (this device)' : ' (synced)'}`])]) {
+      const o = document.createElement('option'); o.value = id; o.textContent = text; filter.append(o);
+    }
+    const stats = el('div');
+    const render = (totals) => { stats.replaceChildren(grid(['Sessions', 'Input tokens', 'Output tokens', 'Prompts', 'Answers'], [[totals.sessions, totals.tokens_in ?? '—', totals.tokens_out ?? '—', totals.prompts ?? '—', totals.answers ?? '—']])); };
+    filter.addEventListener('change', async () => { try { render((await get('global/sync', { device: filter.value })).totals); } catch (e) { report(e); } });
+    root.append(el('h3', 'Merged statistics'), filter, stats); render(data.totals);
+    root.append(grid(['Device', 'Source', 'Sessions', 'Last contribution'], data.devices.map((d) => [d.name, d.local ? 'This device' : 'Synced', d.sessions, new Date(d.updated).toLocaleString()])));
+    root.append(el('p', 'Overlapping session snapshots are counted once, using the observation with the most messages. Divergent copies are not combined. Device subtotals may overlap. GitHub requires Git and an authenticated gh CLI; the repository must already exist and be private.', 'small muted'));
   }
 
   // Interview --------------------------------------------------------------------------------------------

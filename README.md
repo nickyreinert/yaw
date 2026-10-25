@@ -51,6 +51,7 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 | Keep useful context | Decision records, risk notices and Markdown knowledge can be searched and edited with `yaw knowledge` or in the dashboard. Decision retrieval helps agents find relevant records at task start. |
 | Understand past sessions | `yaw sessions scan` explicitly analyzes local Claude Code, Codex and Copilot CLI histories. `yaw sessions analytics` and the dashboard show saved counts, lengths, timing and usage where available. Optional local Laya classification is experimental and separate. |
 | Work across projects | `yaw web --background` runs one local dashboard server. Switch YAW workspaces in the sidebar and use global views for projects, sessions and task snapshots. |
+| Sync devices | `yaw sync setup`, `yaw sync run` and **Global / Settings / Sync** exchange presets and personal defaults through a folder/NAS or private GitHub repository, and merge numerical statistics by named device. See [scope and conflict handling](docs/workspace-dashboard.md#sync-between-devices). |
 | Get notified after a long run | The optional comfort module can send Telegram notifications. Preferences are personal; credentials stay in environment variables. |
 
 Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.

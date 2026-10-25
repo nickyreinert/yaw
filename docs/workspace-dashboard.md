@@ -79,6 +79,69 @@ table searches, sorting, pages and the open file are kept in the address
 view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
 same view locked to the current workspace.
 
+## Sync between devices
+
+Open **Global / Settings / Sync** to choose an existing folder (including a
+mounted NAS) or an existing private GitHub repository, name this device, and
+select settings, presets and/or statistics. Save, then press **Sync now**.
+The same controls are available in the CLI:
+
+```sh
+yaw sync setup --folder /absolute/path/to/yaw-data --name Laptop
+# Or use an existing private repository; Git and authenticated gh are required:
+yaw sync setup --github owner/yaw-data --name Laptop
+yaw sync run
+yaw sync status
+```
+
+Configure the same destination on the other device with a different name,
+such as `PC`. Use `--scopes settings,presets,statistics` during setup to select
+what participates. Setup does not exchange data; sync is manual. Device names
+can be changed with `yaw sync run --name "Work laptop"`; identity stays stable.
+Do not copy `sync-device.json` between installations.
+
+Settings means personal interview defaults; presets means saved setups. Local
+path, folder, directory, endpoint, host, URL and root answer fields stay local.
+Other answers and preset descriptions are user-authored content: review them
+before publishing. Existing workspaces are not reconfigured. Credential files,
+notification channels, local classifier addresses, source code and native
+sessions are not transferred. The destination stores portable records in
+`yaw-sync.json` as plaintext; protect the folder/share and repository access.
+Only private GitHub repositories are accepted, checked on every sync.
+
+Edits merge against each device's last successful sync. Conflicting edits or
+edit/delete pairs stop the exchange without applying portable records. The UI
+offers **Keep local conflicts** / **Keep remote conflicts**; the CLI uses
+`yaw sync run --resolve local` or `--resolve remote` (applies to all reported
+conflicts). Deletion markers prevent previously synchronized presets from
+reappearing. Conflict choices should be made after reviewing the local preset
+and the destination's `yaw-sync.json`. Unrelated changes merge automatically.
+
+Run **Refresh** on Sessions, or `yaw sessions scan`, before syncing to update
+saved numerical summaries. Sync never reads native transcripts. Its statistics
+view shows combined totals and a device selector, alongside each device's last
+contribution. Only hashed session IDs and numeric token, cost, prompt/answer
+counts and character sums travel; project paths, titles and message text do not.
+Unknown usage stays unknown. The same session on several devices counts once
+in the combined total, choosing the snapshot with the most messages; divergent
+copies are not combined. Device subtotals can overlap. These totals are shown
+in Sync; existing session charts continue to describe local saved history.
+
+Local sync configuration, device identity and merge state live in the YAW data
+directory (`YAW_HOME`, default `~/.yaw`). Settings and presets retain their
+existing locations under `~/.yaw`. A disconnected destination fails without
+changing local records or the merge base. The NAS must already be mounted;
+YAW does not mount shares or create the chosen destination directory. Do not
+unmount or replace a share during a sync. GitHub uses a dedicated local clone;
+concurrent pushes can require resolving a diverged clone before retrying.
+Destination changes are refused; use one dedicated destination across devices.
+
+Locks prevent simultaneous local/folder exchanges. After a crash, check that no
+sync is running before manually removing the empty `sync.lock` in the data
+directory or `.yaw-sync.lock` in the destination. Symbolic-link paths are
+refused; use canonical paths, e.g. `/private/tmp` on macOS rather than `/tmp`.
+`yaw sync --check` retains its existing agent adapter drift check.
+
 ## Explicit collection
 
 Opening, filtering or refreshing the dashboard reads saved results and YAW's
