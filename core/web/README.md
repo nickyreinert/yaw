@@ -9,7 +9,7 @@
 | Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project; device filter for session metrics |
 | Sessions | Workspace (locked to the project) and Global; sticky folder/project/device/agent/model/period filter (device on Global only); usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
 | Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
-| Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply; first setup for a folder without YAW), Files (YAW-written files by purpose, read-only Form/Raw drawer), Review prompts (project overrides). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications, Classification, Review prompts (blueprint) |
+| Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply; first setup for a folder without YAW), Files (YAW-written files by purpose, read-only Form/Raw drawer), Review prompts (project overrides). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications, Classification (editable prompt and temporary sample preview; no model training), Review prompts (blueprint) |
 | Tasks | Workspace `TASKS.md`; Global task snapshots filterable by folder/project, linking to each project |
 | Code map | Saved map; shown only when the code-map module is enabled |
 

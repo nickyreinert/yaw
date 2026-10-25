@@ -254,10 +254,22 @@ holds the settings, saved in `~/.yaw/web-preferences.json` and also used by
 | Largest turn (UTF-8 bytes) | 5000 | 1000–32000 |
 | Token budget (`max_len`) | 8192 | 512–32768, at least the largest turn |
 | Timeout per turn (seconds) | 120 | 10–600 |
+| Shared prompt guidance | Classify the coding assistant response using only the supplied conversation. | 1–4,000 characters |
 
 **Test connection** sends one fixed, made-up turn (never your history) and
 reports whether Laya answered and how long it took. Only literal loopback HTTP
 addresses are accepted; redirects and hosted endpoints are refused.
+
+The shared prompt guidance is editable and applied to each classification
+category; YAW continues to add its category labels and safety instructions.
+The **Try Laya on saved sessions** preview lists up to 30 recent sessions from
+the last Refresh. Select up to three and confirm to send up to three eligible
+turns per session to the local Laya service, using the current form values
+(saved or not). It shows short prompt/answer excerpts, Laya's top label and
+confidence, and the label applied at the configured threshold. Preview
+excerpts and predictions are temporary and are not saved. This is prompt
+calibration, not model training: it does not update Laya's weights or teach it
+from your choices. Use **Save** to keep prompt guidance for later evaluation.
 
 YAW sends eligible prompt/answer turns plus the next prompt to
 `POST /v1/systemone`, selects `multilingual`, and requests the configured

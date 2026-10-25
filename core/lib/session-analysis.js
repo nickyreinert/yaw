@@ -34,29 +34,34 @@ export function messageOf(agent, o) {
 }
 
 // Gemini CLI keeps one JSON document per chat; `content` is a string or a list of { text } parts.
-function geminiTurns(file) {
+function geminiTurns(file, maxUserTurns) {
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const st = fstatSync(fd);
     if (!st.isFile() || st.size > 64 * 1024 * 1024) throw new Error('Session analysis reads regular transcript files only');
     const chat = JSON.parse(readFileSync(fd, 'utf8'));
     const messages = [];
+    let userTurns = 0;
     for (const m of Array.isArray(chat?.messages) ? chat.messages : []) {
       const role = m?.type === 'user' ? 'user' : m?.type === 'gemini' ? 'assistant' : null;
       const text = typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m.content.map((p) => p?.text ?? '').join('\n') : '';
-      if (role && text) messages.push({ role, text, time: m.timestamp });
+      if (role && text) {
+        messages.push({ role, text, time: m.timestamp });
+        if (role === 'user' && ++userTurns > maxUserTurns) break;
+      }
     }
     return { messages, limited: false };
   } finally { closeSync(fd); }
 }
 
-export async function readTurns(file, agent) {
+export async function readTurns(file, agent, { maxUserTurns = Infinity } = {}) {
   if (!file) return { messages: [], limited: false };
-  if (agent === 'gemini') return geminiTurns(file);
+  if (maxUserTurns !== Infinity && (!Number.isInteger(maxUserTurns) || maxUserTurns < 1 || maxUserTurns > 11)) throw new Error('maxUserTurns must be from 1 to 11');
+  if (agent === 'gemini') return geminiTurns(file, maxUserTurns);
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   const messages = [], seen = new Map();
   let input;
-  let limited = false;
+  let limited = false, userTurns = 0;
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
@@ -79,6 +84,7 @@ export async function readTurns(file, agent) {
         const message = { role: m.role, text: m.text, time: m.time };
         if (key) seen.set(key, message);
         messages.push(message);
+        if (m.role === 'user' && ++userTurns > maxUserTurns) break;
       }
     } finally { lines.close(); }
   } finally {
@@ -130,10 +136,16 @@ export function localEndpoint(value = 'http://127.0.0.1:8000') {
 
 // Personal classifier settings (Global → Settings → Classification, `yaw sessions evaluate`). The checkpoint is fixed to
 // multilingual because sessions mix languages; the limits keep every turn inside the token budget, so nothing is truncated.
-export const CLASSIFIER_DEFAULTS = Object.freeze({ endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120 });
+export const CLASSIFIER_DEFAULTS = Object.freeze({
+  endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120,
+  prompt: 'Classify the coding assistant response using only the supplied conversation.',
+});
 export const CLASSIFIER_LIMITS = Object.freeze({ threshold: [0.5, 0.99], maxTurnBytes: [1000, 32000], maxLen: [512, 32768], timeoutSeconds: [10, 600] });
 export function classifierSettings(input = {}) {
   const out = { endpoint: localEndpoint(input.endpoint ?? CLASSIFIER_DEFAULTS.endpoint) };
+  const prompt = input.prompt ?? CLASSIFIER_DEFAULTS.prompt;
+  if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 4000) throw new Error('Classification prompt must contain 1–4,000 characters');
+  out.prompt = prompt.trim();
   for (const [key, [min, max]] of Object.entries(CLASSIFIER_LIMITS)) {
     const value = input[key] ?? CLASSIFIER_DEFAULTS[key];
     if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max || (key !== 'threshold' && !Number.isInteger(value))) {
@@ -157,7 +169,9 @@ async function askLaya(state, settings, fetchFn) {
   try {
     response = await fetchFn(`${settings.endpoint}/v1/systemone`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(settings.timeoutSeconds * 1000),
-      body: JSON.stringify({ state, questions: QUESTIONS, model: 'multilingual', max_len: settings.maxLen }),
+      body: JSON.stringify({ state, questions: Object.fromEntries(Object.entries(QUESTIONS).map(([key, question]) => [key, {
+        ...question, instructions: `${settings.prompt} ${question.instructions}`,
+      }])), model: 'multilingual', max_len: settings.maxLen }),
     });
   } catch { throw new Error('Local Laya service is not reachable; no classification result was saved'); }
   if (!response.ok) throw new Error(`Local Laya service returned HTTP ${response.status}; no classification result was saved`);
@@ -183,12 +197,16 @@ async function askLaya(state, settings, fetchFn) {
   return choices;
 }
 
-export async function classifyMessages(messages, { fetchFn = fetch, ...options } = {}) {
+export async function classifyMessages(messages, { fetchFn = fetch, includeTurns = false, maxTurns = Infinity, ...options } = {}) {
   const settings = classifierSettings(options);
+  if (maxTurns !== Infinity && (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 10)) throw new Error('maxTurns must be from 1 to 10');
   const counts = Object.fromEntries(Object.keys(LABELS).map((k) => [k, {}]));
-  let classified = 0, skipped = 0;
+  const turns = [];
+  let classified = 0, skipped = 0, seenTurns = 0, truncated = false;
   for (let i = 0; i < messages.length; i++) {
     if (messages[i].role !== 'user') continue;
+    if (seenTurns >= maxTurns) { truncated = true; break; }
+    seenTurns++;
     let end = i + 1;
     while (end < messages.length && messages[end].role !== 'user') end++;
     const answers = messages.slice(i + 1, end).filter((m) => m.role === 'assistant');
@@ -197,13 +215,57 @@ export async function classifyMessages(messages, { fetchFn = fetch, ...options }
     // Never send a silently truncated turn.
     if (Buffer.byteLength(state) > settings.maxTurnBytes) { skipped++; continue; }
     const choices = await askLaya(state, settings, fetchFn);
+    const predictions = {};
     for (const [key, { choice, p }] of Object.entries(choices)) {
       const label = p >= settings.threshold ? choice : 'unknown';
       counts[key][label] = (counts[key][label] ?? 0) + 1;
+      predictions[key] = { choice, confidence: p, prediction: label };
     }
+    if (includeTurns) turns.push({
+      turn: seenTurns, prompt: [...messages[i].text].slice(0, 500).join(''),
+      answer: [...answers.map((m) => m.text).join('\n')].slice(0, 800).join(''), predictions,
+    });
     classified++;
   }
-  return { backend: 'laya-multilingual', classified, skipped, threshold: settings.threshold, counts, evaluated: new Date().toISOString() };
+  return { backend: 'laya-multilingual', classified, skipped, threshold: settings.threshold, counts, evaluated: new Date().toISOString(),
+    ...(includeTurns ? { turns, truncated } : {}) };
+}
+
+export const CLASSIFIER_SAMPLE_LIMIT = 3;
+export const CLASSIFIER_SAMPLE_TURN_LIMIT = 3;
+export function classifierSamples(env, limit = 30) {
+  return readAnalysis(env).rows.filter((r) => typeof r.id === 'string' && r.id && typeof r.project === 'string' && typeof r.agent === 'string' && Number.isFinite(Date.parse(r.started)))
+    .sort((a, b) => Date.parse(b.started) - Date.parse(a.started))
+    .slice(0, limit)
+    .map(({ id, project, agent, model, started, metrics }) => ({
+      id, project, agent, model: model ?? null, started, prompts: metrics?.prompts ?? null,
+    }));
+}
+
+export async function previewClassification({ env, root, ids, classifier, fetchFn = fetch }) {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > CLASSIFIER_SAMPLE_LIMIT ||
+    ids.some((id) => typeof id !== 'string' || !id || id.length > 512) || new Set(ids).size !== ids.length) {
+    throw new Error(`Choose 1–${CLASSIFIER_SAMPLE_LIMIT} distinct saved sessions`);
+  }
+  const settings = classifierSettings(classifier);
+  const samples = new Map(classifierSamples(env).map((r) => [r.id, r]));
+  if (ids.some((id) => !samples.has(id))) throw new Error('A selected session is no longer in the saved scan. Refresh Sessions and try again.');
+  const sessions = await findSessions({
+    env, root, allProjects: true, sources: effectiveSources(env),
+    known: [...new Set([...samples.values()].map((r) => r.project))],
+  });
+  const found = new Map(sessions.map((s) => [sessionId(s.agent, s.native), s]));
+  const out = [];
+  for (const id of ids) {
+    const sample = samples.get(id), session = found.get(id);
+    if (!session?.transcript) throw new Error('A selected transcript is no longer available in the configured folders. Refresh the sample list and try again.');
+    let read;
+    try { read = await readTurns(session.transcript, session.agent, { maxUserTurns: CLASSIFIER_SAMPLE_TURN_LIMIT + 1 }); }
+    catch { throw new Error('Could not read a selected transcript. Check its session folder and file permissions; nothing was saved.'); }
+    const result = await classifyMessages(read.messages, { ...settings, fetchFn, includeTurns: true, maxTurns: CLASSIFIER_SAMPLE_TURN_LIMIT });
+    out.push({ agent: sample.agent, project: sample.project, started: sample.started, ...result });
+  }
+  return { sessions: out, message: `Previewed up to ${CLASSIFIER_SAMPLE_TURN_LIMIT} turns per selected session. Predictions and excerpts were not saved.` };
 }
 
 // Sends one fixed, made-up turn (never session text) to check address, model and response format.

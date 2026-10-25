@@ -117,6 +117,14 @@ test('Laya classification uses verified local protocol and strict probabilities,
   const result = await classifyMessages(messages, { fetchFn });
   assert.equal(called, 1); assert.equal(result.classified, 1); assert.equal(result.counts.outcome.fulfilled, 1);
   assert.doesNotMatch(JSON.stringify(result), /Fix the parser/);
+  const preview = await classifyMessages(messages, { fetchFn: async (url, options) => {
+    assert.match(JSON.parse(options.body).questions.outcome.instructions, /focus on explicit requirements/i);
+    return Response.json(responseFor());
+  }, prompt: 'Focus on explicit requirements.', includeTurns: true, maxTurns: 1 });
+  assert.equal(preview.turns.length, 1); assert.equal(preview.turns[0].prompt, 'Fix the parser');
+  assert.equal(preview.turns[0].answer, 'Parser fixed.');
+  assert.deepEqual(preview.turns[0].predictions.outcome, { choice: 'fulfilled', confidence: 1, prediction: 'fulfilled' });
+  assert.equal(preview.truncated, true);
   assert.throws(() => localEndpoint('https://remote.example'), /hosted endpoints/);
   assert.throws(() => localEndpoint('http://localhost:8000'), /hosted endpoints/);
   for (const bad of [
@@ -129,11 +137,13 @@ test('Laya classification uses verified local protocol and strict probabilities,
 });
 
 test('classifier settings are validated, applied to requests and probed with a made-up turn only', async () => {
-  assert.deepEqual(classifierSettings(), { endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120 });
+  assert.deepEqual(classifierSettings(), { endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120, prompt: 'Classify the coding assistant response using only the supplied conversation.' });
   assert.throws(() => classifierSettings({ endpoint: 'http://example.com:8000' }), /hosted endpoints/);
   assert.throws(() => classifierSettings({ threshold: 0.2 }), /threshold/);
   assert.throws(() => classifierSettings({ maxTurnBytes: 9000, maxLen: 4096 }), /truncated/);
   assert.throws(() => classifierSettings({ timeoutSeconds: 1.5 }), /whole number/);
+  assert.throws(() => classifierSettings({ prompt: '' }), /Classification prompt/);
+  assert.throws(() => classifierSettings({ prompt: 'x'.repeat(4001) }), /Classification prompt/);
   const seen = [];
   const unsure = { ...responseFor(), answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((l, i) => [l, i === 0 ? 0.9 : i === 1 ? 0.1 : 0])) }])) };
   const fetchFn = async (url, options) => { seen.push([url, JSON.parse(options.body)]); return Response.json(unsure); };
@@ -147,6 +157,28 @@ test('classifier settings are validated, applied to requests and probed with a m
   assert.match(probe.message, /Laya answered at http:\/\/127\.0\.0\.1:8000/);
   assert.doesNotMatch(seen[0][1].state, /Fix the parser/);
   await assert.rejects(probeClassifier({}, async () => Response.json({ answers: {} })), (e) => !/no classification result was saved/.test(e.message));
+});
+
+test('Laya sample preview uses selected saved sessions and does not persist transcripts or predictions', async () => {
+  const env = environment(), root = tmp(); fixture(env, root);
+  await collectAnalysis({ root, env });
+  const api = createWorkspaceApi({
+    root, kitRoot: KIT_ROOT, env,
+    fetchFn: async (_url, options) => {
+      assert.match(JSON.parse(options.body).questions.outcome.instructions, /Look for explicit completion/);
+      return Response.json(responseFor());
+    },
+  });
+  const samples = api.get['/api/classifier-samples'](), before = readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8');
+  assert.equal(samples.length, 1);
+  await assert.rejects(api.action('classifier-preview', { ids: [samples[0].id], classifier: {} }), /Confirm sending/);
+  const preview = await api.action('classifier-preview', { ids: [samples[0].id], classifier: { prompt: 'Look for explicit completion.' }, confirm: true });
+  assert.equal(preview.sessions.length, 1);
+  assert.equal(preview.sessions[0].turns.length, 1);
+  assert.equal(preview.sessions[0].turns[0].prompt, 'Fix the parser');
+  assert.match(preview.message, /were not saved/);
+  assert.equal(readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8'), before);
+  await assert.rejects(api.action('classifier-preview', { ids: ['not-a-saved-session'], classifier: {}, confirm: true }), /no longer in the saved scan/);
 });
 
 test('failed local classification leaves saved results unchanged; CLI scan and analytics work without sessions module', async () => {
@@ -178,12 +210,13 @@ test('dashboard scan and preference actions require session plus CSRF; GET never
   assert.equal(readAnalysis(env).rows.length, 1);
   assert.equal((await post('preferences', { autoRefresh: true })).status, 200);
   assert.equal((await post('preferences', { autoRefresh: 'yes' })).status, 400);
-  assert.equal((await post('classifier-save', { classifier: { endpoint: 'http://127.0.0.1:8123', threshold: 0.8 } })).status, 200);
+  assert.equal((await post('classifier-save', { classifier: { endpoint: 'http://127.0.0.1:8123', threshold: 0.8, prompt: 'Prioritize explicit acceptance criteria.' } })).status, 200);
   assert.equal((await post('classifier-save', { classifier: { endpoint: 'https://remote.example' } })).status, 400);
   assert.equal((await post('classifier-save', { classifier: {} }, false)).status, 403);
   const prefs = await (await fetch(`${base}/api/preferences`, { headers: { cookie } })).json();
   assert.equal(prefs.autoRefresh, true);
   assert.equal(prefs.classifier.endpoint, 'http://127.0.0.1:8123'); assert.equal(prefs.classifier.threshold, 0.8); assert.equal(prefs.classifier.maxLen, 8192);
+  assert.equal(prefs.classifier.prompt, 'Prioritize explicit acceptance criteria.');
   // Nothing listens on port 9 on loopback, so the probe reports the failure instead of a 500.
   const probe = await post('classifier-test', { classifier: { endpoint: 'http://127.0.0.1:9' } });
   assert.equal(probe.status, 502); assert.match((await probe.json()).error, /not reachable/);

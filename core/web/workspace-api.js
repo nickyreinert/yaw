@@ -1,6 +1,6 @@
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
-import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSettings, collectAnalysis, probeClassifier, readAnalysis, scanSummary } from '../lib/session-analysis.js';
+import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSamples, classifierSettings, collectAnalysis, previewClassification, probeClassifier, readAnalysis, scanSummary } from '../lib/session-analysis.js';
 import { resetSources, saveSources, sourcesData } from '../lib/session-sources.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
 import { sessionsData, tasksSection } from './dashboard.js';
@@ -20,7 +20,7 @@ import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
   'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
@@ -38,7 +38,7 @@ const sourcesView = (env, data = sourcesData(env)) => {
   for (const r of readAnalysis(env).rows) found[r.agent] = (found[r.agent] ?? 0) + 1;
   return { ...data, found };
 };
-export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
+export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn }) {
   let running = false;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
   return {
@@ -60,6 +60,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
         return { root: p.root, name: p.name, comfort };
       }),
       '/api/preferences': () => webPreferences(env),
+      '/api/classifier-samples': () => classifierSamples(env),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
       '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
@@ -128,6 +129,14 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
         try { classifier = classifierSettings(input.classifier ?? {}); } catch (e) { throw new FormError(e.message); }
         if (name === 'classifier-save') { savePreferences(env, { classifier }); return { classifier, message: 'Classification settings saved.' }; }
         try { return await probeClassifier(classifier); } catch (e) { throw new FormError(e.message, 502); }
+      }
+      if (name === 'classifier-preview') {
+        if (input.confirm !== true) throw new FormError('Confirm sending the selected session turns to local Laya for preview');
+        if (running) throw new FormError('A session scan or classification is already running', 409);
+        running = true;
+        try { return await previewClassification({ env, root: rootOf(input.workspace), ids: input.ids, classifier: input.classifier, fetchFn }); }
+        catch (e) { throw new FormError(e.message); }
+        finally { running = false; }
       }
       if (name === 'notifications') {
         try { return saveNotifications({ root, env, input }); }

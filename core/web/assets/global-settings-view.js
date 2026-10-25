@@ -31,7 +31,7 @@ function formView(value, depth = 0) {
 }
 
 export function createGlobalSettings({ api, get, report, notifications, onFile }) {
-  let tab = 'interview', classifier = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
+  let tab = 'interview', classifier = null, classifierSamples = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
   const drawer = $('global-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -52,7 +52,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     return tab;
   }
   function hide() { if (!drawer.hidden) { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; } }
-  function reset() { classifier = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
+  function reset() { classifier = null; classifierSamples = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
 
   async function loadReview() {
     const data = await get('global/review-prompts');
@@ -323,7 +323,11 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     ['maxLen', 'Token budget (max_len)', 'number', 'Sent to Laya per turn; must be at least the largest turn. Laya caps it with LAYA_MAX_TOKEN_BUDGET.', 256],
     ['timeoutSeconds', 'Timeout per turn (seconds)', 'number', 'How long to wait for one answer. The first call can be slow while Laya loads its checkpoint.', 10],
   ];
-  async function loadClassifier() { classifier ??= await get('preferences'); renderClassifier(); }
+  async function loadClassifier() {
+    classifier ??= await get('preferences');
+    classifierSamples ??= await get('classifier-samples');
+    renderClassifier();
+  }
   function renderClassifier() {
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
@@ -338,19 +342,75 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       wrap.append(input, el('span', `${help} Default ${defaults[key]}${range ? `; ${range[0]}–${range[1]}` : ''}.`, 'small muted'));
       form.append(wrap);
     }
-    const values = () => Object.fromEntries(FIELDS.map(([key, , type]) => [key, type === 'number' ? Number(inputs[key].value) : inputs[key].value.trim()]));
+    const promptLabel = el('label', 'Shared prompt guidance · sent for every classification category');
+    promptLabel.className = 'classifier-prompt';
+    const prompt = document.createElement('textarea');
+    prompt.id = 'classifier-prompt'; prompt.name = 'prompt'; prompt.rows = 5; prompt.maxLength = 4000; prompt.value = saved.prompt;
+    const promptHelp = el('span', 'Add context for Laya. YAW still appends the category-specific labels and safety instructions. Maximum 4,000 characters.', 'small muted');
+    promptHelp.id = 'classifier-prompt-help';
+    prompt.setAttribute('aria-describedby', promptHelp.id);
+    promptLabel.append(prompt, promptHelp);
+    form.append(promptLabel);
+    const values = () => ({ ...Object.fromEntries(FIELDS.map(([key, , type]) => [key, type === 'number' ? Number(inputs[key].value) : inputs[key].value.trim()])), prompt: prompt.value.trim() });
     const s = el('p', '', 'small muted'); s.setAttribute('role', 'status');
     const say = (text, bad = false) => { s.textContent = text; s.className = `small ${bad ? 'error-text' : 'muted'}`; };
     const act = async (fn) => { buttons.forEach((b) => { b.disabled = true; }); try { await fn(); } catch (e) { say(e.message, true); } finally { buttons.forEach((b) => { b.disabled = false; }); } };
     const buttons = [
       button('Test connection', () => act(async () => { say('Sending one made-up test turn to Laya…'); say((await api('classifier-test', { classifier: values() })).message); }), ''),
       button('Save', () => act(async () => { const r = await api('classifier-save', { classifier: values() }); classifier = { ...classifier, classifier: r.classifier }; say(r.message); }), 'primary'),
-      button('Reset to defaults', () => { for (const [key] of FIELDS) inputs[key].value = String(defaults[key]); say('Defaults restored in the form; press Save to keep them.'); }, ''),
+      button('Reset to defaults', () => { for (const [key] of FIELDS) inputs[key].value = String(defaults[key]); prompt.value = defaults.prompt; say('Defaults restored in the form; press Save to keep them.'); }, ''),
     ];
     buttons[0].title = 'Sends one fixed, made-up turn (no session text) with the values in this form and checks the answer format. Nothing is saved.';
     const actions = el('div', null, 'interview-actions'); actions.append(...buttons, s);
     card.append(form, actions);
-    root.append(card, setupCard(saved));
+    root.append(card, sampleReview(values), setupCard(saved));
+  }
+  function sampleReview(values) {
+    const card = el('section', null, 'card'), samples = classifierSamples ?? [];
+    card.append(el('h2', 'Try Laya on saved sessions'));
+    card.append(el('p', 'Choose up to three sessions from your last scan. YAW sends up to three turns per session to the configured loopback Laya service, then shows the top label, confidence, and short prompt/answer excerpts. This is a preview only: predictions and excerpts are not saved, and it does not train or change Laya.', 'small muted'));
+    const select = document.createElement('select'); select.multiple = true; select.size = Math.min(8, Math.max(3, samples.length)); select.setAttribute('aria-label', 'Sessions to preview');
+    for (const sample of samples) {
+      const option = document.createElement('option'); option.value = sample.id;
+      option.textContent = `${day(sample.started)} · ${sample.agent} · ${sample.project} · ${sample.prompts ?? '?'} prompts`;
+      select.append(option);
+    }
+    const status = el('p', samples.length ? 'Only sessions in the latest saved scan are listed. Refresh Sessions first if the session you want is missing.' : 'No saved sessions to sample. Run Refresh from a Sessions page first.', 'small muted');
+    status.setAttribute('role', 'status');
+    const output = el('div');
+    const run = button('Preview selected sessions', async () => {
+      const ids = [...select.selectedOptions].map((option) => option.value);
+      if (!ids.length) { status.textContent = 'Choose at least one session.'; return; }
+      if (ids.length > 3) { status.textContent = 'Choose no more than three sessions.'; return; }
+      if (!confirm(`Send up to three turns from ${ids.length} selected session(s) to Laya at ${values().endpoint}? The excerpts and predictions are shown here temporarily and are not saved.`)) return;
+      run.disabled = true; run.textContent = 'Previewing…'; status.className = 'small muted'; status.textContent = 'Sending selected turns to local Laya…'; output.replaceChildren();
+      try {
+        const result = await api('classifier-preview', { ids, classifier: values(), confirm: true });
+        status.textContent = result.message; status.className = 'small muted';
+        output.replaceChildren(...result.sessions.map((session) => {
+          const section = el('article', null, 'card'), started = new Date(session.started).toLocaleString();
+          section.append(el('h3', `${session.agent} · ${started}`), el('p', session.project, 'small muted'),
+            el('p', `${session.classified} turn(s) classified · ${session.skipped} skipped`, 'small'));
+          for (const turn of session.turns) {
+            const detail = el('div', null, 'setup-step');
+            detail.append(el('h4', `Turn ${turn.turn}`), el('strong', 'Prompt excerpt'), el('pre', turn.prompt),
+              el('strong', 'Answer excerpt'), el('pre', turn.answer),
+              grid(['Category', 'Top label', 'Confidence', 'Applied label'], Object.entries(turn.predictions).map(([key, prediction]) => [
+                key, prediction.choice, `${(prediction.confidence * 100).toFixed(1)}%`, prediction.prediction,
+              ])));
+            section.append(detail);
+          }
+          if (session.truncated) section.append(el('p', 'Preview stopped at the three-turn limit for this session.', 'small muted'));
+          if (!session.turns.length) section.append(el('p', 'No eligible prompt/answer turns were found.', 'small muted'));
+          return section;
+        }));
+      } catch (e) { status.textContent = e.message; status.className = 'small error-text'; }
+      finally { run.disabled = false; run.textContent = 'Preview selected sessions'; }
+    }, 'primary');
+    run.disabled = !samples.length;
+    card.append(select, el('p', 'Select up to 3 sessions; hold Ctrl or Command to select multiple.', 'small muted'),
+      el('p', 'The preview uses the current form values, whether or not they have been saved.', 'small muted'), run, status, output);
+    return card;
   }
   function setupCard(saved) {
     const port = new URL(saved.endpoint).port || '80', host = new URL(saved.endpoint).hostname.replace(/^\[|\]$/g, '');

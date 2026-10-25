@@ -358,6 +358,8 @@ button.mini { font-size: .68rem; padding: 3px 9px; }
 .classifier-form label { display: grid; align-content: start; gap: 4px; font-weight: 600; font-size: .85rem; }
 .classifier-form label input { margin: 0; }
 .classifier-form label span { font-weight: 400; }
+.classifier-form .classifier-prompt { grid-column: 1 / -1; }
+.classifier-prompt textarea { min-height: 8rem; }
 .laya-setup .setup-step { margin-top: 1rem; }
 .laya-setup h3 { font-size: .95rem; margin: 0 0 .3rem; }
 .command-wrap { position: relative; }
