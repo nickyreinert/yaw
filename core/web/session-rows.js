@@ -19,6 +19,7 @@ function compact(r) {
   const m = r.metrics, e = r.evaluation;
   return {
     id: r.id, project: r.project, agent: r.agent, model: r.model || 'Unknown', title: r.title || '', branch: r.branch || '',
+    language: typeof r.language === 'string' && r.language ? r.language : 'Unknown',
     source: ['local', 'import', 'synced'].includes(r.source) ? r.source : 'hook',
     deviceId: r.deviceId ?? 'local', deviceName: r.deviceName ?? r.device ?? 'This device',
     started: Date.parse(r.started), minutes: minutes(r),

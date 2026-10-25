@@ -54,6 +54,16 @@ test('saved scans are explicit, private, bounded to the chosen workspace, and co
   assert.doesNotMatch(JSON.stringify(all), /Fix the parser|Parser fixed|Thanks, works|rollout-/);
 });
 
+test('session browser exposes each configured project programming language', async () => {
+  const root = await makeProject({ modules: ['core'] }), env = environment();
+  const answers = join(root, '.yaw/answers.yaml');
+  writeFileSync(answers, readFileSync(answers, 'utf8').replace('  idea.text:', '  arch.language: python\n  idea.text:'));
+  fixture(env, root);
+  await collectAnalysis({ root, env });
+  const data = await sessionsData({ root, kitRoot: KIT_ROOT, env });
+  assert.equal(data.rows[0].language, 'python');
+});
+
 test('rescans reuse unchanged transcripts and reread changed ones', async () => {
   const env = environment(), root = tmp(), file = fixture(env, root);
   utimesSync(file, 1800000000, 1800000000);
@@ -181,6 +191,61 @@ test('Laya sample preview uses selected saved sessions and does not persist tran
   await assert.rejects(api.action('classifier-preview', { ids: ['not-a-saved-session'], classifier: {}, confirm: true }), /no longer in the saved scan/);
 });
 
+test('classifier job pauses between turns, resumes, and reports progress', async () => {
+  const root = await makeProject({ modules: ['core'] }), env = environment(), file = fixture(env, root);
+  writeFileSync(file, `${readFileSync(file, 'utf8')}\n${JSON.stringify({
+    type: 'response_item', timestamp: '2026-10-24T08:01:02Z',
+    payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Second task complete.' }] },
+  })}`);
+  await collectAnalysis({ root, env });
+  let announceFirst, finishFirst;
+  const firstStarted = new Promise((resolve) => { announceFirst = resolve; });
+  const firstResponse = new Promise((resolve) => { finishFirst = resolve; });
+  let calls = 0;
+  const api = createWorkspaceApi({
+    root, kitRoot: KIT_ROOT, env,
+    fetchFn: async () => {
+      calls++;
+      if (calls === 1) { announceFirst(); return firstResponse; }
+      return Response.json(responseFor());
+    },
+  });
+  const run = api.action('evaluate', { confirm: true, all: false });
+  await firstStarted;
+  assert.equal((await api.action('classifier-pause', {})).status, 'pausing');
+  finishFirst(Response.json(responseFor()));
+  for (let i = 0; i < 100 && api.get['/api/classification-job']()?.status !== 'paused'; i++) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(api.get['/api/classification-job']().status, 'paused');
+  assert.equal(calls, 1, 'the next Laya request waits while paused');
+  await api.action('classifier-resume', {});
+  const result = await run;
+  assert.equal(result.classified, true);
+  assert.equal(calls, 2);
+  assert.equal(api.get['/api/classification-job']().status, 'completed');
+  assert.equal(readAnalysis(env).rows[0].evaluation.classified, 2);
+});
+
+test('stopping an active classifier aborts Laya and saves no unfinished results', async () => {
+  const root = tmp(), env = environment(); fixture(env, root);
+  await collectAnalysis({ root, env });
+  const before = readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8');
+  let announceStarted;
+  const started = new Promise((resolve) => { announceStarted = resolve; });
+  const api = createWorkspaceApi({
+    root, kitRoot: KIT_ROOT, env,
+    fetchFn: (_url, { signal }) => new Promise((resolve, reject) => {
+      announceStarted();
+      signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }),
+  });
+  const run = api.action('evaluate', { confirm: true, all: false });
+  await started;
+  await api.action('classifier-stop', {});
+  await assert.rejects(run, /Classification stopped/);
+  assert.equal(api.get['/api/classification-job']().status, 'stopped');
+  assert.equal(readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8'), before);
+});
+
 test('failed local classification leaves saved results unchanged; CLI scan and analytics work without sessions module', async () => {
   const root = tmp(), env = environment(); fixture(env, root);
   await collectAnalysis({ root, env });
@@ -199,6 +264,7 @@ test('dashboard scan and preference actions require session plus CSRF; GET never
   const base = `http://127.0.0.1:${server.port}`, cookie = (await fetch(server.url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
   const html = await (await fetch(base, { headers: { cookie } })).text();
   const csrf = html.match(/name="yaw-csrf" content="([a-f0-9]+)"/)[1];
+  assert.match(html, /id="classifier-job"/);
   const post = (action, input, withCsrf = true) => fetch(`${base}/api/${action}`, {
     method: 'POST', headers: { cookie, 'content-type': 'application/json', ...(withCsrf ? { 'x-yaw-token': csrf } : {}) }, body: JSON.stringify(input),
   });
@@ -213,6 +279,8 @@ test('dashboard scan and preference actions require session plus CSRF; GET never
   assert.equal((await post('classifier-save', { classifier: { endpoint: 'http://127.0.0.1:8123', threshold: 0.8, prompt: 'Prioritize explicit acceptance criteria.' } })).status, 200);
   assert.equal((await post('classifier-save', { classifier: { endpoint: 'https://remote.example' } })).status, 400);
   assert.equal((await post('classifier-save', { classifier: {} }, false)).status, 403);
+  assert.equal((await fetch(`${base}/api/classification-job`, { headers: { cookie } })).status, 200);
+  assert.equal((await post('classifier-pause', {})).status, 200);
   const prefs = await (await fetch(`${base}/api/preferences`, { headers: { cookie } })).json();
   assert.equal(prefs.autoRefresh, true);
   assert.equal(prefs.classifier.endpoint, 'http://127.0.0.1:8123'); assert.equal(prefs.classifier.threshold, 0.8); assert.equal(prefs.classifier.maxLen, 8192);

@@ -33,6 +33,12 @@ p { margin-bottom: 1rem; }
 .sidebar nav button > span:first-child { width: 18px; font-size: 18px; line-height: 1; text-align: center; }
 .nav-tag { font-size: .45rem; letter-spacing: .04em; border: 1px solid #526b59; border-radius: 3px; padding: 3px; margin-left: auto; white-space: nowrap; }
 .sidebar-footer { margin-top: auto; padding: 45px 12px 0; color: #bdcfc0; font-size: .78rem; }
+.classifier-job { margin: 16px 8px 0; padding: 11px; border: 1px solid #526b59; border-radius: 8px; color: #edf4ef; background: #203a33; }
+.classifier-job summary { font-size: .78rem; }
+.classifier-job progress { width: 100%; height: 8px; margin: 11px 0 5px; accent-color: var(--teal); }
+.classifier-job p { margin: 4px 0 9px; color: #bdcfc0; font-size: .72rem; }
+.classifier-job > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.classifier-job button { padding: 4px 7px; border-color: #526b59; color: #edf4ef; background: #29473e; font-size: .7rem; }
 .sidebar-footer p { color: #8fa59b; font-size: .73rem; margin: 8px 0 16px; }
 .sidebar-footer code { font-size: .75rem; color: #90ab98; }
 .local-dot { display: inline-block; height: 6px; width: 6px; background: #92b77a; border-radius: 50%; margin-right: 6px; vertical-align: middle; }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MAX_ROWS, sessionRows } from '../core/web/session-rows.js';
 
 const rows = [
-  { id: 'codex:one', agent: 'codex', project: '/a', model: 'alpha', started: '2026-10-23T10:00:00Z', ended: '2026-10-23T11:00:00Z', tokens_in: 500, tokens_out: 100, cost_usd: null, source: 'local',
+  { id: 'codex:one', agent: 'codex', project: '/a', model: 'alpha', language: 'python', started: '2026-10-23T10:00:00Z', ended: '2026-10-23T11:00:00Z', tokens_in: 500, tokens_out: 100, cost_usd: null, source: 'local',
     metrics: { prompts: 2, answers: 3, promptChars: 40, answerChars: 900, medianAnswerChars: 250, p95AnswerChars: 500, medianResponseMs: 2349, p95ResponseMs: 8000, responseSamples: 2, limited: false },
     evaluation: { classified: 2, skipped: 0, counts: { outcome: { unknown: 5, fulfilled: 1 } }, evaluated: '2026-10-24T00:00:00Z' } },
   { id: 'claude:two', agent: 'claude', project: '/b', model: 'beta', started: '2026-10-22T09:00:00Z', ended: '2026-10-22T09:30:00Z', tokens_in: 300, tokens_out: 50, cost_usd: 0, source: 'import' },
@@ -17,6 +17,7 @@ test('session rows: newest first, unknown values stay null, no undated rows', ()
   assert.equal(out.total, 4); assert.equal(out.undated, 1); assert.equal(out.limited, false);
   const [three, one, two] = out.rows;
   assert.equal(three.model, 'Unknown'); assert.equal(three.minutes, null); assert.equal(three.tokensIn, null); assert.equal(three.prompts, null); assert.equal(three.source, 'hook');
+  assert.equal(three.language, 'Unknown'); assert.equal(one.language, 'python');
   assert.equal(three.deviceId, 'local'); assert.equal(three.deviceName, 'This device');
   assert.equal(one.minutes, 60); assert.equal(one.cost, null); assert.equal(one.started, Date.parse('2026-10-23T10:00:00Z'));
   assert.equal(one.medianResp, 2.3); assert.equal(one.answerChars, 900); assert.equal(one.outcome, 'fulfilled', 'a confident label wins over unknown');

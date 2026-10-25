@@ -56,6 +56,9 @@ device instead of counting them as projects. The overview's open-task count is
 project data and is not affected by the session device filter. **Split charts
 by** stacks the charts by agent, model, folder or project; combine it with the
 filters, for example one project split by agent.
+The programming-language filter uses each project's configured stack language
+and applies to all visible metrics, charts and tables. Synced sessions or
+projects without a configured language appear as **Unknown**.
 
 - **Overview**: totals, a drill-down table of projects by folder, and charts.
   The drill-down root is the folder shared by your innermost projects; click a
@@ -213,7 +216,10 @@ yaw sessions evaluate --all --endpoint http://127.0.0.1:8000
 ```
 
 Or press **Classify** in the filter bar of a Sessions page (same scope as
-Refresh) and confirm the message-reading prompt.
+Refresh) and confirm the message-reading prompt. While it runs, the expandable
+sidebar status shows session/turn progress and offers **Pause after current
+turn**, **Resume**, and **Stop**. Stop aborts the active local request and
+discards the unfinished run; only a completed run replaces saved evaluations.
 
 ### Install Laya
 

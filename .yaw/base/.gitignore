@@ -1,3 +1,8 @@
+# local web-form draft (yaw init --web); it can hold unfinished answers
+.yaw/draft.yaml
+# personal Claude Code settings (status line, local permissions)
+.claude/settings.local.json
+
 # yaw:node-cli
 node_modules/
 # /yaw:node-cli

@@ -20,7 +20,7 @@ import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
   'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
@@ -40,7 +40,14 @@ const sourcesView = (env, data = sourcesData(env)) => {
 };
 export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn }) {
   let running = false;
+  let classifierJob = null, resumePaused = null;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
+  const publicClassifierJob = () => classifierJob && ({
+    status: classifierJob.status, session: classifierJob.session, sessions: classifierJob.sessions,
+    turn: classifierJob.turn, turns: classifierJob.turns, complete: classifierJob.complete,
+    sessionComplete: classifierJob.sessionComplete, message: classifierJob.message,
+  });
+  const resume = () => { const release = resumePaused; resumePaused = null; release?.(); };
   return {
     actions: WORKSPACE_ACTIONS,
     get: {
@@ -61,6 +68,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       }),
       '/api/preferences': () => webPreferences(env),
       '/api/classifier-samples': () => classifierSamples(env),
+      '/api/classification-job': () => publicClassifierJob(),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
       '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
@@ -138,6 +146,29 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         catch (e) { throw new FormError(e.message); }
         finally { running = false; }
       }
+      if (name === 'classifier-pause') {
+        if (classifierJob?.status === 'running') {
+          classifierJob.status = 'pausing';
+          classifierJob.message = 'Pausing after the current turn.';
+        }
+        return publicClassifierJob();
+      }
+      if (name === 'classifier-resume') {
+        if (['pausing', 'paused'].includes(classifierJob?.status)) {
+          classifierJob.status = 'running';
+          classifierJob.message = 'Classification resumed.';
+          resume();
+        }
+        return publicClassifierJob();
+      }
+      if (name === 'classifier-stop') {
+        if (classifierJob && ['running', 'pausing', 'paused'].includes(classifierJob.status)) {
+          classifierJob.status = 'stopping';
+          classifierJob.controller.abort();
+          resume();
+        }
+        return publicClassifierJob();
+      }
       if (name === 'notifications') {
         try { return saveNotifications({ root, env, input }); }
         catch (e) { throw new FormError(e.message); }
@@ -152,14 +183,44 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       if (running) throw new FormError('A session scan or classification is already running', 409);
       if (input.all !== undefined && typeof input.all !== 'boolean') throw new FormError('Choose current or all workspaces');
       running = true;
+      const job = name === 'evaluate' ? {
+        status: 'running', session: 0, sessions: 0, turn: 0, turns: 0,
+        message: 'Preparing sessions for classification.', controller: new AbortController(),
+      } : null;
+      if (job) classifierJob = job;
       try {
         const result = await collectAnalysis({
           root, env, all: input.all === true, days: input.days ?? 'all', classify: name === 'evaluate',
-          classifier: webPreferences(env).classifier,
+          classifier: webPreferences(env).classifier, fetchFn,
+          ...(job ? {
+            signal: job.controller.signal,
+            waitIfPaused: async () => {
+              if (job.status === 'pausing') {
+                job.status = 'paused';
+                job.message = 'Paused after the current turn.';
+              }
+              if (job.status !== 'paused') return;
+              await new Promise((resolve) => { resumePaused = resolve; });
+              if (job.controller.signal.aborted) throw new Error('Classification stopped; unfinished results were not saved');
+            },
+            onProgress: ({ session, sessions, turn, turns, complete, sessionComplete }) => {
+              Object.assign(job, { session, sessions, turn, turns, complete, sessionComplete,
+                message: sessions ? `Session ${session} of ${sessions}${turns ? ` · turn ${turn} of ${turns}${complete ? ' complete' : ''}` : ''}` : 'No sessions to classify.',
+              });
+            },
+          } : {}),
           tasksFor: (project) => { try { return tasksSection(project); } catch (e) { return { error: e.message }; } },
         });
+        if (job) {
+          job.status = 'completed';
+          job.message = job.controller.signal.aborted ? 'Classification stopped; unfinished results were not saved.' : 'Classification complete.';
+        }
         return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? 'Local classifications included.' : 'No model was called.'}` };
       } catch (e) {
+        if (job) {
+          job.status = job.controller.signal.aborted ? 'stopped' : 'failed';
+          job.message = e.message;
+        }
         throw new FormError(e.message);
       } finally { running = false; }
     },

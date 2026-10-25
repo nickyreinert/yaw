@@ -13,4 +13,4 @@ proposal:
   status: confirmed
   summary: node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.
   profiles: [node-cli]
-  modules: [core]
+  modules: [core, security, decisions, code-map]

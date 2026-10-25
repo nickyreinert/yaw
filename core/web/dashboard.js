@@ -129,6 +129,19 @@ function syncedRows(env, own) {
   }));
 }
 
+function withProjectLanguages(rows) {
+  const languages = new Map();
+  for (const project of new Set(rows.map((r) => r.project).filter((p) => typeof p === 'string' && p.startsWith('/')))) {
+    const result = section(() => {
+      if (!readManifest(project)) return 'Unknown';
+      const value = readAnswers(project).answers?.['arch.language'];
+      return typeof value === 'string' && value && value !== 'auto' ? value : 'Unknown';
+    });
+    languages.set(project, typeof result === 'string' ? result : 'Unknown');
+  }
+  return rows.map((row) => ({ ...row, language: languages.get(row.project) ?? 'Unknown' }));
+}
+
 // Every known session as compact rows for the Sessions and Global views; the browser filters and charts them.
 export async function sessionsData({ root, kitRoot, env, projects }) {
   const h = await history(kitRoot, env);
@@ -144,7 +157,7 @@ export async function sessionsData({ root, kitRoot, env, projects }) {
   return {
     available: true, current, tasks, projects: known,
     history: { local: Boolean(h?.saved.collected), collected: h?.saved.collected ?? null, registered: h?.stored?.rows.length ?? 0, synced: synced.length },
-    ...sessionRows([...(h?.rows ?? []), ...synced]),
+    ...sessionRows(withProjectLanguages([...(h?.rows ?? []), ...synced])),
   };
 }
 

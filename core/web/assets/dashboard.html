@@ -20,6 +20,12 @@
       <button type="button" data-route="global-knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
       <button type="button" data-route="global-settings"><span aria-hidden="true">⊞</span> Settings</button>
     </nav>
+    <details id="classifier-job" class="classifier-job" hidden>
+      <summary id="classifier-job-summary">Classifying sessions…</summary>
+      <progress id="classifier-job-progress" aria-label="Classification progress"></progress>
+      <p id="classifier-job-message" class="small" role="status" aria-live="polite"></p>
+      <div id="classifier-job-controls"></div>
+    </details>
   </aside>
   <div class="workspace">
     <header class="topbar"><div>Workspace <span aria-hidden="true">/</span> <strong id="breadcrumb">Overview</strong></div><div class="topbar-actions"><div class="project-switch" id="project-switch"><button type="button" class="project-chip" id="project-chip" aria-haspopup="true" aria-expanded="false" title="Current workspace"><strong id="project-name">Local project</strong><span id="project-state" class="small muted">Reading project…</span></button><button type="button" class="icon-button" id="project-search" aria-label="Find a project" title="Find a project" hidden><svg aria-hidden="true" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg></button><button type="button" class="icon-button" id="project-add" aria-label="Add project folder" title="Add project folder" hidden><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg></button></div><span class="local-badge"><span class="local-dot"></span> Local workspace</span><button type="button" id="refresh" aria-label="Refresh workspace data">↻ <span>Refresh</span></button></div></header>

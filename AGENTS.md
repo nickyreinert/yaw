@@ -19,10 +19,12 @@ Rules for coding agents in this project, written by YAW (quick setup). Edit free
 - Never read, print or commit secrets (`.env*`, keys, tokens); ask the user to enter them.
 <!-- /yaw:core -->
 
+<!-- yaw:code-map -->
+- Code map: read `docs/code-map.md` or `just map show <area>` first, then verify against the implementation, callers and tests and search wider when needed; after adding, moving or deleting directories run `just map update` and review the area descriptions.
+<!-- /yaw:code-map -->
+
 <!-- yaw:decisions -->
-- Decision retrieval: `just decisions recall "<the task in one line>"` (add `--path <file>` for files you will change); apply matching decisions, weigh notices, cite their IDs in your summary or say none applied.
-- Record lasting choices as ADRs and unresolved security / business-logic / privacy risks as notices with `just decisions record ...` (`just decisions` lists the options); change a decision by recording a new one with `--supersedes`.
-- `.decisions/*.md` are the truth; after editing one by hand run `just decisions rebuild`.
+- Decision retrieval: `just decisions recall "<the task in one line>"` (add `--path <file>`); apply matching decisions and cite their IDs or say none applied. Record lasting choices and risks with `just decisions record ...` (`just decisions` lists options); change a decision by superseding it, never by editing; `.decisions/*.md` are the truth, run `just decisions rebuild` after hand edits.
 <!-- /yaw:decisions -->
 
 <!-- yaw:security -->

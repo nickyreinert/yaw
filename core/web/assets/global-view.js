@@ -34,8 +34,8 @@ const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', {
 const measured = (r) => r.prompts !== null;
 const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · project paths unavailable`;
 
-const DEFAULTS = { path: '', project: '', device: '', agent: '', model: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
-const FILTERS = ['path', 'project', 'agent', 'model', 'period', 'from', 'to', 'split'];
+const DEFAULTS = { path: '', project: '', device: '', agent: '', model: '', language: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
+const FILTERS = ['path', 'project', 'agent', 'model', 'language', 'period', 'from', 'to', 'split'];
 const KEYS = { global: [...FILTERS, 'device'], 'global-sessions': [...FILTERS, 'device', 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
@@ -47,7 +47,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
   let prefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
-  let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], DEVICES = [], S;
+  let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], LANGUAGES = [], DEVICES = [], S;
   const locked = () => route === 'sessions';
   const rel = (p) => p === ROOTP ? base(p) : p.startsWith(ROOT) ? p.slice(ROOT.length) : p;
   const path = () => state.path ? ROOT + state.path : ROOTP;
@@ -70,10 +70,12 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     PROJECTS = roots;
     AGENTS = [...new Set((body.rows ?? []).map((r) => r.agent))].sort();
     MODELS = [...new Set((body.rows ?? []).map((r) => r.model))].sort();
+    LANGUAGES = [...new Set((body.rows ?? []).map((r) => r.language ?? 'Unknown'))].sort();
     const devices = new Map((body.rows ?? []).map((r) => [r.deviceId, r.deviceName]));
     devices.set('local', 'This device');
     DEVICES = [...devices].map(([id, name]) => ({ id, name })).sort((a, b) => a.id === 'local' ? -1 : b.id === 'local' ? 1 : a.name.localeCompare(b.name));
     if (state.device && !devices.has(state.device)) { state.device = ''; writeUrl(); }
+    if (state.language && !LANGUAGES.includes(state.language)) { state.language = ''; writeUrl(); }
     onData?.(body);
   }
   const deviceLabel = (id) => {
@@ -132,7 +134,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const [from, to] = bounds();
     return (data?.rows ?? []).filter((r) => (locked() ? r.project === data.current : inPath(r.project) && (!state.project || r.project === state.project)) &&
       (!['global', 'global-sessions'].includes(route) || !state.device || r.deviceId === state.device) &&
-      (!state.agent || r.agent === state.agent) && (!state.model || r.model === state.model) && r.started >= from && r.started < to);
+      (!state.agent || r.agent === state.agent) && (!state.model || r.model === state.model) &&
+      (!state.language || r.language === state.language) && r.started >= from && r.started < to);
   }
   function folders() {
     const out = new Set(['']);
@@ -281,6 +284,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (mode !== 'tasks') bar.append(...flat([
       ['global', 'global-sessions'].includes(route) ? select('Device', 'device', DEVICES.map((d) => d.id), 'All devices', deviceLabel) : null,
       select('Agent', 'agent', AGENTS, 'All agents'), select('Model', 'model', MODELS, 'All models'),
+      select('Programming language', 'language', LANGUAGES, 'All languages'),
       seg('Period', 'period', [['7', '7 d'], ['30', '30 d'], ['90', '90 d'], ['all', 'All']]),
       h('label', {}, 'From', h('input', { type: 'date', value: state.from, on: { change: (e) => set({ from: e.target.value }) } })),
       h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
@@ -315,6 +319,61 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         : null,
       job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
   }
+  let classifierPoll = 0;
+  function drawClassifierJob(jobState) {
+    const panel = $('classifier-job');
+    if (!panel || !jobState) return;
+    panel.hidden = false;
+    const active = ['running', 'pausing', 'paused', 'stopping'].includes(jobState.status);
+    const progress = $('classifier-job-progress'), message = $('classifier-job-message');
+    const summary = $('classifier-job-summary');
+    summary.textContent = jobState.status === 'completed' ? 'Classification complete' :
+      jobState.status === 'stopped' ? 'Classification stopped' :
+        jobState.status === 'failed' ? 'Classification failed' :
+          jobState.status === 'pausing' ? 'Finishing current turn before pausing…' :
+            jobState.status === 'paused' ? 'Classification paused' :
+            jobState.status === 'stopping' ? 'Stopping classification…' : 'Classifying sessions…';
+    message.textContent = jobState.message ?? '';
+    if (jobState.sessions > 0) {
+      progress.max = jobState.sessions;
+      const sessionProgress = jobState.turns
+        ? (Math.max(0, (jobState.turn ?? 0) - (jobState.complete ? 0 : 1)) / jobState.turns)
+        : jobState.sessionComplete ? 1 : 0;
+      progress.value = Math.min(Math.max(0, (jobState.session ?? 1) - 1 + sessionProgress), jobState.sessions);
+      progress.removeAttribute('aria-valuetext');
+      progress.setAttribute('aria-valuetext', `${jobState.session} of ${jobState.sessions} sessions`);
+    } else {
+      progress.removeAttribute('value');
+      progress.removeAttribute('aria-valuetext');
+    }
+    const controls = $('classifier-job-controls');
+    fill(controls, active && jobState.status !== 'stopping'
+      ? ['paused', 'pausing'].includes(jobState.status)
+        ? h('button', { type: 'button', on: { click: () => controlClassifier('classifier-resume') } }, jobState.status === 'paused' ? 'Resume' : 'Continue now')
+        : h('button', { type: 'button', on: { click: () => controlClassifier('classifier-pause') } }, 'Pause after current turn')
+      : null,
+    active ? h('button', { type: 'button', class: 'danger', disabled: jobState.status === 'stopping',
+      on: { click: () => controlClassifier('classifier-stop') } }, 'Stop') : null);
+    if (active) panel.open = true;
+  }
+  async function controlClassifier(action) {
+    try { drawClassifierJob(await api(action, {})); }
+    catch (e) { report(e); }
+  }
+  async function monitorClassifier(token) {
+    while (token === classifierPoll) {
+      try {
+        const state = await get('classification-job');
+        if (!state) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          continue;
+        }
+        drawClassifierJob(state);
+        if (!['running', 'pausing', 'paused', 'stopping'].includes(state.status)) return;
+      } catch (e) { report(e); return; }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
   async function saveAuto(on) {
     try {
       const result = await api('preferences', { autoRefresh: on });
@@ -329,14 +388,21 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, classify,
       message: classify ? 'Classifying eligible turns with local Laya… this can take a while.' : `Reading local transcripts of ${scopeText()}…` });
     render();
+    const poll = classify ? ++classifierPoll : null;
+    if (classify) monitorClassifier(poll);
     try {
       const result = await api(classify ? 'evaluate' : 'collect', { all, days: days(), confirm: classify });
       job.message = result.message;
+      if (classify) await get('classification-job').then(drawClassifierJob);
       if (all) autoDone.add('current');
       autoDone.add(all ? 'all' : 'current');
       await load(true); afterCollect?.();
     } catch (e) { Object.assign(job, { message: e.message, error: true }); }
-    finally { job.busy = null; render(); }
+    finally {
+      if (classify) classifierPoll++;
+      job.busy = null;
+      render();
+    }
   }
   const days = () => state.from || state.to ? 'all' : state.period;
   const empty = (node, text) => fill(node, h('article', { class: 'card' }, h('h2', {}, 'No saved sessions'), h('p', {}, text)));
@@ -450,7 +516,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const project = str('project', 'Project', (r) => r.source === 'synced' ? '—' : rel(r.project));
     const body = {
       sessions: () => dataTable('sessions', [str('title', 'Session', (r) => r.title || r.id), str('started', 'Started', (r) => r.started, (r) => new Date(r.started).toLocaleString()), str('agent', 'Agent', (r) => r.agent),
-        ...(locked() ? [] : [project, str('device', 'Device', (r) => deviceLabel(r.deviceId))]), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
+        ...(locked() ? [] : [project, str('device', 'Device', (r) => deviceLabel(r.deviceId))]), str('language', 'Language', (r) => r.language), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
         num('tin', 'Tokens in', (r) => r.tokensIn), num('tout', 'Tokens out', (r) => r.tokensOut), num('minutes', 'Elapsed', (r) => r.minutes, (r) => dur(r.minutes)),
         num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`)], rows, { sort: 'started' }),
       lengths: () => dataTable('lengths', [str('title', 'Session', (r) => r.title || r.id), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
@@ -461,7 +527,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       models: () => dataTable('models', groupCols('Model'), groupBy(rows, (r) => r.model), { sort: 'sessions' }),
       folders: () => dataTable('folders-s', groupCols('Folder'), groupBy(rows, folderOf), { sort: 'sessions' }),
       projects: () => dataTable('projects', groupCols('Project'), groupBy(rows, (r) => r.source === 'synced' ? `Synced · ${r.deviceName}` : rel(r.project)), { sort: 'sessions' }),
-      outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]),
+      outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]), str('language', 'Language', (r) => r.language),
         str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
         num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),
     }[state.table]();

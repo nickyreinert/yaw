@@ -1,5 +1,5 @@
 {
-  "kit": "0.0.0",
+  "kit": "0.1.0",
   "profiles": [
     "node-cli"
   ],
@@ -18,6 +18,9 @@
       "enabled": true
     },
     "decisions": {
+      "enabled": true
+    },
+    "code-map": {
       "enabled": true
     }
   },
@@ -42,16 +45,16 @@
     {
       "path": ".codex/hooks.json",
       "module": "core",
-      "hash": "sha256:701a308f6f5590085004e7db1fbd4a2f60f9700575e7bea87bcedc92fc500db1",
+      "hash": "sha256:69f6cc3d3905bbeb19088422f03b2e59f4fdeca8571062631d66f22b14ca5004",
       "managed": true,
       "fragments": [
         {
           "module": "decisions",
-          "hash": "sha256:79d83adda491950c844a9f02f259830f4e3ee33689ad4cc74514004438e15c67"
+          "hash": "sha256:a5f5511fb9fca858a532e3c5590b99c2660a27236827b14f7b2f62ce6fca2c4b"
         },
         {
           "module": "security",
-          "hash": "sha256:edcc2550031064c3df6164930d33bfcce2fe85e56416fc6defb10c4fc06cd17b"
+          "hash": "sha256:e55db31849e8e584bc3b96e20b4f15fb790a95aa1a52f6699525c4f20ac540ad"
         }
       ]
     },
@@ -70,7 +73,7 @@
     {
       "path": ".gitignore",
       "module": "core",
-      "hash": "sha256:65d7dc583fc5a3554787280aac667366981a2c7a1b29ec9cfbb485e240194ab2",
+      "hash": "sha256:34ca36fd6036286b38a485eca5b87858c103c14b1883ea0ef751eef7832aa812",
       "managed": true,
       "fragments": [
         {
@@ -82,7 +85,7 @@
     {
       "path": ".yaw/answers.yaml",
       "module": "core",
-      "hash": "sha256:f47ab70bfba4303dce1714a78c0f1a8d6fc8a5fe4970be20d63461c679d79b4d",
+      "hash": "sha256:e183f7b845a515b3ea82f451933d4f347dc5c06aeb1e0e0fc33b5809f211a206",
       "managed": false
     },
     {
@@ -94,12 +97,16 @@
     {
       "path": "AGENTS.md",
       "module": "core",
-      "hash": "sha256:9bdd25164ebad2de9bd2412d55ce740b602c09ca43ca9895990cdf910e934223",
+      "hash": "sha256:de8d3aadb7d494dca296a3c16224e114169e6c1ec4a67a925835530a76f7c61f",
       "managed": true,
       "fragments": [
         {
+          "module": "code-map",
+          "hash": "sha256:ddfc58cc4d8db665b88197af4aa47c538977732d449ccc4f298ec741b1c14422"
+        },
+        {
           "module": "decisions",
-          "hash": "sha256:126a88156b3287a522c062d19d81f242bc354f084a8b454f73fa826b1f6e9db7"
+          "hash": "sha256:48d242bdc7e46914c90365c444585699551414b8b42cbca51aa0550a80f1acdf"
         },
         {
           "module": "security",
@@ -111,6 +118,18 @@
       "path": "CLAUDE.md",
       "module": "core",
       "hash": "sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
+      "managed": true
+    },
+    {
+      "path": "docs/code-map.md",
+      "module": "code-map",
+      "hash": "sha256:890d7840a1626510ab15887c5a205fdac577cc24a394c74388c11696cf11bb4b",
+      "managed": false
+    },
+    {
+      "path": "just/code-map.just",
+      "module": "code-map",
+      "hash": "sha256:7b48aaab62ad2736d81faed75e21a23c8f67ed7beb7efd8077ecdfd332b25283",
       "managed": true
     },
     {
@@ -128,9 +147,13 @@
     {
       "path": "justfile",
       "module": "core",
-      "hash": "sha256:d99f88f0e8646cb724f489ed24deb455619bbf9a38e92d4e445847b78e7a4abe",
+      "hash": "sha256:9dbab4295461a09885d6d1b20d2500e063d0bf6263d1c714827ca08fe82a9114",
       "managed": true,
       "fragments": [
+        {
+          "module": "code-map",
+          "hash": "sha256:f88da123616ab9c4ecec43147310e4a31018d3beed92a35e7eb77b2777c303fd"
+        },
         {
           "module": "decisions",
           "hash": "sha256:40cbf2f571d9cb4d1c4cee8ec81d09bb5c1b37930a9ea57100b5f46768721e4f"
