@@ -140,13 +140,13 @@ function render(q, number, total, expertise, style) {
   if (q.status) lines.push(`      ${style.yellow(q.status)}`);
   if (q.choices) {
     q.choices.forEach((c, i) => {
-      const label = typeof c === 'object' && c.label ? ` - ${c.label}` : '';
+      const label = typeof c === 'object' && c.label ? c.label : choiceValue(c);
       if (!available(c)) {
-        lines.push(style.dim(`      ${i + 1}) ${choiceValue(c)}${label} (phase ${c.phase}, not available yet)`));
+        lines.push(style.dim(`      ${i + 1}) ${label} (phase ${c.phase}, not available yet)`));
         return;
       }
-      const value = isDefault(q, choiceValue(c)) ? style.green(style.bold(choiceValue(c))) : choiceValue(c);
-      lines.push(`      ${style.cyan(`${i + 1})`)} ${value}${label}`);
+      const value = isDefault(q, choiceValue(c)) ? style.green(style.bold(label)) : label;
+      lines.push(`      ${style.cyan(`${i + 1})`)} ${value}`);
     });
   }
   return lines.join('\n');

@@ -22,6 +22,27 @@ const fixture = () => {
   const env = { ...process.env, HOME: home, USERPROFILE: home, YAW_TEST_OFFLINE: '1' };
   return { root, home, env, kitRoot: KIT_ROOT };
 };
+
+test('interview UI: concise setup, focus switch and final module review', () => {
+  const html = readFileSync(join(KIT_ROOT, 'core/web/assets/index.html'), 'utf8');
+  const app = readFileSync(join(KIT_ROOT, 'core/web/assets/app.js'), 'utf8');
+  const workspace = readFileSync(join(KIT_ROOT, 'core/web/assets/workspace.js'), 'utf8');
+  assert.match(html, /class="focus-toggle" role="switch"/);
+  assert.match(html, /<h2 id="start-title">Preset<\/h2>/);
+  assert.match(html, /id="draft"[^>]*>Save draft/);
+  assert.match(html, /id="preset"[^>]*>Save preset/);
+  assert.match(html, /id="diff"[^>]*hidden>Inspect file diff/);
+  for (const redundant of ['6 steps · Preview before apply', 'Modules can be added later.', 'Starting answers', 'Loading replaces the current answers.', 'Preview only. Unreviewed questions use the documented defaults.']) {
+    assert.ok(!html.includes(redundant) && !app.includes(redundant), redundant);
+  }
+  assert.match(app, /module-plan/);
+  assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
+  assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
+  const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
+  assert.match(communication, /label: Should the agent use examples and analogies\?/);
+  assert.match(communication, /Only when useful/);
+  assert.match(communication, /Always asks for a plain-language example with each explanation/);
+});
 async function serverFixture(t, extra = {}) {
   const f = fixture();
   const errors = capture();

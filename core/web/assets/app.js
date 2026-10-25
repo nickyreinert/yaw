@@ -34,10 +34,9 @@ function renderWizard(focus = false) {
     const reviewed = shown.filter((c) => Object.hasOwn(state.answers, c.q.id)).length;
     const complete = visitedSteps.has(i) && (!shown.length || reviewed === shown.length);
     button.append(element('span', complete ? '✓' : String(i + 1).padStart(2, '0'), { class: 'step-number', 'aria-hidden': 'true' }));
-    const label = element('span'); label.append(element('strong', s.title), element('small', shown.length ? `${reviewed}/${shown.length} answers reviewed` : s.hint)); button.append(label);
+    button.append(element('strong', s.title));
     button.addEventListener('click', () => { stepIndex = i; renderWizard(true); }); li.append(button); $('sections').append(li);
   });
-  $('step-count').textContent = `STEP ${stepIndex + 1} OF ${steps.length} · ${step.title}`;
   $('previous-step').disabled = stepIndex === 0;
   $('next-step-button').hidden = stepIndex === steps.length - 1;
   const blocked = step.ids.includes('stack') && !stackValid;
@@ -128,13 +127,10 @@ function buildQuestions() {
     if (!q.hint) hint.hidden = true;
     node.append(hint);
     if (q.status) node.append(element('p', q.status, { class: 'hint status', id: `${id}-status` }));
-    inputs.forEach((i) => i.setAttribute('aria-describedby', `${id}-hint ${q.status ? `${id}-status ` : ''}${id}-default`));
-    const defaults = element('p', `Default: ${shownValue(q.default) || '(empty)'}`, { class: 'default', id: `${id}-default` });
-    node.append(defaults);
-    const why = element('details'); why.append(element('summary', 'Why this matters'), element('div', q.helpText || q.hint || 'This answer shapes the generated project rules. You can keep the documented default.', { class: 'help' }));
-    node.append(why);
-    const example = element('details'); example.append(element('summary', 'Example'), element('p', q.type === 'text' ? (q.hint || 'Describe your project in plain words. Do not enter passwords, tokens or API keys.') : `For example: ${shownValue(q.default)}. Keep the default if unsure.`));
-    node.append(example);
+    const describedBy = [q.hint ? `${id}-hint` : '', q.status ? `${id}-status` : ''].filter(Boolean).join(' ');
+    if (describedBy) inputs.forEach((i) => i.setAttribute('aria-describedby', describedBy));
+    const why = q.helpText ? element('details') : null;
+    if (why) { why.append(element('summary', 'Why this matters'), element('div', q.helpText, { class: 'help' })); node.append(why); }
     let capability;
     if (q.id === 'user.agents') { capability = element('div'); node.append(capability); }
     inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : 'change', () => {
@@ -145,7 +141,7 @@ function buildQuestions() {
       update();
     }));
     sections.get(sectionId).node.append(node);
-    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, example, defaults, capability, expertise: null });
+    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, capability, expertise: null });
   }
 
 }
@@ -163,24 +159,26 @@ function renderQuestions() {
       if (c.q.type === 'multi') input.checked = value.includes(input.value);
       else if (document.activeElement !== input) input.value = String(value);
     }
-    c.hint.hidden = !c.q.hint || expertise === 'expert';
+    c.hint.hidden = !c.q.hint || expertise === 'expert' && id !== 'user.examples';
     if (c.expertise !== expertise) {
-      c.why.open = expertise === 'layperson';
-      c.example.open = expertise === 'layperson';
+      if (c.why) c.why.open = expertise === 'layperson';
       c.expertise = expertise;
     }
-    c.defaults.textContent = `${expertise === 'layperson' ? 'If unsure, keep this recommended starting answer: ' : 'Default: '}${shownValue(c.q.default) || '(empty)'}`;
     if (c.capability) {
       c.capability.replaceChildren();
       for (const agent of value) {
         const detail = catalog.agents[agent];
         if (!detail) continue;
-        const note = element('details'); note.append(element('summary', `${detail.name}: capability notes`));
-        if (detail.note) note.append(element('p', detail.note));
+        const notes = [];
+        if (detail.note) notes.push(detail.note);
         for (const [feature, support] of Object.entries(detail.capabilities ?? {})) {
-          if (support.support !== 'native') note.append(element('p', `${feature}: ${support.support}. ${support.note ?? support.via ?? ''}`));
+          if (support.support !== 'native') notes.push(`${feature}: ${support.support}. ${support.note ?? support.via ?? ''}`);
         }
-        c.capability.append(note);
+        if (notes.length) {
+          const note = element('details'); note.append(element('summary', `${detail.name} support`));
+          for (const text of notes) note.append(element('p', text));
+          c.capability.append(note);
+        }
       }
     }
   }
@@ -223,24 +221,18 @@ function renderModules() {
 }
 function summary(preview) {
   const root = $('summary'); root.replaceChildren();
-  root.append(element('p', `Stack: ${preview.profile}`));
-  root.append(element('p', `Modules: ${preview.modules.join(', ')}`));
-  root.append(element('p', `${preview.files.length} files; approximately ${preview.footprint.bytes.toLocaleString()} bytes + ${preview.footprint.baseCopies} base copies.`));
-  root.append(element('p', preview.footprint.note));
-  if (preview.secrets.names.length) {
-    root.append(element('p', preview.secrets.existingFile
-      ? `${preview.secrets.names.length} local secret name(s) found in .env.example; existing .env will not be read or changed.`
-      : `${preview.secrets.names.length} local secret name(s) found in .env.example; values are optional and saved only to .env.`));
+  const modules = new Map(catalog.modules.map((module) => [module.name, module]));
+  const list = element('ul', undefined, { class: 'module-plan' });
+  for (const name of preview.modules) {
+    const module = modules.get(name);
+    if (module) {
+      const item = element('li');
+      const description = (module.what ?? module.description ?? '').split(/[.;]/, 1)[0];
+      item.append(element('strong', module.title ?? name), element('span', description));
+      list.append(item);
+    }
   }
-  const files = element('details');
-  files.append(element('summary', `${preview.files.length} planned files`));
-  const ul = element('ul');
-  for (const f of preview.files) ul.append(element('li', `${f.path}${f.action === 'kept' ? ' — kept unchanged' : ''}${f.bytes === null ? ' (bookkeeping)' : ` (${f.bytes} B rendered)`}`));
-  files.append(ul); root.append(files);
-  const answers = element('details'); answers.append(element('summary', 'Answers and defaults'));
-  const list = element('ul');
-  for (const [id, value] of Object.entries(preview.answers)) list.append(element('li', `${id}: ${shownValue(value) || '(empty)'}${preview.defaulted.includes(id) ? ' (default)' : ''}`));
-  answers.append(list); root.append(answers);
+  root.append(element('p', `Stack: ${preview.profile}`, { class: 'small muted' }), list);
 }
 function applySecretFields() {
   const container = $('secret-fields'); container.replaceChildren();
@@ -278,7 +270,7 @@ function update() {
       const body = await (await request('preview')).json();
       if (current !== revision) return;
       lastPreview = body; summary(body); actions(true);
-      status(catalog.editing ? 'Preview only. Saved answers and user-edited files are preserved until you confirm.' : 'Preview only. Unreviewed questions use the documented defaults.');
+      status('Preview updated.');
     } catch (e) {
       if (current !== revision) return;
       if (e.message.startsWith('Choose another stack')) {
@@ -372,7 +364,8 @@ async function start() {
   if (catalog.hasUserProfile) $('prefill').append(element('option', 'Saved user preferences', { value: 'profile' }));
   if (catalog.hasDraft) $('prefill').append(element('option', 'Resume project draft', { value: 'draft' }));
   for (const p of catalog.presets) $('prefill').append(element('option', `Preset / previous project: ${p.name}`, { value: `preset:${p.name}` }));
-  $('verify-note').textContent = catalog.skipVerify ? 'Verification was explicitly disabled with --skip-verify.' : 'Apply runs the same verification as the CLI: just setup && just check.';
+  $('verify-note').textContent = catalog.editing ? '' : catalog.skipVerify ? 'Verification disabled with --skip-verify.' : 'Apply runs just setup and just check.';
+  $('diff').hidden = !catalog.editing;
   buildQuestions();
   $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { stepIndex--; renderWizard(true); } });
   $('next-step-button').addEventListener('click', advance);

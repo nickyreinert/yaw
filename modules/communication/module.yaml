@@ -36,9 +36,10 @@ questions:
     scope: user
     mode: S
     type: choice
-    label: Examples and analogies?
+    label: Should the agent use examples and analogies?
+    hint: "This adds an instruction: Always asks for a plain-language example with each explanation; Never avoids examples unless asked; Only when useful lets the agent decide."
     choices:
-      - { value: when-helpful, label: When helpful }
+      - { value: when-helpful, label: Only when useful }
       - { value: always, label: Always }
       - { value: never, label: Never }
     default: when-helpful

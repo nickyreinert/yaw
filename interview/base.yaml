@@ -32,7 +32,6 @@ questions:
     mode: Q
     type: text
     label: Language for chat with the agent?
-    hint: Two-letter code, e.g. de or en.
     default: de
   - id: user.autonomy
     ref: "0.7"

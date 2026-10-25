@@ -67,8 +67,8 @@ const replace = (url) => { if (url !== location.hash) history.replaceState(null,
 function setInterviewFocus(on) {
   document.body.classList.toggle('interview-focus', on);
   document.querySelectorAll('.focus-toggle').forEach((button) => {
-    button.setAttribute('aria-pressed', String(on));
-    button.textContent = on ? 'Exit focus mode' : 'Focus mode';
+    button.setAttribute('aria-checked', String(on));
+    button.setAttribute('aria-label', on ? 'Focus mode on' : 'Focus mode off');
   });
 }
 export function showView(hash, focus = true) {
@@ -88,7 +88,8 @@ export function showView(hash, focus = true) {
   if (name === 'settings') sub = settings.show(sub); else settings?.hide();
   const interviewView = name === 'setup' || name === 'settings' && sub === 'interview';
   document.querySelectorAll('.focus-toggle').forEach((button) => { button.hidden = !interviewView || !button.closest(`[data-view="${section}"]`); });
-  if (!interviewView) setInterviewFocus(false);
+  if (name === 'setup' && setup) setInterviewFocus(true);
+  else if (!interviewView) setInterviewFocus(false);
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
   if (name === 'global-settings' && sub === 'files' && new URLSearchParams(query).get('file')) sub = `files?file=${encodeURIComponent(new URLSearchParams(query).get('file'))}`;

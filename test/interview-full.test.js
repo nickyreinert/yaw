@@ -155,7 +155,7 @@ test('agents: the others are shown as phase 3, are refused, and the interview fi
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers['user.agents'], ['codex']);
   const shown = r.prompter.shown.join('');
-  for (const a of ['gemini', 'antigravity', 'pi', 'hermes']) assert.match(shown, new RegExp(`\\) ${a} .*\\(phase 3, not available yet\\)`));
+  for (const label of ['Gemini CLI', 'Antigravity CLI', 'Pi', 'Hermes']) assert.match(shown, new RegExp(`\\) ${label}.*\\(phase 3, not available yet\\)`));
   assert.match(shown, /"Gemini CLI \(enterprise \/ API key\)" is not available yet/);
 });
 

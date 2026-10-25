@@ -33,22 +33,22 @@
         <div class="folder-line"><span class="eyebrow">PROJECT</span><code id="project-path"></code></div>
       </section>
       <section data-view="setup" class="view" hidden>
-  <div class="page-heading interview-heading"><h1 tabindex="-1">Interview</h1><span class="small muted">6 steps · Preview before apply</span><button type="button" class="focus-toggle" aria-pressed="false">Focus mode</button></div>
-  <p id="status" role="status" aria-live="polite">Loading questionnaire…</p><p id="error" role="alert" hidden></p>
-  <div class="wizard-layout"><nav class="wizard-nav" aria-label="Setup steps"><p class="eyebrow">YOUR SETUP</p><ol id="sections"></ol><p class="small muted">You can revisit any step.<br>Nothing is applied until you confirm.</p></nav>
-  <div class="wizard-main"><div class="wizard-progress"><span id="step-count"></span><span class="small muted">Alt + ← / → to navigate</span></div>
+  <div class="page-heading interview-heading"><h1 tabindex="-1">Interview</h1><button type="button" class="focus-toggle" role="switch" aria-checked="false" aria-label="Focus mode"><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M7 3H3v4M13 3h4v4M3 13v4h4m10-4v4h-4M7 10h6"/></svg><span>Focus</span><span class="switch-track"><span></span></span></button></div>
+  <p id="status" role="status" aria-live="polite" hidden>Loading questionnaire…</p><p id="error" role="alert" hidden></p>
+  <div class="wizard-layout"><nav class="wizard-nav" aria-label="Setup steps"><ol id="sections"></ol></nav>
+  <div class="wizard-main">
     <form id="setup">
-      <fieldset id="setup-depth" tabindex="-1"><legend>Setup depth</legend><p class="muted">Modules can be added later.</p><div class="depth-options"><label class="depth-card"><input type="radio" name="mode" value="quick" checked><span><strong>Quick start <span class="pill">RECOMMENDED</span></strong><span>Core modules and defaults.</span></span></label><label class="depth-card"><input type="radio" name="mode" value="full"><span><strong>Full setup</strong><span>All applicable configuration.</span></span></label></div></fieldset>
-      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Starting answers</h2><label for="prefill">Starting answers</label><div class="inline-control"><select id="prefill"><option value="new">New setup</option></select><button id="load" type="button">Load answers</button></div><p class="small muted">Loading replaces the current answers.</p></section>
+      <fieldset id="setup-depth" tabindex="-1"><legend>Setup depth</legend><div class="depth-options"><label class="depth-card"><input type="radio" name="mode" value="quick" checked><span><strong>Quick start</strong><span>Get the essentials in place for a prototype or MVP.</span></span></label><label class="depth-card"><input type="radio" name="mode" value="full"><span><strong>Full setup</strong><span>Configure all tools that fit a long-lived project.</span></span></label></div></fieldset>
+      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Preset</h2><label for="prefill">Choose a preset</label><div class="inline-control"><select id="prefill"><option value="new">New setup</option></select><button id="load" type="button">Load</button></div></section>
       <div id="questions"></div>
-      <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Your stack</h2><p class="muted">Pick the language and where it runs; together they choose one stack. Every language stays selectable; a pair that cannot work keeps “Continue” disabled.</p><div id="stack-cards"></div></section>
-      <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">What YAW adds to your project</h2><p class="muted">Each card says what you get, with a small example. What a module needs is selected automatically; you can add or remove modules later with <code>yaw edit</code>.</p><div id="modules"></div></section>
-      <section id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Review &amp; apply</h2><p>Inspect the file plan and diff before applying.</p><p id="verify-note" class="small muted"></p><div class="actions"><button type="button" id="diff" disabled>Inspect file diff</button><button type="button" id="preset" disabled>Save as preset…</button><button type="button" id="apply" class="primary" disabled>Apply setup →</button></div></section>
-      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="draft" disabled>Save draft</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
+      <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Your stack</h2><div id="stack-cards"></div></section>
+      <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">What YAW adds to your project</h2><div id="modules"></div></section>
+      <section id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Review &amp; apply</h2><div id="summary" aria-live="polite"></div><p id="verify-note" class="small muted"></p><div class="actions"><button type="button" id="draft" disabled>Save draft</button><button type="button" id="preset" disabled>Save preset</button><button type="button" id="diff" disabled hidden>Inspect file diff</button><button type="button" id="apply" class="primary" disabled>Apply</button></div></section>
+      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
     </form>
     <section id="diff-panel" hidden aria-labelledby="diff-title"><h2 id="diff-title" tabindex="-1">File diff</h2><pre id="diff-output"></pre></section><section id="log-panel" hidden aria-labelledby="log-title"><h2 id="log-title" tabindex="-1">Apply log</h2><pre id="log" role="log" aria-live="polite"></pre></section>
   </div>
-  <aside class="plan-panel" aria-labelledby="summary-title"><h2 id="summary-title">File plan</h2><div id="summary" aria-live="polite"></div><p class="small muted">Preview only. Save or apply explicitly to write files.</p></aside></div>
+  </div>
 </section>
       <section data-view="global" class="view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Overview</h1><span class="small muted">All projects · saved session data only</span></div>
