@@ -20,6 +20,7 @@ function compact(r) {
   return {
     id: r.id, project: r.project, agent: r.agent, model: r.model || 'Unknown', title: r.title || '', branch: r.branch || '',
     source: ['local', 'import', 'synced'].includes(r.source) ? r.source : 'hook',
+    deviceId: r.deviceId ?? 'local', deviceName: r.deviceName ?? r.device ?? 'This device',
     started: Date.parse(r.started), minutes: minutes(r),
     tokensIn: amount(r.tokens_in), tokensOut: amount(r.tokens_out), cost: amount(r.cost_usd),
     prompts: m ? m.prompts : null, answers: m ? m.answers : null, promptChars: m ? m.promptChars ?? null : null, answerChars: m ? m.answerChars : null,

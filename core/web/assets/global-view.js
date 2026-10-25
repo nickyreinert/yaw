@@ -32,10 +32,11 @@ const sum = (rows, f) => rows.reduce((n, r) => n + (f(r) ?? 0), 0);
 const median = (list) => { const x = list.filter((v) => v !== null && v !== undefined).sort((a, b) => a - b); return x.length ? x[Math.floor(x.length / 2)] : null; };
 const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', { class: 'eyebrow' }, label), h('strong', {}, value), note ? h('span', { class: 'muted' }, note) : null);
 const measured = (r) => r.prompts !== null;
+const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · project paths unavailable`;
 
-const DEFAULTS = { path: '', project: '', agent: '', model: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
+const DEFAULTS = { path: '', project: '', device: '', agent: '', model: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
 const FILTERS = ['path', 'project', 'agent', 'model', 'period', 'from', 'to', 'split'];
-const KEYS = { global: FILTERS, 'global-sessions': [...FILTERS, 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { global: [...FILTERS, 'device'], 'global-sessions': [...FILTERS, 'device', 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
 const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a', gemini: '#8a5bb5' };
@@ -46,7 +47,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
   let prefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
-  let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], S;
+  let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], DEVICES = [], S;
   const locked = () => route === 'sessions';
   const rel = (p) => p === ROOTP ? base(p) : p.startsWith(ROOT) ? p.slice(ROOT.length) : p;
   const path = () => state.path ? ROOT + state.path : ROOTP;
@@ -69,8 +70,18 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     PROJECTS = roots;
     AGENTS = [...new Set((body.rows ?? []).map((r) => r.agent))].sort();
     MODELS = [...new Set((body.rows ?? []).map((r) => r.model))].sort();
+    const devices = new Map((body.rows ?? []).map((r) => [r.deviceId, r.deviceName]));
+    devices.set('local', 'This device');
+    DEVICES = [...devices].map(([id, name]) => ({ id, name })).sort((a, b) => a.id === 'local' ? -1 : b.id === 'local' ? 1 : a.name.localeCompare(b.name));
+    if (state.device && !devices.has(state.device)) { state.device = ''; writeUrl(); }
     onData?.(body);
   }
+  const deviceLabel = (id) => {
+    const d = DEVICES.find((x) => x.id === id);
+    if (!d) return id;
+    const duplicates = DEVICES.filter((x) => x.name === d.name).length > 1;
+    return duplicates ? `${d.name} (${d.id === 'local' ? 'local' : d.id.slice(0, 8)})` : d.name;
+  };
   async function load(force = false) {
     if (data && !force) return data;
     loading ??= get('sessions').then(prepare).finally(() => { loading = null; });
@@ -111,12 +122,16 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const rows = data?.rows ?? [];
     const to = state.to ? Date.parse(state.to) + DAY : NOW;
     let from = state.from ? Date.parse(state.from) : NOW - Number(state.period) * DAY;
-    if (!state.from && state.period === 'all') from = rows.reduce((m, r) => Math.min(m, r.started), NOW - DAY);
+    if (!state.from && state.period === 'all') {
+      const deviceRows = ['global', 'global-sessions'].includes(route) && state.device ? rows.filter((r) => r.deviceId === state.device) : rows;
+      from = deviceRows.reduce((m, r) => Math.min(m, r.started), NOW - DAY);
+    }
     return [from, Math.max(from + DAY, to)];
   }
   function filtered() {
     const [from, to] = bounds();
     return (data?.rows ?? []).filter((r) => (locked() ? r.project === data.current : inPath(r.project) && (!state.project || r.project === state.project)) &&
+      (!['global', 'global-sessions'].includes(route) || !state.device || r.deviceId === state.device) &&
       (!state.agent || r.agent === state.agent) && (!state.model || r.model === state.model) && r.started >= from && r.started < to);
   }
   function folders() {
@@ -263,7 +278,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (!locked()) bar.append(
       h('label', {}, 'Folder', h('select', { on: { change: (e) => set({ path: e.target.value, project: '' }) } }, folders().map((f) => h('option', { value: f, selected: state.path === f }, f ? `${f}/` : 'All projects')))),
       select('Project', 'project', PROJECTS.filter(inPath), 'All in folder', rel));
-    if (mode !== 'tasks') bar.append(...flat([select('Agent', 'agent', AGENTS, 'All agents'), select('Model', 'model', MODELS, 'All models'),
+    if (mode !== 'tasks') bar.append(...flat([
+      ['global', 'global-sessions'].includes(route) ? select('Device', 'device', DEVICES.map((d) => d.id), 'All devices', deviceLabel) : null,
+      select('Agent', 'agent', AGENTS, 'All agents'), select('Model', 'model', MODELS, 'All models'),
       seg('Period', 'period', [['7', '7 d'], ['30', '30 d'], ['90', '90 d'], ['all', 'All']]),
       h('label', {}, 'From', h('input', { type: 'date', value: state.from, on: { change: (e) => set({ from: e.target.value }) } })),
       h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
@@ -332,9 +349,11 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     fill($('ov-filter'), filterBar('overview'));
     const open = data.tasks.filter((t) => t.available && inPath(t.project) && (!state.project || t.project === state.project)).reduce((n, t) => n + t.active.length + t.backlog.length, 0);
     const usage = rows.filter((r) => r.tokensIn !== null).length;
-    fill($('ov-metrics'), metric('Projects', fmt(new Set(rows.map((r) => r.project)).size), 'with sessions in range'), metric('Sessions', fmt(rows.length)),
+    const projects = new Set(rows.filter((r) => r.source !== 'synced').map((r) => r.project)).size;
+    const syncedCount = rows.filter((r) => r.source === 'synced').length;
+    fill($('ov-metrics'), metric('Projects', fmt(projects), syncedCount ? syncedNote(syncedCount) : 'with sessions in range'), metric('Sessions', fmt(rows.length)),
       metric('Agents', fmt(new Set(rows.map((r) => r.agent)).size)), metric('Tokens', usage ? short(sum(rows, tokens)) : '—', `${usage}/${rows.length} with usage`),
-      metric('Elapsed', dur(sum(rows, (r) => r.minutes))), metric('Cost', `$${sum(rows, (r) => r.cost).toFixed(2)}`, 'reported only'), metric('Open tasks', fmt(open)));
+      metric('Elapsed', dur(sum(rows, (r) => r.minutes))), metric('Cost', `$${sum(rows, (r) => r.cost).toFixed(2)}`, 'reported only'), metric('Open tasks', fmt(open), 'Project tasks · not affected by the device filter'));
     const segs = state.path.split('/').filter(Boolean);
     fill($('ov-crumbs'), h('span', { class: 'root' }, ROOT), h('button', { type: 'button', 'aria-current': segs.length ? null : 'true', on: { click: () => set({ path: '', project: '' }) } }, 'all'),
       segs.map((seg, i) => [h('span', {}, '/'), h('button', { type: 'button', 'aria-current': i === segs.length - 1 ? 'true' : null, on: { click: () => set({ path: segs.slice(0, i + 1).join('/'), project: '' }) } }, seg)]),
@@ -349,12 +368,20 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (p !== full) k.project = false;
       k.projects++; kids.set(full, k);
     }
-    for (const r of rows) for (const k of kids.values()) if (k.project ? r.project === k.full : under(r.project, k.full) && r.project !== path()) k.rows.push(r);
+    for (const r of rows.filter((x) => x.source === 'synced')) {
+      const key = `\u0000${r.deviceId}`;
+      const k = kids.get(key) ?? { full: key, seg: `Synced · ${deviceLabel(r.deviceId)}`, project: false, projects: 0, rows: [], synced: true };
+      k.rows.push(r); kids.set(key, k);
+    }
+    for (const r of rows) {
+      if (r.source === 'synced') continue;
+      for (const k of kids.values()) if (!k.synced && (k.project ? r.project === k.full : under(r.project, k.full) && r.project !== path())) k.rows.push(r);
+    }
     const list = [...kids.values()], max = Math.max(1, ...list.map((k) => k.rows.length));
     const last = (k) => k.rows.length ? Math.max(...k.rows.map((r) => r.started)) : null;
     fill($('ov-tree'), dataTable('folders', [
-      str('name', 'Folder / project', (k) => k.seg, (k) => h('button', { type: 'button', class: 'name', on: { click: () => k.project ? set({ project: k.full }) : set({ path: rel(k.full), project: '' }) } }, h('span', { 'aria-hidden': 'true' }, k.project ? '◆ ' : '▸ '), k.seg + (k.project ? '' : '/'))),
-      num('projects', 'Projects', (k) => k.project ? null : k.projects, (k) => k.project ? '—' : String(k.projects)),
+      str('name', 'Folder / project', (k) => k.seg, (k) => k.synced ? h('span', {}, k.seg) : h('button', { type: 'button', class: 'name', on: { click: () => k.project ? set({ project: k.full }) : set({ path: rel(k.full), project: '' }) } }, h('span', { 'aria-hidden': 'true' }, k.project ? '◆ ' : '▸ '), k.seg + (k.project ? '' : '/'))),
+      num('projects', 'Projects', (k) => k.project || k.synced ? null : k.projects, (k) => k.project || k.synced ? '—' : String(k.projects)),
       num('sessions', 'Sessions', (k) => k.rows.length), num('tokens', 'Tokens', (k) => sum(k.rows, tokens)),
       num('minutes', 'Elapsed', (k) => sum(k.rows, (r) => r.minutes), (k) => dur(sum(k.rows, (r) => r.minutes))),
       str('last', 'Last active', last, (k) => last(k) ? day(last(k)) : '—'),
@@ -373,7 +400,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
 
   // ---------- Sessions (global, or locked to the workspace) ----------
   function sessions() {
-    $('ss-intro').textContent = locked() ? `This workspace · ${data?.current ?? ''}` : 'All projects · Claude Code, Codex, Copilot CLI · registry + saved scans';
+    $('ss-intro').textContent = locked() ? `This workspace · ${data?.current ?? ''}` :
+      `${state.device ? deviceLabel(state.device) : 'All devices'} · All projects · local + synced session stats`;
     const labels = document.querySelectorAll('#sessions .metric-group-label');
     // Without data the filter bar stays, so Refresh can collect the first scan.
     if (!data.available) { fill($('ss-filter'), filterBar('sessions')); for (const id of ['ss-metrics', 'ss-insights', 'ss-charts']) fill($(id)); labels.forEach((x) => { x.hidden = true; }); empty($('ss-browse'), noData); return; }
@@ -381,7 +409,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const rows = filtered(), m = rows.filter(measured), n = Math.max(1, m.length); S = makeSplit(rows);
     fill($('ss-filter'), filterBar('sessions'));
     const prompts = sum(m, (r) => r.prompts), answers = sum(m, (r) => r.answers), usage = rows.filter((r) => r.tokensIn !== null).length, costs = rows.filter((r) => r.cost !== null).length;
-    fill($('ss-metrics'), metric('Sessions', fmt(rows.length), `${new Set(rows.map((r) => r.project)).size} projects`),
+    const projects = new Set(rows.filter((r) => r.source !== 'synced').map((r) => r.project)).size;
+    const syncedCount = rows.filter((r) => r.source === 'synced').length;
+    fill($('ss-metrics'), metric('Sessions', fmt(rows.length), `${fmt(projects)} projects${syncedCount ? ` · ${syncedNote(syncedCount)}` : ''}`),
       metric('Elapsed', dur(sum(rows, (r) => r.minutes)), `median ${dur(median(rows.map((r) => r.minutes)))} per session`),
       metric('Tokens', usage ? short(sum(rows, tokens)) : '—', `${usage}/${rows.length} usage coverage`),
       metric('Reported cost', costs ? `$${sum(rows, (r) => r.cost).toFixed(2)}` : '—', `${costs}/${rows.length} cost coverage`));
@@ -414,10 +444,10 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       num('cpa', 'Chars / answer', (g) => { const a = sum(g.rows, (r) => r.answers); return a ? Math.round(sum(g.rows, (r) => r.answerChars) / a) : null; }),
       num('cost', 'Cost', (g) => sum(g.rows, (r) => r.cost), (g) => `$${sum(g.rows, (r) => r.cost).toFixed(2)}`)];
     const labelsOf = (counts) => Object.entries(counts ?? {}).map(([label, c]) => `${label}: ${c}`).join(', ') || '—';
-    const project = str('project', 'Project', (r) => rel(r.project));
+    const project = str('project', 'Project', (r) => r.source === 'synced' ? '—' : rel(r.project));
     const body = {
       sessions: () => dataTable('sessions', [str('title', 'Session', (r) => r.title || r.id), str('started', 'Started', (r) => r.started, (r) => new Date(r.started).toLocaleString()), str('agent', 'Agent', (r) => r.agent),
-        ...(locked() ? [] : [project]), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
+        ...(locked() ? [] : [project, str('device', 'Device', (r) => deviceLabel(r.deviceId))]), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
         num('tin', 'Tokens in', (r) => r.tokensIn), num('tout', 'Tokens out', (r) => r.tokensOut), num('minutes', 'Elapsed', (r) => r.minutes, (r) => dur(r.minutes)),
         num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`)], rows, { sort: 'started' }),
       lengths: () => dataTable('lengths', [str('title', 'Session', (r) => r.title || r.id), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
@@ -427,7 +457,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       agents: () => dataTable('agents', groupCols('Agent'), groupBy(rows, (r) => r.agent), { sort: 'sessions' }),
       models: () => dataTable('models', groupCols('Model'), groupBy(rows, (r) => r.model), { sort: 'sessions' }),
       folders: () => dataTable('folders-s', groupCols('Folder'), groupBy(rows, folderOf), { sort: 'sessions' }),
-      projects: () => dataTable('projects', groupCols('Project'), groupBy(rows, (r) => rel(r.project)), { sort: 'sessions' }),
+      projects: () => dataTable('projects', groupCols('Project'), groupBy(rows, (r) => r.source === 'synced' ? `Synced · ${r.deviceName}` : rel(r.project)), { sort: 'sessions' }),
       outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]),
         str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
         num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),

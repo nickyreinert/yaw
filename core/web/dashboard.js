@@ -113,14 +113,15 @@ async function history(kitRoot, env) {
   return { registry, stored, saved, rows };
 }
 
-// Sessions from other synced devices as registry-like rows. Their identity is the hash, there is no title, branch or
-// project; the device name stands in for the project so they can be filtered and split like any other.
+// Sessions from other synced devices as registry-like rows. Their identity is the hash; they have no title, branch
+// or project path. Keep a synthetic project only as a grouping key and expose the originating device separately.
 function syncedRows(env, own) {
   let list = [];
   try { list = syncedSessions(env); } catch { return []; }
   const iso = (ms) => Number.isFinite(ms) ? new Date(ms).toISOString() : null;
   return list.filter((s) => !own.has(s.key)).map((s) => ({
     id: `synced:${s.key.slice(0, 24)}`, agent: s.agent || 'Unknown', project: `synced · ${s.device}`, model: s.model || 'Unknown', title: '', branch: '', source: 'synced',
+    deviceId: s.deviceId, deviceName: s.device,
     started: iso(s.started), ended: s.started != null && s.minutes != null ? iso(s.started + s.minutes * 60000) : null,
     tokens_in: s.tokens_in, tokens_out: s.tokens_out, cost_usd: s.cost_usd,
     metrics: s.prompts == null && s.answers == null ? null : { prompts: s.prompts, answers: s.answers, promptChars: s.promptChars, answerChars: s.answerChars,

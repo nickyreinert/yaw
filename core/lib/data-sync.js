@@ -235,7 +235,7 @@ export function syncedSessions(env) {
     if (id === me) continue;
     for (const row of d.rows ?? []) {
       const old = rows.get(row.key);
-      if (!old || (row.prompts ?? 0) + (row.answers ?? 0) > (old.prompts ?? 0) + (old.answers ?? 0)) rows.set(row.key, { ...row, device: d.name });
+      if (!old || (row.prompts ?? 0) + (row.answers ?? 0) > (old.prompts ?? 0) + (old.answers ?? 0)) rows.set(row.key, { ...row, deviceId: id, device: d.name });
     }
   }
   return [...rows.values()];

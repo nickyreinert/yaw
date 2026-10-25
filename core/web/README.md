@@ -6,8 +6,8 @@
 | --- | --- |
 | Overview | Current workspace: session counts, reported tokens, elapsed time, task count, configuration, activity |
 | Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
-| Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project |
-| Sessions | Workspace (locked to the project) and Global; sticky folder/project/agent/model/period filter; usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
+| Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project; device filter for session metrics |
+| Sessions | Workspace (locked to the project) and Global; sticky folder/project/device/agent/model/period filter (device on Global only); usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
 | Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
 | Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply; first setup for a folder without YAW), Files (YAW-written files by purpose, read-only Form/Raw drawer), Review prompts (project overrides). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications, Classification, Review prompts (blueprint) |
 | Tasks | Workspace `TASKS.md`; Global task snapshots filterable by folder/project, linking to each project |
@@ -19,7 +19,18 @@ The default is all history across all projects. The application requests read-on
 
 Native scans cache their metadata for 60 seconds; Refresh rescans. Existing parser bounds apply: up to 20,000 files per agent and lines up to 4 MiB. Symlinked agent-history directories/files are skipped. Missing/unreadable history files do not hide other projects. Full prompt/response objects are parsed transiently by the existing import readers and discarded; only metadata is retained. The UI discloses the scan limit.
 
-Project/agent/model/date filters run before totals, sorting and pagination. All matching rows remain accessible in pages of 50. Sorting supports date, project, agent, model, tokens, duration and cost; unknown numbers sort last in either direction. Aggregates cover the entire selection. Comparisons sort in the client. Activity displays the latest 30 active days; tooltips give UTC dates and counts. Session timestamps use the browser timezone.
+Project/agent/model/date filters run before totals, sorting and pagination.
+Global overview and Global Sessions also have a device selector (**All
+devices** by default, **This device**, or a synced device name); it filters
+every session metric, chart and table, and is kept in the URL. Synced sessions
+have no project path, so the overview groups them by device and project counts
+include only sessions with known project paths. The overview's open-task count
+is project data and is not affected by the device filter. All matching rows
+remain accessible in pages of 50. Sorting supports date, project, agent,
+model, tokens, duration and cost; unknown numbers sort last in either
+direction. Aggregates cover the entire selection. Comparisons sort in the
+client. Activity displays the latest 30 active days; tooltips give UTC dates
+and counts. Session timestamps use the browser timezone.
 
 Missing usage, cost and end times remain unknown; coverage accompanies the totals. Zero reported cost is distinct from missing cost. Tokens include cache input where supplied by the agent; duration is elapsed time rather than active work. Outcome evaluation, cache breakdowns, tool-failure rates and OTel are not collected.
 

@@ -48,9 +48,13 @@ The sidebar has two groups. **Workspace** covers only the selected workspace:
   opening the page does neither.
 
 **Global** spans workspaces. One filter bar, pinned to the top while you
-scroll, drives every card, chart and table on the page: folder, project, agent,
-model, period (7/30/90 days, all, or a From/To range). **Split charts by**
-stacks the charts by agent, model, folder or project; combine it with the
+scroll, drives every session card, chart and table on the page: folder,
+project, device, agent, model, period (7/30/90 days, all, or a From/To range).
+The device selector shows **All devices**, **This device**, and synced device
+names. Synced sessions have no project path; the overview groups them by
+device instead of counting them as projects. The overview's open-task count is
+project data and is not affected by the session device filter. **Split charts
+by** stacks the charts by agent, model, folder or project; combine it with the
 filters, for example one project split by agent.
 
 - **Overview**: totals, a drill-down table of projects by folder, and charts.
@@ -60,8 +64,9 @@ filters, for example one project split by agent.
 - **Sessions**: usage and message-insight cards, then charts (sessions per
   week, duration, prompt and answer length, response time, tokens by model,
   outcomes), then the tables (sessions, lengths and timing, agents, models,
-  folders, projects, outcomes). The sticky filter bar also holds **Refresh**,
-  **Auto** and **Classify**, described below.
+  folders, projects, outcomes). The sessions table distinguishes project from
+  device. The sticky filter bar also holds **Refresh**, **Auto** and
+  **Classify**, described below.
 - **Tasks**: open tasks across projects, filterable by folder and project;
   **Open →** switches the dashboard to that project's Tasks page.
 - **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
@@ -123,12 +128,16 @@ and the destination's `yaw-sync.json`. Unrelated changes merge automatically.
 Run **Refresh** on Sessions, or `yaw sessions scan`, before syncing to update
 saved numerical summaries. Sync never reads native transcripts. Its statistics
 view shows combined totals and a device selector, alongside each device's last
-contribution. Only hashed session IDs and numeric token, cost, prompt/answer
-counts and character sums travel; project paths, titles and message text do not.
+contribution. The Global overview and Sessions views have their own device
+filter; choosing one recalculates every session metric, chart and table for
+that device, while **All devices** combines them. Only hashed session IDs and
+numeric token, cost, prompt/answer counts and character sums travel; project
+paths, titles and message text do not.
 Unknown usage stays unknown. The same session on several devices counts once
 in the combined total, choosing the snapshot with the most messages; divergent
 copies are not combined. Device subtotals can overlap. These totals are shown
-in Sync; existing session charts continue to describe local saved history.
+in Sync; Global overview and Sessions also include other-device sessions and
+let you filter the session metrics by device.
 
 Local sync configuration, device identity and merge state live in the YAW data
 directory (`YAW_HOME`, default `~/.yaw`). Settings and presets retain their

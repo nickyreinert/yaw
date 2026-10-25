@@ -17,6 +17,7 @@ test('session rows: newest first, unknown values stay null, no undated rows', ()
   assert.equal(out.total, 4); assert.equal(out.undated, 1); assert.equal(out.limited, false);
   const [three, one, two] = out.rows;
   assert.equal(three.model, 'Unknown'); assert.equal(three.minutes, null); assert.equal(three.tokensIn, null); assert.equal(three.prompts, null); assert.equal(three.source, 'hook');
+  assert.equal(three.deviceId, 'local'); assert.equal(three.deviceName, 'This device');
   assert.equal(one.minutes, 60); assert.equal(one.cost, null); assert.equal(one.started, Date.parse('2026-10-23T10:00:00Z'));
   assert.equal(one.medianResp, 2.3); assert.equal(one.answerChars, 900); assert.equal(one.outcome, 'fulfilled', 'a confident label wins over unknown');
   assert.equal(two.cost, 0, 'a reported zero is known'); assert.equal(two.source, 'import'); assert.equal(two.evaluation, null);

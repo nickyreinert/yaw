@@ -169,6 +169,10 @@ test('sessions of another device reach the Sessions data with start time, agent 
   const synced = data.rows.filter((r) => r.source === 'synced');
   assert.equal(synced.length, 1);
   assert.deepEqual([synced[0].agent, synced[0].project, synced[0].minutes, synced[0].model], ['claude', 'synced · PC', 30, 'opus']);
+  assert.match(synced[0].deviceId, /^[a-f0-9-]{36}$/);
+  assert.equal(synced[0].deviceId, syncedSessions(a)[0].deviceId);
+  assert.equal(synced[0].deviceName, 'PC');
+  assert.equal(data.rows.find((r) => r.source !== 'synced').deviceId, 'local');
   assert.equal(data.history.synced, 1);
 });
 test('a vault written by an older version (rows without start time) is still accepted', () => {
