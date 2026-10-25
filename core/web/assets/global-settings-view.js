@@ -3,6 +3,7 @@
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
+import { RADIO_MAX, choiceField } from './setup-cards.js';
 
 const $ = (id) => document.getElementById(id);
 const TABS = ['interview', 'files', 'notifications', 'classification', 'review', 'sync'];
@@ -123,8 +124,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     box.append(actions, out); root.append(box, presetsCard());
   }
   function question(q) {
-    const multi = q.type === 'multi', wrap = el(multi ? 'fieldset' : 'label', null, 'interview-question');
-    const head = el(multi ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(code(q.id)); head.lastChild.className = 'small muted'; wrap.append(head);
+    const multi = q.type === 'multi', radios = q.type === 'boolean' || (q.type === 'choice' && (q.choices ?? []).length <= RADIO_MAX);
+    const wrap = el(multi || radios ? 'fieldset' : 'label', null, 'interview-question');
+    const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(code(q.id)); head.lastChild.className = 'small muted'; wrap.append(head);
     const value = answers[q.id] ?? q.default;
     const set = (v) => { answers[q.id] = v; changed(); };
     if (multi) {
@@ -136,9 +138,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       }
       wrap.append(box);
     } else if (q.type === 'choice' || q.type === 'boolean') {
-      const sel = el('select'), choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices ?? [];
-      for (const c of choices) { const o = el('option', choiceLabel(c)); o.value = String(choiceValue(c)); o.disabled = !available(c); sel.append(o); }
-      sel.value = String(value); sel.addEventListener('change', () => set(q.type === 'boolean' ? sel.value === 'true' : sel.value)); wrap.append(sel);
+      const choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices ?? [];
+      wrap.append(choiceField({ name: `gs-${q.id}`, id: `gs-${q.id.replaceAll('.', '-')}`, choices, value: String(value), label: q.label,
+        onChange: (v) => set(q.type === 'boolean' ? v === 'true' : v) }).node);
     } else if (q.type === 'number') {
       const i = el('input'); i.type = 'number'; i.step = 'any'; i.value = String(value ?? ''); i.addEventListener('input', () => set(i.value === '' ? q.default : Number(i.value))); wrap.append(i);
     } else {

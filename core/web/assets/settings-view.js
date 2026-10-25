@@ -1,7 +1,7 @@
 // Settings (Interview | Files | Review prompts) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
 import { available, choiceLabel, choiceValue, defaultModules, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
-import { CARD_QUESTIONS, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -252,10 +252,10 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
       root.append(warn);
     }
     const setup = el('div', null, 'card interview-setup');
-    const depth = el('select'); for (const m of ['quick', 'full']) { const o = el('option', m === 'quick' ? 'Quick' : 'Full'); o.value = m; depth.append(o); }
-    depth.value = state.mode === 'full' ? 'full' : 'quick'; depth.addEventListener('change', () => { state.mode = depth.value; changed(true); });
-    const label = (text, node) => { const l = el('label', text); l.append(node); return l; };
-    setup.append(label('Setup depth', depth));
+    const depth = choiceField({ name: 'interview-depth', id: 'interview-depth', label: 'Setup depth', value: state.mode === 'full' ? 'full' : 'quick',
+      choices: [{ value: 'quick', label: 'Quick' }, { value: 'full', label: 'Full' }], onChange: (m) => { state.mode = m; changed(true); } });
+    const depthBox = el('fieldset', null, 'interview-question'); depthBox.append(el('legend', 'Setup depth'), depth.node);
+    setup.append(depthBox);
     const answers = effectiveAnswers(interview.questions, state.answers, state.mode);
     const stackBox = el('div', null, 'interview-stack'); stackBox.id = 'interview-stack';
     const stack = renderStack(stackBox, { profiles: interview.profiles, questions: interview.questions, answers,
@@ -263,24 +263,30 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     stackValid = stack.valid;
     const stackCard = el('section', null, 'card interview-section'); stackCard.append(el('h2', 'Your stack'), stackBox);
     const modsBox = el('div'); modsBox.id = 'interview-modules';
+    // Questions of module cards are asked inside the card, under the module switch.
+    const visible = new Set(visibleQuestions(interview.questions, state.answers, state.mode, state.modules).map((q) => q.id));
+    const cardQuestions = new Map();
+    for (const q of interview.questions.filter((x) => visible.has(x.id) && isInline(x))) cardQuestions.set(q.owner, [...(cardQuestions.get(q.owner) ?? []), question(q)]);
     renderModuleGroups(modsBox, {
       modules: interview.modules, selected: state.modules, answers, questions: interview.questions, compact,
       gitRepo: interview.gitRepo, gitInit: state.gitInit, usesGitHub: answers['tasks.use-github'] !== false,
+      questionNodes: (name) => cardQuestions.get(name) ?? [],
       onToggle: (name, on) => { state.modules = toggleModules(interview.modules, state.modules, name, on); changed(true); },
       onAnswer: (id, value) => { state.answers[id] = value; changed(true); },
-      onGitInit: (on) => { state.gitInit = on; if (!on && state.modules.includes('git-hooks')) state.modules = toggleModules(interview.modules, state.modules, 'git-hooks', false); changed(true); },
       onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderInterview(); },
       onPreset: (kind) => { state.modules = defaultModules(interview.modules, interview.questions, state.answers, kind); changed(true); },
     });
     const modCard = el('section', null, 'card interview-section'); modCard.append(el('h2', 'What YAW adds to your project'), modsBox);
     root.append(setup, stackCard, modCard);
-    const visible = new Set(visibleQuestions(interview.questions, state.answers, state.mode, state.modules).map((q) => q.id));
     const sections = new Map();
     const titles = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
-    for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id))) {
+    for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id) && !isInline(x))) {
       const key = q.id.split('.')[0];
       if (!sections.has(key)) { const s = el('section', null, 'card interview-section'); s.append(el('h2', titles[key] ?? key)); sections.set(key, s); root.append(s); }
       sections.get(key).append(question(q));
+      // Creating the repository is asked next to "Use GitHub for the repo?": same context.
+      if (q.id === 'tasks.use-github') sections.get(key).append(gitInitControl({ gitRepo: interview.gitRepo, gitInit: state.gitInit,
+        onGitInit: (on) => { state.gitInit = on; if (!on && state.modules.includes('git-hooks')) state.modules = toggleModules(interview.modules, state.modules, 'git-hooks', false); changed(true); } }));
     }
     const actions = el('div', null, 'interview-actions'), status = el('p', '', 'small muted'); status.id = 'interview-status'; status.setAttribute('role', 'status');
     const blocked = interview.folder?.confirm && !state.confirmFolder;
@@ -293,8 +299,9 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     if (previewed) renderPreview(previewed.result);
   }
   function question(q) {
-    const wrap = el(q.type === 'multi' ? 'fieldset' : 'label', null, 'interview-question');
-    const head = el(q.type === 'multi' ? 'legend' : 'span', q.label.replace(' (comma-separated)', ''));
+    const radios = q.type === 'boolean' || (q.type === 'choice' && q.choices.length <= RADIO_MAX);
+    const wrap = el(q.type === 'multi' || radios ? 'fieldset' : 'label', null, 'interview-question');
+    const head = el(q.type === 'multi' || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', ''));
     head.append(el('code', q.id, 'small muted')); wrap.append(head);
     const value = state.answers[q.id] ?? q.default;
     const set = (v) => { state.answers[q.id] = v; changed(true); };
@@ -307,9 +314,9 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
       }
       wrap.append(box);
     } else if (q.type === 'choice' || q.type === 'boolean') {
-      const s = el('select'), choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices;
-      for (const c of choices) { const o = el('option', choiceLabel(c)); o.value = String(choiceValue(c)); o.disabled = !available(c); s.append(o); }
-      s.value = String(value); s.addEventListener('change', () => set(q.type === 'boolean' ? s.value === 'true' : s.value)); wrap.append(s);
+      const choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices;
+      wrap.append(choiceField({ name: q.id, id: `iq-${q.id.replaceAll('.', '-')}`, choices, value: String(value), label: q.label,
+        onChange: (v) => set(q.type === 'boolean' ? v === 'true' : v) }).node);
     } else if (q.type === 'number') {
       const i = el('input'); i.type = 'number'; i.step = 'any'; i.value = String(value ?? ''); i.addEventListener('input', () => set(i.value === '' ? q.default : Number(i.value))); wrap.append(i);
     } else {
@@ -321,7 +328,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   // Visibility depends on answers, depth and modules; re-render then, but keep focus for typing.
   function changed(rerender = false) {
     const apply = $('interview-apply');
-    if (rerender) { const id = document.activeElement?.closest?.('.interview-question')?.querySelector('code')?.textContent; renderInterview(); if (id) [...document.querySelectorAll('.interview-question code')].find((c) => c.textContent === id)?.closest('.interview-question').querySelector('input,select,textarea')?.focus(); return; }
+    if (rerender) { const id = document.activeElement?.closest?.('.interview-question')?.querySelector('code')?.textContent; renderInterview(); if (id) { const box = [...document.querySelectorAll('.interview-question code')].find((c) => c.textContent === id)?.closest('.interview-question'); (box?.querySelector('input[type=radio]:checked') ?? box?.querySelector('input,select,textarea'))?.focus(); } return; }
     if (apply) apply.disabled = (interview.folder?.confirm && !state.confirmFolder) || !previewed || previewed.state !== fingerprint();
     if (previewed && previewed.state !== fingerprint()) $('interview-status').textContent = 'Changed since the preview; preview again before applying.';
   }

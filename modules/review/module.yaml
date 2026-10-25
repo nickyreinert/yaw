@@ -5,6 +5,10 @@ description: "Review sub-agents for quality, business logic, UI/UX and feature f
 title: Review agents
 group: quality
 what: "Sub-agents that look at a change from a non-technical angle. They only read and report; they never edit. Run them on request, get a hint when work is done, or make them the gate before a push."
+adds:
+  - "Four read-only review agents: quality, business logic, UI / UX, feature fit"
+  - "Optional gate before git push"
+  - "Hint when a task is done"
 example: { when: "You push 3 commits", run: "git push", then: "quality and business-logic reviewers run first; findings stop or warn before the push." }
 cost: "Reviews use model tokens only when they run; results are cached per commit. The push gate needs git and an agent CLI (claude, codex or copilot)."
 depends: [core]

@@ -39,14 +39,14 @@
   <div class="wizard-main">
     <form id="setup">
       <fieldset id="setup-depth" tabindex="-1"><legend>Setup depth</legend><div class="depth-options"><label class="depth-card"><input type="radio" name="mode" value="quick" checked><span><strong>Quick start</strong><span>Get the essentials in place for a prototype or MVP.</span></span></label><label class="depth-card"><input type="radio" name="mode" value="full"><span><strong>Full setup</strong><span>Configure all tools that fit a long-lived project.</span></span></label></div></fieldset>
-      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Preset</h2><label for="prefill">Choose a preset</label><div class="inline-control"><select id="prefill"><option value="new">New setup</option></select><button id="load" type="button">Load</button></div></section>
+      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Preset</h2><p id="prefill-label" class="field-label">Choose a preset</p><div id="prefill" class="prefill-field"></div><div class="inline-control"><button id="load" type="button">Load</button></div></section>
       <div id="questions"></div>
       <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Your stack</h2><div id="stack-cards"></div></section>
       <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">What YAW adds to your project</h2><div id="modules"></div></section>
       <section id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Review &amp; apply</h2><div id="summary" aria-live="polite"></div><p id="verify-note" class="small muted"></p><div class="actions"><button type="button" id="draft" disabled>Save draft</button><button type="button" id="preset" disabled>Save preset</button><button type="button" id="diff" disabled hidden>Inspect file diff</button><button type="button" id="apply" class="primary" disabled>Apply</button></div></section>
-      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
+      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="back-to-review" hidden>Back to review</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
     </form>
-    <section id="diff-panel" hidden aria-labelledby="diff-title"><h2 id="diff-title" tabindex="-1">File diff</h2><pre id="diff-output"></pre></section><section id="log-panel" hidden aria-labelledby="log-title"><h2 id="log-title" tabindex="-1">Apply log</h2><pre id="log" role="log" aria-live="polite"></pre></section>
+    <section id="diff-panel" hidden aria-labelledby="diff-title"><h2 id="diff-title" tabindex="-1">File diff</h2><pre id="diff-output"></pre></section><section id="finished" hidden aria-labelledby="finished-title"><h2 id="finished-title" tabindex="-1">Finished</h2><p id="finished-status" role="status"></p><div id="next-steps" hidden><h3>What you can do now</h3><ul id="next-list"></ul></div><details id="log-details" open><summary>Apply log</summary><pre id="log" role="log" aria-live="polite"></pre></details></section>
   </div>
   </div>
 </section>
@@ -114,7 +114,7 @@
   <dialog id="apply-dialog" aria-labelledby="apply-title">
     <form method="dialog">
       <h2 id="apply-title">Apply these files?</h2>
-      <p>This writes the reviewed setup to the project and runs verification unless --skip-verify was explicitly supplied. If any new secret value is saved, automatic verification is skipped because project recipes could read .env; review those recipes before running them. This does not save a preset or user profile.</p>
+      <ul id="apply-facts" class="plain-bullets"></ul>
       <div id="secret-fields" hidden></div>
       <button value="cancel">Cancel</button><button value="apply">Apply now</button>
     </form>

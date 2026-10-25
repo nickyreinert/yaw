@@ -71,6 +71,8 @@ function setInterviewFocus(on) {
     button.setAttribute('aria-label', on ? 'Focus mode on' : 'Focus mode off');
   });
 }
+// After apply the server has stopped; there is nothing left to focus on.
+export function setInterviewDone(on) { document.body.classList.toggle('interview-done', on); }
 export function showView(hash, focus = true) {
   let [route, query = ''] = String(hash).split('?');
   route = ALIASES[route] ?? route;

@@ -4,6 +4,9 @@ description: Renders the user profile (length, register, examples, explanation, 
 title: How the agent talks to you
 group: basics
 what: "Answer length, tone, examples and explanations, taken from your personal profile."
+adds:
+  - "Notes in AGENTS.md: answer length, wording, examples, explanations"
+  - "A Claude output style when you leave the defaults"
 example: { when: "Profile: short, in German, explain choices", then: "\"Ich nehme SQLite, weil die Daten lokal bleiben.\"" }
 depends: [core]
 default: { quick: true, standard: true, full: true }
@@ -24,7 +27,7 @@ questions:
     scope: user
     mode: S
     type: choice
-    label: Which register should the agent use?
+    label: How technical should the agent's wording be?
     choices:
       - { value: plain, label: Plain words }
       - { value: professional, label: Professional }

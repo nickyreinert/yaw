@@ -4,6 +4,10 @@ description: .env.example, git-ignored .env files, `just setup` creating .env fr
 title: Local settings & secrets
 group: basics
 what: ".env.example with the names your project needs, a git-ignored .env, and `just setup` to create it. Docker files only when the stack ships them."
+adds:
+  - ".env.example with the names your project needs"
+  - "Git-ignored .env, created by just setup"
+  - "Dockerfile and compose.yaml when the stack ships them"
 example: { when: "New computer", run: "just setup", then: ".env is created from the example; you fill in the values." }
 depends: [core]
 default: { quick: true, standard: true, full: true }

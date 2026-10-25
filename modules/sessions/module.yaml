@@ -5,6 +5,10 @@ description: Registry of agent sessions (title from the active task, tasks, comm
 title: Session history
 group: memory
 what: "Remembers which agent session worked on which task, commits and files, so you can find and resume them. Also imports your past sessions."
+adds:
+  - "Registry of which session worked on which task and commit"
+  - "/handoff skill for long sessions"
+  - "Import of your past sessions"
 example: { when: "You ask", run: "yaw sessions for \"CSV export\"", then: "3 sessions, the last one yesterday in Codex; yaw sessions resume opens it." }
 cost: "Personal database in ~/.yaw (not in the repo); a tiny hook at session start and end. Nothing leaves your computer."
 depends: [core]

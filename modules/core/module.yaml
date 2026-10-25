@@ -4,6 +4,10 @@ description: AGENTS.md, CLAUDE.md, .gitignore, justfile and the manifest.
 title: Project rules
 group: basics
 what: "One rules file every agent reads (AGENTS.md, CLAUDE.md), a justfile with check and test recipes, and a .gitignore."
+adds:
+  - "AGENTS.md and CLAUDE.md: one rules file for every agent"
+  - "justfile with check and test recipes"
+  - ".gitignore"
 example: { when: "You type", run: "just check", then: "runs the formatter, linter and tests of your stack, the same way for you and every agent." }
 depends: []
 default: { quick: true, standard: true, full: true }

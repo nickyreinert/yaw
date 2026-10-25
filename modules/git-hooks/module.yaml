@@ -4,6 +4,9 @@ description: lefthook pre-commit (format, lint, gitleaks scan of the staged chan
 title: Checks before every commit
 group: quality
 what: "Formats, lints and scans the staged changes for secrets on every commit, for you and every agent."
+adds:
+  - "Formatting, linting and a secret scan before every commit"
+  - "Same checks for you and every agent"
 example: { when: "A commit contains an API key", then: "stopped: \"gitleaks: 1 leak found in config.js\"." }
 cost: "Needs a git repository and lefthook (installed with `just hooks-install`)."
 depends: [core]

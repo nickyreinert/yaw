@@ -11,6 +11,13 @@
     "title": { "description": "Friendly name in the setup (ADR-0054), e.g. Safety guard.", "type": "string", "minLength": 1, "maxLength": 40 },
     "group": { "description": "Setup group of the module card.", "enum": ["basics", "memory", "quality", "github", "comfort"] },
     "what": { "description": "What you get, in plain words (one or two sentences).", "type": "string", "minLength": 1, "maxLength": 300 },
+    "adds": {
+      "description": "What the module adds, as short bullet points for the review step.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "minItems": 1,
+      "maxItems": 6
+    },
     "example": {
       "description": "A small example: a situation, an optional command, and what happens.",
       "type": "object",

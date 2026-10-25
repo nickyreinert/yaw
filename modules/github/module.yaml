@@ -4,6 +4,10 @@ description: GitHub recipes, issue forms and planning skills, a PR template and 
 title: GitHub workflow
 group: github
 what: "Issue forms, a pull-request template and planning skills, so the agent can turn a plan into issues."
+adds:
+  - "Issue forms: feature, bug, chore, spike, epic"
+  - "Pull-request template"
+  - "Planning skills: issue-create, issue-triage, epic-plan"
 example: { when: "You ask", run: "\"split this plan into issues\"", then: "5 issues with labels, ready to review." }
 depends: [core]
 default: { quick: false, standard: true, full: true }

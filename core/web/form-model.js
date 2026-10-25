@@ -165,16 +165,16 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
         : current === null ? (entry ? 'missing' : 'create')
           : d.managed === false || entry?.managed === false ? 'kept'
             : entry && hashContent(current) === entry.hash ? (hashContent(d.content) === entry.hash ? 'kept' : 'update') : 'kept';
-      return { path, bytes: Buffer.byteLength(d.content), managed: d.managed !== false, action };
+      return { path, module: d.module ?? 'core', bytes: Buffer.byteLength(d.content), managed: d.managed !== false, action, excerpt: excerpt(path, d.content) };
     });
     if (edit) for (const entry of manifest.files) {
       if (entry.path === ANSWERS || desired.has(entry.path)) continue;
       const current = readProjectFile(root, entry.path);
-      files.push({ path: entry.path, bytes: null, managed: entry.managed,
+      files.push({ path: entry.path, module: entry.module ?? 'core', bytes: null, managed: entry.managed,
         action: entry.managed && current !== null && hashContent(current) === entry.hash ? 'delete' : 'kept' });
     }
-    files.push({ path: ANSWERS, bytes: Buffer.byteLength(result.text), managed: true, action: 'write' });
-    files.push({ path: MANIFEST, bytes: null, managed: true, action: 'write' });
+    files.push({ path: ANSWERS, module: 'core', bytes: Buffer.byteLength(result.text), managed: true, action: 'write', excerpt: excerpt(ANSWERS, result.text) });
+    files.push({ path: MANIFEST, module: 'core', bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
     const visible = result.selected.filter((q) => (sections.length || (asksIn(q.mode, result.doc.mode) &&
@@ -242,7 +242,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return {
       kit: kitVersion(kitRoot),
       profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
-      modules: definitions.map(({ name, title, group, what, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', what: what ?? null, description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
+      modules: definitions.map(({ name, title, group, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
       gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
         let help = '';
@@ -261,6 +261,20 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   }
   return { bootstrap, normalize, preview, prefill, definitions, secretCatalog, initial, sectionNames, assertUnchanged };
 }
+
+// First lines of a rendered file for the review step. Secret files and binary content are never shown.
+const EXCERPT_LINES = 30, EXCERPT_CHARS = 1800;
+export function excerpt(path, content) {
+  if (/(^|\/)\.env/.test(path)) return null;
+  const text = Buffer.isBuffer(content) ? content.toString('utf8') : String(content);
+  if (text.includes('\0')) return null;
+  const lines = text.split('\n');
+  const head = lines.slice(0, EXCERPT_LINES).join('\n');
+  return head.length > EXCERPT_CHARS || lines.length > EXCERPT_LINES ? `${head.slice(0, EXCERPT_CHARS).trimEnd()}\n…` : head;
+}
+// The rules a module adds to AGENTS.md (the "pre-prompt notes"), one short line each.
+const ruleLines = (text) => String(text ?? '').split('\n').map((l) => l.replace(/^\s*-\s*/, '').trim()).filter(Boolean)
+  .map((l) => l.length > 150 ? `${l.slice(0, 147)}…` : l);
 
 // A valid unified diff with whole-file context, deliberately in memory (no scratch files).
 export function fullFileDiff(path, before, after) {

@@ -5,6 +5,10 @@ description: Decision journal in .decisions/ (ADRs and security / business-logic
 title: Decision journal
 group: memory
 what: "Records why things are the way they are (.decisions/) and reminds the agent when a task touches an earlier decision."
+adds:
+  - ".decisions/ journal: decisions and risk notices"
+  - "Hint when a task touches an earlier decision"
+  - "Critical decisions shown at session start"
 example: { when: "March: \"SQLite, not Postgres\"", then: "in June the agent proposes Postgres; YAW first shows ADR-0007 with your reason." }
 depends: [core]
 default: { quick: false, standard: true, full: true }

@@ -7,6 +7,10 @@ description: "Team mode: no change without an issue (lefthook commit-msg and pre
 title: Team rules
 group: github
 what: "No change without an issue; the agent is told your open issues and pull requests at session start."
+adds:
+  - "Rule: no change without an issue"
+  - "Open issues and pull requests shown at session start"
+  - "Push guard for the default branch and a pull-request policy check"
 example: { when: "A commit without #12", run: "git push", then: "rejected: \"link an open issue\"." }
 depends: [tasks, github, git-hooks]
 default: { quick: false, standard: { team: true }, full: { team: true } }

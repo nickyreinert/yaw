@@ -4,6 +4,9 @@ description: Baseline coding, security, testing, review and git standards in doc
 title: Coding standards
 group: basics
 what: "A short docs/standards.md the agent follows: tests, reviews, git style, plus the rules of your stack."
+adds:
+  - "docs/standards.md: tests, reviews, git style"
+  - "The rules of your stack"
 example: { when: "Agent writes a new function", then: "it adds a test for it, because the standards say so." }
 depends: [core]
 default: { quick: true, standard: true, full: true }

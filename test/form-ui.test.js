@@ -35,7 +35,28 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   for (const redundant of ['6 steps · Preview before apply', 'Modules can be added later.', 'Starting answers', 'Loading replaces the current answers.', 'Preview only. Unreviewed questions use the documented defaults.']) {
     assert.ok(!html.includes(redundant) && !app.includes(redundant), redundant);
   }
-  assert.match(app, /module-plan/);
+  const review = readFileSync(join(KIT_ROOT, 'core/web/assets/review-step.js'), 'utf8');
+  const cards = readFileSync(join(KIT_ROOT, 'core/web/assets/setup-cards.js'), 'utf8');
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  // Review: bullet lists with a jump to where each item is configured and a file preview, no scroll area.
+  assert.match(review, /review-adds/);
+  assert.match(review, /ctx\.jump\(\{ module: name \}\)/);
+  assert.match(review, /review-file/);
+  assert.ok(!/#summary ul \{[^}]*overflow/.test(css));
+  assert.match(css, /\.review-file pre \{ max-height: none; overflow: visible/);
+  // Finished is the seventh step: log, what to do next, no focus switch, nothing to go back to.
+  assert.match(app, /title: 'Finished'/);
+  assert.match(html, /id="next-list"/);
+  assert.match(app, /setInterviewDone\(true\)/);
+  assert.match(css, /body\.interview-done \.focus-toggle \{ display: none/);
+  assert.ok(!html.includes('id="log-panel"'));
+  // Radio buttons up to five choices; the git question sits next to "Use GitHub"; module questions live in their card.
+  assert.match(cards, /RADIO_MAX = 5/);
+  assert.ok(!cards.includes("el('select', { id, disabled"));
+  assert.ok(!app.includes("element('select'"));
+  assert.match(app, /q\.id === 'tasks\.use-github'/);
+  assert.ok(!cards.includes('No git repository yet: create one') || /gitInitControl/.test(cards));
+  assert.match(cards, /INLINE_OWNERS = new Set\(\['communication', 'comfort', 'team'\]\)/);
   assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
   assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
@@ -70,9 +91,11 @@ test('web model: schema catalogue, local help, ownership and phase-3 choices', (
   assert.match(c.questions.find((q) => q.id === 'user.expertise').helpText, /does not change security rules/i);
   assert.match(c.questions.find((q) => q.id === 'user.autonomy').helpText, /does not override tool permissions/i);
   assert.match(c.questions.find((q) => q.id === 'user.comfort').helpText, /optional helpers for you while coding/i);
-  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
-  assert.match(css, /#setup #wrap-q-user-comfort > label \{ display: flex; width: 100%/);
-  assert.match(css, /#setup #wrap-q-user-comfort \{ grid-template-columns: 1fr; \}/);
+  const comm = c.modules.find((m) => m.name === 'communication');
+  assert.ok(c.modules.every((m) => m.adds.length > 0), 'every module lists what it adds');
+  assert.ok(comm.adds.length > 0);
+  assert.match(c.modules.find((m) => m.name === 'comfort').adds.join(' '), /Telegram/);
+  assert.ok(!c.questions.some((q) => /register/i.test(q.label)));
   assert.ok(c.questions.some((q) => q.owner === 'team'));
   assert.match(c.agents.copilot.note, /recall/);
   assert.ok(c.profiles.some((p) => p.name === 'node-cli'));

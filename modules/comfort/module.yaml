@@ -5,7 +5,12 @@ name: comfort
 description: "Comfort features that cost no model tokens: session hygiene hints, a Claude status line (task, context, cache, last `just check`) and notifications after long runs; personal, switchable with `yaw hygiene`."
 title: Comfort
 group: comfort
-what: "Small personal helpers: a status line, context hints (\"context is 80% full: run /handoff\") and notifications after long runs."
+what: "Small personal helpers: a status line, context hints (\"context is 80% full: run /handoff\") and notifications after long runs (terminal, ntfy, Telegram)."
+adds:
+  - "Status line in Claude Code: task, context, cache, last check"
+  - "Session hygiene hints (/handoff, /clear)"
+  - "Notifications after long runs: terminal, ntfy, Telegram"
+  - "Personal: no model tokens; channels are set under Global → Settings → Notifications"
 example: { when: "Context is 80% full", then: "\"run /handoff, then /clear\" appears for you, not for the model." }
 cost: "No model tokens; personal, switch them with `yaw hygiene`."
 depends: [core]
@@ -23,7 +28,7 @@ questions:
     choices:
       - { value: hygiene, label: Session hygiene hints (suggest /handoff and /clear) }
       - { value: status-line, label: "Status line in Claude Code (task, context, cache, last check)" }
-      - { value: notifications, label: Notifications after runs longer than 3 minutes }
+      - { value: notifications, label: "Notifications after runs longer than 3 minutes (terminal, ntfy, Telegram)" }
       - { value: cache-reminder, label: Cache-warmth reminder, phase: 2 }
     default: [hygiene, status-line]
 outputs:

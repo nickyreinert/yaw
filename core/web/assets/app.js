@@ -1,7 +1,8 @@
 import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 
-import { showView, startWorkspace } from './workspace.js';
-import { CARD_QUESTIONS, renderModuleGroups, renderStack } from './setup-cards.js';
+import { showView, startWorkspace, setInterviewDone } from './workspace.js';
+import { CARD_QUESTIONS, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { renderReview } from './review-step.js';
 
 const $ = (id) => document.getElementById(id);
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
@@ -17,12 +18,20 @@ const steps = [
   { title: 'Stack & standards', hint: 'How the project is built', ids: ['stack'], groups: ['arch', 'quality'] },
   { title: 'Your workflow', hint: 'Modules, tasks & collaboration', ids: ['module-section'], groups: null },
   { title: 'Review & apply', hint: 'Inspect what will be written', ids: ['confirm'], groups: [] },
+  { title: 'Finished', hint: 'What happened and what to do next', ids: ['finished'], groups: [] },
 ];
+const LAST = steps.length - 1, REVIEW = LAST - 1, WORKFLOW = steps.findIndex((s) => s.groups === null), STACK = steps.findIndex((s) => s.ids.includes('stack'));
 let stepIndex = 0;
+// edit: answering; applying: the log streams; done: the server has stopped.
+let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
 const belongs = (step, group) => step.groups === null ? !['user', 'idea', 'arch', 'quality'].includes(group) : step.groups.includes(group);
 function renderWizard(focus = false) {
   const step = steps[stepIndex];
+  const finished = step.ids.includes('finished');
+  $('setup').hidden = finished; $('finished').hidden = !finished;
+  if (stepIndex === REVIEW) reviewReturn = false;
+  $('back-to-review').hidden = !reviewReturn || stepIndex >= REVIEW;
   for (const id of ['setup-depth', 'start', 'stack', 'module-section', 'confirm']) $(id).hidden = !step.ids.includes(id);
   for (const [group, section] of sections) section.node.hidden = !section.applicable || !belongs(step, group);
   $('sections').replaceChildren();
@@ -30,15 +39,16 @@ function renderWizard(focus = false) {
     const li = element('li');
     const button = element('button', undefined, { type: 'button' });
     if (i === stepIndex) button.setAttribute('aria-current', 'step');
-    const shown = [...controls.values()].filter((c) => !c.node.hidden && belongs(s, c.q.id.split('.')[0]));
+    const shown = [...controls.values()].filter((c) => !c.node.hidden && !isInline(c.q) && belongs(s, c.q.id.split('.')[0]));
     const reviewed = shown.filter((c) => Object.hasOwn(state.answers, c.q.id)).length;
-    const complete = visitedSteps.has(i) && (!shown.length || reviewed === shown.length);
+    const complete = i === LAST ? phase === 'done' : visitedSteps.has(i) && (!shown.length || reviewed === shown.length);
     button.append(element('span', complete ? '✓' : String(i + 1).padStart(2, '0'), { class: 'step-number', 'aria-hidden': 'true' }));
     button.append(element('strong', s.title));
+    button.disabled = phase === 'edit' ? i === LAST : i !== LAST;
     button.addEventListener('click', () => { stepIndex = i; renderWizard(true); }); li.append(button); $('sections').append(li);
   });
   $('previous-step').disabled = stepIndex === 0;
-  $('next-step-button').hidden = stepIndex === steps.length - 1;
+  $('next-step-button').hidden = stepIndex >= REVIEW;
   const blocked = step.ids.includes('stack') && !stackValid;
   $('next-step-button').disabled = blocked;
   $('next-step-button').title = blocked ? 'Pick a language and a place where it can run' : '';
@@ -49,12 +59,12 @@ function renderWizard(focus = false) {
   }
 }
 function advance() {
-  if (stepIndex === steps.length - 1) return;
+  if (stepIndex >= REVIEW) return;
   if (steps[stepIndex].ids.includes('stack') && !stackValid) return;
   const modules = selectedModules();
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner)), state.answers, state.mode);
   for (const q of visibleQuestions(catalog.questions, state.answers, state.mode, modules)) {
-    if (belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
+    if (!isInline(q) && belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
   }
   visitedSteps.add(stepIndex);
   stepIndex++; update(); renderWizard(true);
@@ -96,9 +106,11 @@ function buildQuestions() {
       sections.set(sectionId, { node: section });
     }
     const id = `q-${q.id.replaceAll('.', '-')}`;
-    const node = element(q.type === 'multi' ? 'fieldset' : 'div', undefined, { class: 'question', id: `wrap-${id}` });
+    const radios = (q.type === 'choice' && q.choices.length <= RADIO_MAX) || q.type === 'boolean';
+    const grouped = q.type === 'multi' || radios;
+    const node = element(grouped ? 'fieldset' : 'div', undefined, { class: 'question', id: `wrap-${id}` });
     const label = q.label.replace(' (comma-separated)', '');
-    node.append(element(q.type === 'multi' ? 'legend' : 'label', label, q.type === 'multi' ? {} : { for: id }));
+    node.append(element(grouped ? 'legend' : 'label', label, grouped ? {} : { for: id }));
     let input;
     const inputs = [];
     if (q.type === 'multi') {
@@ -110,13 +122,9 @@ function buildQuestions() {
         node.append(l); inputs.push(input);
       }
     } else if (q.type === 'choice' || q.type === 'boolean') {
-      input = element('select', undefined, { id, name: q.id });
       const choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices;
-      for (const c of choices) {
-        const option = element('option', `${choiceLabel(c)}${available(c) ? '' : ' — not available yet'}`, { value: choiceValue(c) });
-        option.disabled = !available(c); input.append(option);
-      }
-      node.append(input); inputs.push(input);
+      const field = choiceField({ name: q.id, id, choices, value: String(q.default), label, onChange: () => {} });
+      node.append(field.node); inputs.push(...field.inputs);
     } else {
       input = element(q.type === 'text' ? 'textarea' : 'input', undefined, { id, name: q.id });
       if (q.type === 'text') input.maxLength = 8192;
@@ -131,8 +139,10 @@ function buildQuestions() {
     if (describedBy) inputs.forEach((i) => i.setAttribute('aria-describedby', describedBy));
     const why = q.helpText ? element('details') : null;
     if (why) { why.append(element('summary', 'Why this matters'), element('div', q.helpText, { class: 'help' })); node.append(why); }
-    let capability;
+    let capability, gitHolder;
     if (q.id === 'user.agents') { capability = element('div'); node.append(capability); }
+    // Creating the repository is asked right next to "Use GitHub for the repo?": same context.
+    if (q.id === 'tasks.use-github') { gitHolder = element('div', undefined, { class: 'git-holder' }); node.append(gitHolder); }
     inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : 'change', () => {
       if (q.type === 'multi') state.answers[q.id] = inputs.filter((x) => x.checked && !x.disabled).map((x) => x.value);
       else if (q.type === 'boolean') state.answers[q.id] = i.value === 'true';
@@ -140,8 +150,9 @@ function buildQuestions() {
       else state.answers[q.id] = i.value;
       update();
     }));
-    sections.get(sectionId).node.append(node);
-    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, capability, expertise: null });
+    // Questions of module cards are asked inside the card, under the module switch.
+    if (!isInline(q)) sections.get(sectionId).node.append(node);
+    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, capability, gitHolder, expertise: null });
   }
 
 }
@@ -153,10 +164,14 @@ function renderQuestions() {
   const expertise = answers['user.expertise'] ?? 'intermediate';
   for (const [id, c] of controls) {
     c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id);
+    if (c.gitHolder) {
+      c.gitHolder.replaceChildren(gitInitControl({ gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onGitInit: setGitInit }));
+    }
     c.label.textContent = expertise === 'expert' ? `${c.q.id} — ${c.plainLabel}` : c.plainLabel;
     const value = answers[id] ?? c.q.default;
     for (const input of c.inputs) {
       if (c.q.type === 'multi') input.checked = value.includes(input.value);
+      else if (input.type === 'radio') input.checked = input.value === String(value);
       else if (document.activeElement !== input) input.value = String(value);
     }
     c.hint.hidden = !c.q.hint || expertise === 'expert' && id !== 'user.examples';
@@ -183,7 +198,7 @@ function renderQuestions() {
     }
   }
   for (const [id, s] of sections) {
-    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id));
+    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id) && !isInline(c.q));
     s.applicable = qs.length > 0;
     s.node.hidden = !s.applicable;
   }
@@ -198,19 +213,20 @@ function renderStackStep() {
   });
   stackValid = result.valid;
 }
+function setGitInit(on) {
+  state.gitInit = on;
+  if (!on && selectedModules().includes('git-hooks')) state.modules = toggleModules(catalog.modules, selectedModules(), 'git-hooks', false);
+  update();
+}
 function renderModules() {
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderModuleGroups($('modules'), {
     modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(),
+    questionNodes: (name) => [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && !c.node.hidden).map((c) => c.node),
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
     onAnswer: (id, value) => { state.answers[id] = value; update(); },
-    onGitInit: (on) => {
-      state.gitInit = on;
-      if (!on && selectedModules().includes('git-hooks')) state.modules = toggleModules(catalog.modules, selectedModules(), 'git-hooks', false);
-      update();
-    },
     onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); },
     onPreset: (kind) => {
       let next = defaultModules(catalog.modules, catalog.questions, state.answers, kind);
@@ -219,20 +235,19 @@ function renderModules() {
     },
   });
 }
+// Where a review item is configured: the step and the control to focus.
+const stepFor = (q) => isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, q.id.split('.')[0]));
+function jump(target) {
+  let step, focusId;
+  if (target.stack) { step = STACK; focusId = 'stack-title'; }
+  else if (target.module) { step = WORKFLOW; focusId = `module-${target.module}`; }
+  else { const c = controls.get(target.question); step = stepFor(c.q); focusId = c.inputs[0]?.id; }
+  stepIndex = step; reviewReturn = true; renderWizard();
+  const node = document.getElementById(focusId);
+  if (node) { if (node.tabIndex < 0) node.tabIndex = -1; node.focus(); node.scrollIntoView({ block: 'center', behavior: 'instant' }); }
+}
 function summary(preview) {
-  const root = $('summary'); root.replaceChildren();
-  const modules = new Map(catalog.modules.map((module) => [module.name, module]));
-  const list = element('ul', undefined, { class: 'module-plan' });
-  for (const name of preview.modules) {
-    const module = modules.get(name);
-    if (module) {
-      const item = element('li');
-      const description = (module.what ?? module.description ?? '').split(/[.;]/, 1)[0];
-      item.append(element('strong', module.title ?? name), element('span', description));
-      list.append(item);
-    }
-  }
-  root.append(element('p', `Stack: ${preview.profile}`, { class: 'small muted' }), list);
+  renderReview($('summary'), { preview, modules: catalog.modules, questions: catalog.questions, jump });
 }
 function applySecretFields() {
   const container = $('secret-fields'); container.replaceChildren();
@@ -242,10 +257,10 @@ function applySecretFields() {
     return;
   }
   container.hidden = false;
-  container.append(element('h3', 'Optional local secrets'));
+  container.append(element('h3', 'Optional secrets'));
   container.append(element('p', existingFile
-    ? 'An existing .env is preserved without being read or modified. These values will not be saved.'
-    : 'Values are sent only to this local server, written directly to .env with private permissions, and never added to answers or logs. Leave a field blank to skip it.'));
+    ? 'The existing .env stays as it is; nothing is saved.'
+    : 'Saved only to .env (private permissions). Blank = skip. A saved secret skips the automatic check.'));
   if (existingFile) return;
   for (const name of names) {
     const id = `secret-${name}`;
@@ -256,6 +271,7 @@ function applySecretFields() {
   }
 }
 function update() {
+  const activeId = document.activeElement?.id;
   revision++;
   lastPreview = null;
   error(''); actions(false);
@@ -263,6 +279,8 @@ function update() {
   $('summary').textContent = 'Updating preview…';
   $('diff-panel').hidden = true; $('diff-output').textContent = '';
   renderQuestions(); renderStackStep(); renderModules(); renderWizard();
+  // Cards are rebuilt on every change; keep the keyboard where it was.
+  if (activeId && document.activeElement?.id !== activeId) document.getElementById(activeId)?.focus();
   clearTimeout(timer);
   const current = revision;
   timer = setTimeout(async () => {
@@ -294,15 +312,39 @@ async function perform(name, input = state) {
   } catch (e) { error(e.message); }
   finally { busy = false; actions(Boolean(lastPreview)); }
 }
+const code = (text) => element('code', text);
+const bullet = (...parts) => { const li = element('li'); li.append(...parts.map((p) => typeof p === 'string' ? document.createTextNode(p) : p)); return li; };
+// The last step: outcome, then what the user can do now. The server has stopped by then.
+function finish({ ok, message }) {
+  phase = 'done';
+  setInterviewDone(true);
+  $('finished-status').textContent = message;
+  $('finished-status').className = ok ? 'ok-text' : 'warn';
+  $('log-details').open = !ok;
+  const names = (state.answers['user.agents'] ?? []).map((a) => catalog.agents[a]?.name).filter(Boolean).join(' or ') || 'your coding agent';
+  const list = $('next-list'); list.replaceChildren();
+  if (!ok) list.append(bullet('Fix the problem in the log, then run ', code('just setup && just check'), '.'));
+  list.append(
+    bullet(`Start ${names} in this folder; it reads AGENTS.md.`),
+    bullet(code('yaw web'), ': start the workspace again (overview, sessions, tasks, Settings → Interview).'),
+    bullet('Change answers later: Settings → Interview in the workspace, or ', code('yaw edit'), '.'),
+    bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
+    bullet('This page is disconnected: the local server stopped after applying.'));
+  $('next-steps').hidden = false;
+  status(message);
+  renderWizard(true);
+}
 async function apply() {
   busy = true; actions(false); error('');
-  $('setup').inert = true;
-  $('log-panel').hidden = false; $('log').textContent = ''; $('log-title').focus();
+  phase = 'applying'; stepIndex = LAST;
+  $('log').textContent = ''; $('log-details').open = true; $('next-steps').hidden = true;
+  $('finished-status').className = ''; $('finished-status').textContent = 'Applying… keep this page open.';
+  renderWizard(true);
   status('Applying… keep this page open for the log.');
   let secretValues = Object.fromEntries([...$('secret-fields').querySelectorAll('input[type=password]')]
     .map((input) => [input.name, input.value]).filter(([, value]) => value !== ''));
   for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
-  let completed = false, started = false;
+  let outcome = null, started = false, failure = '';
   try {
     const response = await request('apply', { ...state, secrets: secretValues });
     started = true;
@@ -312,11 +354,8 @@ async function apply() {
       if (!line) return;
       const event = JSON.parse(line);
       if (event.type === 'log') $('log').textContent += event.text;
-      if (event.type === 'error') error(event.message);
-      if (event.type === 'done') {
-        completed = true; status(event.message);
-        if (!event.ok) error(event.message);
-      }
+      if (event.type === 'error') failure = event.message;
+      if (event.type === 'done') outcome = event;
     };
     for (;;) {
       const { value, done } = await reader.read();
@@ -325,15 +364,27 @@ async function apply() {
       lines.forEach(receive);
       if (done) { receive(buffer); break; }
     }
-    if (!completed) throw new Error('Apply did not report completion. Inspect the project and terminal; do not assume it succeeded.');
-  } catch (e) { error(e.message); status(started ? 'Apply did not complete successfully. Inspect the project before retrying.' : 'Apply was rejected before it started. Fix the error and review again.'); }
+    if (!outcome) throw new Error('Apply did not report completion. Inspect the project and terminal; do not assume it succeeded.');
+  } catch (e) { failure = failure || e.message; }
   finally {
     secretValues = null;
-    if (started) status(`${$('status').textContent} The local server closes after apply; ${catalog.editing ? 'run yaw edit to review again.' : 'restart yaw init only if the project is still uninitialized.'}`);
+    if (started) finish(outcome ?? { ok: false, message: failure || 'Apply did not complete successfully. Inspect the project before retrying.' });
     else {
-      busy = false; $('setup').inert = false; actions(Boolean(lastPreview));
+      busy = false; phase = 'edit'; stepIndex = REVIEW; renderWizard(true);
+      error(failure); status('Apply was rejected before it started. Fix the error and review again.');
+      actions(Boolean(lastPreview));
     }
   }
+}
+// "What the dialog does", as short facts.
+function applyFacts() {
+  const written = lastPreview.files.filter((f) => ['create', 'update', 'write', 'missing', 'delete'].includes(f.action)).length;
+  const kept = lastPreview.files.filter((f) => f.action === 'kept').length;
+  const facts = [`Writes ${written} file${written === 1 ? '' : 's'} in this folder${kept ? `; ${kept} kept as they are` : ''}`];
+  if (catalog.skipVerify) facts.push('Skips the check (--skip-verify)');
+  else if (!catalog.editing) facts.push('Then runs just setup and just check');
+  facts.push('The local server stops afterwards; yaw web starts it again');
+  $('apply-facts').replaceChildren(...facts.map((f) => element('li', f)));
 }
 function loadState(next) {
   const { profile: _ignored, ...rest } = next;
@@ -341,6 +392,13 @@ function loadState(next) {
   visitedSteps.clear();
   document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
   update();
+}
+// Where the answers start from. Radio buttons while there are few sources, a dropdown beyond five.
+const prefillOptions = [{ value: 'new', label: 'New setup' }];
+let prefillValue = 'new', prefillLocked = false;
+function renderPrefill() {
+  $('prefill').replaceChildren(choiceField({ name: 'prefill', id: 'prefill-choice', choices: prefillOptions, value: prefillValue,
+    disabled: prefillLocked, label: 'Choose a preset', onChange: (v) => { prefillValue = v; } }).node);
 }
 async function start() {
   const response = await fetch('/api/bootstrap');
@@ -350,24 +408,26 @@ async function start() {
   state.gitInit = !catalog.gitRepo;
   if (catalog.editing) {
     document.title = 'YAW edit setup';
-    $('prefill').append(element('option', 'Current project setup', { value: 'current' }));
-    $('prefill').value = 'current';
+    prefillOptions.push({ value: 'current', label: 'Current project setup' });
+    prefillValue = 'current';
     if (catalog.sections.length) {
       const selected = (q) => catalog.sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
       catalog.questions = catalog.questions.map((q) => selected(q) ? q : { ...q, editHidden: true });
-      for (const id of ['prefill', 'load']) $(id).disabled = true;
+      prefillLocked = true; $('load').disabled = true;
       document.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = true; });
     }
     catalog.questions = catalog.questions.map((q) => Object.hasOwn(catalog.initial.answers, q.id) ? { ...q, default: catalog.initial.answers[q.id] } : q);
   }
   for (const id of ['save-dialog', 'apply-dialog']) installDialogCancellation($(id));
-  if (catalog.hasUserProfile) $('prefill').append(element('option', 'Saved user preferences', { value: 'profile' }));
-  if (catalog.hasDraft) $('prefill').append(element('option', 'Resume project draft', { value: 'draft' }));
-  for (const p of catalog.presets) $('prefill').append(element('option', `Preset / previous project: ${p.name}`, { value: `preset:${p.name}` }));
+  if (catalog.hasUserProfile) prefillOptions.push({ value: 'profile', label: 'Saved user preferences' });
+  if (catalog.hasDraft) prefillOptions.push({ value: 'draft', label: 'Resume project draft' });
+  for (const p of catalog.presets) prefillOptions.push({ value: `preset:${p.name}`, label: `Preset / previous project: ${p.name}` });
+  renderPrefill();
   $('verify-note').textContent = catalog.editing ? '' : catalog.skipVerify ? 'Verification disabled with --skip-verify.' : 'Apply runs just setup and just check.';
   $('diff').hidden = !catalog.editing;
   buildQuestions();
   $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { stepIndex--; renderWizard(true); } });
+  $('back-to-review').addEventListener('click', () => { stepIndex = REVIEW; renderWizard(true); });
   $('next-step-button').addEventListener('click', advance);
   $('setup').addEventListener('keydown', (event) => {
     if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
@@ -383,10 +443,10 @@ async function start() {
   }));
   $('load').addEventListener('click', async () => {
     try {
-      if ($('prefill').value === 'current') loadState(catalog.initial);
-      else if ($('prefill').value === 'new') loadState({ mode: 'quick', answers: {}, modules: null });
+      if (prefillValue === 'current') loadState(catalog.initial);
+      else if (prefillValue === 'new') loadState({ mode: 'quick', answers: {}, modules: null });
       else {
-        const [kind, name] = $('prefill').value.split(':');
+        const [kind, name] = prefillValue.split(':');
         loadState(await (await request('prefill', { kind, ...(name ? { name } : {}) })).json());
       }
     } catch (e) { error(e.message); }
@@ -405,6 +465,7 @@ async function start() {
     $('save-consent').checked = $('save-profile').checked = false;
   });
   $('apply').addEventListener('click', () => {
+    applyFacts();
     applySecretFields();
     $('apply-dialog').returnValue = '';
     $('apply-dialog').showModal();

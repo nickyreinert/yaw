@@ -7,7 +7,7 @@ export const GROUPS = [
   ['memory', 'Remember the work', 'So you and the agent can pick up where you left off, even days later.'],
   ['quality', 'Quality checks & reviews', 'Catch problems before they land: tools check the code, reviewers check the meaning.'],
   ['github', 'GitHub & team', 'Only when the project lives on GitHub.'],
-  ['comfort', 'Comfort', 'Personal helpers. They cost no model tokens.'],
+  ['comfort', 'Comfort', 'Personal helpers on your machine: status line, hints and notifications (terminal, ntfy, Telegram). No model tokens.'],
 ];
 export const REVIEWERS = [
   ['quality', 'Quality', 'Readability, naming, duplication, missing tests and error handling: what a linter cannot judge.', '"parseDate swallows errors; add a test for an empty string."'],
@@ -18,6 +18,11 @@ export const REVIEWERS = [
 export const TRIGGERS = [['off', 'Off'], ['request', 'On request'], ['suggest', 'Suggest when a task is done'], ['push', 'Required before push']];
 // Questions these cards answer; the generic question list hides them.
 export const CARD_QUESTIONS = new Set(['arch.language', 'arch.runs-on', 'quality.review-gate', ...REVIEWERS.map(([k]) => `quality.review-${k}`)]);
+// Modules whose questions are asked inside their own card, under the module switch (no second place to ask).
+export const INLINE_OWNERS = new Set(['communication', 'comfort', 'team']);
+export const isInline = (q) => INLINE_OWNERS.has(q.owner);
+// Radio buttons up to this many choices; a dropdown only beyond it.
+export const RADIO_MAX = 5;
 const HOST_EXTRA = {
   'self-hosted': 'Dockerfile and compose.yaml when the stack ships them',
   serverless: 'the deploy configuration is up to you',
@@ -44,6 +49,39 @@ const shortLabel = (label) => label.split(/ [—(–-] |: /)[0];
 // The profile for a (language, runsOn) pair, or null (ADR-0054: at most one).
 export function profileFor(profiles, language, runsOn) {
   return profiles.find((p) => p.stack?.language?.includes(language) && p.stack?.runsOn?.includes(runsOn)) ?? null;
+}
+
+// One-of-few choices as radio buttons (a dropdown only beyond RADIO_MAX).
+// field: { name, id, choices: [{ value, label, disabled? }], value, disabled, describedBy, label, onChange(value) } -> { node, inputs }
+const pretty = (v) => { const t = String(v).replaceAll('-', ' '); return t[0].toUpperCase() + t.slice(1); };
+export function radioChoices(choices) {
+  return choices.map((c) => typeof c === 'object'
+    ? { value: String(c.value), label: c.label ?? pretty(c.value), disabled: c.phase > 1 || c.disabled === true }
+    : { value: String(c), label: pretty(c), disabled: false });
+}
+export function choiceField({ name, id, choices, value, disabled = false, describedBy, label, onChange }) {
+  const list = radioChoices(choices);
+  if (list.length > RADIO_MAX) {
+    const select = el('select', { id, name, 'aria-label': label, 'aria-describedby': describedBy, disabled, onchange: (e) => onChange(e.target.value) },
+      ...list.map((c) => el('option', { value: c.value, disabled: c.disabled, text: c.label })));
+    select.value = String(value);
+    return { node: select, inputs: [select] };
+  }
+  const longest = Math.max(...list.map((c) => c.label.length));
+  const inputs = list.map((c) => el('input', { type: 'radio', name, value: c.value, id: `${id}-${c.value}`, checked: c.value === String(value),
+    disabled: disabled || c.disabled, 'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
+  const node = el('div', { class: `radios${list.length > 3 || longest > 26 ? ' stacked' : ''}`, role: 'radiogroup', 'aria-label': label },
+    ...list.map((c, i) => el('label', {}, inputs[i], ` ${c.label}${c.disabled ? ' (not available yet)' : ''}`)));
+  return { node, inputs };
+}
+
+// "No git repository yet: create one", asked next to "Use GitHub for the repo?" (same context).
+// ctx: { gitRepo, gitInit, readOnly, onGitInit(on) }
+export function gitInitControl(ctx) {
+  if (ctx.gitRepo) return el('p', { class: 'small git-ok git-init', text: '✓ Git repository found in this folder' });
+  return el('label', { class: 'small git-init', title: 'YAW runs `git init` when it writes the files. Commit checks and the push gate need a repository; you can also do this later with yaw edit.' },
+    el('input', { type: 'checkbox', id: 'git-init', checked: ctx.gitInit, disabled: ctx.readOnly, onchange: (e) => ctx.onGitInit(e.target.checked) }),
+    ' No git repository yet: create one (git init)');
 }
 
 // ---------------------------------------------------------------- stack step
@@ -131,11 +169,7 @@ export function renderModuleGroups(root, ctx) {
       el('button', { type: 'button', disabled: ctx.readOnly, title: 'The basics plus task list and session history: what most projects need.', onclick: () => ctx.onPreset('quick'), text: 'Quick' }),
       el('button', { type: 'button', disabled: ctx.readOnly, title: 'Every module that fits your answers, including commit checks and review agents.', onclick: () => ctx.onPreset('full'), text: 'Everything that fits' })),
     el('label', { class: 'small', title: 'Compact hides the examples and costs, for users who already know the modules.' },
-      el('input', { type: 'checkbox', checked: ctx.compact, onchange: (e) => ctx.onCompact(e.target.checked) }), ' Compact view'),
-    ctx.gitRepo
-      ? el('span', { class: 'small git-ok', text: '✓ Git repository found' })
-      : el('label', { class: 'small', title: 'This folder is not a git repository yet. YAW runs `git init` when it writes the files. Commit checks and the push gate need it; you can also do this later with yaw edit.' },
-        el('input', { type: 'checkbox', checked: ctx.gitInit, disabled: ctx.readOnly, onchange: (e) => ctx.onGitInit(e.target.checked) }), ' No git repository yet: create one (git init)'));
+      el('input', { type: 'checkbox', checked: ctx.compact, onchange: (e) => ctx.onCompact(e.target.checked) }), ' Compact view'));
   const groups = el('div', { class: `module-groups${ctx.compact ? ' compact' : ''}` });
   for (const [id, title, lead] of GROUPS) {
     const mods = ctx.modules.filter((m) => (m.group ?? 'basics') === id);
@@ -153,10 +187,12 @@ function moduleCard(m, ctx, selected, hasGit) {
   const notes = [];
   if (m.appliesTo?.usesGitHub && !ctx.usesGitHub) notes.push('needs GitHub (answer "Use GitHub" with yes)');
   if (m.name === 'git-hooks' && !hasGit) notes.push('needs a git repository');
-  const input = el('input', { type: 'checkbox', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
+  const input = el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
-  const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' ? ' wide' : ''}` },
+  const questions = on ? (ctx.questionNodes?.(m.name) ?? []) : [];
+  const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' || questions.length ? ' wide' : ''}` },
     el('label', { class: 'module-head' }, input, el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
+      el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })),
     el('p', { class: 'what', text: m.what ?? m.description }));
   if (m.example) {
@@ -164,8 +200,13 @@ function moduleCard(m, ctx, selected, hasGit) {
       el('span', { text: ` → ${m.example.then}` })));
   }
   if (m.cost) card.append(el('p', { class: 'cost small muted', text: m.cost }));
+  if (m.rules?.length) {
+    card.append(el('details', { class: 'rules' }, el('summary', { text: `Adds ${m.rules.length} note${m.rules.length === 1 ? '' : 's'} for the agent (AGENTS.md)` }),
+      el('ul', {}, ...m.rules.map((r) => el('li', { text: r })))));
+  }
   if (m.depends?.length && !required) card.append(el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` }));
   for (const n of notes) card.append(el('p', { class: 'small warn-text', text: n }));
+  if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (m.name === 'review') card.append(reviewerGrid(ctx, on, hasGit));
   return card;
 }
@@ -175,18 +216,16 @@ function reviewerGrid(ctx, on, hasGit) {
   const grid = el('div', { class: 'reviewers' });
   for (const [k, title, what, example] of REVIEWERS) {
     const id = `review-${k}`;
-    const select = el('select', { id, disabled: !on || ctx.readOnly, onchange: (e) => ctx.onAnswer(`quality.review-${k}`, e.target.value) });
-    for (const [value, label] of TRIGGERS) {
-      const needsGit = value === 'push' && !hasGit;
-      select.append(el('option', { value, selected: trig(k) === value, disabled: needsGit, text: needsGit ? `${label} (needs git)` : label }));
-    }
+    const { node: select } = choiceField({ name: `review-trigger-${k}`, id, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
+      choices: TRIGGERS.map(([value, label]) => ({ value, label: value === 'push' && !hasGit ? `${label} (needs git)` : label, disabled: value === 'push' && !hasGit })),
+      onChange: (value) => ctx.onAnswer(`quality.review-${k}`, value) });
     grid.append(el('div', { class: `reviewer${trig(k) === 'off' ? ' off' : ''}` },
-      el('label', { for: id }, el('strong', { text: title })), el('p', { class: 'small what', text: what }),
+      el('strong', { text: title }), el('p', { class: 'small what', text: what }),
       el('p', { class: 'small muted example', text: example }), select));
   }
   const wrap = el('div', {}, grid);
   if (!hasGit) {
-    wrap.append(el('div', { class: 'gate muted' }, el('small', { text: 'No git repository: reviews run only on request or as a hint when a task is done. Create the git repository (above, or later with yaw edit) to get the push gate.' })));
+    wrap.append(el('div', { class: 'gate muted' }, el('small', { text: 'No git repository: reviews run only on request or as a hint when a task is done. Create the git repository (next to "Use GitHub for the repo?", or later with yaw edit) to get the push gate.' })));
     return wrap;
   }
   const gated = REVIEWERS.some(([k]) => trig(k) === 'push');

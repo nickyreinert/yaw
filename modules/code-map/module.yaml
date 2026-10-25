@@ -4,6 +4,9 @@ description: Maintained docs/code-map.md (declared areas, generated sections, yo
 title: Code map
 group: memory
 what: "docs/code-map.md: what each part of the code does, kept up to date, so agents find the right files quickly."
+adds:
+  - "docs/code-map.md: what each part of the code does"
+  - "A check in just check that the map is current"
 example: { when: "New folder src/export/", run: "just check", then: "\"code map: src/export is not described yet\"." }
 depends: [core]
 default: { quick: false, standard: true, full: true }
