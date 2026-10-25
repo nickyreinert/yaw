@@ -1,6 +1,7 @@
 import { createSettings, taxonomyEditor } from './settings-view.js';
 import { createGlobal } from './global-view.js';
 import { createGlobalSettings } from './global-settings-view.js';
+import { pickFolder } from './folder-picker.js';
 // Text-node rendering only. Registry and Markdown content are never parsed as HTML or executed.
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -221,24 +222,57 @@ function newRecord() {
   root.append(el('p', knowledgeScope === 'project' ? 'Project records are files in this repository. Secrets are refused. ADRs are created with yaw decisions record.' : 'Personal records live in ~/.yaw/knowledge and are shared by all your projects. Secrets are refused.', 'small muted'), form);
   fields.title.focus();
 }
+// Header project switcher: the current workspace, a search menu (live filter over name and path) and a plus
+// button that adds a project folder (typed or picked with the folder browser).
 async function startProjects() {
-  const box = document.querySelector('.project-switch');
   let list;
   try { const res = await fetch('/api/projects'); if (!res.ok) return; list = await res.json(); } catch { return; }
   if (!workspace || !list.projects.some((p) => p.root === workspace)) workspace = list.current ?? '';
-  const select = el('select'); select.id = 'project-select'; select.setAttribute('aria-label', 'Switch project');
-  for (const p of list.projects) { const o = el('option', p.name); o.value = p.root; o.title = p.root; select.append(o); }
-  select.value = workspace;
-  select.addEventListener('change', () => { workspace = select.value; sessionStorage.setItem('yaw-workspace', workspace); location.reload(); });
-  const add = el('details', null, 'project-add'), input = el('input'); add.append(el('summary', 'Add project folder'));
-  input.placeholder = '/path/to/project'; input.setAttribute('aria-label', 'Project folder path');
-  const status = el('span', '', 'small muted');
-  add.append(input, button('Add', async () => {
-    try { const r = await api('project-add', { path: input.value }); workspace = r.root; sessionStorage.setItem('yaw-workspace', workspace); location.reload(); }
-    catch (e) { status.textContent = e.message; }
-  }), status);
-  box.querySelector('.eyebrow').textContent = 'PROJECT';
-  box.querySelector('.eyebrow').after(select); box.append(add);
+  const box = $('project-switch'), chip = $('project-chip');
+  $('project-search').hidden = false; $('project-add').hidden = false; chip.title = workspace;
+  const choose = (root) => { workspace = root; sessionStorage.setItem('yaw-workspace', workspace); location.reload(); };
+
+  const menu = el('div', null, 'project-menu'), query = el('input'), rows = el('div', null, 'project-rows');
+  query.type = 'search'; query.placeholder = 'Search projects or paths…'; query.setAttribute('aria-label', 'Search projects'); query.autocomplete = 'off';
+  const draw = () => {
+    const words = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const hits = list.projects.filter((p) => { const hay = `${p.name} ${p.root} ${p.root === list.current ? 'pwd launch folder' : ''}`.toLowerCase(); return words.every((w) => hay.includes(w)); });
+    rows.replaceChildren(...(hits.length ? hits.map((p) => {
+      const b = button('', () => choose(p.root), 'project-row'); b.title = p.root;
+      if (p.root === workspace) b.setAttribute('aria-current', 'true');
+      b.append(el('strong', p.name), el('span', p.root, 'small muted'), ...(p.root === list.current ? [el('span', 'PWD', 'pill')] : []));
+      return b;
+    }) : [el('p', 'No project matches.', 'small muted')]));
+  };
+  query.addEventListener('input', draw);
+  query.addEventListener('keydown', (e) => { if (e.code === 'Enter') { e.preventDefault(); rows.querySelector('.project-row')?.click(); } });
+  menu.append(query, rows);
+
+  const add = el('div', null, 'project-menu'), path = el('input'), status = el('p', '', 'small muted');
+  path.placeholder = '/path/to/project'; path.setAttribute('aria-label', 'Project folder path'); path.spellcheck = false;
+  const browse = button('Browse…', async () => {
+    const picked = await pickFolder({ list: (p) => get('browse', p ? { path: p } : {}), start: path.value, title: 'Choose a project folder' });
+    if (picked) path.value = picked;
+  });
+  const submit = button('Add', async () => {
+    try { const r = await api('project-add', { path: path.value }); choose(r.root); } catch (e) { status.textContent = e.message; }
+  }, 'primary');
+  const pathRow = el('div', null, 'inline-control'), actions = el('div', null, 'folder-actions');
+  pathRow.append(path, browse); actions.append(submit);
+  add.append(el('strong', 'Add project folder'), pathRow, actions, status);
+  menu.hidden = add.hidden = true; box.append(menu, add);
+
+  const close = () => { menu.hidden = add.hidden = true; chip.setAttribute('aria-expanded', 'false'); };
+  const open = (which, focus) => {
+    const wasOpen = !which.hidden; close();
+    if (wasOpen) return;
+    which.hidden = false; chip.setAttribute('aria-expanded', 'true'); if (which === menu) { query.value = ''; draw(); } focus.focus();
+  };
+  chip.addEventListener('click', () => open(menu, query));
+  $('project-search').addEventListener('click', () => open(menu, query));
+  $('project-add').addEventListener('click', () => open(add, path));
+  document.addEventListener('click', (e) => { if (!box.contains(e.target)) close(); });
+  box.addEventListener('keydown', (e) => { if (e.code === 'Escape') { close(); chip.focus(); } });
 }
 async function loadKnowledge() {
   const id = ++knowledgeRequest; $('knowledge-error').hidden = true; $('knowledge-status').textContent = 'Reading records…';

@@ -10,12 +10,19 @@ import { enabledModules, readAnswers, requireManifest } from '../render/project.
 import { UsageError } from './commands.js';
 import { task } from './tasks.js';
 
-export function kickoffText({ root, manifest }) {
+// The guide lines and the planning prompt for a project; the terminal and the web UI show the same text.
+export function kickoffParts({ root, manifest }) {
   const doc = readAnswers(root);
   const modules = enabledModules(manifest);
   const mode = tasksMode(doc.answers, { teamModule: modules.includes('team') });
-  const guide = kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') });
-  const prompt = kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode });
+  return {
+    guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
+    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode }),
+  };
+}
+
+export function kickoffText({ root, manifest }) {
+  const { guide, prompt } = kickoffParts({ root, manifest });
   return `Kickoff\n${guide.map((l, i) => `  ${i + 1}. ${l}\n`).join('')}\n----- prompt -----\n${prompt}\n----- end of prompt -----\n`;
 }
 

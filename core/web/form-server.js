@@ -16,6 +16,7 @@ const assets = new Map([
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
   ['/setup-cards.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/setup-cards.js', import.meta.url))]],
+  ['/folder-picker.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/folder-picker.js', import.meta.url))]],
   ['/review-step.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-step.js', import.meta.url))]],
   ['/review-prompts-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-prompts-view.js', import.meta.url))]],
   ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],

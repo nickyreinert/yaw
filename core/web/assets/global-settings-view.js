@@ -4,6 +4,7 @@ import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { RADIO_MAX, choiceField } from './setup-cards.js';
+import { pickFolder } from './folder-picker.js';
 
 const $ = (id) => document.getElementById(id);
 const TABS = ['interview', 'files', 'notifications', 'classification', 'review', 'sync'];
@@ -68,6 +69,11 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     };
     const name = field('Device name', data.device?.name ?? '');
     const folder = field('Existing folder (including a mounted NAS)', data.config?.target ?? '');
+    const browse = button('Browse…', async () => {
+      const chosen = await pickFolder({ list: (path) => get('browse', path ? { path } : {}), start: folder.value, title: 'Choose the sync folder' });
+      if (chosen) folder.value = chosen;
+    });
+    const folderRow = el('div', null, 'inline-control'); folder.parentNode.append(folderRow); folderRow.append(folder, browse);
     const github = field('Or private GitHub repository (owner/repository)', data.config?.github ?? '');
     const scopes = [];
     for (const key of ['settings', 'presets', 'statistics']) {

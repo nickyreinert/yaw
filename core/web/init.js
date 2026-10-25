@@ -13,6 +13,8 @@ import { saveSetup } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
+import { kickoffGuide, kickoffPrompt } from '../lib/kickoff.js';
+import { tasksMode } from '../lib/tasks.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
 import { createWorkspaceApi, WORKSPACE_ACTIONS } from './workspace-api.js';
@@ -115,6 +117,10 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         root, kitRoot, answers: prepared.doc.answers, modules: prepared.modules,
         profiles: prepared.doc.proposal?.profiles ?? [], files: result.manifest.files.map((f) => f.path),
       });
+      // The same kickoff guide and planning prompt `yaw init` prints on a terminal.
+      const mode = tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') });
+      emit({ type: 'kickoff', guide: kickoffGuide({ tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
+        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode }) });
       emit({ type: 'done', ok, message });
     },
     failed(error) {

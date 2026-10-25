@@ -3,6 +3,7 @@ import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions
 import { showView, startWorkspace, setInterviewDone } from './workspace.js';
 import { CARD_QUESTIONS, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { renderReview } from './review-step.js';
+import { kickoffCard } from './settings-view.js';
 
 const $ = (id) => document.getElementById(id);
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
@@ -315,7 +316,7 @@ async function perform(name, input = state) {
 const code = (text) => element('code', text);
 const bullet = (...parts) => { const li = element('li'); li.append(...parts.map((p) => typeof p === 'string' ? document.createTextNode(p) : p)); return li; };
 // The last step: outcome, then what the user can do now. The server has stopped by then.
-function finish({ ok, message }) {
+function finish({ ok, message }, kickoff) {
   phase = 'done';
   setInterviewDone(true);
   $('finished-status').textContent = message;
@@ -331,20 +332,21 @@ function finish({ ok, message }) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet('This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
+  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff)] : []));
   status(message);
   renderWizard(true);
 }
 async function apply() {
   busy = true; actions(false); error('');
   phase = 'applying'; stepIndex = LAST;
-  $('log').textContent = ''; $('log-details').open = true; $('next-steps').hidden = true;
+  $('log').textContent = ''; $('log-details').open = true; $('next-steps').hidden = true; $('kickoff-box').replaceChildren();
   $('finished-status').className = ''; $('finished-status').textContent = 'Applying… keep this page open.';
   renderWizard(true);
   status('Applying… keep this page open for the log.');
   let secretValues = Object.fromEntries([...$('secret-fields').querySelectorAll('input[type=password]')]
     .map((input) => [input.name, input.value]).filter(([, value]) => value !== ''));
   for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
-  let outcome = null, started = false, failure = '';
+  let outcome = null, started = false, failure = '', kickoff = null;
   try {
     const response = await request('apply', { ...state, secrets: secretValues });
     started = true;
@@ -355,6 +357,7 @@ async function apply() {
       const event = JSON.parse(line);
       if (event.type === 'log') $('log').textContent += event.text;
       if (event.type === 'error') failure = event.message;
+      if (event.type === 'kickoff') kickoff = event;
       if (event.type === 'done') outcome = event;
     };
     for (;;) {
@@ -368,7 +371,7 @@ async function apply() {
   } catch (e) { failure = failure || e.message; }
   finally {
     secretValues = null;
-    if (started) finish(outcome ?? { ok: false, message: failure || 'Apply did not complete successfully. Inspect the project before retrying.' });
+    if (started) finish(outcome ?? { ok: false, message: failure || 'Apply did not complete successfully. Inspect the project before retrying.' }, kickoff);
     else {
       busy = false; phase = 'edit'; stepIndex = REVIEW; renderWizard(true);
       error(failure); status('Apply was rejected before it started. Fix the error and review again.');

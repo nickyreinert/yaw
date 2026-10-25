@@ -132,6 +132,24 @@ export function source(text) {
   return pre;
 }
 
+// ------------------------------------------------------------------------------- kickoff
+
+// The kickoff guide and the planning prompt, shared by Settings → Kickoff and the last setup step.
+export function kickoffCard({ guide, prompt }) {
+  const card = el('section', null, 'card kickoff');
+  card.append(el('h2', 'Kickoff: plan the work'));
+  const steps = el('ol', null, 'kickoff-guide');
+  for (const line of guide) steps.append(el('li', line));
+  const status = el('span', '', 'small muted'); status.setAttribute('role', 'status');
+  const copy = button('Copy prompt', async () => {
+    try { await navigator.clipboard.writeText(prompt); status.textContent = 'Copied.'; } catch { status.textContent = 'Copy failed; select the text below.'; }
+  }, 'primary');
+  const text = el('pre', prompt, 'kickoff-prompt');
+  const bar = el('div', null, 'interview-actions'); bar.append(copy, status);
+  card.append(steps, el('h3', 'Planning prompt'), bar, text);
+  return card;
+}
+
 // ------------------------------------------------------------------------------- settings view
 
 export function createSettings({ api, get, report, refresh, go, openSetup }) {
@@ -142,11 +160,13 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden && !drawer.contains(document.activeElement)) closeDrawer(); });
 
   function show(name) {
-    tab = ['interview', 'files', 'review'].includes(name) ? name : 'interview';
+    tab = ['interview', 'files', 'review', 'kickoff'].includes(name) ? name : 'interview';
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
-    for (const id of ['interview', 'files', 'review']) $(`settings-${id}`).hidden = id !== tab;
+    for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== tab;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
-    if (tab === 'interview' && !interview && !interviewStarted) showInterviewEntry();
+    // Inside `yaw init` the entry card continues the wizard; in a set-up project the questions show right away.
+    if (tab === 'interview' && !interview && !interviewStarted) { if (openSetup) showInterviewEntry(); else { interviewStarted = true; loadInterview().catch(report); } }
+    if (tab === 'kickoff') loadKickoff().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);
     if (tab === 'review') loadReview().catch(report);
     return tab;
@@ -160,6 +180,13 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     renderReviewPrompts($('settings-review'), { data, scope: 'project', api, load: loadReview });
   }
 
+  // Kickoff -------------------------------------------------------------------------------------------
+  async function loadKickoff() {
+    const data = await get('kickoff'), root = $('settings-kickoff');
+    root.replaceChildren();
+    if (!data.available) { root.append(el('p', data.message, 'muted')); return; }
+    root.append(kickoffCard(data));
+  }
   // Files ---------------------------------------------------------------------------------------------
   async function loadFiles() { files = await get('settings'); renderFiles(); }
   function row(f, label) {

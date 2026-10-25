@@ -51,6 +51,16 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.match(css, /body\.interview-done \.focus-toggle \{ display: none/);
   assert.ok(!html.includes('id="log-panel"'));
   // Radio buttons up to five choices; the git question sits next to "Use GitHub"; module questions live in their card.
+  // Header project switcher with search and plus; folder browser; one focus switch everywhere; kickoff in the UI.
+  const dash = readFileSync(join(KIT_ROOT, 'core/web/assets/dashboard.html'), 'utf8');
+  for (const page of [html, dash]) {
+    assert.match(page, /id="project-search"/);
+    assert.match(page, /id="project-add"/);
+    assert.ok(!page.includes('CURRENT FOLDER') && !page.includes('aria-pressed="false" hidden>Focus mode'));
+    assert.match(page, /data-tab="kickoff"/);
+    assert.match(page, /class="page-actions"/);
+  }
+  assert.match(app, /event\.type === 'kickoff'|type === 'kickoff'/);
   assert.match(cards, /RADIO_MAX = 5/);
   assert.ok(!cards.includes("el('select', { id, disabled"));
   assert.ok(!app.includes("element('select'"));
@@ -564,4 +574,19 @@ test('launcher: the start token reaches the browser through a private file, neve
   hostile.remove();
   l.remove();
   assert.throws(() => statSync(l.file));
+});
+
+test('workspace: folder browser lists sub-folders only and kickoff text comes from the project', async (t) => {
+  const f = await serverFixture(t);
+  mkdirSync(join(f.root, 'sub'));
+  writeFileSync(join(f.root, 'file.txt'), 'x');
+  mkdirSync(join(f.root, '.hidden'));
+  const get = async (path) => (await fetch(`${f.origin}${path}`, { headers: { cookie: f.cookie } }));
+  assert.equal((await fetch(`${f.origin}/api/browse`)).status, 403);
+  const body = await (await get(`/api/browse?path=${encodeURIComponent(f.root)}`)).json();
+  assert.deepEqual(body.entries.map((e) => e.name), ['sub']);
+  assert.equal((await get('/api/browse?path=relative')).status, 400);
+  assert.equal((await get(`/api/browse?path=${encodeURIComponent(join(f.root, 'nope'))}`)).status, 404);
+  const kick = await (await get('/api/kickoff')).json();
+  assert.equal(kick.available, false);
 });

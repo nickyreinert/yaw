@@ -6,6 +6,8 @@ import { sessionsData, tasksSection } from './dashboard.js';
 import { readManifest } from '../render/manifest.js';
 import { enabledModules } from '../render/project.js';
 import { FormError } from './form-model.js';
+import { browseFolders } from './browse.js';
+import { kickoffParts } from '../cli/kickoff.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
 import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
 import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
@@ -54,6 +56,13 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects }) {
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
       '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
       '/api/taxonomy': (params) => userError(() => taxonomyData({ root: rootOf(params?.get('workspace')), kitRoot })),
+      '/api/kickoff': (params) => userError(() => {
+        const root = rootOf(params?.get('workspace'));
+        const manifest = readManifest(root);
+        if (!manifest) return { available: false, message: 'This folder has no YAW setup. Run yaw init here.' };
+        return { available: true, ...kickoffParts({ root, manifest }) };
+      }),
+      '/api/browse': (params) => browseFolders(params?.get('path')),
       '/api/interview': (params) => userError(() => interviewData({ root: rootOf(params?.get('workspace')), kitRoot, env })),
       '/api/code-map': (params) => {
         const root = rootOf(params?.get('workspace'));

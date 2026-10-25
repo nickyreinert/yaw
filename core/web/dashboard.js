@@ -27,6 +27,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('global-settings-view.js', 'text/javascript; charset=utf-8'),
   asset('ui-state.js', 'text/javascript; charset=utf-8'),
   asset('setup-cards.js', 'text/javascript; charset=utf-8'),
+  asset('folder-picker.js', 'text/javascript; charset=utf-8'),
   asset('review-prompts-view.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),
 ]);
