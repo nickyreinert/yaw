@@ -29,7 +29,7 @@ questions:
       - { value: hygiene, label: Session hygiene hints (suggest /handoff and /clear) }
       - { value: status-line, label: "Status line in Claude Code (task, context, cache, last check)" }
       - { value: notifications, label: "Notifications after runs longer than 3 minutes (terminal, ntfy, Telegram)" }
-      - { value: cache-reminder, label: Cache-warmth reminder, phase: 2 }
+      - { value: cache-reminder, label: "Cache-warmth reminder (a heads-up before Claude's prompt cache goes cold)" }
     default: [hygiene, status-line]
 outputs:
   # The status line is the only committed setting; it renders to nothing in a team repository (ADR-0013).

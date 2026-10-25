@@ -4,6 +4,8 @@
 import { hashContent, readProjectFile } from '../render/files.js';
 import { isAdapterPath } from '../render/agents.js';
 import { enabledModules, renderProject, requireManifest } from '../render/project.js';
+import { existsSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
 import { UsageError } from './commands.js';
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 
@@ -28,6 +30,23 @@ export function adapterDrift({ root, kitRoot }) {
     }
   }
   return drift;
+}
+
+// `yaw init --sync <folder | owner/repo>` and `yaw web --sync ...`: already set up YAW somewhere else? Connect this
+// machine to the same sync folder (or private GitHub repository) and pull the portable settings and presets
+// before the interview starts, so the presets are there to load. Needs no terminal prompt.
+export function syncShortcut({ spec, io }) {
+  const github = !isAbsolute(spec) && !existsSync(resolve(io.cwd, spec)) && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(spec);
+  if (!github && !existsSync(resolve(io.cwd, spec))) throw new UsageError(`--sync ${spec}: that folder does not exist (mount your NAS first) and it is not an owner/repository`);
+  try {
+    configureSync({ env: io.env, kitRoot: io.kitRoot, target: github ? undefined : resolve(io.cwd, spec), github: github ? spec : undefined });
+    const result = runSync({ env: io.env, kitRoot: io.kitRoot });
+    if (result.conflicts?.length) throw new UsageError(`--sync: ${result.conflicts.length} setting(s) differ here and there (${result.conflicts.join(', ')}); choose with: yaw sync run --resolve local|remote, then run this command again`);
+  } catch (e) {
+    if (e instanceof UsageError) throw e;
+    throw new UsageError(`--sync ${spec}: ${e.message}`);
+  }
+  io.stdout.write(`Synced portable settings and presets with ${github ? `GitHub ${spec}` : resolve(io.cwd, spec)}; presets are listed in the setup. Details: yaw sync status\n`);
 }
 
 export async function sync({ values, positionals, io }) {

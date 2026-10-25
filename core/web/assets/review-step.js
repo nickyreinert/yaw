@@ -36,6 +36,9 @@ export function renderReview(root, ctx) {
     answers.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[id])}`), editButton(label, () => ctx.jump({ question: id }))));
   }
 
+  if (ctx.plan?.tasks || ctx.plan?.idea) {
+    answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md, TASKS.md`), editButton('plan', () => ctx.jump({ plan: true }))));
+  }
   const defs = new Map(ctx.modules.map((m) => [m.name, m]));
   const list = el('ul', { class: 'review-modules' });
   for (const name of preview.modules) {

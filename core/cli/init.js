@@ -30,6 +30,7 @@ import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
 import { listPresets, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
+import { syncShortcut } from './sync.js';
 import { createFormModel } from '../web/form-model.js';
 import { PLAIN } from './style.js';
 
@@ -214,6 +215,7 @@ export async function init({ values, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   const root = io.cwd;
   const kitRoot = io.kitRoot;
+  if (values.sync) syncShortcut({ spec: values.sync, io });
   if (values.web) {
     if (values.answers || values.yes) throw new UsageError('--web cannot be combined with --answers or --yes; confirm in the browser');
     if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);

@@ -67,6 +67,17 @@ export async function kickoff({ values, positionals, io }) {
     if (e instanceof PlanError) throw new UsageError(`kickoff import: ${file}: ${e.message}`);
     throw e;
   }
+  const { code, created, skipped } = await importTasks({ root, plan, io, dryRun: values['dry-run'] });
+  if (code !== 0) return code;
+  const verbDone = values['dry-run'] ? 'would add' : 'added';
+  io.stdout.write(`kickoff import: ${verbDone} ${created} task(s), skipped ${skipped}${values['dry-run'] ? '; nothing was written (--dry-run)' : ''}\n`);
+  return 0;
+}
+
+// Plan tasks -> `yaw task new`, so every task store (local, both, github) works the same way. Titles already in
+// TASKS.md are skipped. -> { code, created, skipped }
+export async function importTasks({ root, plan, io, dryRun = false }) {
+  const values = { 'dry-run': dryRun };
   const seen = existingTitles(root);
   let created = 0;
   let skipped = 0;
@@ -84,10 +95,8 @@ export async function kickoff({ values, positionals, io }) {
       continue;
     }
     const code = await task({ values: { ...(t.model ? { model: t.model } : {}), ...(t.effort ? { effort: t.effort } : {}) }, positionals: ['new', t.title], io });
-    if (code !== 0) return code;
+    if (code !== 0) return { code, created, skipped };
     created++;
   }
-  const verbDone = values['dry-run'] ? 'would add' : 'added';
-  io.stdout.write(`kickoff import: ${verbDone} ${created} task(s), skipped ${skipped}${values['dry-run'] ? '; nothing was written (--dry-run)' : ''}\n`);
-  return 0;
+  return { code: 0, created, skipped };
 }

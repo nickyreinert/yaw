@@ -140,3 +140,15 @@ test('sync HTTP actions require authentication and CSRF; reads never configure o
     assert.ok(syncStatus({ env: a }).lastSync);
   } finally { await server.close(); }
 });
+test('--sync shortcut: a new machine joins the sync folder and gets the presets before the interview', async () => {
+  const { target, a, run, preset } = pair();
+  preset(a, 'en'); run(a);
+  const fresh = { HOME: join(realpathSync(mkdtempSync(join(tmpdir(), 'yaw-fresh-'))), 'new') };
+  mkdirSync(fresh.HOME, { recursive: true });
+  const { syncShortcut } = await import('../core/cli/sync.js');
+  let out = '';
+  syncShortcut({ spec: target, io: { env: fresh, kitRoot, cwd: process.cwd(), stdout: { write: (t) => { out += t; } } } });
+  assert.match(out, /Synced portable settings and presets with/);
+  assert.match(readFileSync(join(fresh.HOME, '.yaw/presets/work.yaml'), 'utf8'), /user.language: en/);
+  assert.throws(() => syncShortcut({ spec: join(target, 'missing'), io: { env: { HOME: join(fresh.HOME, 'x') }, kitRoot, cwd: process.cwd(), stdout: { write() {} } } }), /--sync .*does not exist/);
+});

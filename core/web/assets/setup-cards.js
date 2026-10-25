@@ -5,8 +5,8 @@
 export const GROUPS = [
   ['basics', 'The basics', 'Recommended for every project. Only the project rules are required.'],
   ['memory', 'Remember the work', 'So you and the agent can pick up where you left off, even days later.'],
-  ['quality', 'Quality checks & reviews', 'Catch problems before they land: tools check the code, reviewers check the meaning.'],
-  ['github', 'GitHub & team', 'Only when the project lives on GitHub.'],
+  ['quality', 'Reviews', 'Reviewers check what a linter cannot: the meaning of a change.'],
+  ['github', 'Git & GitHub', 'Everything about git in one place: the repository, commit checks and, when the project lives on GitHub, checks, issues and team rules.'],
   ['comfort', 'Comfort', 'Personal helpers on your machine: status line, hints and notifications (terminal, ntfy, Telegram). No model tokens.'],
 ];
 export const REVIEWERS = [
@@ -19,8 +19,10 @@ export const TRIGGERS = [['off', 'Off'], ['request', 'On request'], ['suggest', 
 // Questions these cards answer; the generic question list hides them.
 export const CARD_QUESTIONS = new Set(['arch.language', 'arch.runs-on', 'quality.review-gate', ...REVIEWERS.map(([k]) => `quality.review-${k}`)]);
 // Modules whose questions are asked inside their own card, under the module switch (no second place to ask).
-export const INLINE_OWNERS = new Set(['communication', 'comfort', 'team']);
-export const isInline = (q) => INLINE_OWNERS.has(q.owner);
+export const INLINE_OWNERS = new Set(['communication', 'comfort', 'team', 'tasks']);
+// Questions that open a group instead of sitting in a card: "Use GitHub for the repo?" leads the Git & GitHub group.
+export const GROUP_INTRO = new Map([['tasks.use-github', 'github']]);
+export const isInline = (q) => INLINE_OWNERS.has(q.owner) && !GROUP_INTRO.has(q.id);
 // Radio buttons up to this many choices; a dropdown only beyond it.
 export const RADIO_MAX = 5;
 const HOST_EXTRA = {
@@ -173,14 +175,22 @@ export function renderModuleGroups(root, ctx) {
   const groups = el('div', { class: `module-groups${ctx.compact ? ' compact' : ''}` });
   for (const [id, title, lead] of GROUPS) {
     const mods = ctx.modules.filter((m) => (m.group ?? 'basics') === id);
-    if (!mods.length) continue;
+    const intro = ctx.groupNodes?.(id) ?? [];
+    if (!mods.length && !intro.length) continue;
     const grid = el('div', { class: 'module-grid' });
     for (const m of mods) grid.append(moduleCard(m, ctx, selected, hasGit));
-    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { text: title }), el('p', { class: 'small muted lead', text: lead }), grid));
+    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { text: title }), el('p', { class: 'small muted lead', text: lead }),
+      ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []), grid));
   }
   root.replaceChildren(bar, groups);
 }
 
+// Cards that show their "?" panel (kept across redraws).
+const expanded = new Set();
+
+// Every card reads the same way: switch and title, what it is, its options, warnings, then the "?" with the
+// addendum (what it adds to AGENTS.md, what it uses). Compact view keeps head, options and warnings; the rest
+// shows as a tooltip on hover or focus.
 function moduleCard(m, ctx, selected, hasGit) {
   const on = selected.has(m.name);
   const required = m.name === 'core';
@@ -193,21 +203,38 @@ function moduleCard(m, ctx, selected, hasGit) {
   const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' || questions.length ? ' wide' : ''}` },
     el('label', { class: 'module-head' }, input, el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
-      el('code', { class: 'small muted', text: m.name, title: m.name })),
-    el('p', { class: 'what', text: m.what ?? m.description }));
-  if (m.example) {
-    card.append(el('p', { class: 'example' }, el('span', { class: 'muted', text: `${m.example.when} ` }), m.example.run ? el('code', { text: m.example.run }) : null,
-      el('span', { text: ` → ${m.example.then}` })));
+      el('code', { class: 'small muted', text: m.name, title: m.name })));
+
+  const description = () => [
+    el('p', { class: 'what', text: m.what ?? m.description }),
+    ...(m.example ? [el('p', { class: 'example' }, el('span', { class: 'muted', text: `${m.example.when} ` }), m.example.run ? el('code', { text: m.example.run }) : null, el('span', { text: ` → ${m.example.then}` }))] : []),
+    ...(m.cost ? [el('p', { class: 'cost small muted', text: m.cost })] : []),
+  ];
+  const addendum = () => [
+    ...(m.rules?.length ? [el('p', { class: 'small', text: `Adds ${m.rules.length} note${m.rules.length === 1 ? '' : 's'} for the agent (AGENTS.md):` }), el('ul', {}, ...m.rules.map((r) => el('li', { text: r })))] : []),
+    ...(m.depends?.length && !required ? [el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` })] : []),
+  ];
+  const extra = addendum();
+
+  if (ctx.compact) {
+    card.append(el('div', { class: 'card-tip', role: 'tooltip' }, ...description(), ...extra));
+  } else {
+    card.append(el('div', { class: 'card-desc' }, ...description()));
   }
-  if (m.cost) card.append(el('p', { class: 'cost small muted', text: m.cost }));
-  if (m.rules?.length) {
-    card.append(el('details', { class: 'rules' }, el('summary', { text: `Adds ${m.rules.length} note${m.rules.length === 1 ? '' : 's'} for the agent (AGENTS.md)` }),
-      el('ul', {}, ...m.rules.map((r) => el('li', { text: r })))));
-  }
-  if (m.depends?.length && !required) card.append(el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` }));
-  for (const n of notes) card.append(el('p', { class: 'small warn-text', text: n }));
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (m.name === 'review') card.append(reviewerGrid(ctx, on, hasGit));
+  for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
+  if (!ctx.compact && extra.length) {
+    const open = expanded.has(m.name);
+    const more = el('div', { class: 'card-more', id: `more-${m.name}`, hidden: !open }, ...extra);
+    const help = el('button', { type: 'button', class: 'help-button', 'aria-expanded': String(open), 'aria-controls': `more-${m.name}`, 'aria-label': `More about ${m.title ?? m.name}`, text: '?',
+      onclick: () => {
+        const now = more.hidden;
+        more.hidden = !now; help.setAttribute('aria-expanded', String(now));
+        if (now) expanded.add(m.name); else expanded.delete(m.name);
+      } });
+    card.append(el('div', { class: 'card-foot' }, help), more);
+  }
   return card;
 }
 

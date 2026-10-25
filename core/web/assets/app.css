@@ -452,7 +452,7 @@ label.check input { width: auto; margin: 0; }
 .module-grid .module-card p.example { color: var(--muted); }
 .module-grid .module-card p.cost, .module-grid .module-card p.deps { color: var(--muted); font-size: .74rem; }
 .warn-text { color: #9a3b2f !important; }
-.module-groups.compact .example, .module-groups.compact .cost, .module-groups.compact .what, .module-groups.compact .deps, .module-groups.compact .gate small, .module-groups.compact .lead { display: none; }
+.module-groups.compact .gate small, .module-groups.compact .lead { display: none; }
 .module-groups.compact .module-group { margin-top: 12px; }
 .module-groups.compact .module-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
 .module-groups.compact .module-grid .module-card { padding: 8px 12px; justify-content: center; }
@@ -553,3 +553,30 @@ pre.kickoff-prompt { max-height: none; overflow: visible; font-size: .76rem; }
 .project-menu .inline-control button { padding: 6px 10px; }
 .folder-row { padding: 5px 9px; font-size: .84rem; }
 .folder-list { gap: 0; }
+/* Module cards: head, description, options, warnings, "?" addendum; compact view shows the rest as a tooltip */
+.module-card { position: relative; }
+.module-card .card-foot { margin-top: auto; padding-top: 6px; display: flex; justify-content: flex-end; }
+.help-button { width: 24px; height: 24px; padding: 0; border-radius: 50%; font-size: .78rem; line-height: 1; color: var(--muted); background: #fff; }
+.help-button[aria-expanded=true] { background: var(--wash); border-color: var(--accent); color: var(--ink); }
+.card-more { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 6px; }
+.card-more[hidden] { display: none; }
+.card-more ul, .card-tip ul { margin: 4px 0; padding-left: 18px; font-size: .74rem; color: var(--muted); }
+.card-more p, .card-tip p { margin: 3px 0; }
+.card-tip { display: none; position: absolute; left: 8px; top: calc(100% - 4px); z-index: 20; width: max(100%, 300px); max-width: 380px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: 0 10px 30px #102d2933; }
+.module-groups.compact .module-card:hover .card-tip, .module-groups.compact .module-card:focus-within .card-tip { display: block; }
+.group-intro { display: grid; gap: 8px; margin: 6px 0 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.group-intro .question { padding: 0; border: 0; }
+.prefill-field { flex: 1; }
+.prefill-field select { margin: 0; }
+.plan-card { margin: 18px 0; padding: 14px 16px; border: 1px dashed #97b284; border-radius: 10px; background: #f9fbf6; }
+.plan-card h3 { display: inline; font-size: 1rem; }
+.plan-card .plain-bullets { margin: 8px 0 12px; }
+.plan-steps { padding-left: 20px; display: grid; gap: 14px; margin: 12px 0; }
+.plan-steps li > strong { display: block; margin-bottom: 6px; font-size: .9rem; }
+.plan-steps textarea { font-family: ui-monospace, monospace; font-size: .8rem; min-height: 9rem; }
+.plan-actions { display: flex; gap: 8px; margin: 6px 0; }
+.plan-prompt { max-height: none; overflow: visible; font-size: .74rem; }
+.chat-links { display: flex; flex-wrap: wrap; gap: 6px; }
+a.chip { text-decoration: none; border: 1px solid var(--line); background: #fff; font-size: .82rem; }
+a.chip:hover { border-color: var(--accent); background: var(--wash); }
+.ok-text { color: #1e7a4c; font-weight: 600; }

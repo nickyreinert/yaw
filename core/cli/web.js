@@ -7,6 +7,7 @@ import { initWeb, openBrowser, writeLauncher } from '../web/init.js';
 import { UsageError } from './commands.js';
 import { verifyProject } from './init.js';
 import { guardFolder } from './folder-guard.js';
+import { syncShortcut } from './sync.js';
 import { backgroundRequest, startBackground, writeBackgroundLauncher } from '../web/background.js';
 
 async function openBackground(result, io, root) {
@@ -25,6 +26,7 @@ async function openBackground(result, io, root) {
 export async function web({ values = {}, positionals, io }) {
   if (positionals.length > 0) throw new UsageError(`unexpected argument "${positionals[0]}"`);
   if (values.background && values.stop) throw new UsageError('use either --background or --stop');
+  if (values.sync) { if (values.stop) throw new UsageError('--sync cannot be combined with --stop'); syncShortcut({ spec: values.sync, io }); }
   const project = Boolean(readManifest(io.cwd));
   const action = values.stop ? 'stop' : 'open';
   const body = action === 'open' ? { root: io.cwd } : undefined;

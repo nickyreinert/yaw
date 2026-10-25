@@ -38,7 +38,7 @@
   <div class="wizard-main">
     <form id="setup">
       <fieldset id="setup-depth" tabindex="-1"><legend>Setup depth</legend><div class="depth-options"><label class="depth-card"><input type="radio" name="mode" value="quick" checked><span><strong>Quick start</strong><span>Get the essentials in place for a prototype or MVP.</span></span></label><label class="depth-card"><input type="radio" name="mode" value="full"><span><strong>Full setup</strong><span>Configure all tools that fit a long-lived project.</span></span></label></div></fieldset>
-      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Preset</h2><p id="prefill-label" class="field-label">Choose a preset</p><div id="prefill" class="prefill-field"></div><div class="inline-control"><button id="load" type="button">Load</button></div></section>
+      <section id="start" aria-labelledby="start-title"><h2 id="start-title">Presets</h2><div class="inline-control"><div id="prefill" class="prefill-field"></div><button id="load" type="button">Load</button></div></section>
       <div id="questions"></div>
       <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title">Your stack</h2><div id="stack-cards"></div></section>
       <section id="module-section" aria-labelledby="module-title"><h2 id="module-title">What YAW adds to your project</h2><div id="modules"></div></section>
@@ -104,11 +104,10 @@
   </div>
   <dialog id="save-dialog" aria-labelledby="save-title">
     <form method="dialog">
-      <h2 id="save-title">Save this setup?</h2>
-      <p>Writes answers only to your user folder (~/.yaw/presets/) and adds a history entry. No secrets. This permission is only for this save.</p>
-      <label><input id="save-consent" type="checkbox"> I explicitly agree to save this preset and history entry.</label>
-      <label><input id="save-profile" type="checkbox"> Also save my user preferences to ~/.yaw/user-profile.yaml.</label>
-      <button value="cancel">Cancel</button><button id="save-confirm" value="save">Save this time</button>
+      <h2 id="save-title">Save this setup as a preset?</h2>
+      <ul class="plain-bullets"><li>Saved in ~/.yaw/presets/, answers only, no secrets</li><li>Adds a history entry</li></ul>
+      <label><input id="save-profile" type="checkbox"> Also save my user preferences (~/.yaw/user-profile.yaml)</label>
+      <button value="cancel">Cancel</button><button id="save-confirm" value="save" class="primary">Save preset</button>
     </form>
   </dialog>
   <dialog id="apply-dialog" aria-labelledby="apply-title">

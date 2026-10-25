@@ -17,6 +17,7 @@ import { declaredAgent, fixture, hook, listFixtures } from '../../../test/helper
 import { KIT_ROOT, capture, cleanEnv, readTree, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { readPersonal, resolveFeatures } from '../lib/config.js';
 import { foldTopic, onPrompt, transcriptBytes } from '../lib/hygiene.js';
+import { cacheCooled, cacheSeconds, onStop } from '../lib/cache.js';
 import { buildPayload, line, notifyTurn, ntfyRequest, redact, sendDetached, terminalSequence } from '../lib/notify.js';
 import { JUST_CHECK } from '../lib/check.js';
 import { readCheck, readSession, sessionFile, writeSession } from '../lib/state.js';
@@ -675,4 +676,74 @@ test('a hand-edited session state file cannot break the hook or write elsewhere'
   assert.equal(readSession(env, 'claude', ID).prompts, 1, 'a state with wrong types starts over');
   writeFileSync(file, 'not json');
   assert.deepEqual((await hook({ root, agent: 'claude', event: 'UserPromptSubmit', module: 'comfort', payload: { ...fixture('claude', 'UserPromptSubmit'), cwd: root }, env })).code, 0);
+});
+
+// ------------------------------------------------------------------------------------------ cache-warmth reminder
+
+async function cacheSession({ comfort = '[cache-reminder]', personal = '', kb = 200 } = {}) {
+  const root = await project({ comfort });
+  const env = { ...ENV(), YAW_HOME: join(tmp('yaw-yh-'), '.yaw') };
+  mkdirSync(env.YAW_HOME, { recursive: true });
+  writeFileSync(join(env.YAW_HOME, 'comfort.yaml'), personal);
+  const transcript = join(env.HOME, 't.jsonl');
+  writeFileSync(transcript, 'x'.repeat(kb * 1024));
+  onPrompt({ event: ev('claude', at(0)), root, env, manifest: manifestOf(root), prompt: SAME_TOPIC[0], now: at(0) });
+  return { root, env, transcript };
+}
+const stopEvent = (minutes) => ({ ...ev('claude', at(minutes)), event: 'Stop' });
+
+test('cache reminder: the lifetime comes from Claude\'s own setting, then the personal file, then 5 minutes', () => {
+  const cfg = { ttl: '5m' };
+  assert.equal(cacheSeconds({ cfg, env: {} }), 300);
+  assert.equal(cacheSeconds({ cfg: { ttl: '1h' }, env: {} }), 3600);
+  assert.equal(cacheSeconds({ cfg, env: { CLAUDE_CODE_PROMPT_CACHE_TTL: '1h' } }), 3600);
+  assert.equal(cacheSeconds({ cfg, env: { CLAUDE_CODE_PROMPT_CACHE_TTL: 'nonsense' } }), 300);
+});
+
+test('cache reminder: with a remote channel, Stop starts one silent timer that ends 60 seconds before the cache expires', async () => {
+  const { root, env, transcript } = await cacheSession({ personal: 'notify:\n  ntfy:\n    topic: cache-topic-1\n' });
+  const calls = [];
+  const spawnFn = (cmd, args, options) => { calls.push({ args, options }); return { unref() {} }; };
+  onStop({ event: stopEvent(1), root, env, transcript, spawnFn });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].args[1], /cache-timer\.js$/);
+  assert.deepEqual(calls[0].args.slice(2), ['claude', ID, at(1).toISOString(), '240']);
+  assert.doesNotMatch(JSON.stringify(calls), /cache-topic-1/);
+  assert.equal(readSession(env, 'claude', ID).stopAt, at(1).toISOString());
+});
+
+test('cache reminder: no timer without a remote channel, below the token threshold, off by choice, or for other agents', async () => {
+  const none = await cacheSession();
+  const calls = [];
+  const spawnFn = () => { calls.push(1); return { unref() {} }; };
+  onStop({ event: stopEvent(1), root: none.root, env: none.env, transcript: none.transcript, spawnFn });
+  assert.equal(calls.length, 0, 'terminal only: the prompt message covers it');
+  assert.ok(readSession(none.env, 'claude', ID).stopAt, 'but the stop time is kept for the prompt message');
+  const small = await cacheSession({ personal: 'notify:\n  ntfy:\n    topic: cache-topic-1\n', kb: 10 });
+  onStop({ event: stopEvent(1), root: small.root, env: small.env, transcript: small.transcript, spawnFn });
+  const off = await cacheSession({ comfort: '[hygiene]', personal: 'notify:\n  ntfy:\n    topic: cache-topic-1\n' });
+  onStop({ event: stopEvent(1), root: off.root, env: off.env, transcript: off.transcript, spawnFn });
+  const codex = await cacheSession({ personal: 'notify:\n  ntfy:\n    topic: cache-topic-1\n' });
+  onStop({ event: { ...stopEvent(1), agent: 'codex' }, root: codex.root, env: codex.env, transcript: codex.transcript, spawnFn });
+  assert.equal(calls.length, 0);
+  assert.equal(readSession(small.env, 'claude', ID).stopAt, undefined);
+});
+
+test('cache reminder: coming back after the cache expired says what it cost, once, and only for the user', async () => {
+  const { root, env, transcript } = await cacheSession();
+  onStop({ event: stopEvent(1), root, env, transcript });
+  const early = onPrompt({ event: ev('claude', at(3)), root, env, manifest: manifestOf(root), prompt: SAME_TOPIC[1], now: at(3) });
+  assert.equal(early, null, 'back within 5 minutes: nothing to say');
+  onStop({ event: stopEvent(4), root, env, transcript });
+  const late = onPrompt({ event: ev('claude', at(20)), root, env, manifest: manifestOf(root), prompt: SAME_TOPIC[2], now: at(20) });
+  assert.deepEqual(Object.keys(late), ['systemMessage']);
+  assert.match(late.systemMessage, /^YAW cache: it went cold while you were away; this prompt re-caches ≈ \d+k tokens/);
+  const again = onPrompt({ event: ev('claude', at(21)), root, env, manifest: manifestOf(root), prompt: SAME_TOPIC[0], now: at(21) });
+  assert.equal(again, null, 'said once');
+  assert.equal(cacheCooled({ state: {}, cfg: { ttl: '5m', minTokens: 1 }, env: {}, now: at(99) }), null);
+});
+
+test('cache reminder: the notification line names the cache and carries no code', () => {
+  const payload = buildPayload({ project: '/x/proj', status: 'cache', summary: 'context ≈ 120k tokens; continue, or /handoff and /clear' });
+  assert.equal(line(payload), 'proj: prompt cache cools soon - context ≈ 120k tokens; continue, or /handoff and /clear');
 });

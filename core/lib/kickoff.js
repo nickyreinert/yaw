@@ -12,12 +12,14 @@ const TASK_TARGET = {
 };
 
 // answers: the answers of .yaw/answers.yaml; summary: the confirmed proposal summary (profile - description).
-export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local' } = {}) {
+// stack (web setup, before the stack is chosen): { languages, hosts } as [{ value, label }]; the prompt then also asks
+// for the idea in business words and a stack recommendation, in a format parseKickoffReply understands.
+export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local', stack = null } = {}) {
   const idea = String(answers['idea.text'] ?? '').trim() || '(describe the idea here)';
   const facts = [
     summary && `- Stack: ${summary}`,
-    answers['arch.language'] && `- Language: ${answers['arch.language']}`,
-    answers['arch.runs-on'] && `- Runs on: ${answers['arch.runs-on']}`,
+    !stack && answers['arch.language'] && `- Language: ${answers['arch.language']}`,
+    !stack && answers['arch.runs-on'] && `- Runs on: ${answers['arch.runs-on']}`,
     answers['idea.team'] && `- Team: ${answers['idea.team']}`,
     `- Work items become ${TASK_TARGET[tasksMode] ?? TASK_TARGET.local}`,
   ].filter(Boolean);
@@ -38,11 +40,27 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local' 
     '- Each task is one small, testable change with a short imperative title (at most 80 characters).',
     '- A task may override the phase model when it is clearly easier or harder.',
     '- Ask me questions first if the idea is too vague to plan.',
+    ...(stack ? [
+      '- Recommend exactly one stack for this idea: the simplest one that fits. Use only the values below.',
+      '',
+      `Languages: ${stack.languages.map((l) => `${l.value} (${l.label})`).join('; ')}`,
+      `Runs on: ${stack.hosts.map((h) => `${h.value} (${h.label})`).join('; ')}`,
+    ] : []),
     '',
     'Answer with Markdown in exactly this format and nothing else:',
     '',
     '# Plan: <project name>',
     '',
+    ...(stack ? [
+      '## Idea',
+      '<3 to 6 sentences in plain business words: what it is, who it is for, which problem it solves>',
+      '',
+      '## Stack',
+      'language: <one language value from the list>',
+      'runs-on: <one runs-on value from the list>',
+      'why: <one sentence>',
+      '',
+    ] : []),
     '## Phase 1: <phase name>',
     'model: <tier> · effort: <effort>',
     'Goal: <one sentence>',
@@ -69,6 +87,47 @@ export function kickoffGuide({ tasksMode = 'local', hasTasks = true } = {}) {
 }
 
 export class PlanError extends Error {}
+
+const HEADING = /^##\s+(.+?)\s*$/;
+const stripFence = (text) => {
+  const m = /^\s*```[a-z]*\r?\n([\s\S]*?)\r?\n```\s*$/i.exec(text);
+  return m ? m[1] : text;
+};
+// The answer of the planning chat -> { idea, language, runsOn, tasks, warnings }. Idea and Stack sections are
+// optional; the tasks come from the Phase sections like `yaw kickoff import`. stack: { languages, hosts } (the
+// accepted values); a value outside the lists is dropped with a warning, never guessed.
+export function parseKickoffReply(raw, { languages = [], hosts = [] } = {}) {
+  const text = stripFence(String(raw ?? '')).replace(/\r\n/g, '\n');
+  const sections = new Map();
+  const rest = [];
+  let current = null;
+  for (const line of text.split('\n')) {
+    const h = HEADING.exec(line);
+    if (h && /^(idea|stack)$/i.test(h[1])) { current = h[1].toLowerCase(); sections.set(current, []); continue; }
+    if (h) current = null;
+    if (current) sections.get(current).push(line); else rest.push(line);
+  }
+  const warnings = [];
+  const idea = (sections.get('idea') ?? []).join('\n').trim();
+  const value = (list, given) => {
+    const g = String(given ?? '').trim().toLowerCase();
+    return list.find((x) => x.value.toLowerCase() === g)?.value ?? list.find((x) => g !== '' && x.label.toLowerCase().startsWith(g))?.value ?? null;
+  };
+  const stackLines = sections.get('stack') ?? [];
+  const field = (...names) => stackLines.map((l) => /^[-*\s]*([a-z -_]+?)\s*:\s*(.+?)\s*$/i.exec(l)).find((m) => m && names.includes(m[1].toLowerCase().replace(/[ _]/g, '-')))?.[2];
+  let language = null;
+  let runsOn = null;
+  if (stackLines.length > 0) {
+    language = value(languages, field('language'));
+    runsOn = value(hosts, field('runs-on', 'runs', 'hosting'));
+    if (language === null) warnings.push('No usable language in the Stack section; choose it in step 4.');
+    if (runsOn === null) warnings.push('No usable "runs-on" value in the Stack section; choose it in step 4.');
+  }
+  let tasks = [];
+  try { tasks = parsePlan(rest.join('\n')); } catch (e) { if (!(e instanceof PlanError)) throw e; warnings.push(e.message); }
+  if (idea === '' && language === null && runsOn === null && tasks.length === 0) throw new PlanError('nothing found: the answer needs an "## Idea" section, a "## Stack" section or "## Phase" sections with "- [ ] task" lines');
+  return { idea: idea.slice(0, 8000), language, runsOn, tasks, warnings, text };
+}
 
 const PHASE = /^##\s+(.+?)\s*$/;
 const MODEL = /^model:\s*([^·,;()]+?)\s*(?:[·,;]\s*effort:\s*(\S+?))?\s*$/i;
@@ -97,6 +156,7 @@ export function parsePlan(text) {
     if (/^\s*```/.test(raw)) fence = !fence;
     if (fence || /^\s*```/.test(raw)) return;
     const h = PHASE.exec(raw);
+    if (h && /^(idea|stack)$/i.test(h[1])) { phase = null; current = null; return; }
     if (h) {
       phase = { name: h[1].replace(/^phase\s+\d+\s*[:.-]\s*/i, '').trim(), hint: {} };
       current = null;

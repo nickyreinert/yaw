@@ -13,11 +13,13 @@ import { yawHome } from '../../../core/hooks/dispatch.js';
 import { readUserData } from '../../../core/lib/user-store.js';
 import { validateNotifications } from './settings.js';
 
-export const FEATURES = ['hygiene', 'status-line', 'notifications'];
+export const FEATURES = ['hygiene', 'status-line', 'notifications', 'cache-reminder'];
 export const DEFAULT_FEATURES = ['hygiene', 'status-line'];
 export const DEFAULTS = {
   hygiene: { drift: 0.9, maxPrompts: 60, maxAgeMinutes: 180, maxKbPerPrompt: 100, cooldownPrompts: 20 },
   notify: { minutes: 3, terminal: 'osc9' },
+  // ttl: Claude's prompt-cache lifetime (5m, or 1h on a subscription); CLAUDE_CODE_PROMPT_CACHE_TTL overrides it.
+  cache: { ttl: '5m', minTokens: 30000, warnSeconds: 60 },
 };
 const MAX_BYTES = 64 * 1024;
 
@@ -80,6 +82,7 @@ export function settings(personal) {
   return {
     hygiene: { ...DEFAULTS.hygiene, ...(personal.hygiene ?? {}) },
     notify: { ...DEFAULTS.notify, ...(personal.notify ?? {}) },
+    cache: { ...DEFAULTS.cache, ...(personal.cache ?? {}) },
   };
 }
 

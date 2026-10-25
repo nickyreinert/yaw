@@ -1,7 +1,7 @@
 // Settings (Interview | Files | Review prompts) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
 import { available, choiceLabel, choiceValue, defaultModules, effectiveAnswers, toggleModules, visibleQuestions } from './ui-state.js';
-import { CARD_QUESTIONS, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 
 const $ = (id) => document.getElementById(id);
@@ -294,10 +294,17 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const visible = new Set(visibleQuestions(interview.questions, state.answers, state.mode, state.modules).map((q) => q.id));
     const cardQuestions = new Map();
     for (const q of interview.questions.filter((x) => visible.has(x.id) && isInline(x))) cardQuestions.set(q.owner, [...(cardQuestions.get(q.owner) ?? []), question(q)]);
+    // "Use GitHub for the repo?" and "create a git repository" lead the Git & GitHub group.
+    const groupIntro = new Map();
+    for (const q of interview.questions.filter((x) => visible.has(x.id) && GROUP_INTRO.has(x.id))) {
+      groupIntro.set(GROUP_INTRO.get(q.id), [question(q), gitInitControl({ gitRepo: interview.gitRepo, gitInit: state.gitInit,
+        onGitInit: (on) => { state.gitInit = on; if (!on && state.modules.includes('git-hooks')) state.modules = toggleModules(interview.modules, state.modules, 'git-hooks', false); changed(true); } })]);
+    }
     renderModuleGroups(modsBox, {
       modules: interview.modules, selected: state.modules, answers, questions: interview.questions, compact,
       gitRepo: interview.gitRepo, gitInit: state.gitInit, usesGitHub: answers['tasks.use-github'] !== false,
       questionNodes: (name) => cardQuestions.get(name) ?? [],
+      groupNodes: (group) => groupIntro.get(group) ?? [],
       onToggle: (name, on) => { state.modules = toggleModules(interview.modules, state.modules, name, on); changed(true); },
       onAnswer: (id, value) => { state.answers[id] = value; changed(true); },
       onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderInterview(); },
@@ -307,13 +314,10 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     root.append(setup, stackCard, modCard);
     const sections = new Map();
     const titles = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
-    for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id) && !isInline(x))) {
+    for (const q of interview.questions.filter((x) => visible.has(x.id) && !CARD_QUESTIONS.has(x.id) && !isInline(x) && !GROUP_INTRO.has(x.id))) {
       const key = q.id.split('.')[0];
       if (!sections.has(key)) { const s = el('section', null, 'card interview-section'); s.append(el('h2', titles[key] ?? key)); sections.set(key, s); root.append(s); }
       sections.get(key).append(question(q));
-      // Creating the repository is asked next to "Use GitHub for the repo?": same context.
-      if (q.id === 'tasks.use-github') sections.get(key).append(gitInitControl({ gitRepo: interview.gitRepo, gitInit: state.gitInit,
-        onGitInit: (on) => { state.gitInit = on; if (!on && state.modules.includes('git-hooks')) state.modules = toggleModules(interview.modules, state.modules, 'git-hooks', false); changed(true); } }));
     }
     const actions = el('div', null, 'interview-actions'), status = el('p', '', 'small muted'); status.id = 'interview-status'; status.setAttribute('role', 'status');
     const blocked = interview.folder?.confirm && !state.confirmFolder;

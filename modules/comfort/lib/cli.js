@@ -8,6 +8,7 @@ import { readPersonal, resolveFeatures, settings } from './config.js';
 import { buildPayload, line, ntfyRequest, STATUSES, terminalSequence } from './notify.js';
 import { hygieneMuted, projectKey, readSwitch, writeSwitch } from './state.js';
 import { statusLine } from './statusline.js';
+import { cacheSeconds } from './cache.js';
 import { activeTasks } from '../../sessions/lib/registry.js';
 import { deliverNotifications } from './settings.js';
 
@@ -48,6 +49,8 @@ export function runHygiene({ args, values, io }) {
   say(io, `hygiene: ${state}`);
   say(io, `features: ${features.join(', ') || 'none'} (from ${source}${team && source !== 'personal' ? '; a team project ignores project answers' : ''})`);
   say(io, `thresholds: drift ${cfg.drift}, ${cfg.maxPrompts} prompts, ${cfg.maxAgeMinutes} min, ${cfg.maxKbPerPrompt} KB per prompt; at most one hint per ${cfg.cooldownPrompts} prompts`);
+  const cache = settings(personal.config).cache;
+  say(io, `cache reminder: ${features.includes('cache-reminder') ? `on, Claude only; ${cacheSeconds({ cfg: cache, env })}s lifetime, from ${cache.minTokens} estimated tokens` : 'off (add cache-reminder to user.comfort or features)'}`);
   say(io, `personal file: ${join('~', '.yaw', 'comfort.yaml')} ${personal.error ? `(unusable: ${personal.error})` : Object.keys(personal.config).length > 0 ? '(read)' : '(none; defaults)'}`);
   return 0;
 }

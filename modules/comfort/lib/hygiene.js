@@ -8,6 +8,7 @@ import { isAbsolute, normalize } from 'node:path';
 import { cosine, embed, roundVector } from '../../../core/lib/retrieval.js';
 import { realRoot, snapshot } from '../../sessions/lib/registry.js';
 import { readPersonal, resolveFeatures, settings } from './config.js';
+import { cacheCooled } from './cache.js';
 import { hygieneMuted, pruneSessions, readSession, writeSession } from './state.js';
 
 const MIN_PROMPTS_FOR_DRIFT = 3;
@@ -70,7 +71,8 @@ export function onPrompt({ event, root, env, manifest, prompt, transcript, now =
   const { features } = resolveFeatures({ root, personal });
   const hygieneOn = features.includes('hygiene');
   // Notifications need the turn start, hygiene needs everything; with neither there is no reason to keep state.
-  if (!hygieneOn && !features.includes('notifications')) return null;
+  const cacheOn = features.includes('cache-reminder') && event.agent === 'claude';
+  if (!hygieneOn && !features.includes('notifications') && !cacheOn) return null;
 
   const project = realRoot(root);
   const cfg = settings(personal).hygiene;
@@ -88,6 +90,8 @@ export function onPrompt({ event, root, env, manifest, prompt, transcript, now =
   }
 
   let message = null;
+  const cooled = cacheOn ? cacheCooled({ state, cfg: settings(personal).cache, env, now }) : null;
+  delete state.stopAt;
   if (hygieneOn && !hygieneMuted(env, project)) {
     const vector = typeof prompt === 'string' ? embed(prompt) : [];
     let drift = null;
@@ -114,12 +118,13 @@ export function onPrompt({ event, root, env, manifest, prompt, transcript, now =
     if (snap.branch !== null) state.branch = snap.branch;
     state.refs = [...new Set([...state.refs, ...mentioned])].slice(-10);
 
-    const cooled = state.lastHint === null || state.prompts - state.lastHint >= cfg.cooldownPrompts;
-    if (reasons.length > 0 && cooled) {
+    const spaced = state.lastHint === null || state.prompts - state.lastHint >= cfg.cooldownPrompts;
+    if (reasons.length > 0 && spaced) {
       state.lastHint = state.prompts;
       message = `YAW hygiene: ${reasons.join(', ')} (${state.prompts} prompts, ${duration(minutes)}). ${nextStep(manifest)} Silence: yaw hygiene off`;
     }
   }
   writeSession(env, event.agent, event.sessionId, state);
-  return message === null ? null : { systemMessage: message };
+  const parts = [cooled, message].filter(Boolean);
+  return parts.length === 0 ? null : { systemMessage: parts.join('\n') };
 }

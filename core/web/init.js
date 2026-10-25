@@ -13,7 +13,8 @@ import { saveSetup } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
-import { kickoffGuide, kickoffPrompt } from '../lib/kickoff.js';
+import { kickoffGuide, kickoffPrompt, parseKickoffReply, PLAN_FILE, PlanError } from '../lib/kickoff.js';
+import { importTasks } from '../cli/kickoff.js';
 import { tasksMode } from '../lib/tasks.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
@@ -25,12 +26,45 @@ export const DRAFT = '.yaw/draft.yaml';
 export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null, edit = false, sections = [] }) {
   const model = createFormModel({ root, kitRoot, env, edit, sections });
   const workspace = createWorkspaceApi({ root, kitRoot, env });
+  // The values the planning chat may recommend, in the interview's own words.
+  let lists;
+  const stackLists = () => {
+    if (!lists) {
+      const questions = model.bootstrap().questions;
+      const of = (id) => (questions.find((q) => q.id === id)?.choices ?? []).map((c) => typeof c === 'object' ? { value: c.value, label: c.label ?? c.value } : { value: c, label: c });
+      lists = { languages: of('arch.language'), hosts: of('arch.runs-on') };
+    }
+    return lists;
+  };
+  const replyOf = (text) => {
+    if (typeof text !== 'string' || text.length > 100000) throw new FormError('Paste the answer of the planning chat (at most 100,000 characters).');
+    try { return parseKickoffReply(text, { languages: stackLists().languages, hosts: stackLists().hosts }); }
+    catch (e) { if (e instanceof PlanError) throw new FormError(e.message); throw e; }
+  };
   const ensureNew = () => {
     if (edit) return model.assertUnchanged();
     if (readManifest(root)) throw new FormError('This project is already initialized; use yaw update', 409);
   };
+  // The plan from the planning chat: kept as docs/plan/kickoff.md and, with the tasks module, added to TASKS.md.
+  async function savePlan({ prepared, output }) {
+    const { plan } = prepared;
+    writeAtomic(root, PLAN_FILE, plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`);
+    output.write(`Saved the plan as ${PLAN_FILE}\n`);
+    if (!prepared.modules.includes('tasks')) { output.write(`No task list yet: yaw add tasks, then yaw kickoff import ${PLAN_FILE}\n`); return; }
+    if (tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') }) === 'github') {
+      output.write(`Tasks live in GitHub issues; create them when you are ready: yaw kickoff import ${PLAN_FILE}\n`);
+      return;
+    }
+    try {
+      const io = { cwd: root, kitRoot, env, stdout: output, stderr: output };
+      const done = await importTasks({ root, plan: plan.tasks, io });
+      output.write(`Added ${done.created} task(s) to TASKS.md${done.skipped ? `, skipped ${done.skipped}` : ''}\n`);
+    } catch (e) {
+      output.write(`Could not add the tasks (${e.message}); run: yaw kickoff import ${PLAN_FILE}\n`);
+    }
+  }
   return {
-    actions: WORKSPACE_ACTIONS,
+    actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply'],
     get: {
       ...workspace.get,
       '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
@@ -40,8 +74,9 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     prepareApply(input) {
       ensureNew();
       if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
-      const { secrets, ...setup } = input;
+      const { secrets, plan, ...setup } = input;
       const prepared = model.normalize(setup);
+      if (plan !== undefined && plan !== null) prepared.plan = replyOf(plan);
       try {
         prepared.secretValues = validateSecretValues(secrets, model.secretCatalog(prepared).names);
       } catch (e) {
@@ -55,6 +90,19 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         if (!input || typeof input !== 'object' || Array.isArray(input) ||
           Object.keys(input).some((k) => !['kind', 'name'].includes(k))) throw new FormError('Invalid prefill request');
         return model.prefill(input.kind, input.name);
+      }
+      if (name === 'kickoff-prompt') {
+        if (!input || typeof input !== 'object' || Array.isArray(input.answers ?? {})) throw new FormError('Expected the answers so far');
+        const answers = input.answers ?? {};
+        // The prompt leaves for a third party: the same secret check as every saved answer.
+        assertSafe(answers, kitRoot);
+        const mode = tasksMode(answers, { teamModule: ['team', 'external-reviewers'].includes(answers['idea.team']) && answers['tasks.use-github'] !== false });
+        return { prompt: kickoffPrompt({ answers, tasksMode: mode, stack: stackLists() }) };
+      }
+      if (name === 'kickoff-reply') {
+        const reply = replyOf(input?.text);
+        return { idea: reply.idea, language: reply.language, runsOn: reply.runsOn, warnings: reply.warnings,
+          tasks: reply.tasks.length, phases: [...new Set(reply.tasks.map((t) => t.phase))].length, titles: reply.tasks.slice(0, 6).map((t) => t.title) };
       }
       if (name === 'preview' || name === 'diff') return model.preview(input, name === 'diff');
       ensureNew();
@@ -113,6 +161,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         ok = await verify({ root, io: { env, stdout: output, stderr: output } });
         message = ok ? 'Applied and verified.' : 'Files applied, but verification failed. Fix the reported problem and run just setup && just check.';
       }
+      if (prepared.plan) await savePlan({ prepared, output, result });
       printNextSteps(output, {
         root, kitRoot, answers: prepared.doc.answers, modules: prepared.modules,
         profiles: prepared.doc.proposal?.profiles ?? [], files: result.manifest.files.map((f) => f.path),
@@ -120,7 +169,8 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       // The same kickoff guide and planning prompt `yaw init` prints on a terminal.
       const mode = tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') });
       emit({ type: 'kickoff', guide: kickoffGuide({ tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
-        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode }) });
+        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode }),
+        plan: prepared.plan ? { tasks: prepared.plan.tasks.length, file: PLAN_FILE } : null });
       emit({ type: 'done', ok, message });
     },
     failed(error) {

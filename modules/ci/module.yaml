@@ -2,7 +2,7 @@
 name: ci
 description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and Dependabot for pinned actions and profile dependency ecosystems.
 title: Checks on GitHub
-group: quality
+group: github
 what: "Classic CI, no agent involved: GitHub runs the same `just check` on every push and pull request, plus Dependabot updates."
 adds:
   - "GitHub workflow that runs just check on every push and pull request"

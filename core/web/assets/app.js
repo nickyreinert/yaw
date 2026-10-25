@@ -1,7 +1,8 @@
 import { choiceValue, choiceLabel, available, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 
 import { showView, startWorkspace, setInterviewDone } from './workspace.js';
-import { CARD_QUESTIONS, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { createPlanCard } from './plan-card.js';
 import { renderReview } from './review-step.js';
 import { kickoffCard } from './settings-view.js';
 
@@ -23,6 +24,8 @@ const steps = [
 ];
 const LAST = steps.length - 1, REVIEW = LAST - 1, WORKFLOW = steps.findIndex((s) => s.groups === null), STACK = steps.findIndex((s) => s.ids.includes('stack'));
 let stepIndex = 0;
+// The answer of the planning chat (step 3): sent with Apply only, never with previews or drafts.
+let plan = null, planInfo = null, planCard;
 // edit: answering; applying: the log streams; done: the server has stopped.
 let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
@@ -33,7 +36,7 @@ function renderWizard(focus = false) {
   $('setup').hidden = finished; $('finished').hidden = !finished;
   if (stepIndex === REVIEW) reviewReturn = false;
   $('back-to-review').hidden = !reviewReturn || stepIndex >= REVIEW;
-  for (const id of ['setup-depth', 'start', 'stack', 'module-section', 'confirm']) $(id).hidden = !step.ids.includes(id);
+  for (const id of ['setup-depth', 'start', 'stack', 'module-section', 'confirm']) $(id).hidden = !step.ids.includes(id) || (id === 'start' && !hasPresets());
   for (const [group, section] of sections) section.node.hidden = !section.applicable || !belongs(step, group);
   $('sections').replaceChildren();
   steps.forEach((s, i) => {
@@ -96,6 +99,21 @@ async function request(action, input = state) {
 const selectedModules = () => state.modules ?? defaultModules(catalog.modules, catalog.questions, state.answers, state.mode);
 const shownValue = (v) => Array.isArray(v) ? v.join(', ') : String(v ?? '');
 
+function buildPlan() {
+  planCard = createPlanCard({
+    request,
+    getAnswers: () => state.answers,
+    onUse(reply, text) {
+      plan = text; planInfo = reply;
+      if (reply.idea) state.answers['idea.text'] = reply.idea;
+      if (reply.language) state.answers['arch.language'] = reply.language;
+      if (reply.runsOn) state.answers['arch.runs-on'] = reply.runsOn;
+      planCard.setInfo(reply); update();
+    },
+    onRemove() { plan = null; planInfo = null; update(); },
+  });
+  sections.get('idea')?.node.append(planCard.node);
+}
 function buildQuestions() {
   const title = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
   for (const q of catalog.questions) {
@@ -152,7 +170,7 @@ function buildQuestions() {
       update();
     }));
     // Questions of module cards are asked inside the card, under the module switch.
-    if (!isInline(q)) sections.get(sectionId).node.append(node);
+    if (!isInline(q) && !GROUP_INTRO.has(q.id)) sections.get(sectionId).node.append(node);
     controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, capability, gitHolder, expertise: null });
   }
 
@@ -199,7 +217,7 @@ function renderQuestions() {
     }
   }
   for (const [id, s] of sections) {
-    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id) && !isInline(c.q));
+    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id) && !isInline(c.q) && !GROUP_INTRO.has(c.q.id));
     s.applicable = qs.length > 0;
     s.node.hidden = !s.applicable;
   }
@@ -225,6 +243,7 @@ function renderModules() {
     modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(),
+    groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     questionNodes: (name) => [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && !c.node.hidden).map((c) => c.node),
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
     onAnswer: (id, value) => { state.answers[id] = value; update(); },
@@ -241,6 +260,7 @@ const stepFor = (q) => isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : step
 function jump(target) {
   let step, focusId;
   if (target.stack) { step = STACK; focusId = 'stack-title'; }
+  else if (target.plan) { step = steps.findIndex((st) => st.groups?.includes('idea')); focusId = 'plan-card'; }
   else if (target.module) { step = WORKFLOW; focusId = `module-${target.module}`; }
   else { const c = controls.get(target.question); step = stepFor(c.q); focusId = c.inputs[0]?.id; }
   stepIndex = step; reviewReturn = true; renderWizard();
@@ -248,7 +268,7 @@ function jump(target) {
   if (node) { if (node.tabIndex < 0) node.tabIndex = -1; node.focus(); node.scrollIntoView({ block: 'center', behavior: 'instant' }); }
 }
 function summary(preview) {
-  renderReview($('summary'), { preview, modules: catalog.modules, questions: catalog.questions, jump });
+  renderReview($('summary'), { preview, modules: catalog.modules, questions: catalog.questions, jump, plan: planInfo });
 }
 function applySecretFields() {
   const container = $('secret-fields'); container.replaceChildren();
@@ -332,7 +352,7 @@ function finish({ ok, message }, kickoff) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet('This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
-  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff)] : []));
+  $('kickoff-box').replaceChildren(...(kickoff && !kickoff.plan ? [kickoffCard(kickoff)] : []));
   status(message);
   renderWizard(true);
 }
@@ -348,7 +368,7 @@ async function apply() {
   for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
   let outcome = null, started = false, failure = '', kickoff = null;
   try {
-    const response = await request('apply', { ...state, secrets: secretValues });
+    const response = await request('apply', { ...state, ...(plan ? { plan } : {}), secrets: secretValues });
     started = true;
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = '';
@@ -393,15 +413,21 @@ function loadState(next) {
   const { profile: _ignored, ...rest } = next;
   state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: !catalog.gitRepo };
   visitedSteps.clear();
+  plan = null; planInfo = null; planCard?.setInfo(null);
   document.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === (state.mode === 'standard' ? 'full' : state.mode); });
   update();
 }
-// Where the answers start from. Radio buttons while there are few sources, a dropdown beyond five.
+// Where the answers start from: a dropdown of the presets that exist; nothing is shown when there are none.
 const prefillOptions = [{ value: 'new', label: 'New setup' }];
 let prefillValue = 'new', prefillLocked = false;
+const hasPresets = () => prefillOptions.length > 1;
 function renderPrefill() {
-  $('prefill').replaceChildren(choiceField({ name: 'prefill', id: 'prefill-choice', choices: prefillOptions, value: prefillValue,
-    disabled: prefillLocked, label: 'Choose a preset', onChange: (v) => { prefillValue = v; } }).node);
+  const select = element('select', undefined, { id: 'prefill-choice', 'aria-labelledby': 'start-title' });
+  for (const o of prefillOptions) select.append(element('option', o.label, { value: o.value }));
+  select.value = prefillValue; select.disabled = prefillLocked;
+  select.addEventListener('change', () => { prefillValue = select.value; });
+  $('prefill').replaceChildren(select);
+  $('start').hidden = !hasPresets() || !steps[stepIndex].ids.includes('start');
 }
 async function start() {
   const response = await fetch('/api/bootstrap');
@@ -429,6 +455,7 @@ async function start() {
   $('verify-note').textContent = catalog.editing ? '' : catalog.skipVerify ? 'Verification disabled with --skip-verify.' : 'Apply runs just setup and just check.';
   $('diff').hidden = !catalog.editing;
   buildQuestions();
+  buildPlan();
   $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { stepIndex--; renderWizard(true); } });
   $('back-to-review').addEventListener('click', () => { stepIndex = REVIEW; renderWizard(true); });
   $('next-step-button').addEventListener('click', advance);
@@ -457,15 +484,14 @@ async function start() {
   $('draft').addEventListener('click', () => perform('draft'));
   $('diff').addEventListener('click', () => perform('diff'));
   $('preset').addEventListener('click', () => {
-    $('save-consent').checked = $('save-profile').checked = false;
-    $('save-confirm').disabled = true;
+    $('save-profile').checked = false;
     $('save-dialog').returnValue = '';
     $('save-dialog').showModal();
   });
-  $('save-consent').addEventListener('change', () => { $('save-confirm').disabled = !$('save-consent').checked; });
+  // Pressing "Save" in this dialog is the consent for this one save.
   $('save-dialog').addEventListener('close', () => {
-    if ($('save-dialog').returnValue === 'save' && $('save-consent').checked) perform('preset', { ...state, consent: true, saveProfile: $('save-profile').checked });
-    $('save-consent').checked = $('save-profile').checked = false;
+    if ($('save-dialog').returnValue === 'save') perform('preset', { ...state, consent: true, saveProfile: $('save-profile').checked });
+    $('save-profile').checked = false;
   });
   $('apply').addEventListener('click', () => {
     applyFacts();

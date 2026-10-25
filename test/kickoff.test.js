@@ -131,3 +131,8 @@ test('yaw kickoff import: --dry-run writes nothing; import adds tasks with model
   assert.equal(empty.code, 1);
   assert.match(empty.err, /no tasks found/);
 });
+
+test('Idea and Stack sections of a web-planned reply are never tasks, even with bullets', () => {
+  const tasks = parsePlan('# Plan: X\n\n## Idea\n- A shop\n\n## Stack\n- language: python\n\n## Phase 1: Core\n- [ ] Build it\n');
+  assert.deepEqual(tasks.map((t) => t.title), ['Build it']);
+});

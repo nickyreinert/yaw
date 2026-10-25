@@ -28,7 +28,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   const app = readFileSync(join(KIT_ROOT, 'core/web/assets/app.js'), 'utf8');
   const workspace = readFileSync(join(KIT_ROOT, 'core/web/assets/workspace.js'), 'utf8');
   assert.match(html, /class="focus-toggle" role="switch"/);
-  assert.match(html, /<h2 id="start-title">Preset<\/h2>/);
+  assert.match(html, /<h2 id="start-title">Presets<\/h2>/);
   assert.match(html, /id="draft"[^>]*>Save draft/);
   assert.match(html, /id="preset"[^>]*>Save preset/);
   assert.match(html, /id="diff"[^>]*hidden>Inspect file diff/);
@@ -62,11 +62,16 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   }
   assert.match(app, /event\.type === 'kickoff'|type === 'kickoff'/);
   assert.match(cards, /RADIO_MAX = 5/);
+  assert.ok(!html.includes('save-consent') && !html.includes('I explicitly agree'));
+  assert.ok(!html.includes('Choose a preset'));
+  assert.match(cards, /help-button/);
+  assert.match(cards, /card-tip/);
+  assert.match(cards, /GROUP_INTRO = new Map\(\[\['tasks\.use-github', 'github'\]\]\)/);
   assert.ok(!cards.includes("el('select', { id, disabled"));
-  assert.ok(!app.includes("element('select'"));
+  assert.equal(app.split("element('select'").length - 1, 1, 'the only dropdown is the preset list');
   assert.match(app, /q\.id === 'tasks\.use-github'/);
   assert.ok(!cards.includes('No git repository yet: create one') || /gitInitControl/.test(cards));
-  assert.match(cards, /INLINE_OWNERS = new Set\(\['communication', 'comfort', 'team'\]\)/);
+  assert.match(cards, /INLINE_OWNERS = new Set\(\['communication', 'comfort', 'team', 'tasks'\]\)/);
   assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
   assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
@@ -589,4 +594,24 @@ test('workspace: folder browser lists sub-folders only and kickoff text comes fr
   assert.equal((await get(`/api/browse?path=${encodeURIComponent(join(f.root, 'nope'))}`)).status, 404);
   const kick = await (await get('/api/kickoff')).json();
   assert.equal(kick.available, false);
+});
+
+test('planning chat: the prompt carries the answers so far, the reply fills idea, stack and tasks, Apply saves the plan', async (t) => {
+  const f = await serverFixture(t);
+  const prompt = await (await f.post('kickoff-prompt', { answers: { 'idea.text': 'A bike repair booking site.' } })).json();
+  assert.match(prompt.prompt, /A bike repair booking site\./);
+  assert.match(prompt.prompt, /Languages: python \(Python\); javascript/);
+  assert.match(prompt.prompt, /## Stack\nlanguage:/);
+  const secret = await f.post('kickoff-prompt', { answers: { 'idea.text': `key ${'sk-'}${'a1b2c3d4'.repeat(5)}` } });
+  assert.equal(secret.status, 400, 'a secret never goes into a prompt that leaves the machine');
+  const reply = '```markdown\n# Plan: Bikes\n\n## Idea\nBooking for bike repairs.\n\n## Stack\nlanguage: javascript\nruns-on: nonsense\n\n## Phase 1: Core\nmodel: sonnet · effort: low\n- [ ] Create the booking form\n- [ ] Store bookings\n```';
+  const parsed = await (await f.post('kickoff-reply', { text: reply })).json();
+  assert.deepEqual([parsed.idea, parsed.language, parsed.runsOn, parsed.tasks, parsed.phases], ['Booking for bike repairs.', 'javascript', null, 2, 1]);
+  assert.equal(parsed.warnings.length, 1);
+  assert.equal((await f.post('kickoff-reply', { text: 'hello' })).status, 400);
+  const res = await f.post('apply', { ...setup({ answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.text': parsed.idea } }), plan: reply });
+  const events = (await res.text()).trim().split('\n').map((l) => JSON.parse(l));
+  assert.ok(events.some((e) => e.type === 'kickoff' && e.plan?.tasks === 2));
+  assert.match(readFileSync(join(f.root, 'docs/plan/kickoff.md'), 'utf8'), /Create the booking form/);
+  assert.match(readFileSync(join(f.root, 'TASKS.md'), 'utf8'), /Create the booking form/);
 });

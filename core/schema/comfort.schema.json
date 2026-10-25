@@ -8,7 +8,7 @@
     "features": {
       "description": "Comfort features on for this user in every project; overrides the project's user.comfort answer.",
       "type": "array",
-      "items": { "enum": ["hygiene", "status-line", "notifications"] },
+      "items": { "enum": ["hygiene", "status-line", "notifications", "cache-reminder"] },
       "uniqueItems": true
     },
     "hygiene": {
@@ -19,6 +19,16 @@
         "maxAgeMinutes": { "type": "integer", "minimum": 1 },
         "maxKbPerPrompt": { "description": "Transcript size per prompt, in KB.", "type": "integer", "minimum": 1 },
         "cooldownPrompts": { "description": "Show the hint at most once per this many prompts.", "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "cache": {
+      "description": "Cache-warmth reminder (doc 11 §3): a heads-up before Claude's prompt cache goes cold.",
+      "type": "object",
+      "properties": {
+        "ttl": { "description": "Cache lifetime; CLAUDE_CODE_PROMPT_CACHE_TTL overrides it.", "enum": ["5m", "1h"] },
+        "minTokens": { "description": "No reminder below this context size (estimated tokens).", "type": "integer", "minimum": 0 },
+        "warnSeconds": { "description": "Remind this long before a 5 minute cache cools (a 1 hour cache is announced 5 minutes ahead).", "type": "integer", "minimum": 10, "maximum": 240 }
       },
       "additionalProperties": false
     },

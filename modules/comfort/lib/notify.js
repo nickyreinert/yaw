@@ -13,8 +13,8 @@ import { readPersonal, resolveFeatures, settings } from './config.js';
 import { usable } from './hygiene.js';
 import { readSession, writeSession } from './state.js';
 
-export const STATUSES = ['done', 'input', 'failed'];
-const LABEL = { done: 'done', input: 'needs your input', failed: 'failed' };
+export const STATUSES = ['done', 'input', 'failed', 'cache'];
+const LABEL = { done: 'done', input: 'needs your input', failed: 'failed', cache: 'prompt cache cools soon' };
 const MAX_SUMMARY = 80;
 const MAX_PROJECT = 40;
 const SEND_JS = join(import.meta.dirname, 'send.js');
@@ -104,12 +104,17 @@ export function notificationRequests(payload, config, env) {
 // Fire and forget: a detached node process posts the request and prints nothing. The payload goes in argv (it
 // holds no secret); the child reads the topic from the personal file itself, so it never shows up in `ps`.
 export function sendDetached(payload, env, spawnFn = spawn) {
+  return spawnDetached(SEND_JS, [JSON.stringify(payload)], env, spawnFn);
+}
+
+// Any detached helper of this module: no terminal, no output, only the variables it needs.
+export function spawnDetached(script, args, env, spawnFn = spawn) {
   const home = env.YAW_HOME || env.HOME;
   if (!home) return false;
   try {
     const telegram = readPersonal(env).config.notify?.telegram;
     const credentials = Object.fromEntries([telegram?.tokenEnv, telegram?.chatIdEnv].filter((name) => name && env[name]).map((name) => [name, env[name]]));
-    const child = spawnFn(process.execPath, ['--no-warnings', SEND_JS, JSON.stringify(payload)], {
+    const child = spawnFn(process.execPath, ['--no-warnings', script, ...args], {
       cwd: env.HOME || undefined,
       detached: true,
       stdio: 'ignore',
