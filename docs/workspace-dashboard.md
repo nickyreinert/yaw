@@ -56,9 +56,14 @@ device instead of counting them as projects. The overview's open-task count is
 project data and is not affected by the session device filter. **Split charts
 by** stacks the charts by agent, model, folder or project; combine it with the
 filters, for example one project split by agent.
-The programming-language filter uses each project's configured stack language
-and applies to all visible metrics, charts and tables. Synced sessions or
-projects without a configured language appear as **Unknown**.
+The programming-language filter uses each project's configured stack language,
+falling back to the most common local source-file extension or recognizable
+project manifests. Detection examines at most 2,000 entries, four folders deep,
+without reading file contents, hidden folders, dependencies or symlinks.
+Ties appear as **Mixed**; unavailable projects, synced sessions and projects
+without recognizable evidence remain **Unknown**. This describes the current
+project, not its historical state or the human language of the conversation,
+and applies to all visible metrics, charts and tables.
 
 - **Overview**: totals, a drill-down table of projects by folder, and charts.
   The drill-down root is the folder shared by your innermost projects; click a

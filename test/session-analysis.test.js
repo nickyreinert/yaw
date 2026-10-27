@@ -58,10 +58,22 @@ test('session browser exposes each configured project programming language', asy
   const root = await makeProject({ modules: ['core'] }), env = environment();
   const answers = join(root, '.yaw/answers.yaml');
   writeFileSync(answers, readFileSync(answers, 'utf8').replace('  idea.text:', '  arch.language: python\n  idea.text:'));
+  writeTree(root, { 'src/main.js': '', 'package.json': '{}' });
   fixture(env, root);
   await collectAnalysis({ root, env });
   const data = await sessionsData({ root, kitRoot: KIT_ROOT, env });
   assert.equal(data.rows[0].language, 'python');
+  writeFileSync(answers, readFileSync(answers, 'utf8').replace('arch.language: python', 'arch.language: auto'));
+  assert.equal((await sessionsData({ root, kitRoot: KIT_ROOT, env })).rows[0].language, 'javascript');
+});
+
+test('session browser detects language for projects without a configured language', async () => {
+  const root = tmp(), env = environment();
+  writeTree(root, { 'src/main.go': '', 'go.mod': '' });
+  fixture(env, root);
+  await collectAnalysis({ root, env });
+  const data = await sessionsData({ root, kitRoot: KIT_ROOT, env });
+  assert.equal(data.rows[0].language, 'go');
 });
 
 test('rescans reuse unchanged transcripts and reread changed ones', async () => {

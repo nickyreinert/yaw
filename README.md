@@ -56,6 +56,8 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 
 Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.
 
+The programming-language filter uses YAW configuration or detects the language from local project filenames. Projects with no recognizable evidence and unavailable or synced projects remain **Unknown**.
+
 ### Improve your next session
 
 Open **Global → Improve** in `yaw web`. Start from a project you remember or sessions with saved friction labels, using the same filters and sorting as Sessions. Read a conversation with highlighted corrections, apologies and recovery, then choose **Review this conversation**. YAW prepares a compact review prompt automatically; inspect/redact it and copy it into a browser chat, or use an installed Claude Code/Codex reviewer enabled in **Global → Settings → Improve**. CLI reviews are explicit and may use paid hosted providers. Evidence stays temporary and suggestions are never applied automatically. See [Improve workflow](docs/workspace-dashboard.md#global--improve).

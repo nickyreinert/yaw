@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { readManifest } from '../render/manifest.js';
 import { enabledModules, readAnswers } from '../render/project.js';
 import { sessionRows } from './session-rows.js';
+import { projectLanguage } from './project-language.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
 import { readAnalysis } from '../lib/session-analysis.js';
@@ -135,11 +136,7 @@ function syncedRows(env, own) {
 function withProjectLanguages(rows) {
   const languages = new Map();
   for (const project of new Set(rows.map((r) => r.project).filter((p) => typeof p === 'string' && p.startsWith('/')))) {
-    const result = section(() => {
-      if (!readManifest(project)) return 'Unknown';
-      const value = readAnswers(project).answers?.['arch.language'];
-      return typeof value === 'string' && value && value !== 'auto' ? value : 'Unknown';
-    });
+    const result = section(() => projectLanguage(project));
     languages.set(project, typeof result === 'string' ? result : 'Unknown');
   }
   return rows.map((row) => ({ ...row, language: languages.get(row.project) ?? 'Unknown' }));

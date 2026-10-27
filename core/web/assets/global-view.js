@@ -276,7 +276,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
 
   // ---------- sticky filter bar ----------
   function filterBar(mode) {
-    const select = (label, key, options, all, display = (o) => o) => h('label', {}, label, h('select', { on: { change: (e) => set({ [key]: e.target.value }) } },
+    const select = (label, key, options, all, display = (o) => o) => h('label', key === 'language' ? { title: 'Project programming language: configured in YAW or detected from local file names. Unknown when no evidence is available.' } : {}, label, h('select', { on: { change: (e) => set({ [key]: e.target.value }) } },
       h('option', { value: '' }, all), options.map((o) => h('option', { value: o, selected: state[key] === o }, display(o)))));
     const seg = (label, key, opts) => h('div', { class: 'lbl', role: 'group', 'aria-label': label }, h('span', {}, label), h('div', { class: 'presets' }, opts.map(([v, l]) =>
       h('button', { type: 'button', 'aria-pressed': String(state[key] === v && (key !== 'period' || (!state.from && !state.to))), on: { click: () => set(key === 'period' ? { period: v, from: '', to: '' } : { [key]: v }) } }, l))));
