@@ -48,6 +48,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
   const publicClassifierJob = () => classifierJob && ({
     status: classifierJob.status, session: classifierJob.session, sessions: classifierJob.sessions,
     turn: classifierJob.turn, turns: classifierJob.turns, complete: classifierJob.complete,
+    unavailable: classifierJob.unavailable, skipped: classifierJob.skipped,
     sessionComplete: classifierJob.sessionComplete, message: classifierJob.message,
   });
   const resume = () => { const release = resumePaused; resumePaused = null; release?.(); };
@@ -235,9 +236,11 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         });
         if (job) {
           job.status = 'completed';
-          job.message = job.controller.signal.aborted ? 'Classification stopped; unfinished results were not saved.' : 'Classification complete.';
+          job.message = job.controller.signal.aborted ? 'Classification stopped; unfinished results were not saved.' :
+            `Classified ${result.sessions} session(s).${result.skipped ? ` Skipped ${result.skipped} unavailable or unreadable transcripts; existing results kept. Check Global Settings → Sessions for history folders.` : ''}`;
+          Object.assign(job, { unavailable: result.unavailable, skipped: result.skipped, sessionComplete: true, complete: true });
         }
-        return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? 'Local classifications included.' : 'No model was called.'}` };
+        return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? result.sessions ? 'Local classifications included.' : 'No readable sessions to classify; no model was called.' : 'No model was called.'}` };
       } catch (e) {
         if (job) {
           job.status = job.controller.signal.aborted ? 'stopped' : 'failed';

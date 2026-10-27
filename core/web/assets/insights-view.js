@@ -65,7 +65,7 @@ export function createInsights({ api, get }) {
       metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved outcome labels'),
       metric('Local conversations', number(context.rows.filter((r) => r.source !== 'synced' && r.prompts !== null).length), 'available to open after a local scan'));
     const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, 'Start with a project you remember, or browse sessions with saved signals.')),
-      el('div', { className: 'subtabs', 'aria-label': 'Browse Improve' }, ...[['projects', 'Projects'], ['sessions', 'Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) }))));
+      el('div', { className: 'subtabs', 'aria-label': 'Browse Learn' }, ...[['projects', 'Projects'], ['sessions', 'Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) }))));
     const options = el('div', { className: 'subtabs improve-focus', 'aria-label': 'Classification selection' },
       ...[['attention', `Needs attention (${attention.length})`], ['classified', `All classified (${classified().length})`], ['all', `All sessions (${context.rows.length})`]].map(([value, label]) => button(label, () => context.set({ improveFocus: value }), { 'aria-pressed': String(context.focus === value) })));
     const rows = visibleRows();

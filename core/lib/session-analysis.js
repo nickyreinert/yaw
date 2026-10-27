@@ -315,15 +315,15 @@ export async function collectAnalysis({ root, env, all = false, classify = false
     sessions = old.rows.filter((r) => selectedIds.has(r.id)).map((r) => ({ agent: r.agent, native: r.id.slice(r.agent.length + 1), cwd: r.project,
       started: r.started, ended: r.ended, model: r.model, branch: r.branch, tokensIn: r.tokens_in, tokensOut: r.tokens_out, costUsd: r.cost_usd,
       transcript: files.get(`${r.agent}:${r.file_key}`), stamp: r.stamp }));
-    if (sessions.some((s) => !s.transcript)) throw new Error('A filtered local transcript is unavailable. Refresh Sessions before classifying.');
   } else sessions = (await findSessions({ env, root, allProjects: all, reuse, sources: effectiveSources(env), known: [...new Set(old.rows.map((r) => r.project))] })).filter((s) => Date.parse(s.started) >= since);
   const rows = [];
-  let reused = 0, skipped = 0, limited = 0;
+  let reused = 0, skipped = 0, unavailable = 0, limited = 0;
   onProgress?.({ session: 0, sessions: sessions.length, turn: 0, turns: 0 });
   for (const [index, s] of sessions.entries()) {
     await waitIfPaused?.();
     if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
     onProgress?.({ session: index + 1, sessions: sessions.length, turn: 0, turns: 0 });
+    if (!s.transcript && !s.reused) { skipped++; unavailable++; continue; }
     if (s.reused) {
       rows.push(s.reused); reused++;
       if (s.reused.metrics?.limited) limited++;
@@ -350,8 +350,10 @@ export async function collectAnalysis({ root, env, all = false, classify = false
     rows.push(row);
   }
   if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
+  if (classify && !rows.length) return { sessions: 0, reused, skipped, unavailable, limited, collected: old.collected, classified: true };
   const project = realRoot(root);
-  const merged = new Map(old.rows.filter((r) => (selectedIds && !selectedIds.has(r.id)) || (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
+  // Classification updates readable sessions only; a missing/unreadable transcript must never erase saved results.
+  const merged = new Map(old.rows.filter((r) => classify || (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
   for (const row of rows) {
     const previous = old.rows.find((r) => r.id === row.id);
     if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
@@ -364,9 +366,11 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   ] : old.tasks;
   const data = { version: 1, rows: [...merged.values()], tasks, collected: new Date().toISOString() };
   writeUserData(env, 'session-analysis.json', data);
-  return { sessions: rows.length, reused, skipped, limited, collected: data.collected, classified: classify };
+  return { sessions: rows.length, reused, skipped, unavailable, limited, collected: data.collected, classified: classify };
 }
 
 export const scanSummary = (r) => [`Saved ${r.sessions} session(s)`, r.reused ? `${r.reused} unchanged and reused` : '',
   r.limited ? `${r.limited} partial (oversized or broken lines skipped)` : '',
-  r.skipped ? `${r.skipped} unreadable and skipped` : ''].filter(Boolean).join('; ') + '.';
+  r.unavailable ? `${r.unavailable} local transcripts unavailable and skipped` : '',
+  r.skipped > (r.unavailable ?? 0) ? `${r.skipped - (r.unavailable ?? 0)} unreadable and skipped` : '',
+  r.classified && r.skipped ? 'existing results kept for skipped sessions; check Global Settings → Sessions for history folders' : ''].filter(Boolean).join('; ') + '.';

@@ -329,7 +329,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       job.error && job.busy === null && !job.classify
         ? ' If the browser blocked the request, check your ad blocker (for example uBlock Origin), allow this local dashboard, then retry.'
         : null,
-      job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
+      job.skipped && job.busy === null ? [' ', h('a', { href: '#global-settings/sessions' }, 'Session history folders →')] :
+        job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
   }
   let classifierPoll = 0;
   function drawClassifierJob(jobState) {
@@ -400,7 +401,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Narrow the project, date or agent filters.', error: true }); render(); return; }
     const scope = ids ? `${ids.length} saved local sessions matching these filters` : `${scopeText()} for ${periodText()}`;
     if (classify && !confirm(`Classify ${scope}?\n\nYAW reads these conversations and sends eligible turns to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Only aggregate counts are saved. Pause and Stop remain available while it runs.`)) return;
-    Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, classify,
+    Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, skipped: 0, classify,
       message: classify ? 'Classifying eligible turns with local Laya… this can take a while.' : `Reading local transcripts of ${scopeText()}…` });
     render();
     const poll = classify ? ++classifierPoll : null;
@@ -408,6 +409,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     try {
       const result = await api(classify ? 'evaluate' : 'collect', { all, days: days(), confirm: classify, ...(ids ? { ids } : {}) });
       job.message = result.message;
+      job.skipped = result.skipped ?? 0;
       if (classify) await get('classification-job').then(drawClassifierJob);
       if (all) autoDone.add('current');
       autoDone.add(all ? 'all' : 'current');

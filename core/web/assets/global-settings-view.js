@@ -82,8 +82,8 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     populate(data.defaultTarget);
     const label = el('label', 'Default review destination'); label.append(defaultTarget);
     root.replaceChildren(el('article', null, 'card'));
-    root.firstChild.append(el('h2', 'Improve · review destinations'),
-      el('p', 'Choose where Improve sends a review when you ask. Browser chats open with an empty conversation; copy and paste the prompt as in the interview.'),
+    root.firstChild.append(el('h2', 'Learn · review destinations'),
+      el('p', 'Choose where Learn sends a review when you ask. Browser chats open with an empty conversation; copy and paste the prompt as in the interview.'),
       el('h3', 'Installed coding agents'), choices,
       el('p', 'CLI reviews use your existing sign-in and the CLI’s model provider; they may use paid hosted models. YAW starts a separate review in a temporary folder, sends the inspected prompt over stdin, and displays the answer here. No suggestions are applied. Codex user config is excluded for this restricted review.', 'small muted'),
       el('p', 'Supported: Claude Code and Codex. Install and sign in separately. YAW does not install software or store credentials; provider-side retention still applies.', 'small muted'),

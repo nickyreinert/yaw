@@ -61,7 +61,7 @@ const SECTIONS = { 'global-sessions': 'sessions', 'global-knowledge': 'knowledge
 const ALIASES = { decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
   profiling: 'global-sessions', tasks: 'global-tasks', projects: 'global' };
 const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', sessions: 'Workspace sessions', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
-  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-sessions': 'Global sessions', 'global-improve': 'Improve collaboration', 'global-tasks': 'Global tasks',
+  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-sessions': 'Global sessions', 'global-improve': 'Learn from sessions', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
 const GLOBAL_VIEWS = ['global', 'global-sessions', 'global-improve', 'global-tasks', 'sessions'];
 let settings, globalView, globalSettings, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
@@ -358,7 +358,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'interview', 'Defaults', 'about you personal defaults new projects presets'],
   ['global-settings', 'files', 'Files', '~/.yaw presets profile read-only'],
   ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
-  ['global-settings', 'improve', 'Improve', 'review destination installed CLI agents claude codex browser chat'],
+  ['global-settings', 'improve', 'Learn', 'review destination installed CLI agents claude codex browser chat'],
   ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
   ['global-settings', 'sessions', 'Sessions', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],

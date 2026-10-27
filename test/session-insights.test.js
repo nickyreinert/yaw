@@ -7,6 +7,7 @@ import { conversationMessages, INSIGHTS_LIMITS, reviewCandidates } from '../core
 import { insightCoverage, redactPaths, reviewPrompt, REVIEW_LIMITS } from '../core/web/assets/insights-model.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { startDashboard } from '../core/web/dashboard.js';
+import { writeUserData } from '../core/lib/user-store.js';
 import { KIT_ROOT, tmp, writeTree } from './helpers/fixtures.js';
 
 const time = '2026-10-24T08:00:00Z';
@@ -79,6 +80,53 @@ test('classification from Improve touches only the filtered session IDs and pres
   assert.equal(after.rows.find((r) => r.id === f.id).evaluation.classified, 3);
   await assert.rejects(api.action('evaluate', { all: true, ids: ['invented'], confirm: true }), /saved local sessions/);
   assert.equal(calls, 3);
+});
+
+test('filtered classification skips missing transcripts, classifies available ones and retains saved results', async () => {
+  const f = fixture();
+  const other = 'sessions/2026/10/24/rollout-missing.jsonl';
+  writeTree(f.env.CODEX_HOME, { [other]: readFileSync(f.file, 'utf8').replace('"id":"sample"', '"id":"missing"') });
+  await collectAnalysis({ ...f, all: true });
+  const saved = readAnalysis(f.env), missing = saved.rows.find((r) => r.id === 'codex:missing');
+  missing.evaluation = { classified: 1, skipped: 0, counts: { outcome: { unknown: 1 } } };
+  writeUserData(f.env, 'session-analysis.json', saved);
+  renameSync(join(f.env.CODEX_HOME, other), join(tmp(), 'moved.jsonl'));
+  let calls = 0;
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async () => {
+    calls++;
+    return Response.json({ answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((label, i) => [label, i === 0 ? 1 : 0])) }])), usage: { truncated: false }, routing: { model: 'multilingual' } });
+  } });
+  const result = await api.action('evaluate', { all: true, ids: [f.id, missing.id], confirm: true });
+  assert.equal(result.sessions, 1); assert.equal(result.skipped, 1); assert.equal(result.unavailable, 1);
+  assert.equal(calls, 3);
+  assert.deepEqual(readAnalysis(f.env).rows.find((r) => r.id === missing.id), missing);
+  assert.equal(readAnalysis(f.env).rows.find((r) => r.id === f.id).evaluation.classified, 3);
+  const job = api.get['/api/classification-job']();
+  assert.equal(job.status, 'completed'); assert.equal(job.skipped, 1);
+  assert.match(job.message, /Skipped 1.*existing results kept/);
+  assert.match(result.message, /Settings → Sessions/);
+});
+
+test('all missing or legacy unlocatable selections finish without a model call or changing saved data', async () => {
+  const f = fixture(); await collectAnalysis(f);
+  const saved = readAnalysis(f.env); delete saved.rows[0].file_key;
+  writeUserData(f.env, 'session-analysis.json', saved);
+  const before = readFileSync(join(f.env.HOME, '.yaw/session-analysis.json'), 'utf8');
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: () => { throw new Error('Must not call a model'); } });
+  const result = await api.action('evaluate', { all: true, ids: [f.id], confirm: true });
+  assert.equal(result.sessions, 0); assert.equal(result.skipped, 1);
+  assert.equal(api.get['/api/classification-job']().status, 'completed');
+  assert.match(result.message, /No readable sessions.*no model was called/);
+  assert.equal(readFileSync(join(f.env.HOME, '.yaw/session-analysis.json'), 'utf8'), before);
+});
+
+test('a transcript replaced by a symlink is skipped without deleting its saved row', async () => {
+  const f = fixture(); await collectAnalysis(f);
+  const before = readAnalysis(f.env).rows[0], target = join(tmp(), 'moved.jsonl');
+  renameSync(f.file, target); symlinkSync(target, f.file);
+  const result = await collectAnalysis({ ...f, all: true, classify: true, ids: [f.id], fetchFn: () => { throw new Error('Must not call a model'); } });
+  assert.equal(result.skipped, 1);
+  assert.deepEqual(readAnalysis(f.env).rows[0], before);
 });
 
 test('review marks missing and shortened context and bounds long multi-answer excerpts', () => {

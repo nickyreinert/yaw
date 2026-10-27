@@ -58,9 +58,9 @@ Opening `yaw web` reads saved session analysis; transcript collection (**Refresh
 
 The programming-language filter uses YAW configuration or detects the language from local project filenames. Projects with no recognizable evidence and unavailable or synced projects remain **Unknown**.
 
-### Improve your next session
+### Learn from your sessions
 
-Open **Global → Improve** in `yaw web`. Start from a project you remember or sessions with saved friction labels, using the same filters and sorting as Sessions. Read a conversation with highlighted corrections, apologies and recovery, then choose **Review this conversation**. YAW prepares a compact review prompt automatically; inspect/redact it and copy it into a browser chat, or use an installed Claude Code/Codex reviewer enabled in **Global → Settings → Improve**. CLI reviews are explicit and may use paid hosted providers. Evidence stays temporary and suggestions are never applied automatically. See [Improve workflow](docs/workspace-dashboard.md#global--improve).
+Open **Global → Learn** in `yaw web`. Start from a project you remember or sessions with saved friction labels, using the same filters and sorting as Sessions. Read a conversation with highlighted corrections, apologies and recovery, then choose **Review this conversation**. YAW prepares a compact review prompt automatically; inspect/redact it and copy it into a browser chat, or use an installed Claude Code/Codex reviewer enabled in **Global → Settings → Learn**. CLI reviews are explicit and may use paid hosted providers. Evidence stays temporary and suggestions are never applied automatically. See [Learn workflow](docs/workspace-dashboard.md#global--learn).
 
 ### Optional: classify sessions with Laya
 
@@ -72,7 +72,7 @@ python3 -m venv ~/.laya
 LAYA_HOST=127.0.0.1 LAYA_PORT=8000 LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve
 ```
 
-Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **Global → Settings → Classification** in `yaw web` to test the connection and adjust settings, and press **Classify** in Global → Improve or on a Sessions page (or run `yaw sessions evaluate --days 30`). See [Local Laya classification](docs/workspace-dashboard.md#local-laya-classification-experimental).
+Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **Global → Settings → Classification** in `yaw web` to test the connection and adjust settings, and press **Classify** in Global → Learn or on a Sessions page (or run `yaw sessions evaluate --days 30`). See [Local Laya classification](docs/workspace-dashboard.md#local-laya-classification-experimental).
 
 ## See the setup
 
