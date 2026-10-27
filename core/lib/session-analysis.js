@@ -2,7 +2,7 @@ import { createReadStream, constants, openSync, closeSync, fstatSync, readFileSy
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
-import { findSessions } from '../../modules/sessions/lib/import.js';
+import { findSessions, transcriptFiles } from '../../modules/sessions/lib/import.js';
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
 import { effectiveSources } from './session-sources.js';
@@ -294,17 +294,29 @@ export async function probeClassifier(options = {}, fetchFn = fetch) {
 // A hash, not the path, so the saved file does not list history locations.
 const sourceKey = (path) => createHash('sha256').update(String(path)).digest('hex');
 
-export async function collectAnalysis({ root, env, all = false, classify = false, classifier, fetchFn, tasksFor, days = 'all', signal, waitIfPaused, onProgress }) {
+export async function collectAnalysis({ root, env, all = false, classify = false, classifier, fetchFn, tasksFor, days = 'all', ids, signal, waitIfPaused, onProgress }) {
   if (!['all', '7', '30', '90'].includes(days)) throw new Error('Choose all, 7, 30 or 90 days');
   const since = days === 'all' ? -Infinity : Date.now() - Number(days) * 86400000;
   const old = readAnalysis(env);
+  const byId = new Map(old.rows.map((r) => [r.id, r]));
+  if (ids !== undefined && (!classify || !Array.isArray(ids) || !ids.length || ids.length > 20000 || new Set(ids).size !== ids.length || ids.some((id) => typeof id !== 'string' || !byId.has(id) || byId.get(id).source === 'synced'))) {
+    throw new Error('Choose saved local sessions for classification');
+  }
+  const selectedIds = ids ? new Set(ids) : null;
   const saved = new Map(old.rows.filter((r) => r.file_key && r.stamp).map((r) => [r.file_key, r]));
   // Unchanged transcripts keep their saved row; a classification run rereads text, so it never reuses.
   const reuse = classify ? undefined : (path, stamp) => {
     const row = saved.get(sourceKey(path));
     return row?.stamp === stamp && row.reader === READER ? { reused: row, cwd: row.project, started: row.started } : null;
   };
-  const sessions = (await findSessions({ env, root, allProjects: all, reuse, sources: effectiveSources(env), known: [...new Set(old.rows.map((r) => r.project))] })).filter((s) => Date.parse(s.started) >= since);
+  let sessions;
+  if (ids) {
+    const files = new Map(transcriptFiles(effectiveSources(env)).map(({ agent, file }) => [`${agent}:${sourceKey(file)}`, file]));
+    sessions = old.rows.filter((r) => selectedIds.has(r.id)).map((r) => ({ agent: r.agent, native: r.id.slice(r.agent.length + 1), cwd: r.project,
+      started: r.started, ended: r.ended, model: r.model, branch: r.branch, tokensIn: r.tokens_in, tokensOut: r.tokens_out, costUsd: r.cost_usd,
+      transcript: files.get(`${r.agent}:${r.file_key}`), stamp: r.stamp }));
+    if (sessions.some((s) => !s.transcript)) throw new Error('A filtered local transcript is unavailable. Refresh Sessions before classifying.');
+  } else sessions = (await findSessions({ env, root, allProjects: all, reuse, sources: effectiveSources(env), known: [...new Set(old.rows.map((r) => r.project))] })).filter((s) => Date.parse(s.started) >= since);
   const rows = [];
   let reused = 0, skipped = 0, limited = 0;
   onProgress?.({ session: 0, sessions: sessions.length, turn: 0, turns: 0 });
@@ -339,7 +351,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   }
   if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
   const project = realRoot(root);
-  const merged = new Map(old.rows.filter((r) => (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
+  const merged = new Map(old.rows.filter((r) => (selectedIds && !selectedIds.has(r.id)) || (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
   for (const row of rows) {
     const previous = old.rows.find((r) => r.id === row.id);
     if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;

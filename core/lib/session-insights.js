@@ -9,9 +9,27 @@ const hash = (s) => createHash('sha256').update(s).digest('hex');
 // Deliberately tentative phrase hints, not semantic predictions or measured detector accuracy.
 const HINTS = [
   ['Possible correction', /\b(i meant|that(?:'s| is) not what|wrong (?:component|file|scope)|you (?:missed|ignored)|not what i asked)\b|ich meinte|falsch verstanden|je voulais dire|no es lo que ped[ií]/iu],
-  ['Possible admission or apology', /\b(i (?:overlooked|misunderstood|missed)|you(?:'re| are) right|my mistake|i(?:'m| am) sorry|i apologize)\b|mein fehler|tut mir leid|d[eé]sol[eé]|lo siento/iu],
+  ['Possible admission or apology', /\b(i (?:overlooked|misunderstood|missed)|you(?:'re| are) right|my mistake|i(?:'m| am) sorry|i apologize|apology|apologies|sorry|mistake|overlooked|misunderstood)\b|mein fehler|tut mir leid|d[eé]sol[eé]|lo siento/iu],
   ['Possible acceptance or recovery', /\b(thanks.{0,16}(?:works|fixed)|that works|looks good|thank you|problem solved)\b|funktioniert|merci|gracias/iu],
 ];
+
+// The browser receives the conversation in chronological order, plus phrase ranges for safe text-node highlighting.
+export function conversationMessages(messages) {
+  let turn = 0;
+  return messages.map((m, index) => {
+    if (m.role === 'user') turn++;
+    const text = m.text;
+    const highlights = [];
+    HINTS.forEach(([reason, expression], kind) => {
+      let count = 0;
+      for (const match of text.matchAll(new RegExp(expression.source, 'giu'))) {
+        highlights.push({ start: match.index, end: match.index + match[0].length, kind: ['correction', 'admission', 'recovery'][kind], reason });
+        if (++count >= 200) break;
+      }
+    });
+    return { index, turn, role: m.role, text, highlights };
+  });
+}
 
 export function reviewCandidates(messages, { turn, limited = false } = {}) {
   const turns = [];
@@ -61,11 +79,12 @@ export function reviewCandidates(messages, { turn, limited = false } = {}) {
   }) };
 }
 
-export async function reviewSessions({ env, ids, turn }) {
+export async function reviewSessions({ env, ids, turn, conversation = false }) {
   if (!Array.isArray(ids) || !ids.length || ids.length > INSIGHTS_LIMITS.sessions || new Set(ids).size !== ids.length || ids.some((id) => typeof id !== 'string' || !id || id.length > 512)) {
     throw new Error(`Choose 1–${INSIGHTS_LIMITS.sessions} distinct saved local sessions`);
   }
   if (turn !== undefined && (ids.length !== 1 || !Number.isInteger(turn) || turn < 1 || turn > INSIGHTS_LIMITS.messages)) throw new Error('Choose one session and a valid turn number');
+  if (conversation && ids.length !== 1) throw new Error('Open one conversation at a time');
   const saved = readAnalysis(env).rows;
   const selected = ids.map((id) => saved.find((r) => r.id === id && r.source !== 'synced'));
   if (selected.some((r) => !r)) throw new Error('A selected session has no saved local scan. Refresh Sessions and select again.');
@@ -78,7 +97,8 @@ export async function reviewSessions({ env, ids, turn }) {
     let read;
     try { read = await readTurns(file, row.agent, { maxBytes: INSIGHTS_LIMITS.bytes, maxMessages: INSIGHTS_LIMITS.messages }); }
     catch { sessions.push({ ...base, unavailable: 'Transcript could not be read safely or exceeds the read limit.', candidates: [] }); continue; }
-    sessions.push({ ...base, ...reviewCandidates(read.messages, { turn, limited: read.limited }) });
+    sessions.push({ ...base, ...reviewCandidates(read.messages, { turn, limited: read.limited }),
+      ...(conversation ? { messages: conversationMessages(read.messages) } : {}) });
   }
   return { sessions, limits: INSIGHTS_LIMITS, message: 'Temporary phrase suggestions and manual examples only. No model was called and no excerpts were saved.' };
 }

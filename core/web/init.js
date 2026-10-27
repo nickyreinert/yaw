@@ -65,6 +65,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   }
   return {
     actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply'],
+    close: () => workspace.close(),
     get: {
       ...workspace.get,
       '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),

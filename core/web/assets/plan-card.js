@@ -5,20 +5,8 @@
 import { el } from './setup-cards.js';
 
 // Chat services that take a pasted prompt. Plain links; opened in a new tab, no referrer.
-export const CHATS = [
-  ['ChatGPT', 'https://chatgpt.com/'],
-  ['Claude', 'https://claude.ai/new'],
-  ['Gemini', 'https://gemini.google.com/app'],
-  ['Microsoft Copilot', 'https://copilot.microsoft.com/'],
-  ['Grok', 'https://grok.com/'],
-  ['DeepSeek', 'https://chat.deepseek.com/'],
-  ['Qwen', 'https://chat.qwen.ai/'],
-  ['Mistral Le Chat', 'https://chat.mistral.ai/chat'],
-  ['Perplexity', 'https://www.perplexity.ai/'],
-  ['Kimi', 'https://www.kimi.com/'],
-  ['GLM (Z.ai)', 'https://chat.z.ai/'],
-  ['Meta AI', 'https://www.meta.ai/'],
-];
+import { CHATS } from './chat-services.js';
+export { CHATS } from './chat-services.js';
 
 // ctx: { request(action, input) -> Response, getAnswers() -> explicit answers so far, onUse(reply, text), onRemove() }
 export function createPlanCard(ctx) {

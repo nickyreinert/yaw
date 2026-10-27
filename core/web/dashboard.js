@@ -27,6 +27,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('global-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-model.js', 'text/javascript; charset=utf-8'),
+  asset('chat-services.js', 'text/javascript; charset=utf-8'),
   asset('global-settings-view.js', 'text/javascript; charset=utf-8'),
   asset('ui-state.js', 'text/javascript; charset=utf-8'),
   asset('setup-cards.js', 'text/javascript; charset=utf-8'),

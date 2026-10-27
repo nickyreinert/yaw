@@ -1,5 +1,25 @@
 // Pure temporary review helpers, shared with tests. No storage or network access.
 export const REVIEW_LIMITS = Object.freeze({ sessions: 5, examples: 5, packageChars: 24000 });
+export const labelCount = (row, dimension, labels) => labels.reduce((n, key) => n + (row.evaluation?.counts?.[dimension]?.[key] ?? 0), 0);
+export const correctionCount = (row) => labelCount(row, 'behaviour', ['admits_error', 'apology_loop']);
+export const frustrationCount = (row) => labelCount(row, 'sentiment', ['frustrated', 'aggressive']);
+export const unresolvedCount = (row) => labelCount(row, 'outcome', ['partially', 'not_fulfilled', 'abandoned']);
+export const hasFriction = (row) => correctionCount(row) + frustrationCount(row) + unresolvedCount(row) > 0 || Object.entries(row.evaluation?.counts?.failure ?? {}).some(([label, n]) => !['none', 'unknown'].includes(label) && n > 0);
+export function projectReviews(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = row.source === 'synced' ? `Synced · ${row.deviceName ?? 'Other device'}` : row.project;
+    if (!groups.has(key)) groups.set(key, { project: key, rows: [], local: row.source !== 'synced' });
+    groups.get(key).rows.push(row);
+  }
+  return [...groups.values()].map((g) => ({ ...g, classified: g.rows.filter((r) => r.evaluation).length, attention: g.rows.filter(hasFriction).length,
+    corrections: sum(g.rows, correctionCount), frustrated: sum(g.rows, frustrationCount), unresolved: sum(g.rows, unresolvedCount), last: Math.max(...g.rows.map((r) => r.started)) }));
+}
+export function automaticExamples(session) {
+  const friction = session.candidates.filter((c) => c.reasons.some((reason) => /correction|admission|apology/i.test(reason)));
+  const chosen = friction.length ? [...friction, ...session.candidates.filter((c) => c.reasons.some((reason) => /recovery/i.test(reason)))] : session.candidates;
+  return chosen.slice(0, REVIEW_LIMITS.examples).map((c) => ({ ...c, session: 'S1', excerpt: redactPaths(c.excerpt) }));
+}
 export function redactPaths(text) {
   return text.replace(/(?:[A-Za-z]:\\|\\\\|(?<![:\w/])\/)[^\s"'`<>),;]+/g, '[path redacted]');
 }

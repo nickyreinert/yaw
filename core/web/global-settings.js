@@ -80,6 +80,7 @@ const FILES = [
     [PROFILE, 'user', 'Your defaults for new projects (Defaults tab).'],
     ['notification-settings.json', 'data', 'Personal notification channels (Notifications tab). Holds variable names, never tokens.'],
     ['web-preferences.json', 'data', 'Dashboard: Auto refresh for Sessions pages and the local Laya classifier settings.'],
+    ['improve-settings.json', 'data', 'Improve review destinations: enabled CLI names and the default browser or CLI target; no conversation text.'],
     ['web-projects.json', 'data', 'Projects added to the dashboard project switcher.'],
   ]],
   ['Presets', []],

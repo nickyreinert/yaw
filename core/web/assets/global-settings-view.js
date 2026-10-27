@@ -5,9 +5,10 @@ import { available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { RADIO_MAX, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
+import { CHATS } from './chat-services.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification', 'sessions', 'review', 'sync'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'improve', 'sessions', 'review', 'sync'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -43,6 +44,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
     if (tab === 'notifications') loadNotifications().catch(report);
     if (tab === 'classification') loadClassifier().catch(report);
+    if (tab === 'improve') loadImprove().catch(report);
     if (tab === 'review') loadReview().catch(report);
     if (tab === 'sessions') loadSessions().catch(report);
     if (tab === 'sync') loadSync().catch(report);
@@ -57,6 +59,38 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   async function loadReview() {
     const data = await get('global/review-prompts');
     renderReviewPrompts($('gs-review'), { data, scope: 'global', api, load: loadReview });
+  }
+
+  async function loadImprove() {
+    const data = await get('improve/settings'), root = $('gs-improve');
+    const enabled = new Set(data.enabledAgents), status = el('p', '', 'small'); status.setAttribute('role', 'status');
+    const choices = el('div', null, 'improve-agent-options');
+    const defaultTarget = document.createElement('select'); defaultTarget.setAttribute('aria-label', 'Default review destination');
+    const populate = (wanted = defaultTarget.value || data.defaultTarget) => {
+      defaultTarget.replaceChildren();
+      for (const [name] of CHATS) { const o = el('option', `${name} · browser`); o.value = `browser:${name}`; defaultTarget.append(o); }
+      for (const agent of data.agents.filter((a) => enabled.has(a.id))) { const o = el('option', `${agent.name} · CLI${agent.installed ? '' : ' (not installed)'}`); o.value = `cli:${agent.id}`; defaultTarget.append(o); }
+      defaultTarget.value = wanted; if (!defaultTarget.value) defaultTarget.value = 'browser:ChatGPT';
+    };
+    for (const agent of data.agents) {
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = enabled.has(agent.id);
+      checkbox.addEventListener('change', () => { checkbox.checked ? enabled.add(agent.id) : enabled.delete(agent.id); populate(); });
+      const label = el('label', null, 'improve-agent-option');
+      label.append(checkbox, el('strong', agent.name), el('span', agent.installed ? 'Installed on the dashboard server' : 'Not found on the dashboard server PATH', 'small muted'));
+      choices.append(label);
+    }
+    populate(data.defaultTarget);
+    const label = el('label', 'Default review destination'); label.append(defaultTarget);
+    root.replaceChildren(el('article', null, 'card'));
+    root.firstChild.append(el('h2', 'Improve · review destinations'),
+      el('p', 'Choose where Improve sends a review when you ask. Browser chats open with an empty conversation; copy and paste the prompt as in the interview.'),
+      el('h3', 'Installed coding agents'), choices,
+      el('p', 'CLI reviews use your existing sign-in and the CLI’s model provider; they may use paid hosted models. YAW starts a separate review in a temporary folder, sends the inspected prompt over stdin, and displays the answer here. No suggestions are applied. Codex user config is excluded for this restricted review.', 'small muted'),
+      el('p', 'Supported: Claude Code and Codex. Install and sign in separately. YAW does not install software or store credentials; provider-side retention still applies.', 'small muted'),
+      label, button('Save review destinations', async () => {
+        try { await api('improve-settings', { enabledAgents: [...enabled], defaultTarget: defaultTarget.value }); status.textContent = 'Review destinations saved.'; }
+        catch (e) { status.textContent = e.message; }
+      }, 'primary'), status);
   }
 
   // Session sources ---------------------------------------------------------------------------------------

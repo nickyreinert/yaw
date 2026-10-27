@@ -17,12 +17,13 @@ import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './revie
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
+import { createImproveRunner, improveSettings, saveImproveSettings } from './improve-agents.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -39,7 +40,8 @@ const sourcesView = (env, data = sourcesData(env)) => {
   for (const r of readAnalysis(env).rows) found[r.agent] = (found[r.agent] ?? 0) + 1;
   return { ...data, found };
 };
-export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn }) {
+export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn, spawnFn }) {
+  const reviewer = createImproveRunner({ env, spawnFn });
   let running = false;
   let classifierJob = null, resumePaused = null;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
@@ -51,7 +53,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
   const resume = () => { const release = resumePaused; resumePaused = null; release?.(); };
   return {
     actions: WORKSPACE_ACTIONS,
+    close: () => { reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
+      '/api/improve/settings': () => improveSettings(env),
+      '/api/improve/job': () => reviewer.read(),
       '/api/global/session-sources': () => sourcesView(env),
       '/api/global/sync': (params) => syncStatus({ env, selected: params?.get('device') }),
       '/api/sessions': (params) => sessionsData({ root: rootOf(params?.get('workspace')), kitRoot, env, projects }),
@@ -95,6 +100,14 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (['improve-settings', 'improve-agent-start', 'improve-agent-clear'].includes(name)) {
+        try {
+          if (name === 'improve-settings') return saveImproveSettings(env, input);
+          if (name === 'improve-agent-start') return reviewer.start(input);
+          if (input.id !== reviewer.read()?.id) throw new Error('This review is no longer active');
+          return reviewer.clear();
+        } catch (e) { throw new FormError(e.message); }
+      }
       if (name === 'session-sources-save' || name === 'session-sources-reset') {
         try { return sourcesView(env, name === 'session-sources-save' ? saveSources(env, input.sources) : resetSources(env)); }
         catch (e) { throw new FormError(e.message); }
@@ -120,7 +133,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         if (input.confirm !== true) throw new FormError('Confirm reading the selected local transcripts for temporary review');
         if (running) throw new FormError('A session scan or review is already running', 409);
         running = true;
-        try { return await reviewSessions({ env, root, ids: input.ids, turn: input.turn }); }
+        try { return await reviewSessions({ env, ids: input.ids, turn: input.turn, conversation: input.conversation === true }); }
         catch (e) { throw new FormError(e.message); }
         finally { running = false; }
       }
@@ -199,7 +212,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       if (job) classifierJob = job;
       try {
         const result = await collectAnalysis({
-          root, env, all: input.all === true, days: input.days ?? 'all', classify: name === 'evaluate',
+          root, env, all: input.all === true, days: input.days ?? 'all', ids: input.ids, classify: name === 'evaluate',
           classifier: webPreferences(env).classifier, fetchFn,
           ...(job ? {
             signal: job.controller.signal,

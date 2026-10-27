@@ -1,139 +1,222 @@
-import { insightCoverage, redactPaths, REVIEW_LIMITS, reviewPrompt } from './insights-model.js';
+import { automaticExamples, correctionCount, frustrationCount, hasFriction, insightCoverage, projectReviews, redactPaths, reviewPrompt } from './insights-model.js';
+import { CHATS } from './chat-services.js';
 
 const el = (tag, attrs = {}, ...kids) => {
-  const n = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
-    else if (['value', 'checked', 'disabled', 'className', 'textContent'].includes(k)) n[k] = v;
-    else n.setAttribute(k, v);
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+    else if (['value', 'checked', 'disabled', 'className', 'textContent'].includes(key)) node[key] = value;
+    else if (value !== false && value !== undefined) node.setAttribute(key, value);
   }
-  n.append(...kids.flat().filter((x) => x !== null && x !== undefined));
-  return n;
+  node.append(...kids.flat(Infinity).filter((x) => x !== null && x !== undefined)); return node;
 };
+const button = (text, onclick, attrs = {}) => el('button', { type: 'button', onclick, ...attrs }, text);
+const number = (n) => Number(n ?? 0).toLocaleString('en');
+const date = (n) => new Date(n).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const labels = (counts) => Object.entries(counts ?? {}).filter(([, n]) => n > 0).map(([label, n]) => `${label.replaceAll('_', ' ')}: ${n}`).join(' · ') || 'Not classified';
+const metric = (title, value, note) => el('div', { className: 'metric' }, el('span', { className: 'eyebrow' }, title), el('strong', {}, value), el('span', { className: 'muted' }, note));
+const rate = (row, count) => row.evaluation?.classified ? count(row) / row.evaluation.classified : null;
+const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${row.evaluation.classified} turns` : '—';
 
-export function createInsights({ api }) {
-  let scope, rows = [], period, selection = new Set(), result = null, examples = [], packageText = '', instructions = '', version = 0;
-  let busy = false, message = '', error = false, query = '', page = 1, host;
+export function createInsights({ api, get }) {
+  let host, context, scope, version = 0, opened = null, session = null, loading = false, message = '', draft = '', target = null, job = null, poll = 0;
+  const bubbleNodes = new Map();
+  let clue = 0;
   function reset() {
-    version++; selection = new Set(); result = null; examples = []; packageText = ''; instructions = ''; busy = false; message = ''; error = false; query = ''; page = 1;
+    version++; poll++;
+    if (job?.id) api('improve-agent-clear', { id: job.id }).catch(() => {});
+    opened = null; session = null; loading = false; draft = ''; job = null; message = ''; clue = 0; bubbleNodes.clear();
+    context?.onConversation?.(false);
     host?.replaceChildren();
   }
-  function invalidate() { packageText = ''; }
-  function notice(text, failed = false) { message = text; error = failed; draw(); }
-  function totals() {
-    const c = insightCoverage(rows);
-    const labels = (key) => Object.entries(c.counts[key]).map(([label, n]) => `${label}: ${n}/${c.classifiedTurns} classified turns`).join(' · ') || 'No saved classifications';
-    return el('div', { className: 'insights-summary' },
-      el('p', {}, `${c.sessions} filtered sessions · ${c.measuredSessions} measured (${c.partialSessions} partial) · ${c.unmeasuredSessions} unmeasured · ${c.prompts} prompts · ${c.answers} answers.`),
-      el('p', {}, `${c.classifiedSessions}/${c.sessions} sessions classified · ${c.classifiedTurns} classified turns · ${c.skippedTurns} skipped turns · ${c.unclassifiedSessions} unclassified sessions.`),
-      el('p', {}, el('strong', {}, 'Estimated task outcome: '), labels('outcome')),
-      el('p', {}, el('strong', {}, 'Estimated collaboration signals: '), ['sentiment', 'behaviour', 'failure'].map((k) => `${k}: ${labels(k)}`).join(' | ')),
-      el('p', { className: 'small muted' }, 'Unknown and mixed labels are preserved. Counts use classified turns as the denominator and can repeat across dimensions. No validated detector or comparable-group analysis is available; there is not enough evidence for automatic advice.'));
+  function say(text) { message = text; draw(); }
+  const classified = () => context.rows.filter((r) => r.evaluation);
+  function visibleRows() {
+    if (context.focus === 'all') return context.rows;
+    if (context.focus === 'classified') return classified();
+    return context.rows.filter(hasFriction);
   }
-  async function read(ids, turn) {
-    const selected = ids.map((id) => rows.find((r) => r.id === id));
-    const description = selected.map((r) => `${r.agent} · ${new Date(r.started).toLocaleString()} · ${r.title || r.id}`).join('\n');
-    if (!confirm(`Read these ${ids.length} local transcripts for temporary Insights review?\n\n${description}\n\nUp to 8 MiB or 1,000 recorded messages per session, from the start. Larger Gemini documents are skipped. Phrase suggestions are unvalidated; no Laya or hosted model is called. Nothing is saved.${turn ? `\nRead context around turn ${turn}.` : ''}`)) return;
+  function chart(title, dimension, selectedLabels, kind) {
+    const coverage = insightCoverage(context.rows), counts = coverage.counts[dimension];
+    const entries = (selectedLabels ?? Object.keys(counts)).map((key) => [key, counts[key] ?? 0]).filter(([, value]) => value > 0);
+    const max = Math.max(1, ...entries.map(([, n]) => n));
+    const series = context.series;
+    return el('article', { className: 'card improve-chart' }, el('h2', {}, title),
+      entries.length ? entries.map(([label, n]) => {
+        let bar;
+        if (series?.keys.length > 1) {
+          bar = el('div', { className: 'improve-stacked-bar', role: 'img', 'aria-label': `${label}: ${n} classified turns` });
+          for (const group of series.keys) {
+            const count = context.rows.filter((r) => series.keyOf(r) === group).reduce((sum, r) => sum + (r.evaluation?.counts?.[dimension]?.[label] ?? 0), 0);
+            if (!count) continue;
+            const segment = el('span', { title: `${group}: ${count} classified turns` });
+            segment.style.width = `${count / max * 100}%`; segment.style.background = series.color(group); bar.append(segment);
+          }
+        } else bar = el('progress', { max, value: n, className: kind, 'aria-label': `${label}: ${n} classified turns` });
+        return el('div', { className: 'improve-bar' }, el('span', {}, label.replaceAll('_', ' ')), bar, el('strong', {}, number(n)));
+      }) : el('p', { className: 'muted' }, 'Classify sessions to see this pattern.'),
+      series?.keys.length > 1 ? el('div', { className: 'legend' }, ...series.keys.map((group) => { const dot = el('i'); dot.style.background = series.color(group); return el('span', {}, dot, group); })) : null,
+      el('p', { className: 'small muted' }, `${number(coverage.classifiedTurns)} classified turns · ${number(coverage.skippedTurns)} skipped. Estimated labels.`));
+  }
+  function overview() {
+    const coverage = insightCoverage(context.rows), attention = context.rows.filter(hasFriction);
+    const metrics = el('div', { className: 'metrics compact improve-metrics' },
+      metric('Classified sessions', `${coverage.classifiedSessions}/${coverage.sessions}`, `${coverage.unclassifiedSessions} still unclassified`),
+      metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved outcome labels'),
+      metric('Local conversations', number(context.rows.filter((r) => r.source !== 'synced' && r.prompts !== null).length), 'available to open after a local scan'));
+    const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, 'Start with a project you remember, or browse sessions with saved signals.')),
+      el('div', { className: 'subtabs', 'aria-label': 'Browse Improve' }, ...[['projects', 'Projects'], ['sessions', 'Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) }))));
+    const options = el('div', { className: 'subtabs improve-focus', 'aria-label': 'Classification selection' },
+      ...[['attention', `Needs attention (${attention.length})`], ['classified', `All classified (${classified().length})`], ['all', `All sessions (${context.rows.length})`]].map(([value, label]) => button(label, () => context.set({ improveFocus: value }), { 'aria-pressed': String(context.focus === value) })));
+    const rows = visibleRows();
+    const browse = context.view === 'projects' ? context.table('improve-projects', [
+      { key: 'project', label: 'Project', value: (g) => context.rel(g.project), show: (g) => g.local ? button(context.rel(g.project), () => context.set({ project: g.project, improveView: 'sessions' }), { className: 'name' }) : g.project },
+      { key: 'sessions', label: 'Sessions', num: true, value: (g) => g.rows.length },
+      { key: 'classified', label: 'Classified', num: true, value: (g) => g.classified },
+      { key: 'attention', label: 'With signals', num: true, value: (g) => g.attention },
+      { key: 'last', label: 'Last active', value: (g) => g.last, show: (g) => date(g.last) },
+    ], projectReviews(rows), { sort: 'attention', dir: 'desc' }) : context.table('improve-sessions', [
+      { key: 'title', label: 'Session', value: (r) => r.title || r.id, show: (r) => el('div', {}, el('strong', { title: r.id }, r.title || `${r.agent} session`), el('div', { className: 'small muted' }, `${context.rel(r.project)} · ${r.agent} · ${r.model}`)) },
+      { key: 'started', label: 'Started', value: (r) => r.started, show: (r) => date(r.started) },
+      { key: 'outcome', label: 'Outcome estimates', value: (r) => labels(r.evaluation?.counts?.outcome) },
+      { key: 'corrections', label: 'Admitted errors / apologies', value: (r) => rate(r, correctionCount), show: (r) => rateText(r, correctionCount) },
+      { key: 'frustration', label: 'Frustration', value: (r) => rate(r, frustrationCount), show: (r) => rateText(r, frustrationCount) },
+      { key: 'read', label: 'Conversation', sortable: false, value: () => '', show: (r) => button(r.source === 'synced' || r.prompts === null ? 'Not on this device' : 'Read conversation →', () => open(r), { disabled: r.source === 'synced' || r.prompts === null, title: 'Read this session’s local transcript temporarily. No model is called.' }) },
+    ], rows, { sort: 'started', dir: 'desc' });
+    const empty = !rows.length ? el('div', { className: 'improve-empty' }, el('strong', {}, context.focus === 'attention' ? 'No matching friction labels yet' : 'No matching sessions'),
+      el('p', {}, 'Try All classified, choose another project, or classify the sessions in your current filters.'), button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' }))) : browse;
+    return [metrics, el('div', { className: 'improve-charts' }, chart('Did the task get done?', 'outcome', null, 'outcome'),
+      chart('Where did collaboration get difficult?', 'behaviour', ['admits_error', 'apology_loop', 'sycophantic_admission'], 'admission'),
+      chart('How did the user react?', 'sentiment', ['frustrated', 'aggressive', 'positive', 'neutral'], 'correction')),
+      el('article', { className: 'card improve-browser' }, tabs, options, el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), empty)];
+  }
+  async function open(row) {
     const token = ++version;
-    busy = true; invalidate(); message = 'Reading selected transcripts…'; error = false; draw();
+    opened = row; session = null; loading = true; draft = ''; message = ''; clue = 0; draw();
     try {
-      const response = await api('insights-review', { ids, turn, confirm: true });
+      const result = await api('insights-review', { ids: [row.id], conversation: true, confirm: true });
       if (token !== version) return;
-      const toExamples = (s) => s.candidates.map((c) => ({ ...c, session: `S${[...selection].indexOf(s.id) + 1}`, source: s.id, excerpt: redactPaths(c.excerpt), selected: false }));
-      if (turn) {
-        for (const s of response.sessions) {
-          if (s.unavailable) throw new Error(s.unavailable);
-          const add = toExamples(s).filter((e) => !examples.some((old) => old.source === e.source && old.turn === e.turn));
-          examples.push(...add);
-        }
-      } else { result = response; examples = response.sessions.flatMap(toExamples); }
-      message = response.message;
-    } catch (e) { if (token === version) { message = e.message; error = true; } }
-    finally { if (token === version) { busy = false; draw(); } }
+      session = result.sessions[0];
+      if (session.unavailable) message = session.unavailable;
+    } catch (e) { if (token === version) message = e.message; }
+    finally { if (token === version) { loading = false; draw(); jump(0); } }
   }
-  function picker() {
-    const matches = rows.filter((r) => !query || [r.title, r.id, r.agent, r.model, r.project].join(' ').toLowerCase().includes(query.toLowerCase()));
-    const pages = Math.max(1, Math.ceil(matches.length / 10)); page = Math.min(page, pages);
-    const search = el('input', { type: 'search', value: query, placeholder: 'Find sessions…', 'aria-label': 'Find sessions for Insights', onchange: () => { query = search.value; page = 1; draw(); } });
-    const list = el('div', { className: 'insights-session-list' }, matches.slice((page - 1) * 10, page * 10).map((r) => {
-      const unavailable = r.source === 'synced' || r.prompts === null;
-      const check = el('input', { type: 'checkbox', checked: selection.has(r.id), disabled: busy || Boolean(result) || unavailable,
-        onchange: () => {
-          if (check.checked && selection.size >= REVIEW_LIMITS.sessions) { check.checked = false; notice('Choose at most five sessions.', true); return; }
-          check.checked ? selection.add(r.id) : selection.delete(r.id); draw();
-        } });
-      return el('label', { className: 'insights-session' }, check, el('span', {}, `${r.title || r.id} · ${r.agent} · ${r.model} · ${new Date(r.started).toLocaleString()}`,
-        unavailable ? el('span', { className: 'small muted' }, ' · Evidence unavailable: needs a local saved scan; synced statistics remain in the summary.') : null));
-    }));
-    return el('div', {}, search, list, el('div', { className: 'plan-actions' },
-      el('button', { type: 'button', disabled: page <= 1, onclick: () => { page--; draw(); } }, 'Previous'), el('span', {}, `${page}/${pages} · ${matches.length} sessions`),
-      el('button', { type: 'button', disabled: page >= pages, onclick: () => { page++; draw(); } }, 'Next')),
-    el('div', { className: 'plan-actions' },
-      el('button', { type: 'button', disabled: busy || !selection.size || Boolean(result), onclick: () => read([...selection]) }, `Read selected transcripts (${selection.size}/5)`),
-      el('button', { type: 'button', onclick: () => { reset(); draw(); } }, 'Clear temporary review')));
+  const moments = () => (session?.messages ?? []).filter((m) => m.highlights.some((h) => h.kind !== 'recovery'));
+  function jump(index) {
+    const list = moments(); if (!list.length) return;
+    clue = (index + list.length) % list.length;
+    bubbleNodes.get(list[clue].index)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const counter = host.querySelector('[data-clue-count]'); if (counter) counter.textContent = `${clue + 1} / ${list.length}`;
   }
-  function editor(e, i) {
-    const check = el('input', { type: 'checkbox', checked: e.selected, onchange: () => {
-      if (check.checked && examples.filter((x) => x.selected).length >= REVIEW_LIMITS.examples) { check.checked = false; notice('Choose at most five examples.', true); return; }
-      e.selected = check.checked; invalidate(); draw();
+  function highlighted(m) {
+    const parts = [], text = redactPaths(m.text);
+    // Redaction changes offsets: match the original phrases again against the redacted text.
+    const terms = m.highlights.map((h) => ({ ...h, phrase: m.text.slice(h.start, h.end) }));
+    const ranges = [];
+    for (const hint of terms.filter((h, i, all) => all.findIndex((x) => x.phrase === h.phrase && x.kind === h.kind) === i)) {
+      let from = 0, matches = 0;
+      while (matches++ < 200) {
+        const index = text.toLocaleLowerCase().indexOf(hint.phrase.toLocaleLowerCase(), from);
+        if (index < 0) break;
+        ranges.push({ ...hint, start: index, end: index + hint.phrase.length }); from = index + hint.phrase.length;
+      }
+    }
+    let cursor = 0;
+    for (const h of ranges.sort((a, b) => a.start - b.start)) {
+      if (h.start < cursor) continue;
+      parts.push(text.slice(cursor, h.start), el('mark', { className: `clue-${h.kind}`, title: h.reason }, text.slice(h.start, h.end))); cursor = h.end;
+    }
+    parts.push(text.slice(cursor)); return parts;
+  }
+  function conversation() {
+    const list = moments(), messages = el('div', { className: 'improve-dialogue', 'aria-label': 'Recorded conversation' });
+    bubbleNodes.clear();
+    for (const m of session.messages ?? []) {
+      const bubble = el('article', { className: `conversation-message from-${m.role}${m.highlights.some((h) => h.kind !== 'recovery') ? ' has-clue' : ''}` },
+        el('div', { className: 'message-role' }, m.role === 'user' ? 'You' : 'Assistant'), el('div', { className: 'message-text' }, ...highlighted(m)));
+      bubbleNodes.set(m.index, bubble); messages.append(bubble);
+    }
+    return el('section', { className: 'card conversation-reader' }, el('div', { className: 'conversation-toolbar' },
+      el('div', {}, el('h2', {}, 'The conversation'), el('p', { className: 'small muted' }, `${session.messages?.length ?? 0} recorded messages${session.limited ? ' · Partial read: later messages or broken lines may be missing' : ''}`)),
+      el('div', { className: 'clue-navigation' }, button('← Previous clue', () => jump(clue - 1), { disabled: !list.length }), el('span', { 'data-clue-count': '', 'aria-live': 'polite' }, list.length ? `${clue + 1} / ${list.length}` : 'No phrase clues'), button('Next clue →', () => jump(clue + 1), { disabled: !list.length }), button('Review conversation', prepare, { className: 'primary' }))),
+      el('div', { className: 'clue-legend small' }, el('mark', { className: 'clue-correction' }, 'Correction'), el('mark', { className: 'clue-admission' }, 'Apology / mistake'), el('mark', { className: 'clue-recovery' }, 'Recovery'), el('span', { className: 'muted' }, 'Phrase hints, not confirmed errors. Paths redacted.')),
+      messages);
+  }
+  function prepare() {
+    if (job?.status === 'running') return;
+    try {
+      draft = reviewPrompt({ examples: automaticExamples(session), coverage: insightCoverage(context.rows), period: context.period, selectedSessions: 1 });
+      target ??= context.settings?.defaultTarget ?? 'browser:ChatGPT'; message = ''; draw();
+      host.querySelector('[data-review-draft]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { say(e.message); }
+  }
+  async function copy() {
+    if (!draft.trim() || draft.length > 24000) { say('Keep the review prompt between 1 and 24,000 characters.'); return; }
+    try { await navigator.clipboard.writeText(draft); say('Prompt copied. Open a chat below and paste it there.'); }
+    catch { say('Clipboard unavailable. Select and copy the review prompt below.'); }
+  }
+  async function run() {
+    if (!draft.trim() || draft.length > 24000) { say('Keep the review prompt between 1 and 24,000 characters.'); return; }
+    if (!confirm(`Send this exact review prompt to ${target.slice(4)} CLI?\n\nIt uses the agent’s configured model provider and may incur usage charges. The run uses a separate temporary working folder. YAW will not apply its suggestions.`)) return;
+    const token = version;
+    try {
+      const started = await api('improve-agent-start', { agent: target.slice(4), prompt: draft, confirm: true });
+      if (token !== version) { api('improve-agent-clear', { id: started.id }).catch(() => {}); return; }
+      job = started;
+      draw(); const ticket = ++poll;
+      while (ticket === poll && job?.status === 'running') {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        const next = await get('improve/job');
+        if (ticket !== poll || token !== version) return;
+        if (next?.id !== job.id) { job = null; break; }
+        job = next;
+        // Keep the editable draft stable while waiting; replace only the verdict/status section.
+        const node = host.querySelector('[data-verdict]'); if (node) node.replaceChildren(...verdict());
+      }
+    } catch (e) { if (token === version) say(e.message); }
+  }
+  function verdict() {
+    if (!job) return [];
+    return [el('h3', {}, job.status === 'completed' ? 'Your reviewer’s verdict' : 'CLI review'), el('p', { role: 'status' }, job.message),
+      job.status === 'running' ? button('Stop review', async () => { await api('improve-agent-clear', { id: job.id }); poll++; job = null; draw(); }) : null,
+      job.output && job.status === 'completed' ? el('pre', { className: 'improve-verdict' }, job.output) : null];
+  }
+  function review() {
+    const select = el('select', { 'aria-label': 'Review destination', disabled: job?.status === 'running', onchange: () => { target = select.value; draw(); } },
+      ...CHATS.map(([name]) => el('option', { value: `browser:${name}` }, `${name} · browser`)),
+      ...(context.settings?.agents ?? []).filter((a) => a.installed && context.settings.enabledAgents.includes(a.id)).map((a) => el('option', { value: `cli:${a.id}` }, `${a.name} · installed CLI`)));
+    select.value = target ?? context.settings?.defaultTarget ?? 'browser:ChatGPT'; if (!select.value) select.value = 'browser:ChatGPT'; target = select.value;
+    const text = el('textarea', { rows: 12, value: draft, disabled: job?.status === 'running', 'aria-label': 'Review prompt', oninput: () => {
+      draft = text.value;
+      if (job) { api('improve-agent-clear', { id: job.id }).catch(() => {}); job = null; host.querySelector('[data-verdict]')?.replaceChildren(); }
     } });
-    const text = el('textarea', { rows: 9, value: e.excerpt, 'aria-label': `Edit or redact excerpt ${i + 1}`, oninput: () => { e.excerpt = text.value; invalidate(); clearPreview(); } });
-    const reason = el('input', { type: 'text', value: e.reasons.join('; '), 'aria-label': `Selection reason for excerpt ${i + 1}`, oninput: () => { e.reasons = [reason.value]; invalidate(); clearPreview(); } });
-    const detail = el('details', { className: 'insights-example', ...(e.open ? { open: '' } : {}) }, el('summary', {}, `${e.session} · turn ${e.turn} · ${e.reasons.join(', ')}`),
-      el('label', {}, check, ' Include in package'), el('label', {}, 'Selection reason (editable)', reason),
-      ...e.notes.map((n) => el('p', { className: 'small muted' }, n)),
-      el('p', { className: 'small muted' }, 'Edit or redact this context. Remove false positives. Machine paths were redacted where recognized; names and other sensitive details may remain.'), text);
-    detail.addEventListener('toggle', () => { e.open = detail.open; });
-    return detail;
-  }
-  function clearPreview() { host?.querySelector('[data-package]')?.replaceChildren(); }
-  function exportView() {
-    const area = el('div', { 'data-package': '' });
-    if (!packageText) return area;
-    const exact = el('textarea', { rows: 14, value: packageText, 'aria-label': 'Exact review package', oninput: () => { packageText = exact.value; } });
-    const status = el('p', { role: 'status', className: 'small' });
-    const approved = el('input', { type: 'checkbox' });
-    const copy = el('button', { type: 'button', disabled: true, onclick: async () => {
-      if (!packageText.trim() || packageText.length > REVIEW_LIMITS.packageChars) { status.textContent = 'Keep the package between 1 and 24,000 characters.'; return; }
-      try { await navigator.clipboard.writeText(packageText); status.textContent = 'Copied. Paste into your chosen coding agent or web chat; review its verdict before choosing an action.'; }
-      catch { exact.focus(); exact.select(); status.textContent = 'Clipboard unavailable. Copy the selected package manually.'; }
-    } }, 'Copy review prompt');
-    approved.addEventListener('change', () => { copy.disabled = !approved.checked; });
-    exact.addEventListener('input', () => { approved.checked = false; copy.disabled = true; });
-    area.append(el('h3', {}, 'Inspect the exact package'), el('p', {}, 'Copying and pasting into an LLM is a deliberate disclosure to the service you choose. Inspect and redact excerpts and metadata first. YAW sends nothing to an external model.'),
-      exact, el('label', {}, approved, ' I reviewed this exact package for sensitive information.'), copy, status);
-    return area;
+    return el('article', { className: 'card improve-review', 'data-review-draft': '' }, el('h2', {}, 'Get one useful improvement'),
+      el('p', {}, 'The prompt includes highlighted exchanges and nearby context. Inspect or redact it, then choose where to review it. The reviewer returns one verdict and up to three actions.'),
+      el('div', { className: 'review-destination' }, el('label', {}, 'Review with', select), el('a', { href: '#global-settings/improve' }, 'Configure CLI agents')),
+      el('p', { className: 'small muted' }, 'Only send content you are comfortable sharing with the chosen provider. YAW applies no instruction changes.'),
+      text, el('div', { className: 'plan-actions' }, button('Copy review prompt', copy), target.startsWith('cli:') ? button('Run review with CLI', run, { className: 'primary', disabled: job?.status === 'running' }) : el('a', { className: 'button primary', href: CHATS.find(([name]) => `browser:${name}` === target)?.[1] ?? CHATS[0][1], target: '_blank', rel: 'noopener noreferrer' }, `Open ${target.slice(8)} ↗`)),
+      target.startsWith('browser:') ? el('p', { className: 'small muted' }, 'Copy first, then paste into the new chat. The link contains no conversation text.') : null,
+      el('div', { 'data-verdict': '' }, ...verdict()));
   }
   function draw() {
-    if (!host) return;
-    const body = [el('h2', {}, 'Insights review'), el('p', {}, 'Observe saved patterns, review a few exchanges, then copy a prompt for a short verdict. This review stays temporary and is cleared when you leave this view or change filters.'), totals(), picker(),
-      el('p', { role: 'status', className: error ? 'error-text' : 'small muted' }, message)];
-    if (result) {
-      body.push(el('h3', {}, 'Review suggestions and comparisons'), el('p', {}, 'Choose up to five examples (three to five is a useful start). Hints can be wrong; selected examples cannot establish how common a problem is.'));
-      for (const s of result.sessions) {
-        if (s.unavailable) body.push(el('p', {}, `${s.exampleSession}: ${s.unavailable}`));
-        else {
-          const number = el('input', { type: 'number', min: 1, max: s.turns, value: 1, 'aria-label': `Manual turn for ${s.exampleSession}` });
-          body.push(el('div', { className: 'plan-actions' }, el('span', {}, `${s.exampleSession}: ${s.turns} readable turns${s.limited ? ' · partial read' : ''}`), number,
-            el('button', { type: 'button', disabled: busy || !s.turns, onclick: () => read([s.id], Number(number.value)) }, 'Read this turn')));
-        }
-      }
-      body.push(...examples.map(editor));
-      const supplied = el('textarea', { rows: 3, maxlength: 4000, value: instructions, 'aria-label': 'Optional existing instructions', oninput: () => { instructions = supplied.value; invalidate(); clearPreview(); } });
-      body.push(el('label', {}, 'Existing shared instructions (optional; deliberately supplied by you)', supplied),
-        el('button', { type: 'button', disabled: busy || !examples.some((e) => e.selected), onclick: () => {
-          try { packageText = reviewPrompt({ examples: examples.filter((e) => e.selected), coverage: insightCoverage(rows), period, instructions,
-            selectedSessions: selection.size, unavailableSessions: result.sessions.filter((s) => s.unavailable).length }); message = ''; error = false; draw(); }
-          catch (e) { notice(e.message, true); }
-        } }, 'Preview review prompt'), exportView());
+    if (!host || !context) return;
+    context.onConversation?.(Boolean(opened));
+    if (!opened) { host.replaceChildren(...overview()); return; }
+    const head = el('div', { className: 'improve-conversation-heading' }, button('← Back to projects and sessions', () => { reset(); draw(); }),
+      el('div', {}, el('h2', {}, opened.title || 'Session conversation'), el('p', { className: 'muted small' }, `${context.rel(opened.project)} · ${opened.agent} · ${opened.model} · ${date(opened.started)}`)));
+    const content = [head];
+    if (message) content.push(el('p', { className: 'improve-notice', role: 'status' }, message));
+    if (loading) content.push(el('p', { role: 'status' }, 'Opening the local conversation…'));
+    else if (session && !session.unavailable) {
+      content.push(el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
+        el('p', { className: 'small' }, 'We include relevant moments and their context automatically. You can edit the prompt before sharing.')),
+      button('Review this conversation →', prepare, { className: 'primary', disabled: !session.messages?.length })), conversation());
+      if (draft) content.push(review());
     }
-    host.replaceChildren(...body);
+    host.replaceChildren(...content);
   }
   return {
-    render(node, context) {
-      if (scope !== context.scope) { reset(); scope = context.scope; }
-      host = node; rows = context.rows; period = context.period; draw();
-    },
+    render(node, next) { if (scope !== next.scope) { reset(); scope = next.scope; } host = node; context = next; draw(); },
     reset,
   };
 }

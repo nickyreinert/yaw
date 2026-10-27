@@ -18,6 +18,7 @@ const assets = new Map([
   ['/setup-cards.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/setup-cards.js', import.meta.url))]],
   ['/search.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/search.js', import.meta.url))]],
   ['/folder-picker.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/folder-picker.js', import.meta.url))]],
+  ['/chat-services.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/chat-services.js', import.meta.url))]],
   ['/plan-card.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/plan-card.js', import.meta.url))]],
   ['/review-step.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-step.js', import.meta.url))]],
   ['/review-prompts-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-prompts-view.js', import.meta.url))]],
@@ -221,6 +222,7 @@ export async function startFormServer({ port = 0, idleMs = IDLE_MS, signals = tr
 
   function close({ graceful = false } = {}) {
     closed ??= new Promise((resolve) => {
+      api?.close?.();
       clearTimeout(idle);
       process.removeListener('SIGINT', close);
       process.removeListener('SIGTERM', close);

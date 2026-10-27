@@ -70,6 +70,7 @@ projects without a configured language appear as **Unknown**.
   folders, projects, outcomes). The sessions table distinguishes project from
   device. The sticky filter bar also holds **Refresh**, **Auto** and
   **Classify**, described below.
+- **Improve**: classified projects and sessions, highlighted conversations, and browser or configured CLI reviews (below).
 - **Tasks**: open tasks across projects, filterable by folder and project;
   **Open →** switches the dashboard to that project's Tasks page.
 - **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
@@ -90,13 +91,19 @@ table searches, sorting, pages and the open file are kept in the address
 view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
 same view locked to the current workspace.
 
-### Temporary Insights review
+### Global → Improve
 
-Choose **Insights review** in the Sessions filter bar to inspect saved coverage, select up to five locally scanned sessions, and confirm reading their transcripts. The review reads at most 8 MiB or 1,000 messages per session from the start (larger Gemini JSON documents are skipped). Suggestions use tentative phrase hints and ordinary exchanges; they are not validated findings. **Read this turn** lets you explicitly inspect another turn in the readable portion without Laya.
+Open **Global → Improve** to find a project or session that could teach you something. The same filters and sortable/searchable tables as Sessions apply here. Charts use already saved classification results, preserving unknown and mixed labels. **Needs attention** lists sessions with estimated friction or unresolved work; **All classified** and **All sessions** let you recognize work you remember. Click a project to browse its sessions.
 
-Select up to five examples, remove false positives, and edit/redact the excerpts and selection reasons. Context includes the original recorded request, preceding exchange and following user reaction where available; omissions are marked. Recognized absolute paths are redacted initially, but names and sensitive content can remain. Optionally supply existing instructions yourself. **Preview review prompt** builds an editable package with anonymous example IDs, aggregate coverage and a request for one verdict sentence and at most three action bullets within 150 words. Inspect the exact package before **Copy review prompt**; pasting into your chosen LLM deliberately discloses it to that service.
+**Classify** processes unclassified local sessions matching the current filters. When those are classified, **Reclassify** updates matching local sessions. Classification is explicit, uses loopback Laya, and retains Pause, Resume and Stop. Unrelated saved sessions remain unchanged. Use **Refresh** first if sessions have not been scanned. Synced records contribute statistics but cannot open a transcript on this device.
 
-No model runs, verdict is imported, or instruction change is applied by this flow. Selected examples cannot estimate prevalence; saved outcome and collaboration labels remain separate and retain unknown and mixed results. Partial, skipped, unclassified and unavailable evidence is explicit. Reviews are temporary and cleared when you leave, change filters or refresh. No excerpts enter analytics, registry, sync, logs or URL state. See ADR-0064 for limits; automatic diagnosis and a dedicated Global Insights area remain deferred.
+Click **Read conversation** to authorize reading that session. You see the chronological dialogue, with corrections highlighted in gold, apologies/mistakes in pink and recovery in green. **Previous clue** and **Next clue** jump between possible friction signals. These are phrase hints, not confirmed errors. The transcript is read up to 8 MiB or 1,000 messages; partial or unavailable evidence is identified. Larger Gemini JSON files cannot be opened in this bounded reader. Recognized absolute paths are redacted initially; other sensitive details may remain.
+
+**Review this conversation** prepares relevant moments and their context automatically. Inspect and redact the editable prompt, then **Copy review prompt** and **Open ChatGPT**, Claude or another browser chat. This reuses the interview's destinations and sends no prompt in the link. The requested answer is one verdict sentence and up to three actions within 150 words. You decide which suggestion to apply.
+
+To use a coding agent directly, configure **Global → Settings → Improve**: enable an installed **Claude Code** or **Codex** CLI and select your default destination. Choose it in the review panel and press **Run review with CLI**. Confirmation identifies the deliberate disclosure: the CLI uses your sign-in and may send the prompt to a paid hosted provider. YAW starts a fresh, restricted review and displays the result here, without applying changes. Claude uses bare mode without tools; Codex excludes user config and uses an ephemeral read-only session with shell tools, apps, hooks and delegation disabled. Unsupported CLI versions or missing sign-in fail visibly. Vendor references: [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive), [Codex feature configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
+
+Stop a CLI review at any time; it times out after three minutes. Prompt size is capped at 24,000 characters and output at 32,000. YAW stores no conversation text, review prompts or verdicts in analytics, registry, sync or logs. Temporary reviews clear when you leave Improve, change filters or refresh; server verdicts expire after 15 minutes. Provider-side retention is separate. See ADR-0065.
 
 ## Sync between devices
 

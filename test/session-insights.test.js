@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, symlinkSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
-import { collectAnalysis, readAnalysis, readTurns } from '../core/lib/session-analysis.js';
-import { INSIGHTS_LIMITS, reviewCandidates } from '../core/lib/session-insights.js';
+import { collectAnalysis, LABELS, readAnalysis, readTurns } from '../core/lib/session-analysis.js';
+import { conversationMessages, INSIGHTS_LIMITS, reviewCandidates } from '../core/lib/session-insights.js';
 import { insightCoverage, redactPaths, reviewPrompt, REVIEW_LIMITS } from '../core/web/assets/insights-model.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { startDashboard } from '../core/web/dashboard.js';
@@ -43,6 +43,42 @@ test('review finds late corrections, keeps tentative reasons and provides earlie
   for (const text of ['Ich meinte die andere Datei.', 'Je voulais dire le parseur.', 'No es lo que pedí.']) {
     assert.match(reviewCandidates([{ role: 'user', text }]).candidates[0].reasons[0], /Possible correction/);
   }
+});
+
+test('conversation reads return chronological messages and exact phrase ranges without persistent per-turn data', async () => {
+  const f = fixture(); await collectAnalysis(f);
+  const before = JSON.stringify(readAnalysis(f.env));
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT });
+  const session = (await api.action('insights-review', { ids: [f.id], conversation: true, confirm: true })).sessions[0];
+  assert.equal(session.messages.length, messages.length);
+  assert.deepEqual(session.messages.map((m) => m.role), messages.map((m) => m.role));
+  assert.ok(session.messages[2].highlights.some((h) => session.messages[2].text.slice(h.start, h.end) === 'I meant'));
+  assert.ok(session.messages[3].highlights.some((h) => h.kind === 'admission'));
+  assert.equal(JSON.stringify(readAnalysis(f.env)), before);
+  const repeated = conversationMessages([{ role: 'assistant', text: 'mistake '.repeat(1000) }]);
+  assert.equal(repeated[0].highlights.length, 200, 'repeated phrase ranges are bounded');
+});
+
+test('classification from Improve touches only the filtered session IDs and preserves other saved rows', async () => {
+  const f = fixture(), otherRoot = tmp();
+  writeTree(f.env.CODEX_HOME, { 'sessions/2026/10/24/rollout-other.jsonl': [
+    { type: 'session_meta', timestamp: time, payload: { id: 'other', cwd: otherRoot } },
+    ...messages.map((m) => ({ type: 'response_item', timestamp: time, payload: { type: 'message', role: m.role, content: [{ type: 'text', text: m.text }] } })),
+  ].map(JSON.stringify).join('\n') });
+  await collectAnalysis({ ...f, all: true });
+  const before = JSON.stringify(readAnalysis(f.env).rows.find((r) => r.id === 'codex:other'));
+  let calls = 0;
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async () => {
+    calls++;
+    return Response.json({ answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((label, i) => [label, i === 0 ? 1 : 0])) }])), usage: { truncated: false }, routing: { model: 'multilingual' } });
+  } });
+  await api.action('evaluate', { all: true, ids: [f.id], confirm: true });
+  assert.equal(calls, 3);
+  const after = readAnalysis(f.env);
+  assert.equal(JSON.stringify(after.rows.find((r) => r.id === 'codex:other')), before);
+  assert.equal(after.rows.find((r) => r.id === f.id).evaluation.classified, 3);
+  await assert.rejects(api.action('evaluate', { all: true, ids: ['invented'], confirm: true }), /saved local sessions/);
+  assert.equal(calls, 3);
 });
 
 test('review marks missing and shortened context and bounds long multi-answer excerpts', () => {
@@ -165,7 +201,16 @@ test('Insights action and browser modules use existing authenticated no-store an
   const result = await post({ ids: [f.id], confirm: true });
   assert.equal(result.status, 200); assert.equal(result.headers.get('cache-control'), 'no-store');
   assert.equal((await result.json()).sessions[0].turns, 3);
-  for (const file of ['insights-model.js', 'insights-view.js']) {
+  const preferences = await fetch(`${base}/api/improve/settings`, { headers: { cookie } });
+  assert.equal(preferences.status, 200); assert.deepEqual((await preferences.json()).enabledAgents, []);
+  const action = (name, input, token = csrf) => fetch(`${base}/api/${name}`, { method: 'POST', headers: { cookie, 'content-type': 'application/json', 'x-yaw-token': token }, body: JSON.stringify(input) });
+  assert.equal((await action('improve-settings', { enabledAgents: ['claude'], defaultTarget: 'cli:claude' }, '')).status, 403);
+  assert.equal((await action('improve-settings', { enabledAgents: ['claude'], defaultTarget: 'cli:claude' })).status, 200);
+  assert.equal((await action('improve-agent-start', { agent: 'claude', prompt: 'Do not launch without confirmation.' })).status, 400);
+  assert.equal((await action('improve-agent-start', { agent: 'shell', prompt: 'Never execute arbitrary commands.', confirm: true })).status, 400);
+  assert.equal((await fetch(`${base}/api/improve/job`, { headers: { cookie } })).status, 200);
+  assert.match(html, /data-route="global-improve"/); assert.match(html, /id="gs-improve"/);
+  for (const file of ['insights-model.js', 'insights-view.js', 'chat-services.js']) {
     const response = await fetch(`${base}/${file}`, { headers: { cookie } });
     assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /javascript/);
   }
