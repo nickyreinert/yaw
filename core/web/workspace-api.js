@@ -16,12 +16,13 @@ import { ProjectError } from '../render/project.js';
 import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
+import { reviewSessions } from '../lib/session-insights.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -115,6 +116,14 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         return name === 'review-prompt-save' ? saveReviewPrompt({ root: null, kitRoot, env, input }) : removeReviewPrompt({ root: null, env, input });
       }
       const root = rootOf(input.workspace);
+      if (name === 'insights-review') {
+        if (input.confirm !== true) throw new FormError('Confirm reading the selected local transcripts for temporary review');
+        if (running) throw new FormError('A session scan or review is already running', 409);
+        running = true;
+        try { return await reviewSessions({ env, root, ids: input.ids, turn: input.turn }); }
+        catch (e) { throw new FormError(e.message); }
+        finally { running = false; }
+      }
       if (name === 'review-prompt-save') return saveReviewPrompt({ root, kitRoot, env, input });
       if (name === 'review-prompt-remove') return removeReviewPrompt({ root, env, input });
       input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));

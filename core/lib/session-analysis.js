@@ -34,30 +34,32 @@ export function messageOf(agent, o) {
 }
 
 // Gemini CLI keeps one JSON document per chat; `content` is a string or a list of { text } parts.
-function geminiTurns(file, maxUserTurns) {
+function geminiTurns(file, maxUserTurns, maxBytes, maxMessages) {
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const st = fstatSync(fd);
-    if (!st.isFile() || st.size > 64 * 1024 * 1024) throw new Error('Session analysis reads regular transcript files only');
+    if (!st.isFile() || st.size > Math.min(maxBytes, 64 * 1024 * 1024)) throw new Error('Transcript is unavailable or exceeds the read limit');
     const chat = JSON.parse(readFileSync(fd, 'utf8'));
     const messages = [];
-    let userTurns = 0;
+    let userTurns = 0, limited = false;
     for (const m of Array.isArray(chat?.messages) ? chat.messages : []) {
       const role = m?.type === 'user' ? 'user' : m?.type === 'gemini' ? 'assistant' : null;
       const text = typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m.content.map((p) => p?.text ?? '').join('\n') : '';
       if (role && text) {
+        if (messages.length >= maxMessages) { limited = true; break; }
         messages.push({ role, text, time: m.timestamp });
         if (role === 'user' && ++userTurns > maxUserTurns) break;
       }
     }
-    return { messages, limited: false };
+    return { messages, limited };
   } finally { closeSync(fd); }
 }
 
-export async function readTurns(file, agent, { maxUserTurns = Infinity } = {}) {
+export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes = Infinity, maxMessages = Infinity } = {}) {
   if (!file) return { messages: [], limited: false };
   if (maxUserTurns !== Infinity && (!Number.isInteger(maxUserTurns) || maxUserTurns < 1 || maxUserTurns > 11)) throw new Error('maxUserTurns must be from 1 to 11');
-  if (agent === 'gemini') return geminiTurns(file, maxUserTurns);
+  for (const value of [maxBytes, maxMessages]) if (value !== Infinity && (!Number.isInteger(value) || value < 1)) throw new Error('Read limits must be positive integers');
+  if (agent === 'gemini') return geminiTurns(file, maxUserTurns, maxBytes, maxMessages);
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   const messages = [], seen = new Map();
   let input;
@@ -65,7 +67,8 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity } = {}) {
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
-    input = createReadStream(file, { fd, encoding: 'utf8' });
+    limited = st.size > maxBytes;
+    input = createReadStream(file, { fd, encoding: 'utf8', ...(maxBytes === Infinity ? {} : { end: maxBytes - 1 }) });
     const lines = createInterface({ input, crlfDelay: Infinity });
     try {
       for await (const line of lines) {
@@ -81,6 +84,7 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity } = {}) {
           if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
           continue;
         }
+        if (messages.length >= maxMessages) { limited = true; break; }
         const message = { role: m.role, text: m.text, time: m.time };
         if (key) seen.set(key, message);
         messages.push(message);

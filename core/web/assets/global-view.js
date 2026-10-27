@@ -2,6 +2,7 @@
 // One sticky filter drives every card, chart and table; filters, split and table state live in the URL. On Sessions it
 // also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
+import { createInsights } from './insights-view.js';
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
@@ -36,14 +37,15 @@ const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · proj
 
 const DEFAULTS = { path: '', project: '', device: '', agent: '', model: '', language: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions' };
 const FILTERS = ['path', 'project', 'agent', 'model', 'language', 'period', 'from', 'to', 'split'];
-const KEYS = { global: [...FILTERS, 'device'], 'global-sessions': [...FILTERS, 'device', 'table'], sessions: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { global: [...FILTERS, 'device'], 'global-sessions': [...FILTERS, 'device', 'table'], sessions: ['agent', 'model', 'language', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
 const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a', gemini: '#8a5bb5' };
-const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes']];
+const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes'], ['insights', 'Insights review']];
 const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
+  const insights = createInsights({ api });
   const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
   let prefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
@@ -85,6 +87,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     return duplicates ? `${d.name} (${d.id === 'local' ? 'local' : d.id.slice(0, 8)})` : d.name;
   };
   async function load(force = false) {
+    if (force) insights.reset();
     if (data && !force) return data;
     loading ??= get('sessions').then(prepare).finally(() => { loading = null; });
     await loading; return data;
@@ -309,7 +312,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
       h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
         title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
-      job.busy === 'classify' ? 'Classifying…' : 'Classify'));
+      job.busy === 'classify' ? 'Classifying…' : 'Classify'),
+      h('button', { type: 'button', on: { click: () => set({ table: 'insights' }) }, title: 'Select a few sessions, review and redact exchanges, then copy a concise-verdict prompt.' }, 'Insights review'));
   }
   function collectStatus() {
     const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
@@ -469,6 +473,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
 
   // ---------- Sessions (global, or locked to the workspace) ----------
   function sessions() {
+    if (state.table !== 'insights') insights.reset();
+    $('ss-charts').hidden = state.table === 'insights';
     $('ss-intro').textContent = locked() ? `This workspace · ${data?.current ?? ''}` :
       `${state.device ? deviceLabel(state.device) : 'All devices'} · All projects · local + synced session stats`;
     const labels = document.querySelectorAll('#sessions .metric-group-label');
@@ -507,6 +513,14 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (!tabs.some(([k]) => k === state.table)) state.table = 'sessions';
     const sub = h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Tables' }, tabs.map(([k, l]) =>
       h('button', { type: 'button', 'aria-pressed': String(state.table === k), on: { click: () => { state.table = k; writeUrl(); sessions(); } } }, l)));
+    if (state.table === 'insights') {
+      const panel = h('article', { class: 'card insights-review' });
+      const [from, to] = bounds();
+      insights.render(panel, { rows, scope: JSON.stringify([route, data.current, ...FILTERS.map((k) => state[k]), state.device]),
+        period: `${day(from)} through ${day(to - 1)} (UTC); current shared filters; ${data.limited ? 'session list capped at 20,000' : 'uncapped saved session list'}` });
+      fill($('ss-browse'), sub, panel);
+      return;
+    }
     const groupCols = (label) => [str('name', label, (g) => g.label), num('sessions', 'Sessions', (g) => g.rows.length),
       num('minutes', 'Elapsed', (g) => sum(g.rows, (r) => r.minutes), (g) => dur(sum(g.rows, (r) => r.minutes))),
       num('tokens', 'Tokens', (g) => sum(g.rows, tokens)), num('prompts', 'Prompts', (g) => sum(g.rows, (r) => r.prompts)),
@@ -559,6 +573,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   }
   return {
     async show(name, query = '') {
+      if (route !== name || !['sessions', 'global-sessions'].includes(name)) insights.reset();
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
       if (['sessions', 'global-sessions'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
@@ -569,6 +584,6 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (['sessions', 'global-sessions'].includes(name) && prefs?.autoRefresh && !autoDone.has(scope)) { autoDone.add(scope); run(false); }
     },
     async reload() { try { await load(true); } catch (e) { report(e); return; } render(); },
-    hide() { route = null; },
+    hide() { insights.reset(); route = null; },
   };
 }

@@ -90,6 +90,14 @@ table searches, sorting, pages and the open file are kept in the address
 view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
 same view locked to the current workspace.
 
+### Temporary Insights review
+
+Choose **Insights review** in the Sessions filter bar to inspect saved coverage, select up to five locally scanned sessions, and confirm reading their transcripts. The review reads at most 8 MiB or 1,000 messages per session from the start (larger Gemini JSON documents are skipped). Suggestions use tentative phrase hints and ordinary exchanges; they are not validated findings. **Read this turn** lets you explicitly inspect another turn in the readable portion without Laya.
+
+Select up to five examples, remove false positives, and edit/redact the excerpts and selection reasons. Context includes the original recorded request, preceding exchange and following user reaction where available; omissions are marked. Recognized absolute paths are redacted initially, but names and sensitive content can remain. Optionally supply existing instructions yourself. **Preview review prompt** builds an editable package with anonymous example IDs, aggregate coverage and a request for one verdict sentence and at most three action bullets within 150 words. Inspect the exact package before **Copy review prompt**; pasting into your chosen LLM deliberately discloses it to that service.
+
+No model runs, verdict is imported, or instruction change is applied by this flow. Selected examples cannot estimate prevalence; saved outcome and collaboration labels remain separate and retain unknown and mixed results. Partial, skipped, unclassified and unavailable evidence is explicit. Reviews are temporary and cleared when you leave, change filters or refresh. No excerpts enter analytics, registry, sync, logs or URL state. See ADR-0064 for limits; automatic diagnosis and a dedicated Global Insights area remain deferred.
+
 ## Sync between devices
 
 Open **Global / Settings / Sync** to choose an existing folder (including a

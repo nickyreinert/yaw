@@ -367,6 +367,37 @@ async function gemini(base, project, reuse, known = []) {
 const READERS = { claude, codex, copilot, gemini };
 export const FORMATS = { claude: 'Claude Code', codex: 'Codex', copilot: 'Copilot CLI', gemini: 'Gemini CLI' };
 
+// Filename-only discovery for an explicitly selected review. Never parse other sessions to locate saved file hashes.
+export function transcriptFiles(sources) {
+  const out = [];
+  for (const { agent, path: base } of sources) {
+    if (!isDir(base)) continue;
+    let files = [];
+    if (agent === 'codex' && isDir(join(base, 'sessions'))) files = codexFiles(join(base, 'sessions'));
+    else if (agent === 'copilot') {
+      const dir = join(base, 'session-state');
+      if (isDir(dir)) for (const name of list(dir).slice(0, MAX_FILES)) {
+        if (isDir(join(dir, name))) files.push(join(dir, name, 'events.jsonl'));
+      }
+    } else if (agent === 'claude' || agent === 'gemini') {
+      const parent = join(base, agent === 'claude' ? 'projects' : 'tmp');
+      if (isDir(parent)) for (const name of list(parent)) {
+        const project = join(parent, name);
+        if (!isDir(project)) continue;
+        const dir = agent === 'gemini' ? join(project, 'chats') : project;
+        if (!isDir(dir)) continue;
+        for (const file of list(dir)) {
+          if (files.length >= MAX_FILES) break;
+          if (agent === 'claude' ? file.endsWith('.jsonl') : /^session-.*\.json$/.test(file)) files.push(join(dir, file));
+        }
+        if (files.length >= MAX_FILES) break;
+      }
+    }
+    out.push(...files.filter(isFile).map((file) => ({ agent, file })));
+  }
+  return out;
+}
+
 // Where each agent keeps its history unless the user says otherwise: [agent, folder, note].
 export function defaultSources(env) {
   const home = env.HOME ?? '';

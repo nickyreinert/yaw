@@ -622,4 +622,16 @@ mark.search-hit { background: #ffd966; color: #1d2d2a; border-radius: 3px; paddi
 .source-row input:not([type=checkbox]), .source-row select { margin: 0; }
 .source-row code { overflow-wrap: anywhere; }
 .warn-text { color: #9b2c2c; }
+.insights-review { margin-top: 12px; }
+.insights-review p, .insights-example summary { overflow-wrap: anywhere; }
+.insights-summary { padding: 8px 14px; background: var(--wash); border-radius: 8px; margin: 12px 0; }
+.insights-summary p { margin: 6px 0; font-size: .84rem; }
+.insights-session-list { display: grid; gap: 6px; margin: 10px 0; }
+.insights-session { display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--line); padding: 8px 0; }
+.insights-session span { overflow-wrap: anywhere; }
+.insights-review input[type=checkbox] { width: auto; flex-shrink: 0; }
+.insights-review input[type=number] { width: 6rem; margin: 0; }
+.insights-example { border: 1px solid var(--line); padding: 10px 12px; margin: 10px 0; border-radius: 8px; }
+.insights-example summary { cursor: pointer; }
+.insights-example textarea, .insights-review [data-package] textarea { font-family: ui-monospace, monospace; font-size: .8rem; }
 @media (max-width: 900px) { .source-row { grid-template-columns: 1.6rem 1fr; } .source-row > * { min-width: 0; } }
