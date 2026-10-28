@@ -57,14 +57,14 @@ let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
 const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
 // Routes are `#name[/sub][?query]`. Workspace and Global Sessions share one section, both Knowledge pages another.
-const views = ['overview', 'setup', 'sessions', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'global', 'global-sessions', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
-const SECTIONS = { 'global-sessions': 'sessions', 'global-knowledge': 'knowledge' };
-const ALIASES = { decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
-  profiling: 'global-sessions', tasks: 'global-tasks', projects: 'global' };
-const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', sessions: 'Workspace sessions', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
-  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-sessions': 'Global sessions', 'global-improve': 'Learn from sessions', 'global-tasks': 'Global tasks',
+const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
+const SECTIONS = { 'global-analytics': 'analytics', 'global-knowledge': 'knowledge' };
+const ALIASES = { sessions: 'analytics', 'global-sessions': 'global-analytics', decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
+  profiling: 'global-analytics', tasks: 'global-tasks', projects: 'global' };
+const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', analytics: 'Workspace analytics', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
+  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-analytics': 'Global analytics', 'global-improve': 'Learn from sessions', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
-const GLOBAL_VIEWS = ['global', 'global-sessions', 'global-improve', 'global-tasks', 'sessions'];
+const GLOBAL_VIEWS = ['global', 'global-analytics', 'global-improve', 'global-tasks', 'analytics'];
 let settings, globalView, globalSettings, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
 const replace = (url) => { if (url !== location.hash) history.replaceState(null, '', url); shown = location.hash; };
 function setInterviewFocus(on) {
@@ -136,9 +136,9 @@ function overview(d) {
   document.querySelector('[data-route="code-map"]').hidden = !p.modules?.includes('code-map');
   const activity = card('Activity', 'Last 30 active days · UTC');
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
-  activity.append(action('Browse workspace sessions →', 'sessions'), action('Browse knowledge →', 'knowledge'));
+  activity.append(action('Open workspace analytics →', 'analytics'), action('Browse knowledge →', 'knowledge'));
   $('workspace-actions').replaceChildren(project, activity);
-  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Sessions and press Refresh to read local history.'));
+  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Analytics and press Refresh to read local history.'));
   if (mine && mine.sessions > (mine.recent?.length ?? 0)) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
   const t = d.tasks;
   $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
@@ -366,7 +366,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
   ['global-settings', 'improve', 'Learn', 'review destination installed CLI agents claude codex browser chat'],
   ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
-  ['global-settings', 'sessions', 'Sessions', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
+  ['global-settings', 'sessions', 'Data sources', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],
   ['global-settings', 'sync', 'Sync', 'devices folder nas github repository statistics presets merge conflicts'],
   ['global-settings', 'features', 'Features', 'optional features enable disable'],

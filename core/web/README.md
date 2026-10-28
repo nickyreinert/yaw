@@ -7,16 +7,16 @@
 | Overview | Current workspace: session counts, reported tokens, elapsed time, task count, configuration, activity |
 | Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
 | Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project; device filter for session metrics |
-| Sessions | Workspace (locked to the project) and Global; sticky folder/project/device/agent/model/period filter (device on Global only); usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
+| Analytics | Workspace (locked to the project) and Global; shared multi-select column browser: Device → Folders → Projects → Programming language → Agent → Model; dates and chart split below; usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
 | Learn | Classified project/session browsing, filtered classification, highlighted dialogue and browser/CLI review; temporary evidence |
 | Knowledge | Workspace (project records, decisions, decision categories) and Global (user records); full-text search; namespace/type filters; list/detail reader; rendered/source views; pagination |
 | Settings | Workspace: Interview (`yaw edit` in the browser: preview, then apply; first setup for a folder without YAW), Files (YAW-written files by purpose, read-only Form/Raw drawer), Review prompts (project overrides). Global: personal-defaults interview and presets, `~/.yaw` files, Notifications, Classification (editable prompt and temporary sample preview; no model training), Review prompts (blueprint) |
 | Tasks | Workspace `TASKS.md`; Global task snapshots filterable by folder/project, linking to each project |
 | Code map | Saved map; shown only when the code-map module is enabled |
 
-## Sessions
+## Analytics
 
-**Global → Learn** is the home for reviewing collaboration. It reuses the Sessions folder/project/device/agent/model/language/date filters and sortable, searchable, paged tables. Saved classification charts show outcomes, assistant behaviour and sentiment separately. Start with a recognizable project or browse sessions under Needs attention, All classified or All sessions. Learn classifies only eligible saved local session IDs matching those filters (unclassified first), without touching other saved rows. Pause, Resume and Stop use the shared classifier job controls. Refresh collects saved metadata separately.
+**Global → Learn** is the home for reviewing collaboration. It reuses the shared Analytics filters and sortable, searchable, paged tables. Saved classification charts show outcomes, assistant behaviour and sentiment separately. Start with a recognizable project or browse sessions under Needs attention, All classified or All sessions. Learn classifies only eligible saved local session IDs matching those filters (unclassified first), without touching other saved rows. Pause, Resume and Stop use the shared classifier job controls. Refresh collects saved metadata separately.
 
 **Read conversation** explicitly authorizes reading that named local transcript. The authenticated `insights-review` POST performs filename-only discovery, then returns chronological user/assistant messages with tentative correction, apology/mistake and recovery ranges for safe text-node highlighting. Previous/Next clue moves through the conversation. No turn count or excerpt checklist is required. Reads remain capped at 8 MiB or 1,000 recorded messages; larger Gemini documents are skipped. Missing evidence and partial reads are visible. Synced statistics still work but cannot supply local dialogue.
 
@@ -28,8 +28,8 @@ The default is all history across all projects. The application requests read-on
 
 Native scans cache their metadata for 60 seconds; Refresh rescans. Existing parser bounds apply: up to 20,000 files per agent and lines up to 4 MiB. Symlinked agent-history directories/files are skipped. Missing/unreadable history files do not hide other projects. Full prompt/response objects are parsed transiently by the existing import readers and discarded; only metadata is retained. The UI discloses the scan limit.
 
-Project/agent/model/date filters run before totals, sorting and pagination.
-Global overview and Global Sessions also have a device selector (**All
+The six filter columns combine choices with OR within a column and AND across columns. Each column lists choices allowed by the columns to its left and the date range; changing an earlier column clears incompatible later selections. All is the default. Filters run before totals, sorting and pagination. Repeated URL parameters preserve multiple selections; legacy #sessions and #global-sessions links redirect to #analytics and #global-analytics.
+Global overview and Global Analytics also have a device selector (**All
 devices** by default, **This device**, or a synced device name); it filters
 every session metric, chart and table, and is kept in the URL. Synced sessions
 have no project path, so the overview groups them by device and project counts

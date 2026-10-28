@@ -8,14 +8,14 @@
     <nav id="side-nav" aria-label="Workspace">
       <span class="nav-label">WORKSPACE</span>
       <button type="button" data-route="overview"><span aria-hidden="true">◫</span> Overview</button>
-      <button type="button" data-route="sessions"><span aria-hidden="true">▥</span> Sessions</button>
+      <button type="button" data-route="analytics"><span aria-hidden="true">▥</span> Analytics</button>
       <button type="button" data-route="settings"><span aria-hidden="true">⊞</span> Settings</button>
       <button type="button" data-route="knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
       <button type="button" data-route="workspace-tasks"><span aria-hidden="true">☷</span> Tasks</button>
       <button type="button" data-route="code-map" hidden><span aria-hidden="true">⌗</span> Code map</button>
       <span class="nav-label">GLOBAL</span>
       <button type="button" data-route="global"><span aria-hidden="true">◫</span> Overview</button>
-      <button type="button" data-route="global-sessions"><span aria-hidden="true">▥</span> Sessions</button>
+      <button type="button" data-route="global-analytics"><span aria-hidden="true">▥</span> Analytics</button>
       <button type="button" data-route="global-improve"><span aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="m2 9 10-5 10 5-10 5L2 9Z"/><path d="M6 11v6c3 3 9 3 12 0v-6M22 9v7"/></svg></span> Learn</button>
       <button type="button" data-route="global-tasks"><span aria-hidden="true">☷</span> Tasks</button>
       <button type="button" data-route="global-knowledge"><span aria-hidden="true">◇</span> Knowledge</button>
@@ -81,8 +81,8 @@
       </section>
       <section data-view="workspace-tasks" class="view" hidden><div class="page-heading"><h1 tabindex="-1">Tasks</h1><span class="small muted">This workspace · <code>TASKS.md</code></span></div><div id="workspace-task-list" class="card"></div></section>
       <section data-view="code-map" class="view" hidden><h1 tabindex="-1">Workspace code map</h1><p>Only the current workspace. Updates are explicit: <code>yaw map update</code>; validate with <code>yaw map check</code>.</p><button type="button" id="map-refresh">Read saved map</button><div id="map-areas"></div><pre id="map-content"></pre></section>
-      <section data-view="sessions" id="sessions" class="view" hidden>
-        <div class="page-heading"><h1 tabindex="-1">Sessions</h1><span id="ss-intro" class="small muted">Claude Code · Codex · Copilot CLI · registry + saved scans</span></div>
+      <section data-view="analytics" id="sessions" class="view" hidden>
+        <div class="page-heading"><h1 tabindex="-1">Analytics</h1><span id="ss-intro" class="small muted">Claude Code · Codex · Copilot CLI · registry + saved scans</span></div>
         <div id="ss-filter" class="gfilter-slot"></div>
         <div class="metric-group-label">USAGE</div><div class="metrics compact" id="ss-metrics"></div>
         <div class="metric-group-label">MESSAGE INSIGHTS</div><div class="metrics compact" id="ss-insights"></div>
@@ -109,7 +109,7 @@
       </section>
       <section data-view="global-settings" id="global-settings-view" class="view" hidden>
         <div class="page-heading"><div class="heading-row"><h1 tabindex="-1">Settings</h1><label class="page-search"><span class="sr-only">Search this page</span><input type="search" id="gs-search" placeholder="Search global settings…" maxlength="100" autocomplete="off"><span id="gs-search-status" class="small muted" role="status"></span></label></div><span class="small muted">You · ~/.yaw · applies to all projects</span></div>
-        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Defaults</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button><button type="button" data-tab="classification">Classification</button><button type="button" data-tab="improve">Learn</button><button type="button" data-tab="sessions">Sessions</button><button type="button" data-tab="review">Review prompts</button><button type="button" data-tab="sync">Sync</button></nav>
+        <nav id="global-settings-tabs" class="editor-tabs" aria-label="Global settings views"><button type="button" data-tab="interview">Defaults</button><button type="button" data-tab="files">Files</button><button type="button" data-tab="notifications">Notifications</button><button type="button" data-tab="classification">Classification</button><button type="button" data-tab="improve">Learn</button><button type="button" data-tab="sessions">Data sources</button><button type="button" data-tab="review">Review prompts</button><button type="button" data-tab="sync">Sync</button></nav>
         <div id="gs-interview"></div>
         <div id="gs-files" hidden></div>
         <div id="gs-notifications" hidden><div class="card"><h2>Notifications</h2><div id="notification-settings"></div></div><div id="gs-comfort" class="card"></div></div>

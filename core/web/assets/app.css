@@ -734,3 +734,24 @@ a.button.primary { background: var(--accent); color: #fff; }
   .improve-agent-option { flex-wrap: wrap; }
 }
 .tool-default-cards { align-items: start; }
+
+/* The column browser stays in document flow so charts retain their screen space. */
+.gfilter-slot:has(.analytics-filter) { position: static; }
+.gfilter.analytics-filter { display: grid; gap: 18px; align-items: stretch; padding: 20px; }
+.facet-browser { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; min-width: 0; }
+.facet-column { min-width: 0; padding: 10px 0 0; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.facet-column legend { margin-left: 10px; padding: 0 4px; font-size: .74rem; font-weight: 700; }
+.facet-list { height: 164px; overflow-y: auto; scrollbar-width: thin; }
+.gfilter .facet-list label { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin: 0; cursor: pointer; font-size: .76rem; font-weight: 400; }
+.facet-list label:has(input:checked) { background: #e5f2ec; }
+.facet-list label:hover { background: var(--wash); }
+.facet-list input[type=checkbox] { width: 13px; height: 13px; flex: 0 0 auto; margin: 0; }
+.facet-list label > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facet-list small { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+.analytics-dates { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; }
+.analytics-dates input { margin: 0; }
+.analytics-filter .gfilter-end { margin: 0; padding-top: 14px; border-top: 1px solid var(--line); justify-content: flex-start; }
+.analytics-filter .gfilter-end > strong { margin-right: auto; }
+@media (max-width: 1150px) { .facet-browser { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .facet-browser { grid-template-columns: repeat(2, minmax(0, 1fr)); } .analytics-dates { align-items: start; } }
+@media (max-width: 420px) { .facet-browser { grid-template-columns: 1fr; } }

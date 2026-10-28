@@ -1,7 +1,8 @@
-// Global Overview, Sessions (also Workspace → Sessions, locked to the open project) and Global Tasks.
+// Global Overview, Sessions (also Workspace → Analytics, locked to the open project) and Global Tasks.
 // One sticky filter drives every card, chart and table; filters, split and table state live in the URL. On Sessions it
 // also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
+import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
 import { createInsights } from './insights-view.js';
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
@@ -35,9 +36,9 @@ const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', {
 const measured = (r) => r.prompts !== null;
 const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · project paths unavailable`;
 
-const DEFAULTS = { path: '', project: '', device: '', agent: '', model: '', language: '', period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
-const FILTERS = ['path', 'project', 'agent', 'model', 'language', 'period', 'from', 'to', 'split'];
-const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-sessions': [...FILTERS, 'device', 'table'], sessions: ['agent', 'model', 'language', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
+const FILTERS = ['path', ...FACET_KEYS, 'period', 'from', 'to', 'split'];
+const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: [...FACET_KEYS, 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#173e49', '#67cdd0', '#c28536', '#8a5bb5', '#d0605e', '#5d9b4f', '#3a6fc4', '#9aa7a2'];
 const AGENT_COLOR = { claude: '#c4723a', codex: '#3a6fc4', copilot: '#4f9b6a', gemini: '#8a5bb5' };
@@ -49,8 +50,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
   let prefs = null, improvePrefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
-  let ROOT = '/', ROOTP = '', PROJECTS = [], AGENTS = [], MODELS = [], LANGUAGES = [], DEVICES = [], S;
-  const locked = () => route === 'sessions';
+  let ROOT = '/', ROOTP = '', PROJECTS = [], DEVICES = [], S;
+  const locked = () => route === 'analytics';
   const rel = (p) => p === ROOTP ? base(p) : p.startsWith(ROOT) ? p.slice(ROOT.length) : p;
   const path = () => state.path ? ROOT + state.path : ROOTP;
   const inPath = (p) => !state.path || (`${p}/`).startsWith(`${path()}/`);
@@ -70,14 +71,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (parts.length && parts.some((p) => p.length === common.length)) common = common.slice(0, -1);
     ROOTP = common.length ? `/${common.join('/')}` : ''; ROOT = `${ROOTP}/`;
     PROJECTS = roots;
-    AGENTS = [...new Set((body.rows ?? []).map((r) => r.agent))].sort();
-    MODELS = [...new Set((body.rows ?? []).map((r) => r.model))].sort();
-    LANGUAGES = [...new Set((body.rows ?? []).map((r) => r.language ?? 'Unknown'))].sort();
     const devices = new Map((body.rows ?? []).map((r) => [r.deviceId, r.deviceName]));
     devices.set('local', 'This device');
     DEVICES = [...devices].map(([id, name]) => ({ id, name })).sort((a, b) => a.id === 'local' ? -1 : b.id === 'local' ? 1 : a.name.localeCompare(b.name));
-    if (state.device && !devices.has(state.device)) { state.device = ''; writeUrl(); }
-    if (state.language && !LANGUAGES.includes(state.language)) { state.language = ''; writeUrl(); }
     onData?.(body);
   }
   const deviceLabel = (id) => {
@@ -96,7 +92,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   // ---------- URL ----------
   function readQuery(qs) {
     const p = new URLSearchParams(qs);
-    for (const k of Object.keys(DEFAULTS)) state[k] = p.get(k) ?? DEFAULTS[k];
+    for (const k of Object.keys(DEFAULTS)) if (!FACET_KEYS.includes(k)) state[k] = p.get(k) ?? DEFAULTS[k];
+    Object.assign(state, readFacets(p));
     for (const k of Object.keys(tables)) delete tables[k];
     for (const [k, v] of p) {
       const m = /^(q|sort|page)\.([\w-]+)$/.exec(k); if (!m) continue;
@@ -110,7 +107,10 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function writeUrl() {
     if (!route) return;
     const p = new URLSearchParams();
-    for (const k of KEYS[route] ?? []) if (state[k] !== DEFAULTS[k]) p.set(k, state[k]);
+    for (const k of new Set(KEYS[route] ?? [])) {
+      if (FACET_KEYS.includes(k)) { for (const value of state[k]) p.append(k, value); }
+      else if (state[k] !== DEFAULTS[k]) p.set(k, state[k]);
+    }
     for (const [id, t] of Object.entries(tables)) {
       if (!visibleTables().includes(id)) continue;
       if (t.q) p.set(`q.${id}`, t.q);
@@ -120,7 +120,18 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const url = `#${route}${p.size ? `?${p.toString().replaceAll('%2F', '/')}` : ''}`;
     replace(url);
   }
-  function set(changes) { Object.assign(state, changes); for (const t of Object.values(tables)) t.page = 1; writeUrl(); render(); }
+  function set(changes) {
+    const active = document.activeElement, browser = active?.closest('.facet-browser');
+    const focus = browser ? active.getAttribute('aria-label') : null;
+    const slot = browser?.parentElement.parentElement;
+    const scrolls = browser ? [...browser.querySelectorAll('.facet-list')].map((n) => n.scrollTop) : [];
+    for (const key of FACET_KEYS) if (key in changes && !Array.isArray(changes[key])) changes[key] = changes[key] ? [changes[key]] : [];
+    Object.assign(state, changes); for (const t of Object.values(tables)) t.page = 1; writeUrl(); render();
+    if (focus && slot) {
+      [...slot.querySelectorAll('.facet-list')].forEach((n, i) => { n.scrollTop = scrolls[i] ?? 0; });
+      [...slot.querySelectorAll('input')].find((n) => n.getAttribute('aria-label') === focus)?.focus({ preventScroll: true });
+    }
+  }
 
   // ---------- filtering ----------
   function bounds() {
@@ -128,18 +139,17 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const to = state.to ? Date.parse(state.to) + DAY : NOW;
     let from = state.from ? Date.parse(state.from) : NOW - Number(state.period) * DAY;
     if (!state.from && state.period === 'all') {
-      const deviceRows = ['global', 'global-sessions', 'global-improve'].includes(route) && state.device ? rows.filter((r) => r.deviceId === state.device) : rows;
+      const deviceRows = state.device.length ? rows.filter((r) => state.device.includes(r.deviceId)) : rows;
       from = deviceRows.reduce((m, r) => Math.min(m, r.started), NOW - DAY);
     }
     return [from, Math.max(from + DAY, to)];
   }
-  function filtered() {
+  function scopeRows() {
     const [from, to] = bounds();
-    return (data?.rows ?? []).filter((r) => (locked() ? r.project === data.current : inPath(r.project) && (!state.project || r.project === state.project)) &&
-      (!['global', 'global-sessions', 'global-improve'].includes(route) || !state.device || r.deviceId === state.device) &&
-      (!state.agent || r.agent === state.agent) && (!state.model || r.model === state.model) &&
-      (!state.language || r.language === state.language) && r.started >= from && r.started < to);
+    return (data?.rows ?? []).filter((r) => (locked() ? r.project === data.current : inPath(r.project)) && r.started >= from && r.started < to);
   }
+  function filtered() { return scopeRows().filter((r) => matchesFacets(r, state, undefined, ROOTP)); }
+  const projectMatches = (project) => inPath(project) && matchesFacets({ project }, state, ['folder', 'project'], ROOTP);
   function folders() {
     const out = new Set(['']);
     for (const p of PROJECTS.filter((x) => x.startsWith(ROOT))) { const parts = rel(p).split('/'); for (let i = 1; i < parts.length; i++) out.add(parts.slice(0, i).join('/')); }
@@ -277,25 +287,31 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   // ---------- sticky filter bar ----------
   function filterBar(mode) {
     const select = (label, key, options, all, display = (o) => o) => h('label', key === 'language' ? { title: 'Project programming language: configured in YAW or detected from local file names. Unknown when no evidence is available.' } : {}, label, h('select', { on: { change: (e) => set({ [key]: e.target.value }) } },
-      h('option', { value: '' }, all), options.map((o) => h('option', { value: o, selected: state[key] === o }, display(o)))));
+      h('option', { value: '' }, all), options.map((o) => h('option', { value: o, selected: Array.isArray(state[key]) ? state[key].includes(o) : state[key] === o }, display(o)))));
     const seg = (label, key, opts) => h('div', { class: 'lbl', role: 'group', 'aria-label': label }, h('span', {}, label), h('div', { class: 'presets' }, opts.map(([v, l]) =>
       h('button', { type: 'button', 'aria-pressed': String(state[key] === v && (key !== 'period' || (!state.from && !state.to))), on: { click: () => set(key === 'period' ? { period: v, from: '', to: '' } : { [key]: v }) } }, l))));
     const bar = h('div', { class: 'gfilter', role: 'search', 'aria-label': 'Filter all charts and tables on this page' });
-    if (!locked()) bar.append(
-      h('label', {}, 'Folder', h('select', { on: { change: (e) => set({ path: e.target.value, project: '' }) } }, folders().map((f) => h('option', { value: f, selected: state.path === f }, f ? `${f}/` : 'All projects')))),
-      select('Project', 'project', PROJECTS.filter(inPath), 'All in folder', rel));
-    if (mode !== 'tasks') bar.append(...flat([
-      ['global', 'global-sessions', 'global-improve'].includes(route) ? select('Device', 'device', DEVICES.map((d) => d.id), 'All devices', deviceLabel) : null,
-      select('Agent', 'agent', AGENTS, 'All agents'), select('Model', 'model', MODELS, 'All models'),
-      select('Programming language', 'language', LANGUAGES, 'All languages'),
-      seg('Period', 'period', [['7', '7 d'], ['30', '30 d'], ['90', '90 d'], ['all', 'All']]),
-      h('label', {}, 'From', h('input', { type: 'date', value: state.from, on: { change: (e) => set({ from: e.target.value }) } })),
-      h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
-      seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS)]));
+    if (mode === 'tasks') {
+      bar.append(h('label', {}, 'Folder', h('select', { on: { change: (e) => set({ path: e.target.value, project: [] }) } }, folders().map((f) => h('option', { value: f, selected: state.path === f }, f ? `${f}/` : 'All folders')))),
+        select('Project', 'project', PROJECTS.filter(inPath), 'All projects', rel));
+    } else {
+      bar.classList.add('analytics-filter');
+      bar.append(renderFacetBrowser({ rows: scopeRows(), selection: state, root: ROOTP,
+        label: (key, value) => value === UNAVAILABLE ? 'Unavailable (synced)' : key === 'device' ? deviceLabel(value) : key === 'project' ? (PROJECTS.filter((p) => base(p) === base(value)).length > 1 ? `${base(value)} · ${rel(value)}` : base(value)) : key === 'folder' ? rel(value) || base(value) : value,
+        onChange: (key, values) => {
+          const rows = scopeRows();
+          set(changeFacet(rows, state, key, values, ROOTP));
+        } }),
+      h('div', { class: 'analytics-dates' },
+        seg('Period', 'period', [['7', '7 d'], ['30', '30 d'], ['90', '90 d'], ['all', 'All']]),
+        h('label', {}, 'From', h('input', { type: 'date', value: state.from, on: { change: (e) => set({ from: e.target.value }) } })),
+        h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
+        seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS)));
+    }
     bar.append(h('div', { class: 'gfilter-end' }, mode === 'tasks' ? null : h('strong', {}, `${fmt(filtered().length)} sessions`),
-      ['sessions', 'improve'].includes(mode) ? collectControls() : null,
+      ['sessions', 'improve', 'overview'].includes(mode) ? collectControls() : null,
       h('button', { type: 'button', title: 'Clear all filters and the chart split', on: { click: () => set({ ...DEFAULTS, table: state.table }) } }, 'Reset')));
-    if (['sessions', 'improve'].includes(mode)) bar.append(collectStatus());
+    if (['sessions', 'improve', 'overview'].includes(mode)) bar.append(collectStatus());
     return bar;
   }
 
@@ -317,7 +333,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
         title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
       job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
-      h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when a Sessions page opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Sessions' : 'all workspaces here, only the open one on Workspace → Sessions'}). A personal setting; it never classifies.` },
+      h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when Analytics opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Analytics' : 'all workspaces here, only the open one on Workspace → Analytics'}). A personal setting; it never classifies.` },
         h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
       h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
         title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
@@ -423,17 +439,17 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   }
   const days = () => state.from || state.to ? 'all' : state.period;
   const empty = (node, text) => fill(node, h('article', { class: 'card' }, h('h2', {}, 'No saved sessions'), h('p', {}, text)));
-  const noData = 'No registry or saved scan yet. Press Refresh in the filter bar of a Sessions page to read local session history.';
+  const noData = 'No registry or saved scan yet. Press Refresh in the filter bar of Analytics to read local session history.';
   const openButton = (root, target, label = 'Open →') => known(root)
     ? h('button', { type: 'button', class: 'open-proj', title: `Open ${root} in the Workspace area`, on: { click: () => openProject(root, target) } }, label)
     : h('span', { class: 'small muted', title: 'Not in the project switcher: run yaw web in that folder or add it there' }, 'not added');
 
   // ---------- Global overview ----------
   function overview() {
-    if (!data.available) { for (const id of ['ov-filter', 'ov-metrics', 'ov-tree', 'ov-crumbs']) fill($(id)); empty($('ov-charts'), noData); return; }
+    if (!data.available) { fill($('ov-filter'), filterBar('overview')); for (const id of ['ov-metrics', 'ov-tree', 'ov-crumbs']) fill($(id)); empty($('ov-charts'), noData); return; }
     const rows = filtered(); S = makeSplit(rows);
     fill($('ov-filter'), filterBar('overview'));
-    const open = data.tasks.filter((t) => t.available && inPath(t.project) && (!state.project || t.project === state.project)).reduce((n, t) => n + t.active.length + t.backlog.length, 0);
+    const open = data.tasks.filter((t) => t.available && projectMatches(t.project)).reduce((n, t) => n + t.active.length + t.backlog.length, 0);
     const usage = rows.filter((r) => r.tokensIn !== null).length;
     const projects = new Set(rows.filter((r) => r.source !== 'synced').map((r) => r.project)).size;
     const syncedCount = rows.filter((r) => r.source === 'synced').length;
@@ -443,7 +459,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const segs = state.path.split('/').filter(Boolean);
     fill($('ov-crumbs'), h('span', { class: 'root' }, ROOT), h('button', { type: 'button', 'aria-current': segs.length ? null : 'true', on: { click: () => set({ path: '', project: '' }) } }, 'all'),
       segs.map((seg, i) => [h('span', {}, '/'), h('button', { type: 'button', 'aria-current': i === segs.length - 1 ? 'true' : null, on: { click: () => set({ path: segs.slice(0, i + 1).join('/'), project: '' }) } }, seg)]),
-      state.project ? [h('span', {}, '/'), h('strong', {}, base(state.project)), h('button', { type: 'button', class: 'linkish', on: { click: () => set({ project: '' }) } }, '✕ clear project')] : null);
+      state.project.length ? [h('span', {}, '/'), h('strong', {}, state.project.length === 1 ? base(state.project[0]) : `${state.project.length} projects`), h('button', { type: 'button', class: 'linkish', on: { click: () => set({ project: '' }) } }, '✕ clear project')] : null);
     const kids = new Map();
     // A folder that is also a project drills down; the project itself is listed inside it as ./
     for (const p of PROJECTS) {
@@ -489,7 +505,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     insights.reset();
     $('ss-charts').hidden = false;
     $('ss-intro').textContent = locked() ? `This workspace · ${data?.current ?? ''}` :
-      `${state.device ? deviceLabel(state.device) : 'All devices'} · All projects · local + synced session stats`;
+      `${state.device.length ? state.device.map(deviceLabel).join(', ') : 'All devices'} · All projects · local + synced session stats`;
     const labels = document.querySelectorAll('#sessions .metric-group-label');
     // Without data the filter bar stays, so Refresh can collect the first scan.
     if (!data.available) { fill($('ss-filter'), filterBar('sessions')); for (const id of ['ss-metrics', 'ss-insights', 'ss-charts']) fill($(id)); labels.forEach((x) => { x.hidden = true; }); empty($('ss-browse'), noData); return; }
@@ -570,7 +586,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   // ---------- Global tasks ----------
   function tasksView() {
     fill($('tk-filter'), filterBar('tasks'));
-    const scope = data.tasks.filter((t) => inPath(t.project) && (!state.project || t.project === state.project));
+    const scope = data.tasks.filter((t) => projectMatches(t.project));
     const rows = scope.filter((t) => t.available).flatMap((t) => [...t.active, ...t.backlog].map((r) => ({ project: t.project, ...r })));
     const none = scope.filter((t) => !t.available || !(t.active.length + t.backlog.length)).map((t) => base(t.project));
     fill($('tk-list'), h('article', { class: 'card' }, dataTable('tasks', [
@@ -595,13 +611,13 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (route !== name || name !== 'global-improve') insights.reset();
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
-      if (['sessions', 'global-sessions', 'global-improve'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
+      if (['analytics', 'global-analytics', 'global-improve', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
       if (name === 'global-improve') improvePrefs = await get('improve/settings').catch(() => null);
       if (route !== name) return;
       render();
       // Auto refresh once per page load and scope; all workspaces cover the open one too.
       const scope = locked() ? 'current' : 'all';
-      if (['sessions', 'global-sessions'].includes(name) && prefs?.autoRefresh && !autoDone.has(scope)) { autoDone.add(scope); run(false); }
+      if (['analytics', 'global-analytics'].includes(name) && prefs?.autoRefresh && !autoDone.has(scope)) { autoDone.add(scope); run(false); }
     },
     async reload() { try { await load(true); } catch (e) { report(e); return; } render(); },
     hide() { insights.reset(); route = null; },
