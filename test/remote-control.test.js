@@ -10,16 +10,21 @@ import { remoteStore } from '../core/remote/store.js';
 import { Supervisor } from '../core/remote/supervisor.js';
 import { createHub } from '../core/remote/hub.js';
 import { configureHubClient, syncHub } from '../core/remote/client.js';
-import { configureSync, runSync } from '../core/lib/data-sync.js';
-import { readUserData } from '../core/lib/user-store.js';
+import { configureSync, runSync, syncedSessions, syncedTasks } from '../core/lib/data-sync.js';
+import { readUserData, writeUserData } from '../core/lib/user-store.js';
 import { startRemoteServer } from '../core/remote/server.js';
 import { TelegramController } from '../core/remote/telegram.js';
 import { JsonPeer } from '../core/remote/rpc.js';
 import { claudeAdapter } from '../core/remote/claude-adapter.js';
 import { codexAdapter } from '../core/remote/codex-adapter.js';
 import { sandboxPlan } from '../core/remote/adapters.js';
+import { remoteSettings, saveRemoteSettings } from '../core/lib/remote-settings.js';
+import { createWorkspaceApi } from '../core/web/workspace-api.js';
 
-const environment = () => ({ HOME: realpathSync(tmp('yaw-remote-')), PATH: process.env.PATH });
+const environment = () => {
+  const env = { HOME: realpathSync(tmp('yaw-remote-')), PATH: process.env.PATH };
+  saveRemoteSettings(env, { enabled: true, port: 4318 }); return env;
+};
 function fixtureAdapter() {
   const instances = [];
   return { instances, capabilities: { input: true, resume: true, approvals: true, interrupt: true }, async start(context) {
@@ -175,7 +180,7 @@ test('remote HTTP requires owner login, exact origin and CSRF; paired devices ha
 });
 
 test('Telegram refuses unauthorized, forwarded and duplicate updates, and routes exact targets through the controller', async () => {
-  const f = await setup(), calls = [], bot = new TelegramController({ store: f.store, supervisor: f.supervisor, token: '123:fixture', kitRoot: KIT_ROOT,
+  const f = await setup(), calls = [], bot = new TelegramController({ store: f.store, supervisor: f.supervisor, env: f.env, token: '123:fixture', kitRoot: KIT_ROOT,
     fetchFn: async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return Response.json({ ok: true, result: {} }); } });
   f.store.state.telegram = { userId: '12', chatId: '12' }; bot.send = (text) => calls.push({ text });
   const update = (id, text, more = {}) => ({ update_id: id, message: { from: { id: 12 }, chat: { type: 'private', id: 12 }, text, ...more } });
@@ -274,7 +279,7 @@ test('worker limits include in-flight startups and failure leaves an unknown rec
 
 test('Telegram queued output cannot redirect to a newly paired owner', async () => {
   const f = await setup(), deliveries = [];
-  const bot = new TelegramController({ store: f.store, supervisor: f.supervisor, token: 'fixture', kitRoot: KIT_ROOT });
+  const bot = new TelegramController({ store: f.store, supervisor: f.supervisor, env: f.env, token: 'fixture', kitRoot: KIT_ROOT });
   bot.draining = true;
   f.store.state.telegram = { userId: '12', chatId: '12' }; bot.send('Original owner output');
   f.store.state.telegram = { userId: '13', chatId: '13' };
@@ -322,4 +327,61 @@ test('a failed provider turn retains workspace ownership while its worker is ali
     await f.supervisor.command({ action: 'stop', session: first.session, commandId: 'release-failed-worker' });
     assert.equal((await f.supervisor.command(startInput(f.project, { commandId: 'new-after-failure' }))).status, 'dispatched');
   } finally { await f.close(); }
+});
+
+test('Remote Control defaults off and cannot create service state, configure a hub or make network requests', async () => {
+  const env = { HOME: realpathSync(tmp('yaw-remote-off-')) };
+  assert.deepEqual(remoteSettings(env), { enabled: false, port: 4318 });
+  await assert.rejects(startRemoteServer({ env, kitRoot: KIT_ROOT }), /Remote Control is disabled/);
+  assert.throws(() => configureHubClient({ env, url: 'http://127.0.0.1:4318' }), /Remote Control is disabled/);
+  let called = false;
+  await assert.rejects(syncHub({ env, kitRoot: KIT_ROOT, fetchFn: async () => { called = true; } }), /Remote Control is disabled/);
+  assert.equal(called, false); assert.equal(existsSync(join(env.HOME, '.yaw')), false);
+});
+
+test('the global settings action persists a local opt-in, validates input and keeps credentials out', async () => {
+  const env = { HOME: realpathSync(tmp('yaw-features-')) }, root = await makeProject({ modules: ['core'] });
+  const api = createWorkspaceApi({ env, root, kitRoot: KIT_ROOT });
+  try {
+    assert.equal(api.get['/api/global/features']().remoteControl.enabled, false);
+    assert.deepEqual(await api.action('remote-settings', { enabled: true, port: 4321, workspace: root }), { enabled: true, port: 4321 });
+    assert.equal(remoteSettings(env).enabled, true);
+    await assert.rejects(api.action('remote-settings', { enabled: true, port: 80 }), /1024/);
+    await assert.rejects(api.action('remote-settings', { enabled: true, port: 4321, token: 'not-a-setting' }), /Supply an enabled/);
+    await api.action('remote-settings', { enabled: false, port: 4321 });
+    assert.deepEqual(remoteSettings(env), { enabled: false, port: 4321 });
+    writeFileSync(join(env.HOME, '.yaw/remote-settings.json'), '{invalid');
+    assert.deepEqual(remoteSettings(env), { enabled: false, port: 4318 });
+    writeFileSync(join(env.HOME, '.yaw/remote-settings.json'), JSON.stringify({ enabled: true, port: 80 }));
+    assert.equal(remoteSettings(env).enabled, false);
+  } finally { api.close(); }
+});
+
+test('disabled Remote Control does not expose hub observations or silently restore old dataset writers', async () => {
+  const env = environment(), folder = realpathSync(tmp('yaw-paused-vault-'));
+  configureSync({ env, target: folder, scopes: ['settings'] });
+  configureHubClient({ env, url: 'http://127.0.0.1:4318', scopes: ['settings', 'statistics', 'tasks'], migrate: true });
+  writeUserData(env, 'hub-sync-state.json', { deviceId: 'mine', devices: { other: { name: 'Other device', rows: [{ key: 'a'.repeat(64), prompts: 1 }], tasks: [{ name: 'Other project', active: [], backlog: [] }] } } });
+  assert.equal(syncedSessions(env).length, 1); assert.equal(syncedTasks(env).length, 1);
+  saveRemoteSettings(env, { enabled: false, port: 4318 });
+  assert.deepEqual(syncedSessions(env), []); assert.deepEqual(syncedTasks(env), []);
+  assert.throws(() => runSync({ env, kitRoot: KIT_ROOT }), /migrated/);
+});
+
+test('disabling Remote Control stops a running service and managed workers while retaining their metadata', async () => {
+  const env = environment(), adapter = fixtureAdapter();
+  const service = await startRemoteServer({ env, kitRoot: KIT_ROOT, adapters: { claude: adapter }, signals: false, ownerToken: 'disposable-owner-fixture-'.repeat(2) });
+  try {
+    const project = service.supervisor.register(await makeProject({ modules: ['core'] }));
+    const receipt = await service.supervisor.command(startInput(project));
+    const stopped = new Promise((resolve) => service.server.once('close', resolve));
+    saveRemoteSettings(env, { enabled: false, port: 4318 });
+    let timer;
+    try { await Promise.race([stopped, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Service did not stop after disabling')), 4000); })]); }
+    finally { clearTimeout(timer); }
+    assert.equal(adapter.instances[0].stops, 1);
+    assert.equal(service.supervisor.session(receipt.session).state, 'unknown');
+    assert.equal(existsSync(join(env.HOME, '.yaw/remote-state.json')), true);
+    assert.equal(existsSync(join(env.HOME, '.yaw/remote.lock')), false);
+  } finally { await service.close(); }
 });

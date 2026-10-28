@@ -8,6 +8,7 @@ import { userDir, userDataDir, readUserData, writeUserData, secretFindings } fro
 import { parse, stringify } from './yaml.js';
 import { schemas } from '../render/kit.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
+import { remoteSettings } from './remote-settings.js';
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const canonical = (v) => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x);
@@ -229,7 +230,7 @@ function totals(devices, selected) {
 }
 // Sessions other devices contributed, for the Sessions pages: the most complete copy of each, none of this device's own.
 export function syncedSessions(env) {
-  const hub = readUserData(env, 'hub-sync.json');
+  const hub = remoteSettings(env).enabled ? readUserData(env, 'hub-sync.json') : null;
   if (![...(readUserData(env, 'sync-config.json')?.scopes ?? []), ...(hub?.scopes ?? [])].includes('statistics')) return [];
   const state = hub?.scopes.includes('statistics') ? readUserData(env, 'hub-sync-state.json') : readUserData(env, 'sync-state.json');
   const me = hub?.scopes.includes('statistics') ? state?.deviceId : readUserData(env, 'sync-device.json')?.id;
@@ -245,7 +246,7 @@ export function syncedSessions(env) {
 }
 // Task snapshots of other devices' projects: [{ device, name, active, backlog }]
 export function syncedTasks(env) {
-  const hub = readUserData(env, 'hub-sync.json');
+  const hub = remoteSettings(env).enabled ? readUserData(env, 'hub-sync.json') : null;
   if (![...(readUserData(env, 'sync-config.json')?.scopes ?? []), ...(hub?.scopes ?? [])].includes('tasks')) return [];
   const state = hub?.scopes.includes('tasks') ? readUserData(env, 'hub-sync-state.json') : readUserData(env, 'sync-state.json');
   const me = hub?.scopes.includes('tasks') ? state?.deviceId : readUserData(env, 'sync-device.json')?.id;

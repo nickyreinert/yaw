@@ -18,12 +18,13 @@ import { globalFile, globalFiles, presetAction, presetsData, profileApply, profi
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
 import { createImproveRunner, improveSettings, saveImproveSettings } from './improve-agents.js';
+import { remoteSettings, saveRemoteSettings } from '../lib/remote-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear'];
+  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -56,6 +57,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     actions: WORKSPACE_ACTIONS,
     close: () => { reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
+      '/api/global/features': () => ({ remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')) }),
       '/api/improve/settings': () => improveSettings(env),
       '/api/improve/job': () => reviewer.read(),
       '/api/global/session-sources': () => sourcesView(env),
@@ -101,6 +103,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name === 'remote-settings') {
+        const { workspace, ...settings } = input;
+        try { return saveRemoteSettings(env, settings); } catch (e) { throw new FormError(e.message); }
+      }
       if (['improve-settings', 'improve-agent-start', 'improve-agent-clear'].includes(name)) {
         try {
           if (name === 'improve-settings') return saveImproveSettings(env, input);

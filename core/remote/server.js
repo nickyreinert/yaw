@@ -1,6 +1,9 @@
 import http from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, watchFile, unwatchFile } from 'node:fs';
+import { join } from 'node:path';
+import { userDataDir } from '../lib/user-store.js';
+import { REMOTE_SETTINGS_FILE, requireRemoteEnabled } from '../lib/remote-settings.js';
 import { remoteStore, requireValue, RemoteError, digest } from './store.js';
 import { Supervisor } from './supervisor.js';
 import { executionAdapters } from './adapters.js';
@@ -16,6 +19,7 @@ async function body(req, max = 256000) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new RemoteError('Malformed JSON'); }
 }
 export async function startRemoteServer({ env = process.env, kitRoot, port = 0, adapters, store: injectedStore, fetchFn = fetch, signals = true, ownerToken = env.YAW_REMOTE_OWNER_TOKEN } = {}) {
+  requireRemoteEnabled(env);
   requireValue(typeof ownerToken === 'string' && ownerToken.length >= 32, 'Enter YAW_REMOTE_OWNER_TOKEN privately (at least 32 characters)');
   const ownerHash = digest(ownerToken);
   const store = injectedStore ?? remoteStore(env);
@@ -23,12 +27,15 @@ export async function startRemoteServer({ env = process.env, kitRoot, port = 0, 
   const supervisor = new Supervisor({ store, adapters: adapters ?? executionAdapters({ env, kitRoot }) });
   const hub = createHub({ store, env, kitRoot });
   const logins = new Map(); let loginTimes = [], closing;
+  const settingsFile = join(userDataDir(env), REMOTE_SETTINGS_FILE);
+  const settingsChanged = () => { try { requireRemoteEnabled(env); } catch { close().catch(() => { process.exitCode = 1; }); } };
   const assets = new Map([
     ['/', ['text/html', readFileSync(new URL('../web/assets/remote.html', import.meta.url))]],
     ['/remote.js', ['text/javascript', readFileSync(new URL('../web/assets/remote.js', import.meta.url))]],
     ['/remote.css', ['text/css', readFileSync(new URL('../web/assets/remote.css', import.meta.url))]],
   ]);
   const close = () => closing ??= (async () => {
+    unwatchFile(settingsFile, settingsChanged);
     if (signals) { process.removeListener('SIGINT', onSignal); process.removeListener('SIGTERM', onSignal); }
     await telegram?.close(); await supervisor.close();
     if (server?.listening) await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
@@ -44,6 +51,7 @@ export async function startRemoteServer({ env = process.env, kitRoot, port = 0, 
       };
       try {
         requireValue(!closing, 'Controller is stopping', 503);
+        try { requireRemoteEnabled(env); } catch { throw new RemoteError('Remote Control is disabled', 403); }
         const bound = server.address().port, hosts = [`127.0.0.1:${bound}`, `localhost:${bound}`];
         requireValue(req.rawHeaders.filter((_, i) => i % 2 === 0 && req.rawHeaders[i].toLowerCase() === 'host').length === 1 && hosts.includes(req.headers.host), 'Wrong host', 421);
         requireValue(req.headers.origin === undefined || hosts.some((host) => req.headers.origin === `http://${host}`), 'Wrong origin', 403);
@@ -100,7 +108,9 @@ export async function startRemoteServer({ env = process.env, kitRoot, port = 0, 
     server.requestTimeout = 35000; server.headersTimeout = 10000;
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
     const url = `http://127.0.0.1:${server.address().port}`;
-    if (env.YAW_REMOTE_TELEGRAM_TOKEN) { telegram = new TelegramController({ store, supervisor, token: env.YAW_REMOTE_TELEGRAM_TOKEN, fetchFn, dashboardUrl: url, kitRoot }); await telegram.start(); }
+    if (env.YAW_REMOTE_TELEGRAM_TOKEN) { telegram = new TelegramController({ store, supervisor, token: env.YAW_REMOTE_TELEGRAM_TOKEN, fetchFn, dashboardUrl: url, kitRoot, env }); await telegram.start(); }
+    watchFile(settingsFile, { interval: 500, persistent: false }, settingsChanged);
+    requireRemoteEnabled(env);
     if (signals) { process.once('SIGINT', onSignal); process.once('SIGTERM', onSignal); }
     return { server, supervisor, hub, store, url, close };
   } catch (e) { await close(); throw e; }

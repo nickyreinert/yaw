@@ -23,13 +23,13 @@ import { sessionStart } from './team.js';
 import { presets } from './presets.js';
 import { web } from './web.js';
 import { knowledge } from './knowledge.js';
-import { remote } from './remote.js';
+import { remoteSettings } from '../lib/remote-settings.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
 // The phase-1 command list (ADR-0019). Help and hook are dispatched separately.
 export const COMMANDS = [
-  { name: 'remote', args: 'serve [--port 4318] | sync [--hub http://127.0.0.1:4318 --token-env YAW_HUB_TOKEN --scopes settings,presets,statistics --migrate] [--resolve local|remote] | status', summary: 'private data hub and agent-independent browser/Telegram controller (Linux workers)', options: { port: { type: 'string' }, hub: { type: 'string' }, 'token-env': { type: 'string' }, scopes: { type: 'string' }, migrate: { type: 'boolean' }, resolve: { type: 'string' } }, run: remote },
+  { name: 'remote', optional: true, args: 'serve [--port 4318] | sync [--hub http://127.0.0.1:4318 --token-env YAW_HUB_TOKEN --scopes settings,presets,statistics --migrate] [--resolve local|remote] | status', summary: 'private data hub and agent-independent browser/Telegram controller (Linux workers)', options: { port: { type: 'string' }, hub: { type: 'string' }, 'token-env': { type: 'string' }, scopes: { type: 'string' }, migrate: { type: 'boolean' }, resolve: { type: 'string' } }, run: async (args) => (await import('./remote.js')).remote(args) },
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--sync <folder|owner/repo>] [--skip-verify] [--force]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, sync: { type: 'string' }, 'skip-verify': { type: 'boolean' }, force: { type: 'boolean' }, ...yes }, run: init },
   { name: 'web', args: '[--background | --stop] [--sync <folder|owner/repo>]', summary: 'open the local dashboard; configure an uninitialized folder in Workspace → Settings → Interview; --background keeps it running, --stop stops it', options: { background: { type: 'boolean' }, stop: { type: 'boolean' }, sync: { type: 'string' } }, run: web },
   { name: 'apply', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from saved answers and the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
@@ -68,14 +68,15 @@ export const HELP_GROUPS = [
   { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
 ];
 
-export function usage() {
+export function usage(env = process.env) {
+  const remoteEnabled = remoteSettings(env).enabled;
   const lines = [
     'usage: yaw <command> [options]',
     '       yaw --version',
     '',
     ...HELP_GROUPS.flatMap(({ title, names }) => [
       `${title}:`,
-      ...names.map((name) => {
+      ...names.filter((name) => name !== 'remote' || remoteEnabled).map((name) => {
         const c = COMMANDS.find((c) => c.name === name);
         return `  ${c.name.padEnd(15)} ${c.summary}`;
       }),
@@ -107,7 +108,7 @@ export async function main(argv, io = {}) {
   };
   const [first, ...rest] = argv;
   if (first === undefined || first === '--help' || first === '-h') {
-    ctx.stdout.write(usage());
+    ctx.stdout.write(usage(ctx.env));
     return 0;
   }
   if (first === '--version') {
@@ -116,20 +117,26 @@ export async function main(argv, io = {}) {
   }
   const command = COMMANDS.find((c) => c.name === first);
   if (!command) {
-    ctx.stderr.write(`yaw: unknown command "${first}"\n\n${usage()}`);
+    ctx.stderr.write(`yaw: unknown command "${first}"\n\n${usage(ctx.env)}`);
     return 1;
   }
   if (command.name === 'help') {
     const target = rest[0] && COMMANDS.find((c) => c.name === rest[0]);
     if (rest[0] && !target) {
-      ctx.stderr.write(`yaw: unknown command "${rest[0]}"\n\n${usage()}`);
+      ctx.stderr.write(`yaw: unknown command "${rest[0]}"\n\n${usage(ctx.env)}`);
       return 1;
     }
-    ctx.stdout.write(target ? commandUsage(target) : usage());
+    if (target?.optional && !remoteSettings(ctx.env).enabled) {
+      ctx.stderr.write('Remote Control is disabled. Enable it in yaw web → Global → Settings → Features.\n'); return 1;
+    }
+    ctx.stdout.write(target ? commandUsage(target) : usage(ctx.env));
     return 0;
   }
   // The hook entry point parses its own arguments and never fails (ADR-0007): no usage, no stderr.
   if (command.name === 'hook') return runHook(rest, { ...ctx, stdin: io.stdin ?? process.stdin });
+  if (command.optional && !remoteSettings(ctx.env).enabled) {
+    ctx.stderr.write('Remote Control is disabled. Enable it in yaw web → Global → Settings → Features.\n'); return 1;
+  }
   let parsed;
   try {
     parsed = parseArgs({ args: rest, options: { help: { type: 'boolean', short: 'h' }, ...command.options }, allowPositionals: true, strict: true });

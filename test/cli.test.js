@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { COMMANDS, HELP_GROUPS } from '../core/cli/main.js';
 import { initProject } from '../core/render/project.js';
-import { KIT_ROOT, makeKit, readTree, run, tmp, writeAnswers } from './helpers/fixtures.js';
+import { KIT_ROOT, makeKit, readTree, run, tmp, writeAnswers, cleanEnv } from './helpers/fixtures.js';
+import { saveRemoteSettings } from '../core/lib/remote-settings.js';
 
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const yaw = (args, options = {}) => run(process.execPath, [YAW, ...args], options);
@@ -22,7 +23,7 @@ test('help lists every phase-1 command; no arguments prints help too', () => {
   for (const args of [['help'], ['--help'], []]) {
     const r = yaw(args);
     assert.equal(r.status, 0);
-    for (const c of COMMANDS) assert.match(r.stdout, new RegExp(`^  ${c.name} `, 'm'), c.name);
+    for (const c of COMMANDS.filter((c) => !c.optional)) assert.match(r.stdout, new RegExp(`^  ${c.name} `, 'm'), c.name);
   }
   assert.match(yaw(['help', 'update']).stdout, /usage: yaw update \[--yes\] \[--strategy keep\|take\|merge\] \[--restore <path>\] \[--forget <path>\]/);
 });
@@ -43,9 +44,22 @@ test('help groups every command exactly once without placeholders', () => {
   const output = yaw([]).stdout;
   for (const group of HELP_GROUPS) {
     assert.ok(output.includes(`${group.title}:\n`));
-    for (const name of group.names) assert.equal(output.match(new RegExp(`^  ${name} `, 'gm')).length, 1);
+    for (const name of group.names.filter((name) => name !== 'remote')) assert.equal(output.match(new RegExp(`^  ${name} `, 'gm')).length, 1);
   }
   assert.doesNotMatch(output, /placeholder|not implemented|coming later in phase 1|\(step [35]\)/i);
+});
+
+test('Remote Control is absent from help and refuses direct commands until enabled in global settings', () => {
+  const home = tmp('yaw-disabled-remote-'), env = cleanEnv(home);
+  for (const args of [[], ['help'], ['--help']]) assert.doesNotMatch(yaw(args, { env }).stdout, /^  remote /m);
+  for (const args of [['remote', 'serve'], ['remote', 'status'], ['remote', 'sync'], ['remote', '--help'], ['help', 'remote']]) {
+    const result = yaw(args, { env }); assert.equal(result.status, 1); assert.match(result.stderr, /Global → Settings → Features/);
+  }
+  assert.deepEqual(readTree(home), {});
+  saveRemoteSettings(env, { enabled: true, port: 4320 });
+  assert.match(yaw([], { env }).stdout, /^  remote /m);
+  assert.equal(yaw(['remote', 'status'], { env }).status, 0);
+  assert.match(yaw(['help', 'remote'], { env }).stdout, /usage: yaw remote/);
 });
 
 test('deferred commands are absent from help and use ordinary unknown-command errors', () => {

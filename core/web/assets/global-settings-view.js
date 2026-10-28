@@ -8,7 +8,7 @@ import { pickFolder } from './folder-picker.js';
 import { CHATS } from './chat-services.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification', 'improve', 'sessions', 'review', 'sync'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'improve', 'sessions', 'review', 'sync', 'features'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -48,6 +48,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (tab === 'review') loadReview().catch(report);
     if (tab === 'sessions') loadSessions().catch(report);
     if (tab === 'sync') loadSync().catch(report);
+    if (tab === 'features') loadFeatures().catch(report);
     const file = tab === 'files' ? new URLSearchParams(query).get('file') ?? '' : '';
     if (tab === 'files') (files ? Promise.resolve() : loadFiles()).then(() => { if (file && file !== selected) openFile(file); else if (!file && selected) closeDrawer(); else renderFiles(); }).catch(report);
     else hide();
@@ -55,6 +56,30 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   }
   function hide() { if (!drawer.hidden) { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; } }
   function reset() { classifier = null; classifierSamples = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
+
+  async function loadFeatures() {
+    const data = await get('global/features'), root = $('gs-features'), settings = data.remoteControl;
+    const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.checked = settings.enabled;
+    const label = el('label', ' Enable Remote Control'); label.prepend(enabled);
+    const details = el('section'); details.hidden = !settings.enabled;
+    const portLabel = el('label', 'Controller port'), port = document.createElement('input'); port.type = 'number'; port.min = '1024'; port.max = '65535'; port.value = settings.port; portLabel.append(port);
+    const link = el('a', 'Open Remote Control'); link.href = `http://127.0.0.1:${settings.port}`; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    details.append(el('p', 'Manage coding agents and a shared data hub through a private browser or Telegram. Start the controller separately on its host; enabling this setting does not launch it.'),
+      portLabel, el('p', `Start on this host: yaw remote serve --port ${settings.port}`, 'small'), link,
+      el('p', 'Remote hosts use an SSH tunnel with the same local port. Owner and provider credentials are entered privately on the host; managed workers require Linux and bubblewrap.', 'small muted'));
+    const status = el('p', '', 'small'); status.setAttribute('role', 'status');
+    enabled.addEventListener('change', () => { details.hidden = !enabled.checked; status.textContent = enabled.checked === settings.enabled ? '' : 'Unsaved changes.'; });
+    const card = el('article', null, 'card');
+    card.append(el('h2', 'Optional features'), el('p', 'Features are off until you enable them on this machine.'), label,
+      el('p', 'When disabled, Remote Control is hidden from normal CLI help and its service and hub client cannot run. Disabling stops a running controller and its managed workers.', 'small muted'));
+    if (data.hubMigrated) card.append(el('p', 'Previously migrated hub datasets stay paused when disabled. Folder sync does not resume writing those datasets automatically.', 'small muted'));
+    card.append(details, button('Save features', async () => {
+      try {
+        const saved = await api('remote-settings', { enabled: enabled.checked, port: Number(port.value) });
+        await loadFeatures(); $('gs-features').append(el('p', saved.enabled ? 'Remote Control enabled. Start or restart the controller separately to use the saved port.' : 'Remote Control disabled. Any running controller is shutting down.', 'small'));
+      } catch (e) { status.textContent = e.message; }
+    }, 'primary'), status); root.replaceChildren(card);
+  }
 
   async function loadReview() {
     const data = await get('global/review-prompts');

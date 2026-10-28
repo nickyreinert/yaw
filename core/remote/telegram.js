@@ -1,14 +1,16 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { requireValue } from './store.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
+import { requireRemoteEnabled } from '../lib/remote-settings.js';
 
 // One polling consumer belongs to the service lock; no independent bot controls a worker.
 export class TelegramController {
-  constructor({ store, supervisor, token, fetchFn = fetch, dashboardUrl = '', pollSeconds = 25, kitRoot }) {
+  constructor({ store, supervisor, token, fetchFn = fetch, dashboardUrl = '', pollSeconds = 25, kitRoot, env = process.env }) {
     Object.assign(this, { store, supervisor, token, fetchFn, dashboardUrl, pollSeconds });
     this.abort = new AbortController(); this.queue = []; this.draining = false; this.output = new Map(); this.health = 'stopped';
     this.listener = (e) => this.event(e);
     this.rules = loadRules({ kitRoot }); this.shown = new Map();
+    this.env = env;
   }
   async api(method, input) {
     let response;
@@ -47,6 +49,7 @@ export class TelegramController {
     }
   }
   async handle(update) {
+    try { requireRemoteEnabled(this.env); } catch { return { refused: true }; }
     requireValue(Number.isSafeInteger(update?.update_id), 'Invalid Telegram update');
     if (update.update_id < this.store.state.offset) return { duplicate: true };
     const message = update.message, owner = this.store.state.telegram;
@@ -88,6 +91,7 @@ export class TelegramController {
     catch { this.send('Command refused. Check the session status, workspace ownership and request format.'); return { refused: true }; }
   }
   async start() {
+    requireRemoteEnabled(this.env);
     requireValue(typeof this.token === 'string' && /^\d+:[A-Za-z0-9_-]{20,}$/.test(this.token), 'Enter the Telegram bot credential in the service environment');
     const webhook = await this.api('getWebhookInfo', {});
     requireValue(!webhook.url, 'This bot has a webhook; choose a dedicated polling bot or remove its webhook privately');

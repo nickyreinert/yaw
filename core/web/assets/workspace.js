@@ -363,6 +363,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'sessions', 'Sessions', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],
   ['global-settings', 'sync', 'Sync', 'devices folder nas github repository statistics presets merge conflicts'],
+  ['global-settings', 'features', 'Features', 'optional features enable disable'],
 ];
 async function searchEntries() {
   const out = [];

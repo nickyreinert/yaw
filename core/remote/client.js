@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { readUserData, writeUserData, userDataDir } from '../lib/user-store.js';
 import { portableSnapshot, portableScope, applyPortableRecords, validateVault, mergeRecords } from '../lib/data-sync.js';
 import { requireValue } from './store.js';
+import { requireRemoteEnabled } from '../lib/remote-settings.js';
 
 export function hubUrl(value) {
   const url = new URL(value);
@@ -12,6 +13,7 @@ export function hubUrl(value) {
   return url.origin;
 }
 export function configureHubClient({ env, url, tokenEnv = 'YAW_HUB_TOKEN', scopes = ['settings', 'presets', 'statistics'], migrate = false }) {
+  requireRemoteEnabled(env);
   const origin = hubUrl(url);
   requireValue(/^[A-Z][A-Z0-9_]{0,79}$/.test(tokenEnv), 'Give a credential environment variable name');
   requireValue(Array.isArray(scopes) && scopes.length && scopes.every((s) => ['settings', 'presets', 'statistics', 'tasks', 'knowledge'].includes(s)), 'Choose supported sync scopes');
@@ -24,6 +26,7 @@ export function configureHubClient({ env, url, tokenEnv = 'YAW_HUB_TOKEN', scope
   return { configured: true, url: origin, scopes };
 }
 export async function syncHub({ env, kitRoot, resolution, fetchFn = fetch }) {
+  requireRemoteEnabled(env);
   requireValue(resolution === undefined || ['local', 'remote'].includes(resolution), 'Resolve conflicts with local or remote');
   const cfg = readUserData(env, 'hub-sync.json'); requireValue(cfg, 'Configure the hub client first');
   const token = env[cfg.tokenEnv]; requireValue(typeof token === 'string' && /^[a-f0-9]{64}$/.test(token), 'Enter the paired-device credential in its environment variable');

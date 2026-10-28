@@ -1,8 +1,10 @@
 # YAW Remote
 
-`yaw remote serve` runs a private data hub and an agent-independent execution controller. Open its browser interface through an SSH tunnel, or send commands through a paired private Telegram chat. Managed agents work in registered checkouts on the server. Closing the browser leaves them running; stopping the service stops its workers.
+Remote Control is **off by default**. Enable it on each participating machine in `yaw web` → **Global → Settings → Features**, then save. Enabling permits the feature; start the service separately with `yaw remote serve`. Its browser interface is available through an SSH tunnel, or commands through a paired private Telegram chat. Managed agents work in registered checkouts on the server. Closing the browser leaves them running; stopping the service stops its workers.
 
-This is an initial implementation of [the remote-control concept](../CONCEPT-REMOTE-CONTROL.md). The browser, controller, hub protocol and adapters have automated fixture coverage. Actual NAS compatibility and real provider approvals must be verified on the deployment host before relying on unattended work. Public hosting, proxy authentication, multi-user access, adoption of existing processes and durable conversation replay are outside this version.
+While disabled, the command is hidden from normal CLI help, service startup and hub-client operations are refused, and provider adapters are not loaded by ordinary CLI commands. No remote service, worker or Telegram polling starts automatically. Turning the setting off shuts down a running controller and its workers. Its metadata and configuration remain available for a later opt-in. Previously migrated hub datasets remain paused rather than silently reverting to folder/GitHub authority.
+
+This is an initial implementation of YAW Remote. The browser, controller, hub protocol and adapters have automated fixture coverage. Actual NAS compatibility and real provider approvals must be verified on the deployment host before relying on unattended work. Public hosting, proxy authentication, multi-user access, adoption of existing processes and durable conversation replay are outside this version.
 
 ## Host and provider setup
 
@@ -27,7 +29,7 @@ Enter a strong random `YAW_REMOTE_OWNER_TOKEN` of at least 32 characters private
 yaw remote serve --port 4318
 ```
 
-The service prints its loopback URL, with no credential in it. Sign in using the owner credential. Browser sessions expire after 12 hours; **Sign out all browsers** revokes all current sessions. Rotating the owner credential requires restarting the service, which also revokes browser sessions. Paired-device credentials are separately revocable and do not grant execution control.
+The service prints its loopback URL, with no credential in it. The saved Features port is used when `--port` is omitted. Sign in using the owner credential. Browser sessions expire after 12 hours; **Sign out all browsers** revokes all current sessions. Rotating the owner credential requires restarting the service, which also revokes browser sessions. Paired-device credentials are separately revocable and do not grant execution control.
 
 On your MacBook, preserve the same local and remote port:
 
@@ -80,7 +82,7 @@ Shared settings, presets, statistics and opt-in task/knowledge records use the e
 
 For an existing vault, stop its writers, back it up, then use **Manage hub → Import a portable vault** to import `yaw-sync.json` into an empty hub. Pair each device with **Pair device**, copy its credential once, and enter it privately in `YAW_HUB_TOKEN` on that device. The service stores only the credential hash. A paired credential grants read/write access to portable datasets, not browser login or agent control.
 
-Configure the client through its SSH tunnel:
+Enable Remote Control in that client's Global Settings too, then configure it through its SSH tunnel:
 
 ```sh
 yaw remote sync --hub http://127.0.0.1:4318 --scopes settings,presets,statistics --migrate
@@ -106,6 +108,7 @@ State lives under `YAW_HOME` (default `~/.yaw`):
 | `remote-hub.json` | Authoritative portable records, revisions, device observations, deletion markers and receipt fingerprints. User-authored text is plaintext, as in existing sync. |
 | `remote-workers/<session-id>/` | Each provider's private native home/history. Excluded from portable sync; subject to the provider's own content-retention behavior. |
 | `remote.lock` | Exclusive service PID lock. A dead PID can be recovered at startup; a live/reused PID or invalid lock requires inspection. |
+| `remote-settings.json` | Machine-local enabled switch and controller port. Missing, invalid or unreadable settings mean disabled. This opt-in is never included in portable sync. |
 
 Browser connections do not own worker lifetimes. Service restarts terminate managed workers through bubblewrap/process supervision; metadata becomes **unknown**, pending decisions are invalidated, and no prompt is replayed automatically. Resume only through the original managed session and native ID. Live output is held in bounded memory; a changed service epoch or expired buffer reports a gap. There is no durable conversation replay or exactly-once provider execution guarantee.
 
