@@ -767,10 +767,9 @@ a.button.primary { background: var(--accent); color: #fff; }
 .plan-card { border: 1px solid var(--line); padding: 20px; background: var(--paper); }
 .plan-card > h2, .plan-card > h3 { display: block; margin: 0 0 10px; }
 .plan-workflow > summary { cursor: pointer; font-weight: 650; font-size: .85rem; margin: 16px 0; }
-.planning-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 24px; counter-reset: planning; }
-.planning-steps > li { counter-increment: planning; padding-top: 16px; border-top: 1px solid var(--line); }
-.planning-steps > li > strong { font-size: .88rem; display: block; margin-bottom: 12px; }
-.planning-steps > li > strong::before { content: counter(planning) '. '; color: var(--muted); }
+.planning-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 24px; }
+.planning-steps > div { padding-top: 16px; border-top: 1px solid var(--line); }
+.planning-steps > div > strong { font-size: .88rem; display: block; margin-bottom: 12px; }
 .planning-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .planning-controls label { display: grid; gap: 6px; font-size: .8rem; flex: 1 1 220px; max-width: 24rem; margin: 0; }
 .planning-controls select { margin: 0; }
@@ -780,6 +779,5 @@ a.button.primary { background: var(--accent); color: #fff; }
 .plan-card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
 .plan-card .plan-actions { display: flex; gap: 10px; margin-top: 12px; }
 .plan-card .setting-toggle { font-size: .82rem; line-height: 1.5; margin: 16px 0; }
-.plan-card > p { line-height: 1.6; }
 
 .plan-card > h2, .plan-card > h3 { font-size: 1rem; }

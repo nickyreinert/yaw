@@ -12,6 +12,7 @@ Rules for coding agents in this project, written by YAW (quick setup). Edit free
 - Chat in "en"; write code, comments, commit messages and docs in English.
 - Ask before risky or ambiguous steps; otherwise act.
 - Keep changes small and focused; do what was asked, no more.
+- Keep product UI copy terse: concise labels, controls and factual status. No explanatory, promotional or narrative paragraphs on screens.
 
 <!-- yaw:core -->
 - Start every task by reading `TASKS.md` (if present) and running decision retrieval (if enabled).
