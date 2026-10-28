@@ -418,24 +418,26 @@ async function loadMap() {
 }
 async function loadNotifications() {
   const cfg = await api('notifications'), root = $('notification-settings'); root.replaceChildren();
-  root.append(el('p', cfg.installed ? 'Comfort is enabled in this workspace. These notification settings are personal and shared across all comfort-enabled projects.' : 'Comfort is not enabled here. Run yaw add comfort in this workspace. Quick keeps it optional; Full includes it by default.'));
+  root.append(el('p', cfg.installed ? 'Comfort is enabled in this workspace. These notification settings are personal and shared across all comfort-enabled projects.' : 'Comfort is not enabled here. Run yaw add comfort in this workspace. Optional tools stay off until you select them.'));
   const fields = {};
   const field = (name, title, type, value) => {
     const label = el('label', title), input = el('input'); input.type = type;
     if (type === 'checkbox') input.checked = value; else input.value = value;
-    label.append(input); root.append(label); fields[name] = input; return input;
+    if (type === 'checkbox') { label.prepend(input); label.className = 'setting-toggle'; } else label.append(input);
+    root.append(label); fields[name] = input; return input;
   };
   field('enabled', 'Enable notifications (personal setting)', 'checkbox', cfg.enabled);
-  field('minutes', 'Minimum run length in minutes', 'number', cfg.minutes);
+  field('minutes', 'Minimum run length in minutes', 'number', cfg.minutes).min = '0';
   const terminal = el('select'); terminal.setAttribute('aria-label', 'Terminal channel');
   for (const name of ['osc9', 'osc777', 'off']) { const o = el('option', name); o.value = name; terminal.append(o); }
-  terminal.value = cfg.terminal; root.append(el('p', 'Terminal channel'), terminal);
+  terminal.value = cfg.terminal; const terminalLabel = el('label', 'Terminal channel'); terminalLabel.append(terminal); root.append(terminalLabel);
   field('telegram', 'Enable Telegram', 'checkbox', cfg.telegram.enabled);
   field('tokenEnv', 'Bot token environment variable NAME (not the token)', 'text', cfg.telegram.tokenEnv);
   field('chatIdEnv', 'Chat ID environment variable NAME (not the ID)', 'text', cfg.telegram.chatIdEnv);
   root.append(el('p', `Telegram environment: ${cfg.telegramReady ? 'configured' : 'not configured'}. Enter credentials in your shell before starting yaw web; never paste them here. Restart an existing background server to pick up environment changes. ntfy: ${cfg.ntfyConfigured ? 'configured in comfort.yaml' : 'not configured'}.`));
   const status = el('p', cfg.delivery ? `Last background delivery: ${cfg.delivery.ok ? 'sent' : 'failed'} · ${date(cfg.delivery.date)}` : '');
-  root.append(button('Save personal settings', async () => {
+  const actions = el('div', null, 'interview-actions'); root.append(actions);
+  actions.append(button('Save personal settings', async () => {
     try {
       const result = await api('notifications', { enabled: fields.enabled.checked, minutes: Number(fields.minutes.value), terminal: terminal.value,
         telegram: { enabled: fields.telegram.checked, tokenEnv: fields.tokenEnv.value, chatIdEnv: fields.chatIdEnv.value } });

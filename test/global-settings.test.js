@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from '../core/web/global-settings.js';
+import { setupDefaults, saveSetupDefaults } from '../core/lib/setup-defaults.js';
 import { KIT_ROOT, tmp, writeTree } from './helpers/fixtures.js';
 
 const home = () => { const HOME = tmp('yaw-global-'); return { env: { HOME }, dir: join(HOME, '.yaw') }; };
@@ -60,4 +61,17 @@ test('files: only listed ~/.yaw files are readable, links are refused, folders s
   for (const path of ['other.txt', 'notification-settings.json', '../.yaw/user-profile.yaml', 'kit/', 'kit/x', 'session-analysis.json']) {
     assert.throws(() => globalFile({ env, path }), /unavailable/, path);
   }
+});
+
+// The catalog shown in Settings is also returned after saving; writes retain only user choices.
+test('tool defaults expose kit descriptions and dependencies without persisting catalog metadata', () => {
+  const { env, dir } = home(), ctx = { env, kitRoot: KIT_ROOT };
+  const first = setupDefaults(ctx);
+  assert.deepEqual(first.catalog.map((m) => m.name), first.availableModules);
+  const ci = first.catalog.find((m) => m.name === 'ci');
+  assert.equal(ci.group, 'github'); assert.ok(ci.title && ci.short && ci.what);
+  assert.ok(ci.depends.includes('github'));
+  const saved = saveSetupDefaults(ctx, { modules: ['ci'], answers: {} });
+  assert.deepEqual(saved.catalog, first.catalog);
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, 'setup-defaults.json'), 'utf8')), { version: 1, modules: ['ci'], answers: {} });
 });

@@ -3,7 +3,7 @@
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
-import { RADIO_MAX, choiceField } from './setup-cards.js';
+import { GROUPS, RADIO_MAX, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
 import { CHATS } from './chat-services.js';
 
@@ -48,6 +48,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     tab = TABS.includes(sub) ? sub : 'interview';
     document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
     for (const id of TABS) $(`gs-${id}`).hidden = id !== tab;
+    for (const id of ['sync', 'sessions']) $(`gs-${id}`).classList.add('card', 'settings-panel');
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
     if (tab === 'notifications') loadNotifications().catch(report);
     if (tab === 'classification') loadClassifier().catch(report);
@@ -97,7 +98,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const data = await get('improve/settings'), root = $('gs-improve');
     const enabled = new Set(data.enabledAgents), status = el('p', '', 'small'); status.setAttribute('role', 'status');
     const choices = el('div', null, 'improve-agent-options');
-    const defaultTarget = document.createElement('select'); defaultTarget.setAttribute('aria-label', 'Default review destination');
+    const defaultTarget = document.createElement('select'); defaultTarget.setAttribute('aria-label', 'Preferred reviewer');
     const populate = (wanted = defaultTarget.value || data.defaultTarget) => {
       defaultTarget.replaceChildren();
       for (const [name] of CHATS) { const o = el('option', `${name} · browser`); o.value = `browser:${name}`; defaultTarget.append(o); }
@@ -108,18 +109,26 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = enabled.has(agent.id);
       checkbox.addEventListener('change', () => { checkbox.checked ? enabled.add(agent.id) : enabled.delete(agent.id); populate(); });
       const label = el('label', null, 'improve-agent-option');
-      label.append(checkbox, el('strong', agent.name), el('span', agent.installed ? 'Installed on the dashboard server' : 'Not found on the dashboard server PATH', 'small muted'));
+      label.append(checkbox, el('strong', agent.name), el('span', agent.installed ? 'Available here' : 'Install separately to run here', 'small muted'));
       choices.append(label);
     }
     populate(data.defaultTarget);
-    const label = el('label', 'Default review destination'); label.append(defaultTarget);
+    const label = el('label', 'Preferred reviewer'); label.append(defaultTarget, el('span', 'Preselected when you request a review; you can change it for each review.', 'small muted'));
     root.replaceChildren(el('article', null, 'card'));
-    root.firstChild.append(el('h2', 'Learn · review destinations'),
-      el('p', 'Choose where Learn sends a review when you ask. Browser chats open with an empty conversation; copy and paste the prompt as in the interview.'),
-      el('h3', 'Installed coding agents'), choices,
-      el('p', 'CLI reviews use your existing sign-in and the CLI’s model provider; they may use paid hosted models. YAW starts a separate review in a temporary folder, sends the inspected prompt over stdin, and displays the answer here. No suggestions are applied. Codex user config is excluded for this restricted review.', 'small muted'),
-      el('p', 'Supported: Claude Code and Codex. Install and sign in separately. YAW does not install software or store credentials; provider-side retention still applies.', 'small muted'),
-      label, button('Save review destinations', async () => {
+    const flow = el('ol', null, 'learn-flow');
+    for (const [title, text] of [['Choose sessions', 'In Learn, select saved conversations to inspect.'], ['Preview the prompt', 'Review the context before sharing it with a reviewer.'], ['Request a review', 'Use a browser chat or an enabled CLI. Review proposed changes before applying them.']]) {
+      const step = el('li'); step.append(el('strong', title), el('span', text, 'small muted')); flow.append(step);
+    }
+    const help = el('details', null, 'settings-help');
+    help.append(el('summary', 'How are reviews run?'),
+      el('p', 'Learn runs only when you request a review. It does not forward each prompt. Session hooks collect metadata; model diagnosis happens separately on selected saved conversations.', 'small muted'),
+      el('p', 'Browser chats open empty: paste the reviewed prompt yourself. CLI reviews run on the computer running yaw web (normally this computer), in a separate temporary folder, using your existing sign-in and model provider. They may use paid hosted models. YAW shows the response here; it does not apply suggestions automatically.', 'small muted'),
+      el('p', 'Install and sign in to Claude Code or Codex separately. YAW does not install them or store credentials. Codex user config is excluded for this restricted review; provider retention still applies.', 'small muted'));
+    const actions = el('div', null, 'interview-actions');
+    root.firstChild.append(el('h2', 'Learn · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions.'), flow, help,
+      el('h3', 'CLI reviewers'), el('p', 'Allow these tools as review choices. Availability is checked on the computer running yaw web.', 'small muted'), choices,
+      label, actions);
+    actions.append(button('Save review destinations', async () => {
         try { await api('improve-settings', { enabledAgents: [...enabled], defaultTarget: defaultTarget.value }); status.textContent = 'Review destinations saved.'; }
         catch (e) { status.textContent = e.message; }
       }, 'primary'), status);
@@ -138,7 +147,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     };
     const draw = () => {
       root.replaceChildren(el('h2', 'Session folders'),
-        el('p', 'Where YAW reads your agents\' session history. Sessions › Refresh scans exactly these folders (nothing is scanned by itself) and keeps only counts, times and model names, never message text. Each folder needs the format of the tool that wrote it; the VS Code extensions of Claude Code and Codex write to the same folders as their command lines.', 'small muted'));
+        el('p', 'Where YAW reads your agents\' session history. Analytics › Refresh scans exactly these folders (nothing is scanned by itself) and keeps only counts, times and model names, never message text. Each folder needs the format of the tool that wrote it; the VS Code extensions of Claude Code and Codex write to the same folders as their command lines.', 'small muted'));
       const rows = el('div', null, 'source-rows');
       list.forEach((s, i) => {
         const row = el('div', null, 'source-row'), on = document.createElement('input'), path = document.createElement('input'), fmt = formatSelect(s.agent);
@@ -174,7 +183,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
         el('p', 'Not readable yet: Cursor and Antigravity (databases / binary chats) and VS Code Copilot Chat. Their folders cannot be added.', 'small muted'));
       const bar = el('div', null, 'interview-actions');
       bar.append(button('Save folders', async () => {
-        try { Object.assign(data, await api('session-sources-save', { sources: list.map(({ agent, path, enabled }) => ({ agent, path, enabled })) })); list = data.sources.map((s) => ({ ...s })); dirty = false; draw(); say('Saved. Press Refresh on a Sessions page to scan them.'); }
+        try { Object.assign(data, await api('session-sources-save', { sources: list.map(({ agent, path, enabled }) => ({ agent, path, enabled })) })); list = data.sources.map((s) => ({ ...s })); dirty = false; draw(); say('Saved. Press Refresh on an Analytics page to scan them.'); }
         catch (e) { say(e.message, true); }
       }, 'primary'), button('Reset to defaults', async () => {
         if (!confirm('Forget your folders and use each agent\'s usual folder again?')) return;
@@ -188,7 +197,8 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
 
   async function loadSync() {
     const data = await get('global/sync'), root = $('gs-sync'); root.replaceChildren();
-    root.append(el('h2', 'Sync'), el('p', 'Merge saved numerical statistics across devices. Sync presets, personal defaults and, if you tick them, task snapshots and global knowledge in both directions. No transcripts, passwords or workspace folders are transferred; task and knowledge text is, so tick those only for a destination you trust (the files are plain text). Refresh Sessions locally before syncing to include recent statistics. Sessions from your other devices then appear on the Sessions pages as "synced · device"; a device needs this YAW version and one sync to share start times.'));
+    root.append(el('h2', 'Sync'), el('p', 'Share defaults, presets and saved statistics between your devices. Choose an existing folder or a private GitHub repository.'));
+    const help = el('details', null, 'settings-help'); help.append(el('summary', 'What is transferred?'), el('p', 'No transcripts, passwords or workspace folders. Optional task snapshots and knowledge contain plain text: choose a destination you trust. Refresh Analytics before syncing to include recent statistics. Other devices appear as synced in Analytics after they sync with this YAW version.', 'small muted')); root.append(help);
     const field = (title, value = '') => {
       const label = el('label', title), input = document.createElement('input');
       input.value = value; label.append(input); root.append(label); return input;
@@ -202,7 +212,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const folderRow = el('div', null, 'inline-control'); folder.parentNode.append(folderRow); folderRow.append(folder, browse);
     const github = field('Or private GitHub repository (owner/repository)', data.config?.github ?? '');
     const scopes = [];
-    const SCOPE_TEXT = { settings: 'Personal defaults (About you answers)', presets: 'Presets', statistics: 'Session statistics (counts, times, model names; shown on the Sessions pages)',
+    const SCOPE_TEXT = { settings: 'Personal defaults (About you answers)', presets: 'Presets', statistics: 'Session statistics (counts, times, model names; shown in Analytics)',
       tasks: 'Tasks (the Global → Tasks snapshots: project folder name, task ids, titles and status)', knowledge: 'Global knowledge (Markdown records in ~/.yaw/knowledge)' };
     for (const key of ['settings', 'presets', 'statistics', 'tasks', 'knowledge']) {
       const label = el('label', ` ${SCOPE_TEXT[key]}`), input = document.createElement('input'); input.type = 'checkbox';
@@ -213,13 +223,14 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       const result = await api('sync-run', { name: name.value || undefined, resolution });
       await loadSync(); root.append(el('p', result.message, 'small muted'));
     };
-    root.append(button('Save sync settings', async () => {
+    const actions = el('div', null, 'interview-actions'); root.append(actions);
+    actions.append(button('Save sync settings', async () => {
       try {
         await api('sync-setup', { name: name.value || undefined, target: folder.value || undefined, github: github.value || undefined, scopes: scopes.filter(([, input]) => input.checked).map(([key]) => key) });
         await loadSync();
       } catch (e) { report(e); }
     }));
-    if (data.configured) root.append(button('Sync now', () => run().catch(report), 'primary'));
+    if (data.configured) actions.append(button('Sync now', () => run().catch(report), 'primary'));
     root.append(el('p', data.lastSync ? `Last successful sync: ${new Date(data.lastSync).toLocaleString()}` : 'No successful sync yet.', 'small muted'));
     if (data.conflicts.length) {
       root.append(el('p', `Conflicting records: ${data.conflicts.join(', ')}. Choose which version to keep for these conflicts.`, 'warn'),
@@ -264,24 +275,43 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const box = el('section', null, 'card'); box.append(el('h2', 'Optional tools for new projects'), el('p', 'Undecided tools start off. Quick reuses these defaults; Basic and Pro let you review them. Existing projects keep their selections.', 'small muted'));
     if (setupPolicy.warning) box.append(el('p', setupPolicy.warning, 'warn'));
     const selected = new Set(setupPolicy.modules), values = { ...setupPolicy.answers };
-    for (const name of setupPolicy.availableModules) {
-      const label = el('label'), input = el('input'); input.type = 'checkbox'; input.checked = selected.has(name);
-      input.addEventListener('change', () => { if (input.checked) selected.add(name); else selected.delete(name); });
-      label.append(input, document.createTextNode(' ' + name), ...depthBadges(['quick'])); box.append(label);
-    }
-    for (const q of setupPolicy.questions) {
-      const label = el('label', q.label), select = el('select');
-      label.append(...depthBadges(['quick', 'basic'].filter((depth) => !asksIn(q, depth))));
-      for (const choice of q.type === 'boolean' ? [{ value: 'false', label: 'Off' }, { value: 'true', label: 'On' }] : q.choices) {
-        const option = el('option', typeof choice === 'object' ? choice.label ?? choice.value : choice); option.value = String(typeof choice === 'object' ? choice.value : choice); select.append(option);
+    const groups = el('div', null, 'tool-default-groups');
+    for (const [group, title] of GROUPS) {
+      const modules = setupPolicy.catalog.filter((m) => m.group === group);
+      if (!modules.length) continue;
+      const section = el('section', null, 'tool-default-group'), cards = el('div', null, 'tool-default-cards');
+      section.append(el('h3', title));
+      for (const m of modules) {
+        const card = el('article', null, 'tool-default'), label = el('label', null, 'setting-toggle');
+        const input = el('input'); input.type = 'checkbox'; input.checked = selected.has(m.name);
+        input.addEventListener('change', () => { if (input.checked) selected.add(m.name); else selected.delete(m.name); });
+        label.append(input, el('strong', m.title));
+        const help = el('details', null, 'quick-help'), summary = el('summary', '?');
+        summary.setAttribute('aria-label', `About ${m.title}`); summary.title = m.what;
+        help.append(summary, el('p', m.what));
+        if (m.adds.length) help.append(el('p', m.adds.join(' · '), 'small muted'));
+        const dependencies = m.depends.filter((n) => n !== 'core');
+        if (dependencies.length) help.append(el('p', `Also enables: ${dependencies.map((n) => setupPolicy.catalog.find((x) => x.name === n)?.title ?? n).join(', ')}.`, 'small muted'));
+        card.append(label, help, el('p', m.short, 'small muted')); cards.append(card);
       }
-      select.value = String(values[q.id] ?? q.default);
-      select.addEventListener('change', () => { values[q.id] = q.type === 'boolean' ? select.value === 'true' : select.value; });
-      label.append(select); box.append(label);
+      section.append(cards); groups.append(section);
     }
+    box.append(...depthBadges(['quick']), groups, el('h3', 'Workflow defaults'));
+    const policies = el('div', null, 'settings-fields');
+    for (const q of setupPolicy.questions) {
+      const field = el('fieldset', null, 'interview-question'), legend = el('legend', q.label);
+      legend.append(...depthBadges(['quick', 'basic'].filter((depth) => !asksIn(q, depth))));
+      const choices = q.type === 'boolean' ? [{ value: 'false', label: 'Off' }, { value: 'true', label: 'On' }] : q.choices;
+      field.append(legend, choiceField({ name: `policy-${q.id}`, id: `policy-${q.id}`, choices, value: String(values[q.id] ?? q.default), label: q.label,
+        onChange: (v) => { values[q.id] = q.type === 'boolean' ? v === 'true' : v; } }).node);
+      if (q.hint) field.append(el('p', q.hint, 'small muted'));
+      policies.append(field);
+    }
+    box.append(policies);
     const status = el('p', '', 'small muted'); status.setAttribute('role', 'status');
-    box.append(button('Save tool defaults', async () => { try { setupPolicy = await api('setup-defaults-save', { modules: [...selected], answers: values }); status.textContent = 'Saved for future project setups.'; } catch (e) { status.textContent = e.message; } }, 'primary'), status);
-    return box;
+    const actions = el('div', null, 'interview-actions');
+    actions.append(button('Save tool defaults', async () => { try { setupPolicy = await api('setup-defaults-save', { modules: [...selected], answers: values }); status.textContent = 'Saved for future project setups.'; } catch (e) { status.textContent = e.message; } }, 'primary'), status);
+    box.append(actions); return box;
   }
   function question(q) {
     const multi = q.type === 'multi', radios = q.type === 'boolean' || (q.type === 'choice' && (q.choices ?? []).length <= RADIO_MAX);
@@ -424,7 +454,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
     const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
-    card.append(el('p', 'Classify (in the filter bar of a Sessions page, or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.', 'small muted'));
+    card.append(el('p', 'Classify (in the filter bar of Analytics, or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.', 'small muted'));
     const form = el('div', null, 'classifier-form'), inputs = {};
     for (const [key, label, type, help, step] of FIELDS) {
       const wrap = el('label', label), input = el('input'), range = limits[key];

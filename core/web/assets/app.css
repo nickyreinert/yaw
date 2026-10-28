@@ -689,3 +689,48 @@ a.button.primary { background: var(--accent); color: #fff; }
 @media (max-width: 900px) { .source-row { grid-template-columns: 1.6rem 1fr; } .source-row > * { min-width: 0; } }
 
 .personal-defaults-notice { padding: 12px 16px; margin: 0 0 20px; border-left: 3px solid #b48140; border-radius: 4px; background: #fcf6eb; color: #85633e; font-size: .88rem; }
+
+/* Settings use the same card, field and action rhythm in every tab. */
+#global-settings-view .card, #settings .card { padding: 24px; margin-bottom: 20px; }
+#global-settings-tabs, #settings-tabs { gap: 8px; margin-bottom: 20px; }
+#global-settings-view .card > h2 { margin: 0 0 12px; }
+#global-settings-view .card h3 { font-size: .9rem; margin: 24px 0 12px; }
+#global-settings-view .card > label, #notification-settings > label { display: grid; gap: 8px; margin: 16px 0; font-size: .82rem; }
+#global-settings-view label input:not([type=checkbox]):not([type=radio]), #global-settings-view label select,
+#notification-settings label input, #notification-settings label select { margin: 0; min-width: 0; }
+#global-settings-view label:has(> input[type=checkbox]), #notification-settings label:has(> input[type=checkbox]),
+.setting-toggle { display: flex; align-items: center; gap: 10px; }
+#global-settings-view input[type=checkbox], #notification-settings input[type=checkbox] { width: 1rem; height: 1rem; margin: 0; flex: 0 0 auto; }
+#notification-settings > p { font-size: .8rem; line-height: 1.6; color: var(--muted); }
+#notification-settings input[type=number] { max-width: 10rem; }
+.interview-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.interview-actions > p { margin: 0; }
+.settings-help { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; font-size: .82rem; }
+.settings-help summary { cursor: pointer; font-weight: 600; }
+.settings-help p { line-height: 1.65; }
+.settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.settings-fields .interview-question { margin: 0; min-width: 0; }
+.tool-default-groups { display: grid; gap: 4px; }
+.tool-default-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tool-default { display: grid; grid-template-columns: 1fr auto; align-content: start; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fff; }
+.tool-default:has(input:checked) { border-color: #88beb2; background: #eef7f2; }
+.tool-default label { font-size: .82rem; margin: 0; cursor: pointer; }
+.tool-default > p { grid-column: 1 / -1; margin: 0; line-height: 1.5; }
+.quick-help { position: relative; font-size: .8rem; }
+.quick-help summary { list-style: none; cursor: help; width: 22px; height: 22px; text-align: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); }
+.quick-help summary::-webkit-details-marker { display: none; }
+.quick-help[open] { grid-column: 1 / -1; grid-row: 2; }
+.quick-help[open] summary { float: right; margin: 0 0 6px 8px; }
+.quick-help p { margin: 8px 0; line-height: 1.5; }
+.learn-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; list-style: none; counter-reset: learn; margin: 20px 0; }
+.learn-flow li { counter-increment: learn; padding: 14px; background: var(--wash); border-radius: 8px; font-size: .85rem; }
+.learn-flow li::before { content: counter(learn) '. '; color: var(--muted); }
+.learn-flow span { display: block; margin-top: 8px; line-height: 1.5; }
+#gs-improve > .card > label { max-width: 32rem; }
+@media (max-width: 1100px) { .tool-default-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .tool-default-cards, .settings-fields, .learn-flow { grid-template-columns: 1fr; }
+  #global-settings-view .card, #settings .card { padding: 18px; }
+  .improve-agent-option { flex-wrap: wrap; }
+}
+.tool-default-cards { align-items: start; }
