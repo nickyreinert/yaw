@@ -1,5 +1,6 @@
-// Global Overview, Sessions (also Workspace → Analytics, locked to the open project) and Global Tasks.
-// One sticky filter drives every card, chart and table; filters, split and table state live in the URL. On Sessions it
+import { renderOverviewMetrics, summarizeOverview } from './overview-metrics.js';
+// Global Overview, Analytics (also Workspace → Analytics, locked to the open project) and Global Tasks.
+// One column browser drives every card, chart and table; filters, split and table state live in the URL. It
 // also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
@@ -450,12 +451,10 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const rows = filtered(); S = makeSplit(rows);
     fill($('ov-filter'), filterBar('overview'));
     const open = data.tasks.filter((t) => t.available && projectMatches(t.project)).reduce((n, t) => n + t.active.length + t.backlog.length, 0);
-    const usage = rows.filter((r) => r.tokensIn !== null).length;
     const projects = new Set(rows.filter((r) => r.source !== 'synced').map((r) => r.project)).size;
     const syncedCount = rows.filter((r) => r.source === 'synced').length;
-    fill($('ov-metrics'), metric('Projects', fmt(projects), syncedCount ? syncedNote(syncedCount) : 'with sessions in range'), metric('Sessions', fmt(rows.length)),
-      metric('Agents', fmt(new Set(rows.map((r) => r.agent)).size)), metric('Tokens', usage ? short(sum(rows, tokens)) : '—', `${usage}/${rows.length} with usage`),
-      metric('Elapsed', dur(sum(rows, (r) => r.minutes))), metric('Cost', `$${sum(rows, (r) => r.cost).toFixed(2)}`, 'reported only'), metric('Open tasks', fmt(open), 'Project tasks · not affected by the device filter'));
+    renderOverviewMetrics($('ov-metrics'), { summary: summarizeOverview(rows), projects, openTasks: open,
+      projectNote: syncedCount ? syncedNote(syncedCount) : 'With sessions in range', taskNote: 'Project scope · independent of device' });
     const segs = state.path.split('/').filter(Boolean);
     fill($('ov-crumbs'), h('span', { class: 'root' }, ROOT), h('button', { type: 'button', 'aria-current': segs.length ? null : 'true', on: { click: () => set({ path: '', project: '' }) } }, 'all'),
       segs.map((seg, i) => [h('span', {}, '/'), h('button', { type: 'button', 'aria-current': i === segs.length - 1 ? 'true' : null, on: { click: () => set({ path: segs.slice(0, i + 1).join('/'), project: '' }) } }, seg)]),

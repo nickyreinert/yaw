@@ -125,7 +125,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       el('p', 'Browser chats open empty: paste the reviewed prompt yourself. CLI reviews run on the computer running yaw web (normally this computer), in a separate temporary folder, using your existing sign-in and model provider. They may use paid hosted models. YAW shows the response here; it does not apply suggestions automatically.', 'small muted'),
       el('p', 'Install and sign in to Claude Code or Codex separately. YAW does not install them or store credentials. Codex user config is excluded for this restricted review; provider retention still applies.', 'small muted'));
     const actions = el('div', null, 'interview-actions');
-    root.firstChild.append(el('h2', 'Learn · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions.'), flow, help,
+    root.firstChild.append(el('h2', 'Learn · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
       el('h3', 'CLI reviewers'), el('p', 'Allow these tools as review choices. Availability is checked on the computer running yaw web.', 'small muted'), choices,
       label, actions);
     actions.append(button('Save review destinations', async () => {

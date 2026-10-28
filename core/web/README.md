@@ -4,7 +4,7 @@
 
 | Area | Data / controls |
 | --- | --- |
-| Overview | Current workspace: session counts, reported tokens, elapsed time, task count, configuration, activity |
+| Overview | Current workspace: shared overview cards (projects, sessions, agents, tokens, elapsed, reported cost, open tasks), configuration, recent tasks/sessions and activity |
 | Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
 | Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project; device filter for session metrics |
 | Analytics | Workspace (locked to the project) and Global; shared multi-select column browser: Device → Folders → Projects → Programming language → Agent → Model; dates and chart split below; usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |

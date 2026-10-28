@@ -39,6 +39,7 @@ test('dashboard data: project facts, tasks, and session stats for this project a
   assert.deepEqual(data.decisions, { available: false });
   const mine = data.sessions.project;
   assert.equal(mine.sessions, 2);
+  assert.equal(mine.usageSessions, 1); assert.equal(mine.costSessions, 1); assert.equal(mine.timedSessions, 2);
   assert.equal(mine.minutes, 110);
   assert.deepEqual(mine.byAgent, { claude: { sessions: 1, minutes: 90, tokens: 1200 }, codex: { sessions: 1, minutes: 20 } });
   assert.equal(mine.tokens, 1200);

@@ -1,3 +1,4 @@
+import { renderOverviewMetrics } from './overview-metrics.js';
 import { PANES, createSettings, paneOf, taxonomyEditor } from './settings-view.js';
 import { attachPageSearch, attachSidebarSearch } from './search.js';
 import { createGlobal } from './global-view.js';
@@ -30,10 +31,6 @@ function card(title, text = '', cls = '') {
 }
 function command(text) { return el('pre', text, 'command'); }
 function button(text, fn, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
-function metric(label, value, note) {
-  const node = el('div', null, 'metric'); node.append(el('span', label, 'eyebrow'), el('strong', value));
-  if (note) node.append(el('span', note, 'muted')); return node;
-}
 function action(text, view, primary = false) { return button(text, () => navigate(view), primary ? 'primary' : ''); }
 function activityChart(rows) {
   const wrap = el('div', null, 'activity-chart'), NS = 'http://www.w3.org/2000/svg';
@@ -56,7 +53,7 @@ const TYPES = ['document', 'rule', 'preference', 'lesson', 'snippet'];
 let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
 const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
-// Routes are `#name[/sub][?query]`. Workspace and Global Sessions share one section, both Knowledge pages another.
+// Routes are `#name[/sub][?query]`. Workspace and Global Analytics share one section, both Knowledge pages another.
 const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
 const SECTIONS = { 'global-analytics': 'analytics', 'global-knowledge': 'knowledge' };
 const ALIASES = { sessions: 'analytics', 'global-sessions': 'global-analytics', decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
@@ -126,10 +123,11 @@ function overview(d) {
   $('project-name').textContent = p.name ?? 'Project'; $('project-path').textContent = p.root ?? 'Unavailable';
   $('project-state').textContent = p.error ? 'Read error' : p.initialized ? 'Configured' : 'Not configured';
   $('overview-warning').textContent = p.error || '';
-  const metrics = $('overview-metrics'); metrics.replaceChildren();
-  metrics.append(metric('Workspace sessions', mine ? fmt(mine.sessions) : '—'),
-    metric('Agents', mine ? fmt(Object.keys(mine.byAgent).length) : '—'), metric('Reported tokens', mine?.tokens ? fmt(mine.tokens) : '—'),
-    metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
+  renderOverviewMetrics($('overview-metrics'), {
+    summary: mine ? { ...mine, agents: Object.keys(mine.byAgent).length } : null,
+    projects: p.root ? 1 : null, projectNote: 'Current workspace',
+    openTasks: d.tasks.available ? d.tasks.active.length + d.tasks.backlog.length : null, taskNote: 'Current workspace',
+  });
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
   project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'settings?interview', true));

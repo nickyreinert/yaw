@@ -205,9 +205,6 @@ h2 { font-size: 1.05rem; }
 .metric strong { font-size: 1.8rem; color: var(--ink); font-variant-numeric: tabular-nums; }
 .metric .eyebrow { color: var(--muted); font-size: .65rem; margin-bottom: 7px; }
 .metric .muted { font-size: .7rem; }
-#overview-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-#overview-metrics .metric { padding: 16px 13px; }
-#overview-metrics .metric strong { font-size: 1.6rem; }
 button { font-size: .8rem; }
 button.primary:hover { background: #2b6871; }
 button:hover { border-color: #90bbb5; background: #e7f3ed; }
@@ -266,9 +263,9 @@ td { font-variant-numeric: tabular-nums; }
 .wizard-nav small { font-size: .65rem; }
 .step-number { border-color: #a9cbc3; color: #4a7d7a; }
 .content-footer { margin-top: 28px; color: var(--muted); }
-@media (max-width: 1150px) { #overview-metrics { grid-template-columns: repeat(3, 1fr); } .metric:nth-child(n+4) { border-top: 1px solid var(--line); } .knowledge-layout { grid-template-columns: 1fr 1.2fr; } }
+@media (max-width: 1150px) { .metric:nth-child(n+4) { border-top: 1px solid var(--line); } .knowledge-layout { grid-template-columns: 1fr 1.2fr; } }
 @media (max-width: 900px) { .overview-grid, .knowledge-layout { grid-template-columns: 1fr; } #knowledge-detail { position: static; max-height: none; } .filters { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 760px) { .sidebar { width: 100%; position: static; padding: 14px 18px 0; } .workspace { margin-left: 0; } .brand img { width: 30px; height: 30px; } .brand .brand-name { font-size: 1.4rem; } .content { padding: 22px 18px; } .topbar { padding: 0 18px; } .sidebar nav button { padding: 8px 10px; } #overview-metrics { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 1.65rem; } .card, .interview-form { padding: 17px; } .knowledge-search { grid-column: 1 / -1; } .pager { flex-wrap: wrap; } .knowledge-layout { display: block; } }
+@media (max-width: 760px) { .sidebar { width: 100%; position: static; padding: 14px 18px 0; } .workspace { margin-left: 0; } .brand img { width: 30px; height: 30px; } .brand .brand-name { font-size: 1.4rem; } .content { padding: 22px 18px; } .topbar { padding: 0 18px; } .sidebar nav button { padding: 8px 10px; } h1 { font-size: 1.65rem; } .card, .interview-form { padding: 17px; } .knowledge-search { grid-column: 1 / -1; } .pager { flex-wrap: wrap; } .knowledge-layout { display: block; } }
 .interview-heading { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .interview-heading :is(h1, h2) { flex: 0 1 auto; margin: 0; font-size: 1.7rem; }
 .interview-heading .focus-toggle { margin-left: 0; display: inline-flex; align-items: center; gap: 8px; padding: 5px 9px; font-size: .74rem; background: #fff; }
@@ -691,7 +688,7 @@ a.button.primary { background: var(--accent); color: #fff; }
 .personal-defaults-notice { padding: 12px 16px; margin: 0 0 20px; border-left: 3px solid #b48140; border-radius: 4px; background: #fcf6eb; color: #85633e; font-size: .88rem; }
 
 /* Settings use the same card, field and action rhythm in every tab. */
-#global-settings-view .card, #settings .card { padding: 24px; margin-bottom: 20px; }
+#global-settings-view .card, #settings-view .card { padding: 24px; margin-bottom: 20px; }
 #global-settings-tabs, #settings-tabs { gap: 8px; margin-bottom: 20px; }
 #global-settings-view .card > h2 { margin: 0 0 12px; }
 #global-settings-view .card h3 { font-size: .9rem; margin: 24px 0 12px; }
@@ -730,7 +727,7 @@ a.button.primary { background: var(--accent); color: #fff; }
 @media (max-width: 1100px) { .tool-default-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) {
   .tool-default-cards, .settings-fields, .learn-flow { grid-template-columns: 1fr; }
-  #global-settings-view .card, #settings .card { padding: 18px; }
+  #global-settings-view .card, #settings-view .card { padding: 18px; }
   .improve-agent-option { flex-wrap: wrap; }
 }
 .tool-default-cards { align-items: start; }
@@ -755,3 +752,13 @@ a.button.primary { background: var(--accent); color: #fff; }
 @media (max-width: 1150px) { .facet-browser { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .facet-browser { grid-template-columns: repeat(2, minmax(0, 1fr)); } .analytics-dates { align-items: start; } }
 @media (max-width: 420px) { .facet-browser { grid-template-columns: 1fr; } }
+
+/* Both overview scopes use the same seven metric cards. */
+.metrics.overview-metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.overview-metrics .metric { padding: 18px; }
+.overview-metrics .metric strong { font-size: 1.65rem; }
+.analytics-filter .gfilter-end, .analytics-filter .collect-actions { flex-wrap: wrap; }
+
+@media (max-width: 1150px) { .metrics.overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .metrics.overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .overview-metrics .metric:last-child { grid-column: 1 / -1; } }
+#notification-settings > label:has(select) { max-width: 24rem; }

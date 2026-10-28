@@ -29,6 +29,7 @@ const assets = new Map([
   ['/review-prompts-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-prompts-view.js', import.meta.url))]],
   ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],
   ['/settings-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/settings-view.js', import.meta.url))]],
+  ['/overview-metrics.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/overview-metrics.js', import.meta.url))]],
   ['/analytics-filters.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/analytics-filters.js', import.meta.url))]],
   ['/global-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-view.js', import.meta.url))]],
   ['/insights-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-view.js', import.meta.url))]],

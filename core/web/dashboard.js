@@ -30,6 +30,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
   asset('settings-view.js', 'text/javascript; charset=utf-8'),
+  asset('overview-metrics.js', 'text/javascript; charset=utf-8'),
   asset('analytics-filters.js', 'text/javascript; charset=utf-8'),
   asset('global-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-view.js', 'text/javascript; charset=utf-8'),
@@ -183,8 +184,12 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
       let total = 0;
       let tokens = 0;
       let cost = 0;
+      let usageSessions = 0, costSessions = 0, timedSessions = 0;
       for (const r of list) {
         const m = minutes(r);
+        if (r.tokens_in != null || r.tokens_out != null) usageSessions++;
+        if (r.cost_usd != null) costSessions++;
+        if (r.ended && Number.isFinite(Date.parse(r.ended)) && Date.parse(r.ended) >= Date.parse(r.started)) timedSessions++;
         total += m;
         tokens += tokensOf(r);
         cost += Number(r.cost_usd ?? 0);
@@ -202,7 +207,7 @@ export async function sessionsSection(root, kitRoot, env, now = new Date()) {
           days[day] = (days[day] ?? 0) + 1;
         }
       }
-      return { sessions: list.length, minutes: total, tokens, costUsd: Math.round(cost * 100) / 100, byAgent, last30Days: days };
+      return { sessions: list.length, usageSessions, costSessions, timedSessions, minutes: total, tokens, costUsd: Math.round(cost * 100) / 100, byAgent, last30Days: days };
     };
     const mine = rows.filter((r) => r.project === project);
     const projects = {};
