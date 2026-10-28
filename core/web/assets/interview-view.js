@@ -422,11 +422,9 @@ function finish({ ok, message }, kickoff) {
   if (!ok) list.append(bullet('Fix the problem in the log, then run ', code('just setup && just check'), '.'));
   list.append(
     bullet(`Start ${names} in this folder; it reads AGENTS.md.`),
-    bullet('Optional tools: if you use the local Laya classifier or another external helper, install it separately; YAW does not install or start it for you.'),
-    bullet(code('yaw web'), ': start the workspace again (overview, sessions, tasks, Settings → Interview).'),
-    bullet('Change answers later: Settings → Interview in the workspace, or ', code('yaw edit'), '.'),
+    bullet(code('yaw web'), ': start the workspace again.'),
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
-    bullet(options.persistent ? 'The workspace remains open. Reopen Project settings to edit again.' : 'This page is disconnected: the local server stopped after applying.'));
+    bullet(options.persistent ? 'The workspace remains open.' : 'This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
   $('kickoff-box').replaceChildren(...(kickoff && !kickoff.plan ? [kickoffCard(kickoff)] : []));
   status(message);
