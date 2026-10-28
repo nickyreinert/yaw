@@ -13,3 +13,15 @@ export const CHATS = [
   ['GLM (Z.ai)', 'https://chat.z.ai/'],
   ['Meta AI', 'https://www.meta.ai/'],
 ];
+
+// Reused by setup planning and the saved kickoff prompt; links carry no project data.
+export function chatLinks() {
+  const links = document.createElement('div');
+  links.className = 'chat-links'; links.setAttribute('role', 'group'); links.setAttribute('aria-label', 'Open an AI chat');
+  for (const [name, href] of CHATS) {
+    const link = document.createElement('a');
+    link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.className = 'chip'; link.textContent = `${name} ↗`;
+    links.append(link);
+  }
+  return links;
+}

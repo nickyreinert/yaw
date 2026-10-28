@@ -2,6 +2,7 @@ import { mountInterview } from './interview-view.js';
 // Settings (Project | Files | Review prompts | Kickoff) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
 import { renderReviewPrompts } from './review-prompts-view.js';
+import { chatLinks } from './chat-services.js';
 
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -149,7 +150,9 @@ export function kickoffCard({ guide, prompt }) {
   }, 'primary');
   const text = el('pre', prompt, 'kickoff-prompt');
   const bar = el('div', null, 'interview-actions'); bar.append(copy, status);
-  card.append(steps, el('h3', 'Planning prompt'), bar, text);
+  card.append(steps, el('h3', 'Planning prompt'),
+    el('p', 'Optional: use your coding agent, a local model or an external chat to draft foundations and a build plan. Review the result before importing it.', 'small muted'),
+    bar, chatLinks(), el('p', 'Links only open the service. Paste the copied prompt yourself; nothing is sent automatically.', 'small muted'), text);
   return card;
 }
 

@@ -74,6 +74,8 @@ To plan the work, `yaw kickoff` prints a versioned prompt to draft and review ar
 
 `yaw web` opens the local dashboard in any folder without starting setup or writing project files. In an uninitialized folder, first-time setup is an explicit action under Workspace → Settings → Interview, with preview and folder confirmation before writing. The dashboard shows project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`). `yaw sessions import --dry-run`, then `yaw sessions import`, loads the past sessions of any project folder (also one without YAW) from the local history of Claude Code, Codex and Copilot: times, model and token counts only, never prompt content.
 
+The optional planning prompt includes links to external AI chats alongside Copy prompt. You can also use your coding agent or a local model. Opening a link sends no prompt; paste it yourself, then review the proposed foundations and plan before importing them.
+
 ## Quick, Basic and Pro
 
 **Quick** asks purpose, language and runtime. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.

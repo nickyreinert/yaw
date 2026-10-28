@@ -5,7 +5,7 @@
 import { el } from './setup-cards.js';
 
 // Chat services that take a pasted prompt. Plain links; opened in a new tab, no referrer.
-import { CHATS } from './chat-services.js';
+import { chatLinks } from './chat-services.js';
 export { CHATS } from './chat-services.js';
 
 // ctx: { request(action, input) -> Response, getAnswers() -> explicit answers so far, onUse(reply, text), onRemove() }
@@ -56,7 +56,7 @@ export function createPlanCard(ctx) {
       el('details', {}, el('summary', { text: 'Show the prompt' }), promptText)),
     el('li', {}, el('strong', { text: 'Open a chat and paste it' }),
       el('p', { text: 'You can also use your configured local model or draft the documents manually.' }),
-      el('div', { class: 'chat-links' }, ...CHATS.map(([name, href]) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', class: 'chip', text: name })))),
+      chatLinks()),
     el('li', {}, el('strong', { text: 'Paste the answer here' }), answer, review, el('div', { class: 'plan-actions' }, use)));
   panel.append(steps, status);
   toggle.addEventListener('click', () => {
@@ -69,7 +69,7 @@ export function createPlanCard(ctx) {
     el('h3', { id: 'plan-title', text: 'Plan with an AI chat' }), el('span', { class: 'pill', text: 'optional' }),
     el('ul', { class: 'plain-bullets small' },
       el('li', { text: 'Draft and review architecture/domain, data model and UI/UX foundations, then derive tasks with acceptance criteria' }),
-      el('li', { text: 'Set hosting, library, external-service and budget constraints under Architecture first, or resolve them with the planning chat' }),
+      el('li', { text: 'Discuss hosting, library, service and budget constraints here, or use Pro’s optional Architecture cards before copying the prompt' }),
       el('li', { text: 'You copy the prompt and paste the answer: nothing is sent from here' }),
       el('li', { text: 'Only for ideas that are not confidential' })),
     toggle, panel, summary);
