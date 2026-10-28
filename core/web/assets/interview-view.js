@@ -228,7 +228,7 @@ function buildQuestions() {
   if (personal) {
     personal.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
     const global = element('button', 'Edit personal defaults for future projects', { type: 'button', class: 'link' });
-    global.addEventListener('click', () => showView('global-settings/interview')); personal.append(global);
+    global.addEventListener('click', () => showView('global-settings')); personal.append(global);
   }
 
 }
@@ -589,5 +589,13 @@ async function start() {
   } else update();
 }
 await start();
-return { destroy() { clearTimeout(timer); revision++; root.replaceChildren(); }, state: () => state };
+return {
+  destroy() { clearTimeout(timer); revision++; root.replaceChildren(); }, state: () => state,
+  showSection(section) {
+    const index = ({ start: 0, user: 1, idea: 2, stack: STACK, workflow: WORKFLOW })[section];
+    if (index === undefined || phase !== 'edit') return;
+    if (skipped(index)) setDepth(section === 'user' ? 'basic' : 'pro');
+    stepIndex = index; renderWizard(true);
+  },
+};
 }

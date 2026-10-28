@@ -3,6 +3,7 @@ import { attachPageSearch, attachSidebarSearch } from './search.js';
 import { createGlobal } from './global-view.js';
 import { createGlobalSettings } from './global-settings-view.js';
 import { pickFolder } from './folder-picker.js';
+import { settingsRoute } from './ui-state.js';
 // Text-node rendering only. Registry and Markdown content are never parsed as HTML or executed.
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -98,9 +99,11 @@ export function showView(hash, focus = true) {
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (params.has('q') && pageSearch[name]) pageSearch[name].set(params.get('q'), { scroll: true });
   if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
-  if (name === 'global-settings' && sub === 'files' && new URLSearchParams(query).get('file')) sub = `files?file=${encodeURIComponent(new URLSearchParams(query).get('file'))}`;
   if (GLOBAL_VIEWS.includes(name)) globalView.show(name, query);
-  else { globalView?.hide(); replace(`#${sub ? `${name}/${sub}` : name}`); }
+  else {
+    globalView?.hide();
+    replace(`#${['settings', 'global-settings'].includes(name) ? settingsRoute(name, sub, query) : sub ? `${name}/${sub}` : name}`);
+  }
   if (focus && changed) { document.querySelector(`[data-view="${section}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
   if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null);
   if (name === 'code-map') loadMap().catch(reportError);
@@ -129,7 +132,7 @@ function overview(d) {
     metric('Elapsed time', mine ? duration(mine.minutes) : '—'), metric('Open tasks', d.tasks.available ? fmt(d.tasks.active.length + d.tasks.backlog.length) : '—'));
   const project = card('Current project');
   project.append(table(['Setting', 'Value'], [['Name', p.name], ['Kit', p.kit], ['Profile', p.profiles?.join(', ') || '—'], ['Modules', p.modules?.join(', ') || '—'], ['Agents', p.agents?.join(', ') || '—']]));
-  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'settings/interview', true));
+  project.append(action(p.initialized ? 'Settings →' : 'Configure project →', p.initialized ? 'settings' : 'settings?interview', true));
   document.querySelector('[data-route="code-map"]').hidden = !p.modules?.includes('code-map');
   const activity = card('Activity', 'Last 30 active days · UTC');
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
@@ -329,12 +332,12 @@ export function startWorkspace() {
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
   $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
-  settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(`settings/${tab}`), openSetup: setup ? () => navigate('setup') : null });
+  settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(settingsRoute('settings', tab)), openSetup: setup ? () => navigate('setup') : null });
   globalView = createGlobal({ get, api, report: reportError, openProject, replace, afterCollect: () => load() });
   globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications,
     onFile: (path) => { if (path) navigate(`global-settings/files?file=${encodeURIComponent(path)}`); else replace('#global-settings/files'); } });
-  document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(`settings/${b.dataset.tab}`)));
-  document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(`global-settings/${b.dataset.tab}`)));
+  document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(settingsRoute('settings', b.dataset.tab))));
+  document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(settingsRoute('global-settings', b.dataset.tab))));
   $('knowledge-search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); }, 200); });
   $('knowledge-new')?.addEventListener('click', () => newRecord());
   pageSearch = {
@@ -375,15 +378,15 @@ async function searchEntries() {
     if (node.classList.contains('nav-label')) { group = node.textContent.trim(); continue; }
     if (node.dataset.route) out.push({ title: node.lastChild.textContent.trim(), trail: group[0] + group.slice(1).toLowerCase(), route: node.dataset.route, text: '' });
   }
-  for (const [page, tab, title, text] of SETTINGS_TABS) out.push({ title, trail: `${page === 'settings' ? 'Workspace' : 'Global'} › Settings`, route: `${page}/${tab}`, text });
+  for (const [page, tab, title, text] of SETTINGS_TABS) out.push({ title, trail: `${page === 'settings' ? 'Workspace' : 'Global'} › Settings`, route: settingsRoute(page, tab), text });
   const [project, mine] = await Promise.all([get('interview').catch(() => null), get('global/profile').catch(() => null)]);
   const pane = (id) => PANES.find(([p]) => p === paneOf(id))[1];
   if (project?.available) {
-    for (const q of project.questions) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: `Workspace › Settings › Project › ${pane(q.id)}`, route: `settings/interview?section=${paneOf(q.id)}`,
+    for (const q of project.questions) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: `Workspace › Settings › Project › ${pane(q.id)}`, route: `settings?interview&section=${paneOf(q.id)}`,
       text: [q.id, q.hint, ...(q.choices ?? []).map((c) => typeof c === 'object' ? `${c.value} ${c.label ?? ''}` : c)].filter(Boolean).join(' · ') });
-    for (const m of project.modules ?? []) out.push({ title: m.title ?? m.name, trail: 'Workspace › Settings › Project › Your workflow', route: 'settings/interview?section=workflow', text: [m.name, m.description, m.summary].filter(Boolean).join(' · ') });
+    for (const m of project.modules ?? []) out.push({ title: m.title ?? m.name, trail: 'Workspace › Settings › Project › Your workflow', route: 'settings?interview&section=workflow', text: [m.name, m.description, m.summary].filter(Boolean).join(' · ') });
   }
-  for (const q of mine?.questions ?? []) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: 'Global › Settings › Defaults', route: 'global-settings/interview',
+  for (const q of mine?.questions ?? []) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: 'Global › Settings › Defaults', route: 'global-settings',
     text: [q.id, q.hint, ...(q.choices ?? []).map((c) => typeof c === 'object' ? `${c.value} ${c.label ?? ''}` : c)].filter(Boolean).join(' · ') });
   return out;
 }

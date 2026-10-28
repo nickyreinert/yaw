@@ -163,7 +163,7 @@ export function kickoffCard({ guide, prompt }) {
 export function createSettings({ api, get, report, refresh, go, openSetup }) {
   let tab = 'interview', files = null, open = new Set(), selected = null, interview = null, interviewStarted = false;
   let mountedInterview = null;
-  let pane = PANES[0][0], guided = false, repane = null;
+  let pendingSection = null;
   const drawer = $('settings-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -171,7 +171,10 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
 
   function show(name, params) {
     const section = params?.get('section');
-    if (PANES.some(([id]) => id === section)) { pane = section; repane?.(); }
+    if (PANES.some(([id]) => id === section)) {
+      pendingSection = section;
+      if (mountedInterview) { mountedInterview.showSection(section); pendingSection = null; }
+    }
     tab = ['interview', 'files', 'review', 'kickoff'].includes(name) ? name : 'interview';
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
     for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== tab;
@@ -183,7 +186,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     return tab;
   }
   function hide() { if (!drawer.hidden) closeDrawer(); }
-  function reset() { mountedInterview?.destroy(); mountedInterview = null; files = null; interview = null; interviewStarted = false; }
+  function reset() { mountedInterview?.destroy(); mountedInterview = null; pendingSection = null; files = null; interview = null; interviewStarted = false; }
 
   // Review prompts --------------------------------------------------------------------------------------
   async function loadReview() {
@@ -284,6 +287,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
         return json(await api('interview-action', { action, payload, expected: opened.hash, confirmFolder: opened.confirmFolder === true }));
       },
     });
+    if (pendingSection) { mountedInterview.showSection(pendingSection); pendingSection = null; }
   }
   return { show, hide, reset };
 }
