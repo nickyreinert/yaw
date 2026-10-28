@@ -1,7 +1,7 @@
 // Global Settings: Defaults (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { button, el, grid, press, source, tabs } from './settings-view.js';
-import { available, choiceLabel, choiceValue } from './ui-state.js';
+import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { RADIO_MAX, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
@@ -12,6 +12,13 @@ const TABS = ['interview', 'files', 'notifications', 'classification', 'improve'
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
+function depthBadges(depths) {
+  return depths.map((depth) => {
+    const badge = el('span', `${depth === 'quick' ? 'Quick' : 'Basic'} default`, `depth-default ${depth}`);
+    badge.title = `${depth === 'quick' ? 'Quick' : 'Basic'} uses this saved value without asking, when applicable.`;
+    return badge;
+  });
+}
 
 // A parsed file as nested tables; scalars stay text. Deep or long structures fall back to Raw.
 function formView(value, depth = 0) {
@@ -242,6 +249,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   function renderInterview() {
     const root = $('gs-interview'); root.replaceChildren();
     root.append(el('p', `Defaults for every new project · stored in ${profile.path}${profile.exists ? '' : ' (not created yet)'} · existing projects keep their own answers · nothing is written until Apply`, 'small muted'));
+    root.append(el('p', 'Depth badges show where a saved value is used without asking, when applicable.', 'small muted'));
     const box = el('section', null, 'card interview-section'); box.append(el('h2', 'About you'));
     for (const q of profile.questions) box.append(question(q));
     if (!profile.questions.length) box.append(el('p', 'This kit asks no personal questions.', 'muted'));
@@ -259,10 +267,11 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     for (const name of setupPolicy.availableModules) {
       const label = el('label'), input = el('input'); input.type = 'checkbox'; input.checked = selected.has(name);
       input.addEventListener('change', () => { if (input.checked) selected.add(name); else selected.delete(name); });
-      label.append(input, document.createTextNode(' ' + name)); box.append(label);
+      label.append(input, document.createTextNode(' ' + name), ...depthBadges(['quick'])); box.append(label);
     }
     for (const q of setupPolicy.questions) {
       const label = el('label', q.label), select = el('select');
+      label.append(...depthBadges(['quick', 'basic'].filter((depth) => !asksIn(q, depth))));
       for (const choice of q.type === 'boolean' ? [{ value: 'false', label: 'Off' }, { value: 'true', label: 'On' }] : q.choices) {
         const option = el('option', typeof choice === 'object' ? choice.label ?? choice.value : choice); option.value = String(typeof choice === 'object' ? choice.value : choice); select.append(option);
       }
@@ -277,7 +286,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   function question(q) {
     const multi = q.type === 'multi', radios = q.type === 'boolean' || (q.type === 'choice' && (q.choices ?? []).length <= RADIO_MAX);
     const wrap = el(multi || radios ? 'fieldset' : 'label', null, 'interview-question');
-    const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(code(q.id)); head.lastChild.className = 'small muted'; wrap.append(head);
+    const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(code(q.id)); head.lastChild.className = 'small muted'; head.append(...depthBadges(q.assumedIn ?? [])); wrap.append(head);
     const value = answers[q.id] ?? q.default;
     const set = (v) => { answers[q.id] = v; changed(); };
     if (multi) {

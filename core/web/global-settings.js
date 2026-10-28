@@ -6,6 +6,7 @@ import { lstatSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectQuestions, hasModule, schemas } from '../render/kit.js';
 import { parseReply, validAnswer } from '../interview/engine.js';
+import { asksIn } from '../interview/policy.js';
 import { parse } from '../lib/yaml.js';
 import { deletePreset, listPresets, nextUserProfile, renamePreset, userDataDir, userDir, writeUserProfile } from '../lib/user-store.js';
 import { assertSafe, FormError, fullFileDiff } from './form-model.js';
@@ -27,7 +28,10 @@ export function profileData({ kitRoot, env }) {
   const answers = before === null ? {} : parse(before)?.answers ?? {};
   return {
     exists: before !== null, hash: hash(before), answers, path: `~/.yaw/${PROFILE}`,
-    questions: questions(kitRoot).map(({ id, type, label, hint, choices, default: fallback }) => ({ id, type, label, hint: hint ?? null, choices: choices ?? null, default: fallback ?? null })),
+    questions: questions(kitRoot).map((q) => ({
+      id: q.id, type: q.type, label: q.label, hint: q.hint ?? null, choices: q.choices ?? null, default: q.default ?? null,
+      assumedIn: ['quick', 'basic'].filter((depth) => !asksIn(q, depth)),
+    })),
   };
 }
 
