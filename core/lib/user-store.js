@@ -1,10 +1,12 @@
 // The user folder ~/.yaw/ (Y-7.2, ADR-0043, doc 02 §5): user profile, saved setups ("presets"), history.jsonl.
 // Created only after the user opted in; files 0600, folders 0700; answers only, never secrets (doc 08).
 
-import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join } from 'node:path';
+import { PERSONAL_PREFERENCES } from '../interview/policy.js';
+import { depthOf } from '../interview/depth.js';
 import { parse, stringify, YamlError } from './yaml.js';
 import { formatError } from './schema.js';
 import { schemas } from '../render/kit.js';
@@ -212,9 +214,9 @@ export function loadPreferences({ env, kitRoot }) {
   try {
     const answers = readUserProfile(env)?.answers ?? {};
     if (secretFindings({ answers, kitRoot }).length) throw new Error('unsafe profile');
-    return { answers, warning: null };
+    return { answers, hasDefaults: PERSONAL_PREFERENCES.some((id) => Object.hasOwn(answers, id)), warning: null };
   } catch {
-    return { answers: {}, warning: 'Saved personal settings are unreadable or invalid; using documented defaults. The saved file was left untouched.' };
+    return { answers: {}, hasDefaults: false, warning: 'Saved personal settings are unreadable or invalid; using documented defaults. The saved file was left untouched.' };
   }
 }
 
@@ -282,4 +284,33 @@ export function userDataDir(env) {
   const dir = env.YAW_HOME || userDir(env);
   if (!isAbsolute(dir) || /[\u0000-\u001f\u007f]/.test(dir)) throw new Error('YAW user data requires an absolute YAW_HOME / HOME');
   return dir;
+}
+
+// First confirmed Basic/Pro answers establish personal defaults, never project facts or tool choices.
+// Exclusive linking publishes a complete private file without replacing concurrently saved defaults.
+export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed = [] }) {
+  if (!['basic', 'pro'].includes(depthOf(mode))) return { saved: false };
+  const preferences = loadPreferences({ env, kitRoot });
+  if (preferences.hasDefaults || preferences.warning) return { saved: false };
+  const chosen = Object.fromEntries(PERSONAL_PREFERENCES.filter((id) => reviewed.includes(id) && Object.hasOwn(answers, id)).map((id) => [id, answers[id]]));
+  if (!Object.keys(chosen).length) return { saved: false };
+  if (secretFindings({ answers: chosen, kitRoot }).length) throw new Error('Personal defaults were not saved: an answer looks like a secret.');
+  const doc = { answers: chosen };
+  check('user-profile.yaml', 'user-profile.schema.json', doc);
+  const dir = userDir(env); directory(dir, true);
+  const file = profileFile(env), temp = join(dir, `personal-defaults.${randomUUID()}.tmp`);
+  if (existingStat(file)) {
+    // A legacy profile may contain agent/tool choices but no personal preferences yet.
+    const before = read(file), current = readUserProfile(env);
+    if (PERSONAL_PREFERENCES.some((id) => Object.hasOwn(current.answers, id)) || read(file) !== before) return { saved: false };
+    const merged = { answers: { ...current.answers, ...chosen } };
+    check('user-profile.yaml', 'user-profile.schema.json', merged);
+    write(file, stringify(merged));
+    return { saved: true };
+  }
+  try {
+    write(temp, stringify(doc));
+    try { linkSync(temp, file); } catch (e) { if (e.code === 'EEXIST') return { saved: false }; throw e; }
+  } finally { rmSync(temp, { force: true }); }
+  return { saved: true };
 }

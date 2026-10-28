@@ -13,7 +13,7 @@ Rules for the interviewer (CLI, form, or agent):
 
 ## 0. Personal settings and repository agents
 
-Personal values can be reviewed using the optional `u` setup-menu entry or Global Settings → Defaults. They are stored in `~/.yaw/user-profile.yaml` only after explicit consent, independently of project-preset saving (doc 02 §5, ADR-0043). Quick reuses explicit project values, then saved personal settings, then documented defaults. Pro offers its complete review with saved defaults. Existing-project edits preserve saved values. The `user.agents` key is retained for compatibility, but its repository selection is asked in Basic and Pro and reused in Quick.
+Personal defaults cover experience, chat language, autonomy, answer length, tone, examples and explanation style. A fresh interactive installation offers to enter them; `yaw defaults` and Global Settings → Defaults edit them later. Init has no separate personal-settings menu. Quick reuses saved or factory values without asking; Basic and Pro offer those values for project-specific overrides. When no defaults exist, a notice explains that first confirmed Basic/Pro personal answers establish defaults after Apply. Existing global values are never automatically replaced by a project override. Presets, agent selections, architecture, GitHub and optional tools are separate; legacy profile fields remain readable.
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|

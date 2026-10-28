@@ -1,5 +1,5 @@
 // Pure browser state helpers; also tested without a DOM.
-import { asksIn, isPersonal } from '../../interview/policy.js';
+import { asksIn, isPersonal, isPreference } from '../../interview/policy.js';
 import { selectedByPolicy } from '../../interview/depth.js';
 export { asksIn };
 export const choiceValue = (c) => typeof c === 'object' ? c.value : c;
@@ -36,7 +36,7 @@ export function effectiveAnswers(questions, given, mode) {
   return answers;
 }
 export function visibleQuestions(questions, given, mode, modules) {
-  const selected = questions.filter((q) => modules.includes(q.owner) || ['pro', 'all'].includes(mode) && asksIn(q, mode));
+  const selected = questions.filter((q) => modules.includes(q.owner) || isPreference(q) && asksIn(q, mode) || ['pro', 'all'].includes(mode) && asksIn(q, mode));
   const answers = effectiveAnswers(selected, given, mode);
   return selected.filter((q) => !q.editHidden && asksIn(q, mode) && matches(q.when, answers));
 }

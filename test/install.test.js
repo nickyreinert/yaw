@@ -35,6 +35,8 @@ test('install.sh: clone, link, PATH hint; a second run is a no-op', () => {
   const src = makeKitRepo(tmp('yaw-src-'), { env: cleanEnv(home) });
   const first = install(home, src);
   assert.equal(first.status, 0, first.stderr);
+  assert.doesNotMatch(first.stdout, /Would you like to enter personal defaults/, 'unattended installation never asks personal questions');
+  assert.equal(existsSync(join(home, '.yaw/user-profile.yaml')), false);
   assert.match(first.stdout, /^yaw 0\.1\.0: cloned .*\/\.yaw\/kit, checked out v0\.1\.0 \(channel: tag\)$/m);
   assert.match(first.stdout, /^linked .*\/\.local\/bin\/yaw -> .*\/\.yaw\/kit\/bin\/yaw$/m);
   assert.match(first.stdout, /export PATH="\$HOME\/\.local\/bin:\$PATH"/);

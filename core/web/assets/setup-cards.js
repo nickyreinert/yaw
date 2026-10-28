@@ -19,8 +19,8 @@ export const REVIEWERS = [
 export const TRIGGERS = [['off', 'Off'], ['request', 'On request'], ['suggest', 'Suggest when a task is done'], ['push', 'Required before push']];
 // Questions these cards answer; the generic question list hides them.
 export const CARD_QUESTIONS = new Set(['arch.language', 'arch.runs-on', 'quality.review-gate', ...REVIEWERS.map(([k]) => `quality.review-${k}`)]);
-// Modules whose questions are asked inside their own card, under the module switch (no second place to ask).
-export const INLINE_OWNERS = new Set(['communication', 'comfort', 'team', 'tasks']);
+// Optional tool questions live inside module cards; personal communication preferences belong in About you.
+export const INLINE_OWNERS = new Set(['comfort', 'team', 'tasks']);
 // Questions that open a group instead of sitting in a card: "Use GitHub for the repo?" leads the Git & GitHub group.
 export const GROUP_INTRO = new Map([['tasks.use-github', 'github']]);
 export const isInline = (q) => INLINE_OWNERS.has(q.owner) && !GROUP_INTRO.has(q.id);

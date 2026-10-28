@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFile
 import { join } from 'node:path';
 import { startFormServer, MAX_JSON_BYTES } from '../core/web/form-server.js';
 import { createFormApi, DRAFT, writeLauncher } from '../core/web/init.js';
+import { isPreference } from '../core/interview/policy.js';
 import { createFormModel, fullFileDiff } from '../core/web/form-model.js';
 import { defaultModules, effectiveAnswers, toggleModules, visibleQuestions, installDialogCancellation } from '../core/web/assets/ui-state.js';
 import { deriveFacts } from '../core/interview/facts.js';
@@ -71,7 +72,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.equal(app.split("element('select'").length - 1, 1, 'the only dropdown is the preset list');
   assert.match(app, /q\.id === 'tasks\.use-github'/);
   assert.ok(!cards.includes('No git repository yet: create one') || /gitInitControl/.test(cards));
-  assert.match(cards, /INLINE_OWNERS = new Set\(\['communication', 'comfort', 'team', 'tasks'\]\)/);
+  assert.match(cards, /INLINE_OWNERS = new Set\(\['comfort', 'team', 'tasks'\]\)/);
   assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
   assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
@@ -151,7 +152,7 @@ test('web model: normalization and browser defaults match the CLI interview', as
         },
       });
       assert.deepEqual(normalized.doc.answers, cli.answers, `${mode}/${expertise}`);
-      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || q.id === 'tasks.use-github'), input.answers, mode);
+      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || isPreference(q) || q.id === 'tasks.use-github'), input.answers, mode);
       assert.deepEqual(browser, normalized.doc.answers);
       assert.deepEqual(defaultModules(c.modules, c.questions, input.answers, mode),
         selectModules({ kitRoot: KIT_ROOT, mode, facts: deriveFacts(effectiveAnswers(c.questions, input.answers, mode)) }));

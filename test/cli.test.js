@@ -31,7 +31,7 @@ test('help lists every phase-1 command; no arguments prints help too', () => {
 test('the implemented command list includes remote control (ADR-0069)', () => {
   assert.deepEqual(COMMANDS.map((c) => c.name), [
     'remote',
-    'init', 'web', 'apply', 'update', 'edit', 'remove', 'status', 'doctor', 'self-update', 'self-uninstall', 'help',
+    'init', 'defaults', 'web', 'apply', 'update', 'edit', 'remove', 'status', 'doctor', 'self-update', 'self-uninstall', 'help',
     'add', 'hook', 'sync', 'agents', 'task', 'kickoff', 'gh', 'decisions', 'knowledge', 'map', 'review', 'sessions', 'session-start', 'hygiene', 'notify', 'statusline', 'presets',
   ]);
 });

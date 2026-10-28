@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { whenMatches, parseReply, validAnswer } from '../interview/engine.js';
-import { asksIn as asksQuestion, isPersonal, missingAnswers, sourceOf } from '../interview/policy.js';
+import { asksIn as asksQuestion, isPersonal, isPreference, missingAnswers, sourceOf } from '../interview/policy.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
@@ -53,7 +53,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     if (current) original.answers = { ...original.answers, 'arch.language': current.stack.language[0], 'arch.runs-on': current.stack.runsOn[0] };
   }
   const owner = new Map(definitions.flatMap((d) => (d.questions ?? []).map((q) => [q.id, d.name])));
-  const editableQuestions = edit ? questions.filter((q) => enabledModules(manifest).includes(owner.get(q.id) ?? 'core')) : questions;
+  const editableQuestions = edit ? questions.filter((q) => (isPreference(q) || enabledModules(manifest).includes(owner.get(q.id) ?? 'core'))) : questions;
   const sectionNames = [...new Set(editableQuestions.map((q) => q.id.split('.')[0]))];
   for (const section of sections) {
     if (!sectionNames.includes(section) && !editableQuestions.some((q) => q.id === section)) throw new FormError(`Unknown interview section or question "${section}"; choose ${sectionNames.join(', ')}`);
@@ -134,7 +134,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     modules = names.filter((n) => modules.includes(n));
     try { checkDependencies({ kitRoot, modules }); }
     catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
-    const selected = questions.filter((q) => modules.includes(owner.get(q.id) ?? 'core') || asksQuestion(q, input.mode));
+    const selected = questions.filter((q) => isPreference(q) || modules.includes(owner.get(q.id) ?? 'core') || asksQuestion(q, input.mode));
     const selectedIds = new Set(selected.map((q) => q.id));
     // GitHub owns its own opt-out. Keep that selection-driving answer even when it removes its owner.
     const answerQuestions = questions.filter((q) => selectedIds.has(q.id) ||
@@ -159,7 +159,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       if (e instanceof ProjectError) throw new FormError('Invalid setup answers; select at least one available agent and valid task settings');
       throw e;
     }
-    return { doc, text, defaulted, sources, unresolved, modules, profile, selected, answerQuestions, gitInit: input.gitInit === true };
+    return { reviewedPreferences: Object.keys(given).filter(isPreference), doc, text, defaulted, sources, unresolved, modules, profile, selected, answerQuestions, gitInit: input.gitInit === true };
   }
 
   function secretCatalog(result, rendered = null) {
@@ -281,7 +281,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       }),
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),
-      hasUserProfile: existsSync(join(userDir(env), 'user-profile.yaml')),
+      hasUserProfile: preferences.hasDefaults === true,
+      personalDefaultsNotice: !edit && !preferences.hasDefaults && !preferences.warning ? 'No personal defaults set. Quick uses factory defaults. In Basic or Pro, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific.' : null,
       personalWarning: [preferences.warning, setupPolicy.warning].filter(Boolean).join(' ') || null,
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
       ...(edit ? { editing: true, sections, initial, sectionNames } : {}),

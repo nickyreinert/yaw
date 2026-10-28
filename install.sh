@@ -148,3 +148,13 @@ case ":$PATH:" in
   *) say "add this line to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
 esac
 say "check: yaw doctor    uninstall: yaw self-uninstall"
+
+# Offer personal onboarding only on a fresh interactive install. A pipe may carry this script,
+# so read answers from the controlling terminal rather than consuming shell source on stdin.
+if [ "$fetched" = cloned ] && [ -f "$KIT/core/cli/defaults.js" ] && [ -t 1 ]; then
+  if [ -t 0 ]; then
+    node "$KIT/bin/yaw" defaults --offer || say "Personal defaults were not saved; run yaw defaults whenever you are ready."
+  elif ( : </dev/tty ) 2>/dev/null; then
+    node "$KIT/bin/yaw" defaults --offer </dev/tty || say "Personal defaults were not saved; run yaw defaults whenever you are ready."
+  fi
+fi

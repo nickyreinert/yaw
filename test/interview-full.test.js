@@ -73,6 +73,7 @@ const QUICK = {
   'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
   'arch.language': 'javascript', 'arch.runs-on': 'local', 'arch.framework': '', ...CONSTRAINTS,
 };
+Object.assign(QUICK, { 'user.length': 'balanced', 'user.register': 'professional', 'user.examples': 'when-helpful', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];
 const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
 

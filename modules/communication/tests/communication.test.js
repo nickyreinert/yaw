@@ -108,7 +108,7 @@ test('manifest entries: owner, fragments and hashes', async () => {
   assert.ok(byPath["docs/standards.md"].hash);
 });
 
-test('remove leaves zero residue; answers stay; re-add restores the same files', async () => {
+test('removing communication removes optional artifacts, keeps core preferences and re-add restores the same files', async () => {
   const root = await project({ extra: { 'user.length': 'brief' } });
   const withBoth = readTree(root);
   await removeModule({ root, kitRoot: KIT_ROOT, module: 'communication' });
@@ -117,7 +117,8 @@ test('remove leaves zero residue; answers stay; re-add restores the same files',
   for (const gone of ['.claude/output-styles/yaw.md', '.claude/settings.json', 'docs/standards.md']) {
     assert.equal(Object.hasOwn(left, gone), false, gone);
   }
-  assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication|yaw:standards|Keep answers short/);
+  assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication|yaw:standards/);
+  assert.match(read(root, 'AGENTS.md'), /Keep answers short/, 'core still applies personal preferences without an optional output style');
   assert.equal(readAnswers(root).answers['user.length'], 'brief'); // user answers kept
   assert.equal(existsSync(join(root, '.yaw/base/docs')), false);
   await addModule({ root, kitRoot: KIT_ROOT, module: 'communication' });

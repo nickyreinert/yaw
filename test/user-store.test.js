@@ -37,8 +37,8 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
   const declined = await yaw(['init', '--skip-verify'], { home, prompter: declinedP });
   assert.equal(declined.code, 0, declined.err);
   assert.match(declinedP.asked.join('\n'), /Save this setup as a preset in .*\.yaw\/presets\/ and add a line \(project path, date, kit version\) to .*history\.jsonl\?/);
-  assert.match(declined.out, /Saving a preset and saving personal defaults are separate choices/);
-  assert.match(declined.out, /not saved; nothing was written to the user folder/);
+  assert.match(declined.out, /personal defaults are managed separately/);
+  assert.match(declined.out, /Preset not saved; no preset or history entry was written/);
   assert.deepEqual(readdirSync(home), []);
   // --answers (no interview) never asks and never writes
   const answers = join(KIT_ROOT, 'examples', 'node-cli', 'answers.yaml');
@@ -47,9 +47,10 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
   assert.deepEqual(readdirSync(home), []);
 });
 
-test('opt-in yes: profile, preset and history are written with restrictive modes; every later setup asks again', async () => {
+test('presets remain opt-in; personal defaults are saved separately and unchanged by Quick', async () => {
   const home = tmp('yaw-home-');
-  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, 'y', 'y', 'y', '']) });
+  saveSetup({ env: { HOME: home }, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'], 'user.language': 'de', 'user.autonomy': 'ask-risky' }, mode: 'quick', projectRoot: tmp(), kit: '0.1.0', preset: false, profile: true });
+  const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, 'y', 'y', '']) });
   assert.equal(r.code, 0, r.err);
   const dir = join(home, '.yaw');
   assert.equal(mode(dir), 0o700);
@@ -96,18 +97,16 @@ test('opt-in yes: profile, preset and history are written with restrictive modes
   assert.equal(mode(join(dir, 'history.jsonl')), 0o600);
 });
 
-test('a broken user-profile.yaml is never overwritten; an unknown key only prints "not saved"', async () => {
-  for (const [text, message] of [['answers: [unclosed\n  : :\n', /fix or remove the file/], ['answers:\n  user.nonsense: 1\n', /not saved: .*invalid/]]) {
+test('broken personal defaults are ignored and preserved during Quick setup', async () => {
+  for (const text of ['answers: [unclosed\n  : :\n', 'answers:\n  user.nonsense: 1\n']) {
     const home = tmp('yaw-home-');
     mkdirSync(join(home, '.yaw'), { recursive: true });
     writeFileSync(join(home, '.yaw/user-profile.yaml'), text);
-    const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, 'y', 'y', 'y', '']) });
+    const r = await yaw(['init', '--skip-verify'], { home, prompter: scripted([...INTERVIEW, 'y', '', '']) });
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, message);
-    assert.match(r.out, /not saved/);
-    assert.equal(readFileSync(join(home, '.yaw/user-profile.yaml'), 'utf8'), text, 'left untouched');
-    assert.deepEqual(readdirSync(join(home, '.yaw')), ['user-profile.yaml'], 'nothing else written');
-    assert.match(r.out, /verification skipped/, 'the run goes on');
+    assert.match(r.err, /unreadable or invalid/);
+    assert.equal(readFileSync(join(home, '.yaw/user-profile.yaml'), 'utf8'), text);
+    assert.deepEqual(readdirSync(join(home, '.yaw')), ['user-profile.yaml']);
   }
 });
 
@@ -235,7 +234,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   const home = tmp('yaw-home-');
   const interview = [...INTERVIEW];
   interview[1] = `Deploy with ${CANARY}`;
-  const prompter = scripted([...interview, 'y', 'y', 'y', '']);
+  const prompter = scripted([...interview, 'y', 'y', '']);
   const r = await yaw(['init', '--skip-verify'], { home, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /not saved: idea\.text \(token-prefix\) looks like a secret/);

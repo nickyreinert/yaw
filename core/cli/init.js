@@ -2,7 +2,7 @@
 //
 //   collect  interview on the terminal, or --answers <file>; nothing is written
 //   confirm  summary of the decisions and the files; --yes confirms, otherwise ask
-//   apply    render, write files, bases and the manifest (the only step that writes)
+//   apply    render project files, then seed first personal defaults when applicable
 //   verify   `just setup && just check` in the new project
 // Without an LLM the profile comes from the stack answers (language x runs-on, ADR-0054); `proposal:` is filled in from that.
 
@@ -15,7 +15,7 @@ import { loadSetupDefaults } from '../lib/setup-defaults.js';
 import { depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview, whenMatches } from '../interview/engine.js';
-import { missingAnswers, isPersonal } from '../interview/policy.js';
+import { missingAnswers, isPersonal, isPreference } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -31,7 +31,7 @@ import { kickoffText } from './kickoff.js';
 import { guardFolder } from './folder-guard.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
-import { listPresets, loadPreferences, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
+import { listPresets, loadPreferences, seedPersonalPreferences, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
 import { syncShortcut } from './sync.js';
 import { createFormModel } from '../web/form-model.js';
@@ -76,42 +76,19 @@ async function chooseMode({ prompter }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Setup depth')}\n`);
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
-  prompter.show(`  ${s.cyan('2)')} basic - essentials plus GitHub and review gates\n`);
+  prompter.show(`  ${s.cyan('2)')} basic - essentials plus personal preferences, GitHub and review gates\n`);
   prompter.show(`  ${s.cyan('3)')} pro / all - every applicable question and optional tool\n`);
   prompter.show(`  ${s.cyan('p)')} Load a previous setup - clone saved answers, then review them\n`);
-  prompter.show(`  ${s.cyan('u)')} Review and save personal settings (optional)\n`);
   prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   for (;;) {
-    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'basic', 'pro', 'p', 'u', 'w'], start: 0 })).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'basic', 'pro', 'p', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'basic') return 'basic';
     if (['3', 'pro', 'all'].includes(reply)) return 'pro';
     if (['full', 'standard'].includes(reply)) return reply;
     if (reply === 'p') return 'previous';
-    if (reply === 'u') return 'preferences';
     if (['w', WEB].includes(reply)) return WEB;
     prompter.show('  choose quick, basic, pro/all, p to load a previous setup, or w to continue in the browser\n');
-  }
-}
-
-async function reviewPreferences(io, preferences) {
-  const modules = selectModules({ kitRoot: io.kitRoot, mode: 'full', facts: { team: false, usesGitHub: true } });
-  const questions = collectQuestions(io.kitRoot, modules).filter((q) => q.scope === 'user');
-  io.stdout.write('\nPersonal settings are optional and separate from project setup. Saving here changes defaults for future projects.\n');
-  const result = await runInterview({ questions, mode: 'full', prompter: io.prompter, kitRoot: io.kitRoot, defaults: preferences.answers });
-  if (secretFindings({ answers: result.answers, kitRoot: io.kitRoot }).length) {
-    io.stdout.write('Personal settings were not saved: an answer looks like a secret.\n');
-    return preferences;
-  }
-  for (const [id, value] of Object.entries(result.answers)) io.stdout.write(`  ${id}: ${Array.isArray(value) ? value.join(', ') : value}\n`);
-  if (!(await confirm(io.prompter, 'Save these personal settings globally?'))) return preferences;
-  try {
-    saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: result.answers, mode: 'full', projectRoot: io.cwd, kit: '', preset: false, profile: true });
-    io.stdout.write('Saved personal settings. No project files were written.\n');
-    return loadPreferences({ env: io.env, kitRoot: io.kitRoot });
-  } catch {
-    io.stdout.write('Personal settings could not be saved; the existing profile was left untouched.\n');
-    return preferences;
   }
 }
 
@@ -216,19 +193,18 @@ export async function verifyProject({ root, io }) {
   return true;
 }
 
-// Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): every setup is asked, default no; a "no" writes nothing. No standing yes.
+// Saving a project preset remains optional and independent of personal defaults.
 async function offerSave({ io, root, answersDoc, kit }) {
   const dir = userDir(io.env);
-  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). Saving a preset and saving personal defaults are separate choices.\n`);
+  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). A preset is a reusable project setup; personal defaults are managed separately with yaw defaults.\n`);
   const preset = await confirm(io.prompter, `  Save this setup as a preset in ${dir}/presets/ and add a line (project path, date, kit version) to ${dir}/history.jsonl?`);
-  const profile = await confirm(io.prompter, `  Save your preferences (agents, expertise, language, autonomy, ...) in ${dir}/user-profile.yaml?`);
-  if (!preset && !profile) {
-    io.stdout.write('not saved; nothing was written to the user folder\n');
+  if (!preset) {
+    io.stdout.write('Preset not saved; no preset or history entry was written\n');
     return;
   }
   try {
-    const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit, preset, profile });
-    if (r.saved) io.stdout.write(`saved${r.preset ? ` preset ${r.preset} (yaw presets list)` : ''}${r.preset && r.profile ? ' and' : ''}${r.profile ? ' user-profile.yaml' : ''} in ${r.dir}\n`);
+    const r = saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: answersDoc.answers, mode: answersDoc.mode, projectRoot: root, kit, preset, profile: false });
+    if (r.saved) io.stdout.write(`saved preset ${r.preset} (yaw presets list) in ${r.dir}\n`);
     else io.stdout.write(`not saved: ${r.findings.map((f) => `${f.key} (${f.rule})`).join(', ')} looks like a secret; saved setups never hold secrets. The value is already in this project: ${ANSWERS}, AGENTS.md and .yaw/base/AGENTS.md\n`);
   } catch (e) {
     io.stdout.write(`not saved: ${e.message}\n`);
@@ -276,7 +252,11 @@ export async function init({ values, positionals, io }) {
   } else {
     io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", w continues in the browser). Nothing is written until you confirm.\n');
     let mode;
-    let preferences = loadPreferences({ env: io.env, kitRoot });
+    const preferences = loadPreferences({ env: io.env, kitRoot });
+    if (!preferences.hasDefaults && !preferences.warning) {
+      const notice = 'No personal defaults set. Quick uses factory defaults. In Basic or Pro, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific. You can continue now, or run yaw defaults separately.';
+      io.stdout.write(`\n${(io.prompter.style ?? PLAIN).yellow(notice)}\n`);
+    }
     const setupPolicy = loadSetupDefaults({ env: io.env, kitRoot });
     if (setupPolicy.warning) io.stderr.write(`${setupPolicy.warning}\n`);
     moduleDefaults = setupPolicy.modules;
@@ -286,13 +266,6 @@ export async function init({ values, positionals, io }) {
     let defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, 'saved personal setting']));
     for (;;) {
       mode = await chooseMode({ prompter: io.prompter });
-      if (mode === 'preferences') {
-        preferences = await reviewPreferences(io, preferences);
-        preferences.answers = { ...setupPolicy.answers, ...preferences.answers };
-        defaults = { ...preferences.answers };
-        defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, 'saved personal setting']));
-        continue;
-      }
       if (mode === WEB) return handOff({ io, values, mode: 'quick' });
       if (mode !== 'previous') break;
       const previous = await choosePrevious(io);
@@ -314,7 +287,7 @@ export async function init({ values, positionals, io }) {
       if (moduleDefaults.some((name) => !potential.includes(name))) throw new ProjectError('Choose only listed module names');
     }
     const reusedModules = selectModules({ kitRoot, mode, facts: deriveFacts(defaults), answers: defaults, defaults: moduleDefaults });
-    const interviewModules = depthOf(mode) === 'pro' ? potential : depthOf(mode) === 'basic' ? [...new Set(['core', 'tasks', 'review', ...moduleDefaults])] : reusedModules;
+    const interviewModules = depthOf(mode) === 'pro' ? potential : depthOf(mode) === 'basic' ? [...new Set(['core', 'communication', 'tasks', 'review', ...moduleDefaults])] : [...new Set([...reusedModules, ...(hasModule(kitRoot, 'communication') ? ['communication'] : [])])];
     const questions = withGitHubHint(collectQuestions(kitRoot, interviewModules), githubStatus({ root, env: io.env }));
     const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, defaults, defaultSources, allowWeb: true });
     if (r.web) return handOff({ io, values, mode, answers: { ...defaults, ...r.answers }, proposed: questions.filter((q) => q.required && Object.hasOwn(defaults, q.id) && !r.sources[q.id]).map((q) => q.id) });
@@ -411,6 +384,12 @@ export async function init({ values, positionals, io }) {
   }
 
   // save (opt-in, interview on a terminal only; never with --answers)
+  if (!fromFile && io.prompter.interactive) {
+    try {
+      const seeded = seedPersonalPreferences({ env: io.env, kitRoot, mode: answersDoc.mode, answers: answersDoc.answers, reviewed: Object.keys(sources).filter((id) => isPreference(id) && ['answered', 'confirmed proposal'].includes(sources[id])) });
+      if (seeded.saved) io.stdout.write('Saved your first personal defaults. Future project overrides will not change them; use yaw defaults to edit them.\n');
+    } catch { io.stderr.write('Personal defaults could not be saved; existing settings were left untouched. Use yaw defaults to review them.\n'); }
+  }
   if (!fromFile && io.prompter.interactive) await offerSave({ io, root, answersDoc, kit: result.manifest.kit });
 
   const done = async (code) => {

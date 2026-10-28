@@ -33,6 +33,7 @@ Works for any kind of job: a quick Python script, a dockerized static page, a se
 | 12 | [kickoff/12-memory-and-sessions.md](kickoff/12-memory-and-sessions.md) | Record/reference structure, global knowledge store, session registry |
 | 13 | [kickoff/13-dashboard-and-evaluation.md](kickoff/13-dashboard-and-evaluation.md) | Local dashboard, metrics/profiling, token-free session evaluation |
 | 14 | [kickoff/14-team-mode.md](kickoff/14-team-mode.md) | Team mode: issue-driven work, enforcement, session-start sync, launch plan and freezes |
+| 15 | [kickoff/15-project-foundations.md](kickoff/15-project-foundations.md) | Implemented resolution: Quick vs. personal settings, reviewed project foundations and generic agent practices |
 | R | [kickoff/reference/governance-blueprint.md](kickoff/reference/governance-blueprint.md) | Original technical spec: decision journal, embeddings, hooks, gates |
 
 ## Status of decisions (concept level)
@@ -45,6 +46,8 @@ Works for any kind of job: a quick Python script, a dockerized static page, a se
 | File formats | YAML for files humans write or edit (`answers.yaml`, `module.yaml`, `profile.yaml`, `release-plan.yaml`, `github.yaml`, presets), JSON for kit-written files (`manifest.json`, ledger/registry data, normalised hook events, agent settings). YAML is read by a small built-in strict-subset parser (maps, lists, scalars, quoted strings, flow collections, block scalars `\|`/`>`, comments; YAML 1.2 core typing, `yes/no/on/off` stay strings). Comments are not preserved when the kit rewrites a YAML file; the kit writes a header comment saying so and rewrites only via explicit commands (`yaw config set`). Exception: `taxonomy.json` stays JSON (managed via `yaw decisions`) | Accepted |
 | Entry point | `AGENTS.md`; `CLAUDE.md` / `GEMINI.md` import it | Accepted |
 | Agent focus | Claude Code first; user ticks supported agents on the first screen; every item carries a per-agent compatibility attribute (doc 09) | Accepted |
+| Quick interview | Reuse personal settings; establish project purpose, language and runtime explicitly. Optional personal onboarding/review; separate profile/preset saving consent. Incomplete drafts are allowed, unconfirmed project choices block Apply ([doc 15 §1](kickoff/15-project-foundations.md#1-quick-asks-about-this-project), ADR-0074) | Accepted; implemented |
+| Architecture constraints and UI examples | Collect hosting control, library policy, external services and cost/cap separately; carry them into kickoff and agent context. Offer reviewed layout/interaction mockups before substantial UI implementation, including colours where useful (ADR-0076) | Accepted; implemented |
 | Tasks | User chooses: local only, GitHub only, both (local-first). Local: `TASKS.md` is the source, IDs `T-NNN`. GitHub only / team: issues are the source, IDs `#123`, `TASKS.md` is a generated read-only view. Both: `T-NNN` with linked issue number | Accepted |
 | Profiles | 9 initial (incl. `node-cli`), extensible by folder | Accepted |
 | Decision memory | ADR + notices (`security`, `business-logic`, `privacy`) in one journal; index points to records, records link details/code | Accepted |
@@ -67,7 +70,3 @@ Works for any kind of job: a quick Python script, a dockerized static page, a se
 | Hackability by users/agents | high, plain source | needs rebuild | needs rebuild | high |
 
 Node is the easiest to build, extend and keep transparent (no black box: users read the source they run). Go would be the safest *distribution* (one binary, no runtime), so it stays the fallback if Node's presence becomes a problem: the file formats are the interface, the runtime is replaceable.
-
-## Open items
-
-None at concept level. Implementation notes (e.g. Antigravity hook schema) live in the respective docs.

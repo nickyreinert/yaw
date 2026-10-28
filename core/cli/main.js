@@ -3,6 +3,7 @@
 import { parseArgs } from 'node:util';
 import { KIT_ROOT, kitVersion } from '../render/kit.js';
 import { add, remove, status, update, UsageError } from './commands.js';
+import { defaults } from './defaults.js';
 import { init } from './init.js';
 import { edit } from './edit.js';
 import { doctor } from './doctor.js';
@@ -31,6 +32,7 @@ const yes = { yes: { type: 'boolean', short: 'y' } };
 export const COMMANDS = [
   { name: 'remote', optional: true, args: 'serve [--port 4318] | sync [--hub http://127.0.0.1:4318 --token-env YAW_HUB_TOKEN --scopes settings,presets,statistics --migrate] [--resolve local|remote] | status', summary: 'private data hub and agent-independent browser/Telegram controller (Linux workers)', options: { port: { type: 'string' }, hub: { type: 'string' }, 'token-env': { type: 'string' }, scopes: { type: 'string' }, migrate: { type: 'boolean' }, resolve: { type: 'string' } }, run: async (args) => (await import('./remote.js')).remote(args) },
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--sync <folder|owner/repo>] [--skip-verify] [--force]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, sync: { type: 'string' }, 'skip-verify': { type: 'boolean' }, force: { type: 'boolean' }, ...yes }, run: init },
+  { name: 'defaults', args: '[--offer]', summary: 'review and save personal defaults for future projects', options: { offer: { type: 'boolean' } }, run: defaults },
   { name: 'web', args: '[--background | --stop] [--sync <folder|owner/repo>]', summary: 'open the local dashboard; configure an uninitialized folder in Workspace → Settings → Interview; --background keeps it running, --stop stops it', options: { background: { type: 'boolean' }, stop: { type: 'boolean' }, sync: { type: 'string' } }, run: web },
   { name: 'apply', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from saved answers and the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
   { name: 'update', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 'alias for apply: re-render managed files', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
@@ -61,7 +63,7 @@ export const COMMANDS = [
 ];
 
 export const HELP_GROUPS = [
-  { title: 'Project setup and maintenance', names: ['init', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
+  { title: 'Project setup and maintenance', names: ['init', 'defaults', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'review', 'sessions'] },
   { title: 'Monitoring and collaboration', names: ['web', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },

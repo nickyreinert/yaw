@@ -41,7 +41,7 @@ export async function edit({ values, positionals: sections, io }) {
       io.prompter.show('choose quick, basic, pro/all or w\n');
     }
   }
-  const questions = withGitHubHint(collectQuestions(io.kitRoot, state.modules), githubStatus({ root: io.cwd, env: io.env }))
+  const questions = withGitHubHint(collectQuestions(io.kitRoot, [...new Set([...state.modules, 'communication'])]), githubStatus({ root: io.cwd, env: io.env }))
     .filter((q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`)))
     .map((q) => sections.length ? { ...q, mode: 'Q', reviewPersonal: true } : q);
   const result = await runInterview({

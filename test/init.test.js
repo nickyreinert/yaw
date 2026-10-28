@@ -128,7 +128,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted([...INTERVIEW, 'y', '', '', 'y']);
+  const prompter = scripted([...INTERVIEW, 'y', '', 'y']);
   // look at the folder at the moment the confirmation is asked
   const ask = prompter.ask;
   const seen = [];
@@ -394,7 +394,7 @@ test('interview: "web" at a question continues in the browser form with the answ
   assert.match(prompter.shown.join(''), / {2}w\) Continue in the browser\n/);
   assert.match(prompter.shown.join(''), / {6}w\) Continue in the browser\n/);
   assert.deepEqual(boot.handoff.answers['user.agents'], ['codex']);
-  assert.equal(boot.handoff.answers['user.expertise'], 'intermediate');
+  assert.equal(boot.handoff.answers['user.expertise'], undefined, 'handoff occurs before that question is answered');
   assert.ok(!Object.hasOwn(boot.handoff.answers, 'arch.language'));
   assert.match(stdout.text(), /Continuing in the browser with your answers so far; nothing was written\./);
   assert.deepEqual(readdirSync(dir), []);

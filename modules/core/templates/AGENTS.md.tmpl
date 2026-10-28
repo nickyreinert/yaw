@@ -17,4 +17,8 @@ Rules for coding agents in this project, written by YAW (<%= mode %> setup). Edi
 - Chat in "<%= answers.user.language %>"; write code, comments, commit messages and docs in English.
 - <%= rules.autonomy %>
 <% end %>
+<% if coreCommunication %>
+- <%= rules.length %> <%= rules.register %> <%= rules.expertise %>
+- <%= rules.examples %> <%= rules.explain %>
+<% end %>
 - Keep changes small and focused; do what was asked, no more.

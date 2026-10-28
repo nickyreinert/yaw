@@ -11,7 +11,7 @@ YAW is a zero-runtime-dependency Node.js CLI that prepares a repository for codi
 
 ## Install
 
-The installer clones the selected YAW tag into `~/.yaw/kit` and links `yaw` into `~/.local/bin`. It never uses `sudo` or installs prerequisites.
+The installer clones the selected YAW tag into `~/.yaw/kit` and links `yaw` into `~/.local/bin`. It never uses `sudo` or installs prerequisites. On a fresh interactive install, its first question offers personal-default setup. You can skip it and run `yaw defaults` or use Global Settings → Defaults later; unattended installs and update reruns do not prompt.
 
 Quick install for v0.1.0:
 
@@ -78,7 +78,9 @@ To plan the work, `yaw kickoff` prints a versioned prompt to draft and review ar
 
 **Quick** asks purpose, language/runtime, any framework constraint and architecture choices. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
 
-**Basic** adds repository agents, collaboration, GitHub on/off and review gates. **Pro / all** asks every applicable implemented question and exposes every optional module. Pro asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
+**Basic** adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. **Pro / all** asks every applicable implemented question and exposes every optional module. Pro asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
+
+Personal defaults concern experience level, chat language, autonomy and answer style. Quick uses saved values or factory defaults; Basic and Pro offer them for project-specific overrides. When none exist, init shows a notice outside its menu: the first confirmed Basic/Pro personal answers become defaults after Apply. Existing defaults remain unchanged by later project overrides; edit them explicitly with `yaw defaults` or Global Settings.
 
 Save future-project tool defaults under Global Settings → Defaults. They are separate from personal preferences. Existing project modules remain selected; legacy `full` and `standard` answer files stay readable with their legacy module policy. Confirmed explicit module proposals continue to work unchanged.
 

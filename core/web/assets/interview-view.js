@@ -1,5 +1,5 @@
 import { choiceValue, choiceLabel, available, asksIn, matches, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
-import { isPersonal } from '../../interview/policy.js';
+import { isPreference } from '../../interview/policy.js';
 
 import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
@@ -91,7 +91,7 @@ function advance() {
     return;
   }
   const modules = selectedModules();
-  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
+  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
   for (const q of visibleQuestions(catalog.questions, state.answers, state.mode, modules)) {
     if (!isInline(q) && belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
   }
@@ -207,13 +207,6 @@ function buildQuestions() {
   const personal = sections.get('user')?.node;
   if (personal) {
     personal.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
-    const review = element('input', undefined, { type: 'checkbox', id: 'review-personal' });
-    review.checked = Boolean(catalog.editing && catalog.sections?.some((s) => s === 'user' || s.startsWith('user.')));
-    review.addEventListener('change', () => {
-      for (const q of catalog.questions) if (isPersonal(q)) q.reviewPersonal = review.checked;
-      update();
-    });
-    const label = element('label'); label.append(review, document.createTextNode(' Review personal settings for this project')); personal.append(label);
     const global = element('button', 'Edit personal defaults for future projects', { type: 'button', class: 'link' });
     global.addEventListener('click', () => showView('global-settings/interview')); personal.append(global);
   }
@@ -223,7 +216,7 @@ function buildQuestions() {
 function renderQuestions() {
   const modules = selectedModules();
   const visible = new Set(visibleQuestions(catalog.questions, state.answers, state.mode, modules).map((q) => q.id));
-  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
+  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
   const expertise = answers['user.expertise'] ?? 'intermediate';
   for (const [id, c] of controls) {
     c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id);
@@ -455,6 +448,7 @@ function applyFacts() {
   const written = lastPreview.files.filter((f) => ['create', 'update', 'write', 'missing', 'delete'].includes(f.action)).length;
   const kept = lastPreview.files.filter((f) => f.action === 'kept').length;
   const facts = [`Writes ${written} file${written === 1 ? '' : 's'} in this folder${kept ? `; ${kept} kept as they are` : ''}`];
+  if (catalog.personalDefaultsNotice && depthOf(state.mode) !== 'quick') facts.push('Confirmed personal answers will establish your defaults for future projects');
   if (catalog.skipVerify) facts.push('Skips the check (--skip-verify)');
   else if (!catalog.editing) facts.push('Then runs just setup and just check');
   if (!options.persistent) facts.push('The local server stops afterwards; yaw web starts it again');
@@ -484,6 +478,10 @@ async function start() {
   const body = options.bootstrap ?? await (await fetch('/api/bootstrap')).json();
   catalog = body;
   state.gitInit = !catalog.gitRepo;
+  if (catalog.personalDefaultsNotice) {
+    const notice = element('p', catalog.personalDefaultsNotice, { class: 'personal-defaults-notice', role: 'status' });
+    $('setup').before(notice);
+  }
   const depthCards = $('setup-depth').querySelector('.depth-options');
   depthCards.replaceChildren(...DEPTHS.map((depth) => {
     const label = element('label', undefined, { class: 'depth-card' });

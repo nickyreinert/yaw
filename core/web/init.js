@@ -10,7 +10,7 @@ import { readManifest, writeManifest } from '../render/manifest.js';
 import { hashContent, writeAtomic } from '../render/files.js';
 import { assertFoundationsUnchanged, checkTaskReferences, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { kitVersion } from '../render/kit.js';
-import { saveSetup } from '../lib/user-store.js';
+import { saveSetup, seedPersonalPreferences } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
@@ -181,6 +181,12 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         : await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });
       printReport(output, result);
       emit({ type: 'log', text: 'Wrote .yaw/answers.yaml and .yaw/manifest.json\n' });
+      if (!edit) {
+        try {
+          const seeded = seedPersonalPreferences({ env, kitRoot, mode: prepared.doc.mode, answers: prepared.doc.answers, reviewed: prepared.reviewedPreferences });
+          if (seeded.saved) output.write('Saved your first personal defaults; later project overrides keep them unchanged.\n');
+        } catch { output.write('Personal defaults could not be saved; existing settings were left untouched. Use yaw defaults to review them.\n'); }
+      }
       const saved = writeEnvSecrets(root, model.secretCatalog(prepared).names, prepared.secretValues);
       if (saved.preserved) emit({ type: 'log', text: 'Existing .env was preserved; submitted secret values were not saved.\n' });
       else if (saved.written) emit({ type: 'log', text: `Saved ${saved.written} secret value(s) to .env (mode 0600).\n` });

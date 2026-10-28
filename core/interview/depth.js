@@ -1,7 +1,7 @@
 // Shared terminal/browser contract. Old file values remain readable.
 export const DEPTHS = [
   { value: 'quick', label: 'Quick', description: 'Essential project and architecture choices; saved defaults for everything else.' },
-  { value: 'basic', label: 'Basic', description: 'Quick plus GitHub, collaboration and review gates.' },
+  { value: 'basic', label: 'Basic', description: 'Quick plus personal preferences, GitHub, collaboration and review gates.' },
   { value: 'pro', label: 'Pro / all', description: 'Every applicable question and optional tool.' },
 ];
 export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[mode] ?? mode);

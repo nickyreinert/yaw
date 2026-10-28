@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
+import { isPreference } from '../core/interview/policy.js';
 import { runInterview } from '../core/interview/engine.js';
 import { collectQuestions } from '../core/render/kit.js';
 import { readAnswers } from '../core/render/project.js';
@@ -55,17 +56,12 @@ test('unknown project constraints remain explicit and mockups include layout bef
   assert.match(prompt, /Review structure and the main flow before polishing colour/);
   assert.match(prompt, /never infer a subscription, credit-card, purchase or provisioning approval/);
 });
-function prompts(answers = BASE, { onboarding = false, saveProfile = false } = {}) {
+function prompts(answers = BASE) {
   const p = scripted(), questions = collectQuestions(KIT_ROOT, ['core', 'communication', 'comfort', 'tasks']);
-  let started = false;
   p.ask = async (prompt) => {
     p.asked.push(prompt);
     assert.ok(p.asked.length < 80, 'interview must make progress');
-    if (/Setup depth/.test(prompt)) {
-      if (onboarding && !started) { started = true; return 'u'; }
-      return 'quick';
-    }
-    if (/Save these personal settings globally/.test(prompt)) return saveProfile ? 'y' : 'n';
+    if (/Setup depth/.test(prompt)) return 'quick';
     if (/Write these files/.test(prompt)) return 'y';
     if (/Save |guidance to kick off/.test(prompt)) return 'n';
     const screen = [...p.shown].reverse().find((text) => /^  \d+\/\d+ /.test(text));
@@ -99,7 +95,7 @@ test('Quick CLI and browser reuse the same saved personal values without asking 
   const input = { mode: 'quick', answers: BASE };
   const preview = web.preview(input), boot = web.bootstrap();
   assert.deepEqual(web.normalize(input).doc, doc);
-  assert.deepEqual(effectiveAnswers(boot.questions.filter((q) => preview.modules.includes(q.owner)), BASE, 'quick'), doc.answers);
+  assert.deepEqual(effectiveAnswers(boot.questions.filter((q) => preview.modules.includes(q.owner) || isPreference(q)), BASE, 'quick'), doc.answers);
   assert.equal(preview.sources['user.language'], 'saved personal setting');
   assert.ok(!visibleQuestions(boot.questions, BASE, 'quick', preview.modules).some((q) => q.id === 'user.language'));
 });
@@ -206,13 +202,11 @@ test('noninteractive --yes cannot fill missing facts or accept an unconfirmed pr
   }
 });
 
-test('optional personal onboarding saves only on explicit consent and creates no project preset', async () => {
-  for (const consent of [false, true]) {
-    const f = fixture();
-    const r = await cli(f, prompts({ ...BASE, ...PERSONAL }, { onboarding: true, saveProfile: consent }));
-    assert.equal(r.code, 0, r.err);
-    assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), consent);
-    assert.ok(!existsSync(join(f.env.HOME, '.yaw/history.jsonl')));
-    assert.equal(readAnswers(f.root).answers['user.language'], consent ? 'en' : 'de');
-  }
+test('init no longer offers a separate personal onboarding menu', async () => {
+  const f = fixture(), p = prompts();
+  const r = await cli(f, p);
+  assert.equal(r.code, 0, r.err);
+  assert.doesNotMatch(p.shown.join(''), /u\) Review|Review and save personal settings/);
+  assert.match(r.out, /No personal defaults set/);
+  assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), false);
 });

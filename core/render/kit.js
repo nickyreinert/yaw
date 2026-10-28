@@ -270,7 +270,7 @@ function comfortFlags(picked, agents, team) {
 // answer take their default, so a template never sees a missing answer.
 export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   const flat = {};
-  for (const q of collectQuestions(kitRoot, modules, definitions)) {
+  for (const q of collectQuestions(kitRoot, [...modules, ...(!modules.includes('communication') && hasModule(kitRoot, 'communication') ? ['communication'] : [])], definitions)) {
     if (Object.hasOwn(answersDoc.answers ?? {}, q.id) && !validAnswer(q, answersDoc.answers[q.id])) {
       throw new KitError(`invalid answer for ${q.id}: expected ${q.type}${q.choices ? ' from the available choices' : ''}`);
     }
@@ -314,6 +314,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     },
     // ADR-0013: the user profile is personal; a team repository does not commit it.
     team,
+    coreCommunication: !team && !modules.includes('communication'),
     // Output style: Claude only, and only when length or register differ from the default (doc 04).
     outputStyle: !team && (flat['user.agents'] ?? []).includes('claude')
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
