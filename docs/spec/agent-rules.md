@@ -2,6 +2,12 @@
 
 `AGENTS.md` has a hard limit of 80 lines (ADR-0009, ADR-0032). A module's `agentsMd` is one dense line where the module has more to say; this page keeps the full rules. The module's `just` recipes and skills carry the details at run time.
 
+## core
+
+- At task start, read `yaw kickoff context`, the task ledger when present and relevant decisions. Project ground truth defines intended architecture/domain, data contracts and UI/UX; versioned generic YAW practices guide work within those constraints. Surface conflicts for a project decision and update affected authoritative sources with agreed behavior changes (ADR-0075).
+- Foundation paths are registered after review in `.yaw/foundations.json`; Markdown remains authoritative. Context is available as text or JSON, with explicit warnings for changed or missing sources. Read complete sources when an excerpt is insufficient and retrieve applicable ADRs and linked knowledge. Existing projects can reuse their established documentation.
+- Read-only reviewers consume both scopes and report needed changes without editing. Hooks retain their existing contracts; there is no new per-prompt context output. See [the foundation format](formats.md#guided-kickoff-foundations).
+
 ## github
 
 - Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status` and `just gh-issue`; they keep branch names, footers and PRs uniform.

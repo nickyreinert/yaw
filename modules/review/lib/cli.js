@@ -74,6 +74,7 @@ export function buildPrompt({ root, kind, range, diff, env = process.env }) {
     reviewerPrompt(kind, { root, env }).trim(),
     reviewerPrompt('rules', { root, env }).trim(),
     contextText(foundationContext({ root })),
+    'For this review, report needed foundation updates and rule conflicts as findings; never edit the sources.',
     'Read and report only; never edit, stage, commit or push.',
     'End with exactly one line: `VERDICT: PASS` (nothing that should stop a push) or `VERDICT: FINDINGS`.',
   ];

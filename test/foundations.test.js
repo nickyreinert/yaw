@@ -108,6 +108,10 @@ test('foundation protocol: documents cannot become tasks; incomplete, unknown an
   assert.throws(() => parseKickoffReply(text.replace('  acceptance:', '  outcome:')), /acceptance/);
   assert.throws(() => parseKickoffReply(text + '\n## Phase 2: Bad\nmodel: opus · effort: huge\n- [ ] Bad\n'), /effort/);
   assert.equal(parseKickoffReply('## Phase 1: Legacy\n- [ ] Still works').foundations.length, 0);
+  const nested = text.replaceAll('```markdown', '````markdown').replaceAll('\n```\n', '\n````\n')
+    .replace('Preserve files.', 'Preserve files.\n```sh\n## Phase 9: A code example\n- [ ] Not a task\n```');
+  assert.equal(parseKickoffReply(nested).tasks.length, 1);
+  assert.match(parseKickoffReply(nested).foundations[0].text, /```sh/);
 });
 
 test('preflight rejects overwrite, missing sources, broken task anchors, secret paths, oversized files and symlinks', () => {
@@ -169,10 +173,9 @@ test('GitHub task views and mirroring retain specification links and acceptance 
 });
 
 test('core-only projects can review foundations without installing a task store', async () => {
-  const root = tmp(), file = join(tmp(), 'answers.yaml');
+  const root = tmp();
   const init = await yaw(root, ['init', '--answers', join(KIT_ROOT, 'examples/node-cli/answers.yaml'), '--yes', '--skip-verify']);
   assert.equal(init.code, 0, init.err);
-  writeFileSync(file, 'unused');
   writeFileSync(join(root, 'plan.md'), bundle(CLI));
   const result = await yaw(root, ['kickoff', 'import', 'plan.md', '--reviewed']);
   assert.equal(result.code, 0, result.err);

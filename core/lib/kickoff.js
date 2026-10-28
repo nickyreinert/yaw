@@ -46,6 +46,7 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
     `- Reasoning effort is one of: ${EFFORTS.join(', ')}.`,
     '- Each task is one small, testable change with a short imperative title (at most 80 characters).',
     '- Under every task include spec: <authoritative path#section> and acceptance: <observable outcome>. Use only reviewed foundation paths. Keep foundation documents after the temporary plan is removed.',
+    '- Fence each new foundation as Markdown; use four or more backticks around a document containing triple-backtick code examples.',
     '- A task may override the phase model when it is clearly easier or harder.',
     '- Ask me questions first if the idea is too vague to plan.',
     ...(stack ? [
@@ -109,9 +110,15 @@ export function kickoffGuide({ tasksMode = 'local', hasTasks = true } = {}) {
 export class PlanError extends Error {}
 
 const HEADING = /^##\s+(.+?)\s*$/;
+const openFence = (line) => {
+  const m = /^\s*(`{3,}|~{3,})[^`~]*$/.exec(line);
+  return m ? { char: m[1][0], length: m[1].length } : null;
+};
+const closesFence = (line, fence) => new RegExp(`^\\s*${fence.char}{${fence.length},}\\s*$`).test(line);
 const stripFence = (text) => {
-  const m = /^\s*```[a-z]*\r?\n([\s\S]*?)\r?\n```\s*$/i.exec(text);
-  return m ? m[1] : text;
+  const lines = text.trim().split(/\r?\n/);
+  const fence = openFence(lines[0]);
+  return fence && lines.length > 1 && closesFence(lines.at(-1), fence) ? lines.slice(1, -1).join('\n') : text;
 };
 
 // Foundation bodies are fenced so their headings and bullet rules can never become tasks.
@@ -121,12 +128,17 @@ export function parseFoundations(text) {
   if (!marker && !hasSections) return [];
   if (marker?.[1] !== '1') throw new PlanError('Foundations require kickoff-format: 1.');
   const documents = [];
-  let current = null, fence = false, body = [];
+  let current = null, fence = null, body = [];
   for (const raw of text.split('\n')) {
     if (fence) {
-      if (/^```\s*$/.test(raw)) { fence = false; current.text = body.join('\n'); body = []; }
-      else body.push(raw);
+      if (closesFence(raw, fence)) { fence = null; if (current) current.text = body.join('\n'); body = []; }
+      else if (current) body.push(raw);
       continue;
+    }
+    const opening = openFence(raw);
+    if (opening) {
+      if (current?.text !== undefined) throw new PlanError('Only one Markdown body per foundation.');
+      fence = opening; continue;
     }
     const heading = HEADING.exec(raw);
     if (heading) {
@@ -136,10 +148,6 @@ export function parseFoundations(text) {
       continue;
     }
     if (!current) continue;
-    if (/^```(?:markdown|md)?\s*$/.test(raw)) {
-      if (current.text !== undefined) throw new PlanError('Only one Markdown body per foundation.');
-      fence = true; continue;
-    }
     const field = /^(path|action):\s*(.+?)\s*$/.exec(raw);
     if (field) { if (current[field[1]] !== undefined) throw new PlanError('Duplicate foundation field.'); current[field[1]] = field[2]; }
   }
@@ -157,10 +165,11 @@ export function parseKickoffReply(raw, { languages = [], hosts = [] } = {}) {
   const sections = new Map();
   const rest = [];
   let current = null;
-  let fence = false;
+  let fence = null;
   for (const line of text.split('\n')) {
-    if (/^\s*```/.test(line)) { fence = !fence; rest.push(line); continue; }
-    if (fence) { rest.push(line); continue; }
+    if (fence) { rest.push(line); if (closesFence(line, fence)) fence = null; continue; }
+    const opening = openFence(line);
+    if (opening) { fence = opening; rest.push(line); continue; }
     const h = HEADING.exec(line);
     if (h && /^(idea|stack)$/i.test(h[1])) { current = h[1].toLowerCase(); sections.set(current, []); continue; }
     if (h) current = null;
@@ -213,12 +222,13 @@ export function parsePlan(text) {
   const tasks = [];
   let phase = null;
   let current = null;
-  let fence = false;
+  let fence = null;
   const lines = String(text).split(/\r?\n/);
   lines.forEach((raw, i) => {
     const where = `line ${i + 1}`;
-    if (/^\s*```/.test(raw)) fence = !fence;
-    if (fence || /^\s*```/.test(raw)) return;
+    if (fence) { if (closesFence(raw, fence)) fence = null; return; }
+    const opening = openFence(raw);
+    if (opening) { fence = opening; return; }
     const h = PHASE.exec(raw);
     if (h && /^(idea|stack|foundation:.*)$/i.test(h[1])) { phase = null; current = null; return; }
     if (h) {

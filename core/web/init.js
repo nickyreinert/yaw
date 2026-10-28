@@ -20,6 +20,7 @@ import { tasksMode } from '../lib/tasks.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
 import { createWorkspaceApi, WORKSPACE_ACTIONS } from './workspace-api.js';
+import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 
 export const DRAFT = '.yaw/draft.yaml';
 
@@ -39,7 +40,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   };
   const replyOf = (text) => {
     if (typeof text !== 'string' || text.length > 100000) throw new FormError('Paste the answer of the planning chat (at most 100,000 characters).');
-    assertSafe({ plan: text }, kitRoot);
+    if (secretValueRule(loadRules({ kitRoot }), text)) throw new FormError('The plan looks like it contains a secret; remove it before importing.');
     try { return parseKickoffReply(text, { languages: stackLists().languages, hosts: stackLists().hosts }); }
     catch (e) { if (e instanceof PlanError) throw new FormError(e.message); throw e; }
   };
