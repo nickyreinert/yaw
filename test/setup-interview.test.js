@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { isPreference } from '../core/interview/policy.js';
 import { runInterview } from '../core/interview/engine.js';
-import { collectQuestions } from '../core/render/kit.js';
+import { collectQuestions, hasModule } from '../core/render/kit.js';
 import { readAnswers } from '../core/render/project.js';
 import { saveSetup } from '../core/lib/user-store.js';
 import { createFormModel } from '../core/web/form-model.js';
@@ -28,11 +28,11 @@ test('project architecture constraints reach terminal, browser, kickoff and agen
   const f = fixture();
   save(f);
   const chosen = { ...BASE, 'arch.hosting-control': 'on-premises', 'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month; no overage' };
-  const result = await cli(f, prompts(chosen));
+  const result = await cli(f, prompts(chosen, 'pro'));
   assert.equal(result.code, 0, result.err);
   const answers = readAnswers(f.root).answers;
   for (const [key, value] of Object.entries(chosen)) assert.equal(answers[key], value);
-  const browser = createFormModel({ ...f, root: tmp() }).normalize({ mode: 'quick', answers: chosen });
+  const browser = createFormModel({ ...f, root: tmp() }).normalize({ mode: 'pro', answers: chosen });
   assert.deepEqual(browser.doc.answers, answers);
   const prompt = kickoffPrompt({ answers });
   assert.match(prompt, /Hosting control: on-premises/);
@@ -56,12 +56,30 @@ test('unknown project constraints remain explicit and mockups include layout bef
   assert.match(prompt, /Review structure and the main flow before polishing colour/);
   assert.match(prompt, /never infer a subscription, credit-card, purchase or provisioning approval/);
 });
-function prompts(answers = BASE) {
-  const p = scripted(), questions = collectQuestions(KIT_ROOT, ['core', 'communication', 'comfort', 'tasks']);
+
+test('no preference invites recommendations and explicit Pro answers survive a switch to Quick', () => {
+  const model = createFormModel(fixture());
+  const ids = ['arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost'];
+  const answers = { ...BASE, 'arch.framework': 'Keep Django', ...Object.fromEntries(ids.map((id) => [id, 'no-preference'])) };
+  for (const mode of ['pro', 'basic', 'quick']) {
+    const normalized = model.normalize({ mode, answers });
+    for (const id of ids) assert.equal(normalized.doc.answers[id], 'no-preference');
+    assert.equal(normalized.doc.answers['arch.framework'], 'Keep Django');
+    const prompt = kickoffPrompt({ answers: normalized.doc.answers });
+    assert.match(prompt, /Hosting control: no preference \(recommend a suitable option with rationale\)/);
+    assert.match(prompt, /Neither authorizes a purchase or provisioning/);
+    const visible = visibleQuestions(model.bootstrap().questions, answers, mode, normalized.modules).map((q) => q.id);
+    assert.equal(visible.includes('arch.hosting-control'), mode === 'pro');
+    assert.ok(!visible.includes('arch.cost-limit'));
+  }
+});
+function prompts(answers = BASE, mode = 'quick') {
+  const p = scripted(), questions = collectQuestions(KIT_ROOT, readdirSync(join(KIT_ROOT, 'modules')).filter((name) => hasModule(KIT_ROOT, name)));
   p.ask = async (prompt) => {
     p.asked.push(prompt);
     assert.ok(p.asked.length < 80, 'interview must make progress');
-    if (/Setup depth/.test(prompt)) return 'quick';
+    if (/Setup depth/.test(prompt)) return mode;
+    if (/^Modules \(comma-separated/.test(prompt)) return 'none';
     if (/Write these files/.test(prompt)) return 'y';
     if (/Save |guidance to kick off/.test(prompt)) return 'n';
     const screen = [...p.shown].reverse().find((text) => /^  \d+\/\d+ /.test(text));

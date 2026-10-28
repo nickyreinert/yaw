@@ -76,7 +76,7 @@ To plan the work, `yaw kickoff` prints a versioned prompt to draft and review ar
 
 ## Quick, Basic and Pro
 
-**Quick** asks purpose, language/runtime, any framework constraint and architecture choices. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
+**Quick** asks purpose, language and runtime. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
 
 **Basic** adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. **Pro / all** asks every applicable implemented question and exposes every optional module. Pro asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
 

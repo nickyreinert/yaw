@@ -23,7 +23,7 @@ export const CONSTRAINT_FIELDS = [
 export function constraintFacts(answers = {}) {
   return [
     ...(answers['arch.framework'] ? [`- Required framework / existing stack: ${answers['arch.framework']}`] : []),
-    ...CONSTRAINT_FIELDS.map(([key, label]) => `- ${label}: ${answers[key] || 'undecided (ask before choosing)'}`),
+    ...CONSTRAINT_FIELDS.map(([key, label]) => `- ${label}: ${answers[key] === 'no-preference' ? 'no preference (recommend a suitable option with rationale)' : answers[key] || 'undecided (ask before choosing)'}`),
     ...(answers['arch.cost-limit'] ? [`- Budget cap: ${answers['arch.cost-limit']}`] : []),
   ];
 }

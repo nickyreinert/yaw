@@ -114,7 +114,7 @@ Link the accepted example and observable acceptance criteria from the UI/UX foun
 
 ### Architecture includes control, reuse and cost constraints
 
-Quick, Basic and Pro collect four independent project choices, separate from personal preferences and language × runtime profile selection:
+Pro collects four independent project choices, separate from personal preferences and language × runtime profile selection:
 
 | Dimension | Project choice | Kickoff consequence |
 | --- | --- | --- |
@@ -125,7 +125,7 @@ Quick, Basic and Pro collect four independent project choices, separate from per
 
 On-premises software can use third-party open-source libraries. Managed hosting does not itself authorize an external application service. Open-source or free-tier software can still incur hosting, maintenance or overage costs. The kickoff prompt carries the exact saved policies, asks about unknowns or contradictions before committing to architecture, and records agreed build/reuse rationale, data flows, operating costs, trial/free-tier limits and exit/export choices in the architecture foundation. Permission to propose a paid option does not authorize a purchase, subscription or provisioning action.
 
-These fields may remain explicitly undecided while installing a deterministic kit. They are also exposed in agent context before foundations exist; differences between setup inputs and reviewed sources must be resolved. Existing answers without these fields stay valid, with missing constraints made explicit in planning guidance. The setup budget concerns the project's implementation and operation; pricing the project's own product is a separate domain decision when relevant.
+Each policy also offers Decide later (discussion needed) and Doesn’t matter (`no-preference`, a reasoned recommendation invited). Quick and Basic retain explicit project values but do not ask these detailed questions. These fields may remain explicitly undecided while installing a deterministic kit. They are also exposed in agent context before foundations exist; differences between setup inputs and reviewed sources must be resolved. Existing answers without these fields stay valid, with missing constraints made explicit in planning guidance. The setup budget concerns the project's implementation and operation; pricing the project's own product is a separate domain decision when relevant.
 
 ### What remains open
 
@@ -135,7 +135,7 @@ For Global → Improve, the remaining concept work is empirical validation of fr
 
 ### Interview depths and reusable setup UI
 
-Quick asks essential purpose, language/runtime, any required framework and architecture constraints. It reuses saved personal and tool defaults; optional tools are off when never chosen. Basic adds personal preferences, repository agent/collaboration choices, GitHub on/off and review gates. Pro / all asks every applicable implemented question, including advanced questions for laypeople, and exposes all optional modules. Depth alone grants no tool or provider consent. Global Settings → Defaults saves tool defaults independently of the personal profile. Existing project module selections are preserved; legacy `full` and `standard` files remain readable with their legacy module-selection policy. New UI choices use `quick`, `basic` and `pro`.
+Quick asks purpose, language and runtime. It reuses saved personal and tool defaults; optional tools are off when never chosen. Basic adds personal preferences, repository agent/collaboration choices, GitHub on/off and review gates. Pro / all adds optional existing-framework, hosting, library, service and cost constraints, asks every applicable implemented question, including advanced questions for laypeople, and exposes all optional modules. Depth alone grants no tool or provider consent. Global Settings → Defaults saves tool defaults independently of the personal profile. Existing project module selections are preserved; legacy `full` and `standard` files remain readable with their legacy module-selection policy. New UI choices use `quick`, `basic` and `pro`.
 
 The initial browser setup and Workspace → Settings → Interview mount the same wizard markup, controller and question policy. Both support drafts, planning prompts, foundation review, file preview and explicit Apply; the Settings workspace remains open afterward.
 

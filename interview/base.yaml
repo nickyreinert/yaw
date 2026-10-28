@@ -109,64 +109,68 @@ questions:
     default: ""
   - id: arch.framework
     ref: "3.12"
-    mode: Q
+    mode: F
     type: text
-    label: Any required framework or existing stack to keep?
-    hint: Name an existing framework or write none; leave blank to discuss during kickoff. Language and runtime still select the kit profile.
+    label: Existing framework to keep? (optional)
+    hint: Only for an existing requirement, such as keeping Django. Leave blank for a new project; language and runtime choose the kit profile.
     default: ""
   - id: arch.hosting-control
     ref: "3.7"
-    mode: Q
+    mode: F
     type: choice
-    label: Who should control the deployment infrastructure?
-    hint: Independent of language and runtime. Self-hosting can still use third-party libraries.
+    label: Who manages hosting?
+    hint: Guides the architecture plan; separate from where the code runs.
     choices:
-      - { value: on-premises, label: "On premises: infrastructure controlled by us, with network boundaries to agree" }
-      - { value: self-hosted, label: "Self-managed: our own server or rented infrastructure" }
-      - { value: managed, label: "Managed hosting is allowed" }
-      - { value: undecided, label: "Not decided: discuss during kickoff" }
+      - { value: on-premises, label: "On premises" }
+      - { value: self-hosted, label: "Self-managed" }
+      - { value: managed, label: "Managed hosting" }
+      - { value: undecided, label: "Decide later" }
+      - { value: no-preference, label: "Doesn’t matter" }
     default: undecided
   - id: arch.libraries
     ref: "3.8"
-    mode: Q
+    mode: F
     type: choice
-    label: Which third-party libraries may the project use?
-    hint: A library installed in your deployment is different from a hosted API or subscription.
+    label: Which libraries are allowed?
+    hint: Installed code, not hosted services. Guides build-versus-reuse choices.
     choices:
-      - { value: standard-only, label: "Built-in or standard libraries only" }
-      - { value: open-source, label: "Suitable maintained open-source libraries" }
-      - { value: commercial-allowed, label: "Commercial libraries may also be considered, within the budget" }
-      - { value: undecided, label: "Not decided: discuss during kickoff" }
+      - { value: standard-only, label: "Built-in only" }
+      - { value: open-source, label: "Open source" }
+      - { value: commercial-allowed, label: "Commercial too" }
+      - { value: undecided, label: "Decide later" }
+      - { value: no-preference, label: "Doesn’t matter" }
     default: undecided
   - id: arch.services
     ref: "3.9"
-    mode: Q
+    mode: F
     type: choice
-    label: May application features or data rely on external services?
-    hint: Auth, databases, APIs and SaaS outside our deployment; hosting is a separate choice.
+    label: Can the app use external services?
+    hint: Hosted auth, databases or APIs. Guides data flows in the plan.
     choices:
-      - { value: none, label: "No external application services" }
-      - { value: approved-only, label: "Only explicitly approved services" }
-      - { value: allowed, label: "External services may be proposed, within data and budget constraints" }
-      - { value: undecided, label: "Not decided: discuss during kickoff" }
+      - { value: none, label: "No external services" }
+      - { value: approved-only, label: "Approved services only" }
+      - { value: allowed, label: "Proposals welcome" }
+      - { value: undecided, label: "Decide later" }
+      - { value: no-preference, label: "Doesn’t matter" }
     default: undecided
   - id: arch.cost
     ref: "3.10"
-    mode: Q
+    mode: F
     type: choice
-    label: What cost policy should architecture choices follow?
-    hint: Include hosting, libraries, subscriptions, usage-based APIs and AI. This does not authorize purchases.
+    label: What can the architecture cost?
+    hint: Hosting, libraries, APIs and subscriptions. Purchases still need approval.
     choices:
-      - { value: free-only, label: "No paid components or subscriptions; explain free-tier limits and operating costs" }
-      - { value: capped, label: "Paid components allowed within an agreed cap" }
-      - { value: flexible, label: "Propose paid options with a cost estimate for review" }
-      - { value: undecided, label: "Not decided: ask before proposing a paid dependency" }
+      - { value: free-only, label: "Free components only" }
+      - { value: capped, label: "Within a budget" }
+      - { value: flexible, label: "Estimate for review" }
+      - { value: undecided, label: "Decide later" }
+      - { value: no-preference, label: "Doesn’t matter" }
     default: undecided
   - id: arch.cost-limit
     ref: "3.11"
-    mode: Q
+    mode: F
     type: text
-    label: What is the budget cap, currency and billing period?
-    hint: For example EUR 20 per month plus EUR 50 one-off; leave blank to resolve during kickoff.
+    label: Budget cap (amount, currency, period)
+    hint: For example EUR 20 / month. Leave blank to agree during planning.
     when: { arch.cost: capped }
     default: ""

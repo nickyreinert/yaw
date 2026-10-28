@@ -174,8 +174,14 @@ function buildQuestions() {
       const field = choiceField({ name: q.id, id, choices, value: String(q.default), label, onChange: () => {} });
       node.append(field.node); inputs.push(...field.inputs);
     } else {
-      input = element(q.type === 'text' ? 'textarea' : 'input', undefined, { id, name: q.id });
-      if (q.type === 'text') input.maxLength = 8192;
+      const shortText = ['arch.framework', 'arch.cost-limit'].includes(q.id);
+      input = element(q.type === 'text' && !shortText ? 'textarea' : 'input', undefined, { id, name: q.id });
+      if (q.type === 'text') {
+        input.maxLength = 8192;
+        if (shortText) { input.type = 'text'; input.className = 'short-answer'; }
+        if (q.id === 'arch.cost-limit') input.placeholder = 'e.g. EUR 20 / month';
+        if (q.id === 'arch.framework') input.placeholder = 'e.g. keep Django — or leave blank';
+      }
       else { input.type = 'number'; input.step = 'any'; }
       node.append(input); inputs.push(input);
     }
@@ -205,6 +211,8 @@ function buildQuestions() {
   }
 
   const personal = sections.get('user')?.node;
+  // Choose the kit profile first; optional planning constraints follow it.
+  sections.get('arch')?.node.before($('stack'));
   if (personal) {
     personal.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
     const global = element('button', 'Edit personal defaults for future projects', { type: 'button', class: 'link' });

@@ -49,6 +49,42 @@ export function el(tag, attrs = {}, ...kids) {
 const choiceOf = (c) => (typeof c === 'object' ? { value: c.value, label: c.label ?? String(c.value) } : { value: c, label: String(c) });
 const shortLabel = (label) => label.split(/ [—(–-] |: /)[0];
 
+// Small, decorative line drawings. The adjacent text always names the choice.
+const ICONS = {
+  building: 'M4 21V5h16v16M8 21v-5h8v5M8 8h1m6 0h1M8 12h1m6 0h1M2 21h20',
+  server: 'M4 3h16v7H4zM4 14h16v7H4zM7 6h1m3 0h6M7 17h1m3 0h6',
+  cloud: 'M6 18a4 4 0 0 1-1-8 7 7 0 0 1 13-1 4.5 4.5 0 0 1 0 9Z',
+  box: 'm12 3 9 5v9l-9 5-9-5V8Zm0 10 9-5M12 13 3 8m9 5v9M7 5.8l9 5',
+  open: 'M8 10V7a4 4 0 0 1 7.5-2M5 10h14v11H5zM12 14v3',
+  briefcase: 'M8 6V3h8v3M3 6h18v15H3zM3 11l9 3 9-3M12 12v4',
+  shield: 'm12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Zm-4 9 3 3 5-6',
+  globe: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z',
+  unplug: 'm4 4 16 16M8 5l3 3m4-3 3 3M5 8l3 3m8 2-3 3-5-5M5 19l3-3',
+  gift: 'M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9C4 9 4 2 8 3c3 0 4 6 4 6Zm0 0s1-6 4-6c4-1 4 6-4 6Z',
+  wallet: 'M20 7H4V4h14v3M4 7v14h17V7ZM16 12h5v5h-5z',
+  chart: 'M3 3v18h18M7 16l4-5 4 2 5-7M16 6h4v4',
+  question: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01',
+  shuffle: 'M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4M3 18h3c2 0 3-2 4-4m4-4c1-2 2-4 4-4h3m-4-4 4 4-4 4',
+  terminal: 'M3 4h18v16H3zM7 9l3 3-3 3m6 0h4',
+  bolt: 'm13 2-9 12h7l-1 8L21 9h-8Z',
+  window: 'M3 4h18v16H3zM3 8h18M7 6h.01m3 0h.01',
+  phone: 'M7 2h10v20H7zM10 18h4',
+};
+export function decisionIcon(kind) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [name, value] of Object.entries({ class: 'decision-icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) svg.setAttribute(name, value);
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', ICONS[kind] ?? ICONS.question); svg.append(path);
+  return svg;
+}
+const ARCH_DECISIONS = {
+  'arch.hosting-control': { 'on-premises': 'building', 'self-hosted': 'server', managed: 'cloud' },
+  'arch.libraries': { 'standard-only': 'box', 'open-source': 'open', 'commercial-allowed': 'briefcase' },
+  'arch.services': { none: 'unplug', 'approved-only': 'shield', allowed: 'globe' },
+  'arch.cost': { 'free-only': 'gift', capped: 'wallet', flexible: 'chart' },
+};
+
 // The profile for a (language, runsOn) pair, or null (ADR-0054: at most one).
 export function profileFor(profiles, language, runsOn) {
   return profiles.find((p) => p.stack?.language?.includes(language) && p.stack?.runsOn?.includes(runsOn)) ?? null;
@@ -64,6 +100,13 @@ export function radioChoices(choices) {
 }
 export function choiceField({ name, id, choices, value, disabled = false, describedBy, label, onChange }) {
   const list = radioChoices(choices);
+  if (ARCH_DECISIONS[name]) {
+    const inputs = list.map((c) => el('input', { type: 'radio', name, id: `${id}-${c.value}`, value: c.value, checked: c.value === String(value), disabled: disabled || c.disabled,
+      'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
+    const node = el('div', { class: 'decision-options', role: 'radiogroup', 'aria-label': label },
+      ...list.map((c, i) => el('label', { class: 'decision-option' }, inputs[i], decisionIcon(c.value === 'no-preference' ? 'shuffle' : ARCH_DECISIONS[name][c.value]), el('span', { text: c.label }))));
+    return { node, inputs };
+  }
   if (list.length > RADIO_MAX) {
     const select = el('select', { id, name, 'aria-label': label, 'aria-describedby': describedBy, disabled, onchange: (e) => onChange(e.target.value) },
       ...list.map((c) => el('option', { value: c.value, disabled: c.disabled, text: c.label })));
@@ -122,6 +165,7 @@ export function renderStack(root, ctx) {
     const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : `${langName(lang)} does not run here`;
     hostGrid.append(el('button', { type: 'button', class: 'host', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
+    decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone' })[h.value]),
     el('strong', { text: hostName(h.value) }),
     el('span', { class: 'small muted', text: h.label.slice(shortLabel(h.label).length).replace(/^[\s—(–:-]+/, '').replace(/\)$/, '') }),
     el('span', { class: `fit ${f === 'tailored' ? 'yes' : f === 'basic' ? 'basic' : 'no'}`, text })));

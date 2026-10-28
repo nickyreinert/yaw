@@ -14,14 +14,18 @@ import { visibleQuestions } from '../core/web/assets/ui-state.js';
 import { main } from '../core/cli/main.js';
 import { readAnswers } from '../core/render/project.js';
 import { KIT_ROOT, tmp, capture, scripted } from './helpers/fixtures.js';
-const base = { 'idea.text': 'A project.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'arch.framework': 'none' };
+const base = { 'idea.text': 'A project.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
 const f = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: { HOME: tmp(), PATH: process.env.PATH } });
 
 test('Quick asks only project essentials and architecture; Basic adds GitHub/reviews; Pro asks all applicable questions', () => {
   const questions = collectQuestions(KIT_ROOT, ['core', 'tasks', 'review', 'communication', 'team']);
   assert.deepEqual(DEPTHS.map((d) => d.value), ['quick', 'basic', 'pro']);
   const ids = (mode) => questions.filter((q) => asksIn(q, mode)).map((q) => q.id);
-  assert.ok(ids('quick').every((id) => id === 'idea.text' || id.startsWith('arch.')));
+  assert.deepEqual(ids('quick'), ['idea.text', 'arch.language', 'arch.runs-on']);
+  for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {
+    assert.ok(!ids('basic').includes(id), `${id} belongs to Pro`);
+    assert.ok(ids('pro').includes(id));
+  }
   assert.ok(ids('basic').includes('tasks.use-github'));
   assert.ok(ids('basic').includes('quality.review-quality'));
   assert.equal(ids('pro').length, questions.length);

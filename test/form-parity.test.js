@@ -37,7 +37,7 @@ function nonDefaults(overrides = {}) {
 const BASE = { 'idea.text': 'A small tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
 const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
-  { name: 'Quick, self-managed with open-source libraries and a paid cap', mode: 'quick', answers: { ...BASE, 'arch.hosting-control': 'self-hosted', 'arch.libraries': 'open-source', 'arch.services': 'approved-only', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month, no overage' } },
+  { name: 'Pro, self-managed with open-source libraries and a paid cap', mode: 'pro', answers: { ...BASE, 'arch.hosting-control': 'self-hosted', 'arch.libraries': 'open-source', 'arch.services': 'approved-only', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month, no overage' } },
   { name: 'Full solo, defaults', mode: 'full', answers: BASE },
   { name: 'Full solo without GitHub', mode: 'full', answers: { ...BASE, 'tasks.use-github': false } },
   { name: 'Full team', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'team.session-context': false } },

@@ -2,7 +2,7 @@
 
 The Quick/personal boundary in [doc 15 §1](15-project-foundations.md#1-quick-asks-about-this-project) is implemented in the terminal and browser. The catalogue also contains future questions; availability still follows implemented module definitions.
 
-Legend: Q/S/F annotations describe the catalogue's original question groups. The shared depth policy now governs visibility: **Quick** asks essential purpose and architecture, **Basic** adds repository agents, collaboration, GitHub and review gates, and **Pro / all** asks every applicable implemented question. Saved personal/tool defaults are reused; optional tools are off when never chosen. Pro does not suppress advanced questions for laypeople. Future catalogue entries remain unavailable until implemented. Essential purpose/language/runtime start unresolved; uncertainty calls for help or a proposal to confirm.
+Legend: Q/S/F annotations describe the catalogue's original question groups. The shared depth policy now governs visibility: **Quick** asks purpose, language and runtime, **Basic** adds repository agents, collaboration, GitHub and review gates, and **Pro / all** asks every applicable implemented question. Saved personal/tool defaults are reused; optional tools are off when never chosen. Pro does not suppress advanced questions for laypeople. Future catalogue entries remain unavailable until implemented. Essential purpose/language/runtime start unresolved; uncertainty calls for help or a proposal to confirm.
 
 Rules for the interviewer (CLI, form, or agent):
 
@@ -66,14 +66,14 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 | 3.4 | Login needed? Which kind? | S | auth ADR |
 | 3.5 | Expected load and latency needs (tiny / moderate / high) | F | performance budget |
 | 3.6 | Repositories: one / several (frontend, backend, public vs. private) | F | repo ADR |
-| 3.7 | Infrastructure control: on premises / self-managed server or rented infrastructure / managed hosting allowed / **undecided** (`arch.hosting-control`) | Q | deployment and network boundaries |
-| 3.12 | Required framework or existing stack to keep? (`arch.framework`, optional text) | Q | preserve explicit stack constraints during kickoff |
-| 3.8 | Library policy: built-in/standard only / maintained open-source / commercial libraries may be considered / **undecided** (`arch.libraries`) | Q | build/reuse and maintenance choices |
-| 3.9 | External application services: none / explicitly approved only / proposals allowed / **undecided** (`arch.services`) | Q | auth, storage, APIs, SaaS and data flows |
-| 3.10 | Cost policy: no paid components/subscriptions / capped / paid proposals with estimates / **undecided** (`arch.cost`) | Q | architecture and kickoff constraints |
-| 3.11 | Budget cap, currency and period, plus one-off/overage rules; shown only for capped policy (`arch.cost-limit`) | Q | estimates and review |
+| 3.7 | Infrastructure control: on premises / self-managed server or rented infrastructure / managed hosting allowed / **undecided** (`arch.hosting-control`) | F | deployment and network boundaries |
+| 3.12 | Required framework or existing stack to keep? (`arch.framework`, optional text) | F | preserve explicit stack constraints during kickoff |
+| 3.8 | Library policy: built-in/standard only / maintained open-source / commercial libraries may be considered / **undecided** (`arch.libraries`) | F | build/reuse and maintenance choices |
+| 3.9 | External application services: none / explicitly approved only / proposals allowed / **undecided** (`arch.services`) | F | auth, storage, APIs, SaaS and data flows |
+| 3.10 | Cost policy: no paid components/subscriptions / capped / paid proposals with estimates / **undecided** (`arch.cost`) | F | architecture and kickoff constraints |
+| 3.11 | Budget cap, currency and period, plus one-off/overage rules; shown only for capped policy (`arch.cost-limit`) | F | estimates and review |
 
-These four policies are independent: self-hosting can use open-source libraries; managed hosting does not automatically permit external auth or data services; open-source software can still have operating costs. All three depths collect them without personal-profile reuse. `undecided` and a blank cap remain unresolved constraints for guided kickoff, rather than implicit permission. They do not prevent installing a deterministic kit, which provisions no infrastructure or subscriptions. The shared prompt includes the exact saved choices and asks about missing limits or contradictions before committing to an architecture. Permissions to propose paid options never authorize purchases or provisioning.
+These four policies are independent: self-hosting can use open-source libraries; managed hosting does not automatically permit external auth or data services; open-source software can still have operating costs. Pro collects the detailed constraints; Quick and Basic retain explicit project answers or leave them undecided. They are never personal-profile defaults. `no-preference` invites a recommendation with rationale; `undecided` and a blank cap remain unresolved constraints for guided kickoff, rather than implicit permission. They do not prevent installing a deterministic kit, which provisions no infrastructure or subscriptions. The shared prompt includes the exact saved choices and asks about missing limits or contradictions before committing to an architecture. Permissions to propose paid options never authorize purchases or provisioning.
 
 The proposal shows: chosen profile(s), shape (monolith, static + API, …), data, hosting, and two rejected alternatives with one-line reasons.
 
