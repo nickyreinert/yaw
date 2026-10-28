@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', 'Rename photos by EXIF date.', 'javascript', 'local', '', '', '', '', ''];
+const INTERVIEW = ['', 'Rename photos by EXIF date.', 'javascript', 'local'];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };

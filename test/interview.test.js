@@ -14,7 +14,8 @@ test('interview/base.yaml validates, ids are unique, and Quick asks only Q quest
   const all = collectQuestions(KIT_ROOT, ['core']);
   assert.ok(all.length >= 5);
   assert.deepEqual(loadBaseQuestions(KIT_ROOT), all);
-  assert.ok(all.every((x) => x.mode === 'Q'));
+  assert.ok(all.filter((x) => asksIn(x, 'quick')).every((x) => x.mode === 'Q'));
+  assert.ok(all.some((x) => x.mode === 'F'));
   assert.ok(all.some((x) => x.id === 'user.agents') && all.some((x) => x.id === 'arch.language'));
 });
 

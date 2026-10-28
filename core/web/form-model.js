@@ -277,7 +277,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
           const file = join(kitRoot, 'interview', 'help', `${q.help}.md`);
           if (existsSync(file)) help = readFileSync(file, 'utf8').trim();
         }
-        return { ...q, ...(edit && sections.length && editable(q) ? { mode: 'Q', reviewPersonal: true } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
+        return { ...q, ...(edit && sections.length && editable(q) ? { reviewSelected: true } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
       }),
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),

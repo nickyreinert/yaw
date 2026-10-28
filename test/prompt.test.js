@@ -83,7 +83,7 @@ test('the browser entry is visible for every question type and accepts w or web'
           return reply;
         },
       };
-      const q = { id: 'arch.test', label: 'Test?', type, mode: 'Q', default: '' };
+      const q = { id: 'arch.test', required: true, label: 'Test?', type, mode: 'Q', default: '' };
       if (type === 'choice' || type === 'multi') q.choices = ['a', 'b'];
       const result = await runInterview({ questions: [q], mode: 'quick', prompter, allowWeb: true });
       assert.deepEqual(result, { answers: {}, defaulted: [], sources: {}, web: true });
@@ -110,7 +110,7 @@ test('arrow keys can select the browser entry without changing the default', asy
 
 test('w is still a text answer outside init', async () => {
   const result = await runInterview({
-    questions: [{ id: 'arch.test', label: 'Test?', type: 'text', mode: 'Q', default: '' }],
+    questions: [{ id: 'arch.test', required: true, label: 'Test?', type: 'text', mode: 'Q', default: '' }],
     mode: 'quick',
     prompter: { show() {}, ask: async () => 'w' },
   });

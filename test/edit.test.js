@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../core/cli/main.js';
+import { asksIn } from '../core/interview/policy.js';
 import { collectQuestions } from '../core/render/kit.js';
 import { editProject, readAnswers, requireManifest } from '../core/render/project.js';
 import { createFormApi } from '../core/web/init.js';
@@ -106,6 +107,19 @@ test('explicit question editing asks beyond the saved Quick depth without changi
   assert.equal(p.asked.filter((q) => q.includes('(? help, skip)')).length, 1);
   assert.equal(readAnswers(root).mode, 'quick');
   assert.deepEqual(requireManifest(root).modules.core.enabled, true);
+});
+
+test('selected architecture constraints are editable at saved Quick depth in terminal and browser', async () => {
+  for (const [id, value] of [['arch.framework', 'Keep React'], ['arch.hosting-control', 'no-preference']]) {
+    const root = await makeProject({ modules: ['core'] });
+    const model = modelFor(root, [id]);
+    const question = model.bootstrap().questions.find((q) => q.id === id);
+    assert.equal(asksIn(question, 'quick'), true);
+    const io = ioFor(root, interview({ [id]: value }));
+    assert.equal(await main(['edit', id, '--skip-verify'], io), 0, io.stderr.text());
+    assert.equal(readAnswers(root).answers[id], value);
+    assert.equal(readAnswers(root).mode, 'quick');
+  }
 });
 
 test('edit refuses secret-like saved answers before showing them', async () => {

@@ -43,7 +43,7 @@ export async function edit({ values, positionals: sections, io }) {
   }
   const questions = withGitHubHint(collectQuestions(io.kitRoot, [...new Set([...state.modules, 'communication'])]), githubStatus({ root: io.cwd, env: io.env }))
     .filter((q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`)))
-    .map((q) => sections.length ? { ...q, mode: 'Q', reviewPersonal: true } : q);
+    .map((q) => sections.length ? { ...q, reviewSelected: true } : q);
   const result = await runInterview({
     questions, mode: state.mode, prompter: io.prompter, kitRoot: io.kitRoot,
     known: state.answers, defaults: state.answers, allowWeb: true,
