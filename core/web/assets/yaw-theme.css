@@ -12,6 +12,9 @@
   --sun: #ffe56b;
   --sun-wash: #fff7cc;
   --sea: #eef4f8;
+  --notice-ink: #81365d;
+  --notice-line: #cc8eae;
+  --notice-wash: #fff0f7;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   color: var(--ink);
   background: var(--sea);
@@ -76,7 +79,7 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .topbar strong, .topbar .local-badge { color: var(--ink); }
 .local-dot { background: var(--accent); box-shadow: 0 0 0 3px var(--wash); }
 .topbar .project-chip { border-radius: 5px; }
-.card, .interview-form, .plan-card, .gfilter {
+.card, .hero-card, .workflow-card, .interview-form, .plan-card, .gfilter {
   background: var(--paper); border-color: var(--line); border-radius: 14px 4px 14px 4px;
   box-shadow: none;
 }
@@ -116,8 +119,11 @@ pre, .command { background: #edf2fa; color: var(--ink); border-color: var(--line
 }
 .hosts button[aria-pressed=true], .chips .chip[aria-pressed=true] { background: var(--sun-wash); border-color: var(--ink); color: var(--ink); }
 .stack-result { background: var(--wash); border-color: var(--line); }
-.stack-result.basic { background: var(--sun-wash); border-color: #b6a35e; }
-.stack-result.invalid { background: #fff0eb; border-color: #d78f7e; }
+.stack-result.basic { background: var(--wash); border-color: var(--line); }
+.stack-result.invalid { background: var(--notice-wash); border-color: var(--notice-line); }
+.stack-result.invalid h3 { color: var(--notice-ink); }
+.fit.no { color: var(--muted); }
+.fit.basic { color: var(--accent); }
 .depth-default.quick { background: #e6edff; color: #304f8b; }
 .depth-default.basic { background: #fff1bc; color: #6d581e; }
 .decision-icon { color: var(--accent); }
@@ -135,10 +141,13 @@ pre, .command { background: #edf2fa; color: var(--ink); border-color: var(--line
 .learn-flow li, .improve-notice, .improve-empty { background: var(--wash); }
 .improve-review-callout { background: var(--sun-wash); border-color: #c0aa54; }
 .improve-verdict { background: var(--wash); border-left-color: var(--accent); }
-.warn, .personal-defaults-notice { background: #fff3e7; color: #7d4622; border-left-color: #d77a42; }
+.warn, .personal-defaults-notice, .interview-error {
+  background: var(--notice-wash); color: var(--notice-ink); border-left-color: var(--notice-line);
+}
 .ok-text { color: #12634f; }
-button.danger { color: #9b342c; border-color: #d89b94; }
-button.danger:hover { background: #ffebe7; }
+button.danger { color: var(--notice-ink); border-color: var(--notice-line); }
+button.danger:hover { background: var(--notice-wash); }
+.error-text, .warn-text, .card .warn-text { color: var(--notice-ink) !important; }
 .settings-help { background: #f3f7fc; border-color: var(--line); }
 .content-footer { color: var(--muted); font-size: .64rem; }
 @media (max-width: 760px) {
@@ -158,5 +167,24 @@ button.danger:hover { background: #ffebe7; }
 .sidebar :focus-visible { outline-color: var(--sun); }
 @media (prefers-reduced-motion: reduce) { .brand img, .brand:hover img { transform: none; } }
 .card .ok-text { color: #12634f; }
-.card .warn { color: #7d4622; }
-.card .warn-text { color: #9b342c; }
+.card .warn { color: var(--notice-ink); }
+/* Secondary surfaces and small controls share the same ink and paper as the main cards. */
+.plan-panel, .question .help, .group-intro, .card-tip, .project-menu, dialog {
+  background: var(--paper); border-color: var(--line);
+}
+.plan-panel, .card-tip, .project-menu, dialog { box-shadow: 0 8px 28px #142d461a; }
+dialog::backdrop { background: #142d4680; }
+dialog p, .intro, .interview-status, .activity-day { color: var(--muted); }
+.topbar .project-menu button.primary { background: var(--sun); color: var(--ink); border-color: var(--ink); }
+.classifier-job { background: #203d59; border-color: #536d85; }
+.classifier-job p, .sidebar-footer p, .sidebar-footer code, .search-trail, .search-none { color: #c1d5e5; }
+.classifier-job button { background: #294965; border-color: #536d85; }
+.search-result { color: #d6e4ef; }
+.search-result:hover, .search-result:focus-visible { background: #23425f; }
+.gfilter-slot { background: linear-gradient(var(--sea) 70%, transparent); }
+.conversation-message.from-user { background: var(--wash); border-color: var(--line); }
+.conversation-message.has-clue { box-shadow: -3px 0 var(--notice-line); }
+.bar, .improve-stacked-bar { background: var(--wash); }
+svg.chart text { fill: var(--muted); }
+meter::-webkit-meter-bar { background: var(--wash); }
+meter::-webkit-meter-optimum-value { background: var(--accent); }

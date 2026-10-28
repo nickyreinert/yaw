@@ -37,7 +37,7 @@ export function renderReview(root, ctx) {
   }
 
   const unasked = ctx.questions.filter((q) => !preview.visible.includes(q.id) && Object.hasOwn(preview.answers, q.id));
-  const defaults = el('details', { open: true }, el('summary', { text: `Settings not asked at this depth (${unasked.length})` }));
+  const defaults = el('details', {}, el('summary', { text: `Settings not asked at this depth (${unasked.length})` }));
   const defaultsList = el('ul', { class: 'review-list' });
   for (const q of unasked) {
     const label = SHORT[q.id] ?? q.label.replace(/\?$/, '');

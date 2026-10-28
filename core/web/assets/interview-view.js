@@ -84,7 +84,7 @@ function renderWizard(focus = false) {
   $('next-step-button').hidden = stepIndex >= REVIEW;
   const blocked = step.ids.includes('stack') && !stackValid;
   $('next-step-button').disabled = blocked;
-  $('next-step-button').title = blocked ? 'Pick a language and a place where it can run' : '';
+  $('next-step-button').title = blocked ? 'Pick a language and hosting target with a YAW profile' : '';
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
     const heading = (step.ids[0] ? $(step.ids[0])?.querySelector('h2, legend') : null) ?? visibleSection?.querySelector('h2');
@@ -220,7 +220,7 @@ function buildQuestions() {
     }));
     // Questions of module cards are asked inside the card, under the module switch.
     if (!isInline(q) && !GROUP_INTRO.has(q.id)) sections.get(sectionId).node.append(node);
-    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, why, capability, gitHolder, expertise: null });
+    controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, capability, gitHolder });
   }
 
   const personal = sections.get('user')?.node;
@@ -252,10 +252,6 @@ function renderQuestions() {
       else if (document.activeElement !== input) input.value = String(value);
     }
     c.hint.hidden = !c.q.hint || expertise === 'expert' && id !== 'user.examples';
-    if (c.expertise !== expertise) {
-      if (c.why) c.why.open = expertise === 'layperson';
-      c.expertise = expertise;
-    }
     if (c.capability) {
       c.capability.replaceChildren();
       for (const agent of value) {

@@ -72,7 +72,7 @@ questions:
     hint: "GitHub is optional; off keeps development local. This does not create a remote repository."
     default: false
   # The stack is language x runs-on (ADR-0054): together they pick exactly one profile, tailored or basic.
-  # A pair no profile covers is rejected with the places that language can run.
+  # A pair no profile covers is rejected with the hosting targets covered by this kit.
   - id: arch.language
     ref: "3.1"
     mode: Q

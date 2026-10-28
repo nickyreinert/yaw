@@ -1,5 +1,6 @@
 - Language and where it runs pick one ready-made stack: tools, checks and files
 - Tailored stack for a common pair (Python on your own server: FastAPI); other pairs get a basic stack with the language's standard tools
-- A pair that does not work (Python inside WordPress) is refused, with the places that language can run
+- If this kit has no profile for a pair, choose a covered target; this is a YAW catalogue limit, not a claim that the language cannot run there
 - The toolchain must be on your computer (Go, Rust, a JDK, Xcode ...); yaw doctor shows what is missing
 - Example: a script for your machine is "local"; a GitHub Pages site is HTML, CSS & JavaScript on "static"
+- HTML, CSS & JavaScript supports local preview, your own server, static, serverless-platform and edge/CDN hosting. The frontend profile supplies browser assets; provider configuration and server functions are separate work.
