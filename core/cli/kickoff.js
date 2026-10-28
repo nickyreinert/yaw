@@ -1,9 +1,8 @@
 // `yaw kickoff` (#173): print the kickoff guide and the planning prompt; `yaw kickoff import <plan.md>` turns
 // the plan into tasks through `yaw task new`, so every task store (local, both, github) works the same way.
 
-import { readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { kickoffGuide, kickoffPrompt, parsePlan, PlanError } from '../lib/kickoff.js';
+import { kickoffGuide, kickoffPrompt, parseKickoffReply, PlanError } from '../lib/kickoff.js';
+import { checkTaskReferences, contextText, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { modelEffort, parseTasks, tasksMode } from '../lib/tasks.js';
 import { readProjectFile } from '../render/files.js';
 import { enabledModules, readAnswers, requireManifest } from '../render/project.js';
@@ -37,37 +36,58 @@ function existingTitles(root) {
   }
 }
 
-function readPlan(cwd, file) {
-  const path = resolve(cwd, file);
-  let st;
-  try {
-    st = statSync(path);
-  } catch {
-    throw new UsageError(`kickoff import: ${file} does not exist`);
-  }
-  if (!st.isFile()) throw new UsageError(`kickoff import: ${file} is not a file`);
-  return readFileSync(path, 'utf8');
+function readPlan(cwd, file, kitRoot) {
+  const text = readFoundationFile(cwd, file, { kitRoot });
+  if (text === null) throw new UsageError(`kickoff import: ${file} does not exist`);
+  return text;
 }
 
 export async function kickoff({ values, positionals, io }) {
   const root = io.cwd;
   const manifest = requireManifest(root);
   const [verb, file, ...extra] = positionals;
+  if (verb === 'context') {
+    if (file || extra.length) throw new UsageError('kickoff context takes no positional arguments');
+    const context = foundationContext({ root, kitRoot: io.kitRoot });
+    io.stdout.write(values.json ? `${JSON.stringify(context, null, 2)}\n` : `${contextText(context)}\n`);
+    return 0;
+  }
+  if (verb === 'ux') {
+    if (file || extra.length) throw new UsageError('kickoff ux takes no positional arguments');
+    io.stdout.write(`${contextText(foundationContext({ root, kitRoot: io.kitRoot }))}\n\nOptional UI/UX guidance: review this exact package before copying to your chosen local or external model. Ask for missing user evidence; label assumptions. Walk through the main task with realistic content, empty/error/recovery states and applicable accessibility criteria. Propose a small prototype or user walkthrough for the riskiest assumption. Return a candidate revision to the UI/UX foundation, linked domain/data effects and observable acceptance criteria. Surface conflicts for a project decision; do not change accepted documents automatically.\n`);
+    return 0;
+  }
   if (verb === undefined) {
     io.stdout.write(kickoffText({ root, manifest }));
     return 0;
   }
   if (verb !== 'import') throw new UsageError(`kickoff: unknown verb "${verb}"; use: yaw kickoff [import <plan.md> [--dry-run]]`);
   if (!file || extra.length > 0) throw new UsageError('kickoff import: give exactly one plan file');
-  if (!enabledModules(manifest).includes('tasks')) throw new UsageError('kickoff import needs the tasks module; run: yaw add tasks');
+  const hasTasks = enabledModules(manifest).includes('tasks');
+  const needsTasks = () => new UsageError('kickoff import needs the tasks module; run: yaw add tasks');
   let plan;
   try {
-    plan = parsePlan(readPlan(root, file));
+    let text;
+    try { text = readPlan(root, file, io.kitRoot); }
+    catch (e) { if (!hasTasks && e instanceof UsageError) throw needsTasks(); throw e; }
+    plan = parseKickoffReply(text);
+    if (!hasTasks && !plan.foundations.length) throw needsTasks();
+    if (!plan.tasks.length && !plan.foundations.length) throw new PlanError('no tasks found; the plan needs "## Phase" headings with "- [ ] task" lines');
   } catch (e) {
-    if (e instanceof PlanError) throw new UsageError(`kickoff import: ${file}: ${e.message}`);
+    if (e instanceof PlanError) throw new UsageError(`kickoff import: ${file}: ${e.message.startsWith('nothing found') ? 'no tasks found; ' : ''}${e.message}`);
     throw e;
   }
-  const { code, created, skipped } = await importTasks({ root, plan, io, dryRun: values['dry-run'] });
+  const prepared = prepareFoundations({ root, kitRoot: io.kitRoot, documents: plan.foundations, reviewed: values.reviewed || values['dry-run'] });
+  checkTaskReferences(plan.tasks, prepared);
+  if (prepared) {
+    for (const d of prepared.entries) io.stdout.write(`Foundation ${d.kind}: ${d.path}\n${d.text}\n`);
+    if (!values['dry-run']) saveFoundations({ root, prepared, kitRoot: io.kitRoot });
+  }
+  if (!hasTasks) {
+    io.stdout.write(`kickoff import: ${values['dry-run'] ? 'would save' : 'saved'} reviewed foundations; tasks remain in ${file}. Add the tasks module (yaw add tasks), then import again to create them.\n`);
+    return 0;
+  }
+  const { code, created, skipped } = await importTasks({ root, plan: plan.tasks, io, dryRun: values['dry-run'] });
   if (code !== 0) return code;
   const verbDone = values['dry-run'] ? 'would add' : 'added';
   io.stdout.write(`kickoff import: ${verbDone} ${created} task(s), skipped ${skipped}${values['dry-run'] ? '; nothing was written (--dry-run)' : ''}\n`);
@@ -91,10 +111,11 @@ export async function importTasks({ root, plan, io, dryRun = false }) {
     seen.add(t.title.toLowerCase());
     if (values['dry-run']) {
       io.stdout.write(`would add  [${t.phase}] ${t.title}${hint}\n`);
+      if (t.spec) io.stdout.write(`  spec: ${t.spec}\n  acceptance: ${t.acceptance}\n`);
       created++;
       continue;
     }
-    const code = await task({ values: { ...(t.model ? { model: t.model } : {}), ...(t.effort ? { effort: t.effort } : {}) }, positionals: ['new', t.title], io });
+    const code = await task({ values: { ...(t.model ? { model: t.model } : {}), ...(t.effort ? { effort: t.effort } : {}), ...(t.spec ? { spec: t.spec } : {}), ...(t.acceptance ? { acceptance: t.acceptance } : {}) }, positionals: ['new', t.title], io });
     if (code !== 0) return { code, created, skipped };
     created++;
   }

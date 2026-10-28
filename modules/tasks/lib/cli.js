@@ -151,7 +151,13 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         const title = oneLine(args[0]);
         if (title === '') throw new LedgerError('a task needs a title');
         const hint = modelOption(values);
-        const n = createIssue(gh, title, hint.model ? `**Model / effort:** ${modelEffort(hint.model, hint.effort)}` : '');
+        const fields = [hint.model ? `**Model / effort:** ${modelEffort(hint.model, hint.effort)}` : '',
+          ...['spec', 'acceptance'].filter((k) => values[k] !== undefined).map((k) => {
+            const text = oneLine(values[k]);
+            if (!text) throw new LedgerError(`--${k} must not be empty`);
+            return `**${k === 'spec' ? 'Spec' : 'Acceptance'}:** ${text}`;
+          })];
+        const n = createIssue(gh, title, fields.filter(Boolean).join('\n\n'));
         stdout.write(`#${n} ${title}\n`);
         refresh();
         return 0;

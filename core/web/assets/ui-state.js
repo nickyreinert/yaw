@@ -1,4 +1,6 @@
 // Pure browser state helpers; also tested without a DOM.
+import { asksIn, isPersonal } from '../../interview/policy.js';
+export { asksIn };
 export const choiceValue = (c) => typeof c === 'object' ? c.value : c;
 // The value stays visible (as in the terminal) unless the label already starts with it: "edge — code on a CDN ...".
 export const choiceLabel = (c) => {
@@ -17,7 +19,6 @@ export function installDialogCancellation(dialog) {
     if (event.key === 'Escape') cancel(event);
   });
 }
-export const asksIn = (q, mode) => q.mode === 'Q' || (q.mode === 'S' ? mode !== 'quick' : mode === 'full');
 export function matches(when, answers) {
   return !when || Object.entries(when).every(([key, wanted]) => {
     const values = Array.isArray(wanted) ? wanted : [wanted];
@@ -28,7 +29,7 @@ export function effectiveAnswers(questions, given, mode) {
   const answers = {};
   for (const asked of [true, false]) for (const q of questions) {
     if (asksIn(q, mode) !== asked || !matches(q.when, answers)) continue;
-    const use = asked && !(answers['user.expertise'] === 'layperson' && q.mode === 'F') && Object.hasOwn(given, q.id);
+    const use = (isPersonal(q) || (asked && !((given['user.expertise'] ?? answers['user.expertise']) === 'layperson' && q.mode === 'F'))) && Object.hasOwn(given, q.id);
     answers[q.id] = use ? given[q.id] : q.default;
   }
   return answers;

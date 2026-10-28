@@ -96,7 +96,7 @@ export async function add({ values, positionals, io }) {
   if (questions.length > 0) {
     if (interactive) {
       io.stdout.write(`yaw add ${module}: ${questions.length} question${questions.length === 1 ? '' : 's'} (Enter takes the default, ? explains). Nothing is written until you confirm.\n`);
-      ({ answers: newAnswers, defaulted } = await runInterview({ questions, mode: answersDoc.mode, prompter: io.prompter, kitRoot: io.kitRoot, known: answersDoc.answers }));
+      ({ answers: newAnswers, defaulted } = await runInterview({ questions, mode: answersDoc.mode, prompter: io.prompter, kitRoot: io.kitRoot, known: answersDoc.answers, reviewPersonal: true }));
     } else {
       for (const q of questions) {
         if (!whenMatches(q.when, { ...answersDoc.answers, ...newAnswers })) continue;

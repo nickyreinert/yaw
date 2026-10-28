@@ -207,6 +207,17 @@ export function readUserProfile(env) {
   return doc;
 }
 
+// Optional defaults must never stop setup or expose invalid profile contents.
+export function loadPreferences({ env, kitRoot }) {
+  try {
+    const answers = readUserProfile(env)?.answers ?? {};
+    if (secretFindings({ answers, kitRoot }).length) throw new Error('unsafe profile');
+    return { answers, warning: null };
+  } catch {
+    return { answers: {}, warning: 'Saved personal settings are unreadable or invalid; using documented defaults. The saved file was left untouched.' };
+  }
+}
+
 export function deletePreset(env, name) {
   rmSync(existingPreset(env, name));
 }

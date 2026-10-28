@@ -6,8 +6,9 @@ import { createFormModel, assertSafe, FormError } from './form-model.js';
 import { startFormServer } from './form-server.js';
 import { editProject, initProject } from '../render/project.js';
 import { gitInit, isGitRepo } from '../lib/git-init.js';
-import { readManifest } from '../render/manifest.js';
-import { writeAtomic } from '../render/files.js';
+import { readManifest, writeManifest } from '../render/manifest.js';
+import { hashContent, writeAtomic } from '../render/files.js';
+import { assertFoundationsUnchanged, checkTaskReferences, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { kitVersion } from '../render/kit.js';
 import { saveSetup } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
@@ -38,8 +39,14 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   };
   const replyOf = (text) => {
     if (typeof text !== 'string' || text.length > 100000) throw new FormError('Paste the answer of the planning chat (at most 100,000 characters).');
+    assertSafe({ plan: text }, kitRoot);
     try { return parseKickoffReply(text, { languages: stackLists().languages, hosts: stackLists().hosts }); }
     catch (e) { if (e instanceof PlanError) throw new FormError(e.message); throw e; }
+  };
+  const assertPlanUnchanged = (prepared) => {
+    if (!prepared.plan) return;
+    const current = readFoundationFile(root, PLAN_FILE, { kitRoot });
+    if ((current === null ? null : hashContent(current)) !== prepared.planExpected) throw new FormError('The saved plan changed; review again.', 409);
   };
   const ensureNew = () => {
     if (edit) return model.assertUnchanged();
@@ -48,7 +55,15 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   // The plan from the planning chat: kept as docs/plan/kickoff.md and, with the tasks module, added to TASKS.md.
   async function savePlan({ prepared, output }) {
     const { plan } = prepared;
+    assertPlanUnchanged(prepared);
+    saveFoundations({ root, prepared: prepared.foundations, kitRoot });
+    if (prepared.foundations) output.write(`Registered reviewed project foundations: ${prepared.foundations.entries.map((d) => d.path).join(', ')}\n`);
     writeAtomic(root, PLAN_FILE, plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`);
+    const manifest = readManifest(root);
+    if (!manifest.files.some((f) => f.path === PLAN_FILE)) {
+      manifest.files.push({ path: PLAN_FILE, module: 'core', managed: false, hash: hashContent(plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`) });
+      writeManifest(root, manifest);
+    }
     output.write(`Saved the plan as ${PLAN_FILE}\n`);
     if (!prepared.modules.includes('tasks')) { output.write(`No task list yet: yaw add tasks, then yaw kickoff import ${PLAN_FILE}\n`); return; }
     if (tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') }) === 'github') {
@@ -75,9 +90,20 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     prepareApply(input) {
       ensureNew();
       if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
-      const { secrets, plan, ...setup } = input;
+      const { secrets, plan, foundationsReviewed, foundationReview, ...setup } = input;
       const prepared = model.normalize(setup);
-      if (plan !== undefined && plan !== null) prepared.plan = replyOf(plan);
+      if (plan !== undefined && plan !== null) {
+        prepared.plan = replyOf(plan);
+        try {
+          prepared.foundations = prepareFoundations({ root, kitRoot, documents: prepared.plan.foundations, reviewed: foundationsReviewed });
+          checkTaskReferences(prepared.plan.tasks, prepared.foundations);
+          if (prepared.foundations && JSON.stringify(foundationReview) !== JSON.stringify(prepared.foundations.entries.map(({ path, expected }) => ({ path, expected })))) throw new FormError('Foundation sources changed or were not previewed; load and review the plan again.', 409);
+          const current = readFoundationFile(root, PLAN_FILE, { kitRoot });
+          const text = prepared.plan.text.endsWith('\n') ? prepared.plan.text : `${prepared.plan.text}\n`;
+          if (current !== null && hashContent(current) !== hashContent(text)) throw new FormError(`${PLAN_FILE} already exists; preserve or edit that plan before importing a different one.`, 409);
+          prepared.planExpected = current === null ? null : hashContent(current);
+        } catch (e) { throw new FormError(e.message, e.status ?? 400); }
+      }
       try {
         prepared.secretValues = validateSecretValues(secrets, model.secretCatalog(prepared).names);
       } catch (e) {
@@ -102,12 +128,17 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       }
       if (name === 'kickoff-reply') {
         const reply = replyOf(input?.text);
+        let foundations;
+        try { foundations = prepareFoundations({ root, kitRoot, documents: reply.foundations, reviewed: true }); checkTaskReferences(reply.tasks, foundations); }
+        catch (e) { throw new FormError(e.message); }
         return { idea: reply.idea, language: reply.language, runsOn: reply.runsOn, warnings: reply.warnings,
+          foundations: foundations?.entries.map(({ kind, path, text }) => ({ kind, path, text })) ?? [],
+          foundationReview: foundations?.entries.map(({ path, expected }) => ({ path, expected })) ?? [],
           tasks: reply.tasks.length, phases: [...new Set(reply.tasks.map((t) => t.phase))].length, titles: reply.tasks.slice(0, 6).map((t) => t.title) };
       }
       if (name === 'preview' || name === 'diff') return model.preview(input, name === 'diff');
       ensureNew();
-      const prepared = model.normalize(input);
+      const prepared = model.normalize(input, { allowIncomplete: name === 'draft' });
       if (name === 'draft') {
         writeAtomic(root, DRAFT, prepared.text, { mode: 0o600 });
         return { message: `Draft saved to ${DRAFT}; no generated files were applied.` };
@@ -135,6 +166,8 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     },
     async apply(prepared, emit) {
       ensureNew();
+      assertFoundationsUnchanged(root, prepared.foundations, kitRoot);
+      assertPlanUnchanged(prepared);
       assertSafe(prepared.doc.answers, kitRoot);
       const output = { write: (text) => emit({ type: 'log', text: String(text) }) };
       emit({ type: 'log', text: 'Applying confirmed setup…\n' });

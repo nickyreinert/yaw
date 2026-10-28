@@ -1,7 +1,8 @@
 // Read-only collection/preview shared by the HTTP actions. No project writes here.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { asksIn, whenMatches, parseReply, validAnswer } from '../interview/engine.js';
+import { whenMatches, parseReply, validAnswer } from '../interview/engine.js';
+import { asksIn as asksQuestion, isPersonal, missingAnswers, sourceOf } from '../interview/policy.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
@@ -9,7 +10,7 @@ import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, sche
 import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
 import { MANIFEST, hashContent, readProjectFile, resolveInside } from '../render/files.js';
 import { parse, stringify } from '../lib/yaml.js';
-import { secretFindings, listPresets, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
+import { secretFindings, listPresets, loadPreferences, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
 import { envFileExists, envNames } from '../lib/env-secrets.js';
 import { loadCapabilities } from '../cli/agents.js';
 
@@ -37,7 +38,9 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     .map((n) => loadModule(kitRoot, n));
   definitions.sort((a, b) => a.name === 'core' ? -1 : b.name === 'core' ? 1 : a.name.localeCompare(b.name));
   const names = definitions.map((d) => d.name);
-  const questions = collectQuestions(kitRoot, names);
+  const preferences = edit ? { answers: {}, warning: null } : loadPreferences({ env, kitRoot });
+  const questions = collectQuestions(kitRoot, names).map((q) => Object.hasOwn(preferences.answers, q.id)
+    ? { ...q, default: preferences.answers[q.id], defaultSource: 'saved personal setting' } : q);
   const byId = new Map(questions.map((q) => [q.id, q]));
   const profiles = listProfiles(kitRoot);
   // A project saved without a stack answer keeps the stack of its current profile.
@@ -68,10 +71,10 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     for (const [id, value] of Object.entries(given)) {
       const q = byId.get(id);
       if (!q) throw new FormError('Unknown answer key');
-      const valid = validAnswer(q, value) && !(q.type === 'text' && value.length > 8192);
+      const valid = (validAnswer(q, value) || (q.required && value === '')) && !(q.type === 'text' && value.length > 8192);
       if (!valid) throw new FormError(`Invalid answer for ${q.id}`);
       // Use the interview parser too, without returning its input-echoing error messages.
-      if (q.type !== 'text' && !(q.type === 'multi' && value.length === 0)) {
+      if (q.type !== 'text' && !(q.required && value === '') && !(q.type === 'multi' && value.length === 0)) {
         const reply = Array.isArray(value) ? value.join(',') : String(value);
         if (parseReply(q, reply).error) throw new FormError(`Invalid answer for ${q.id}`);
       }
@@ -79,13 +82,15 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   }
   if (edit) validateGiven(original.answers);
 
-  function normalize(input) {
+  function normalize(input, { allowIncomplete = false } = {}) {
     assertUnchanged();
-    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'modules', 'consent', 'saveProfile', 'gitInit'].includes(k))) {
+    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'modules', 'consent', 'saveProfile', 'gitInit', 'proposed'].includes(k))) {
       throw new FormError('Expected a setup object with mode, answers and optional modules');
     }
     if (input.gitInit !== undefined && typeof input.gitInit !== 'boolean') throw new FormError('gitInit must be true or false');
     if (!['quick', 'full', 'standard'].includes(input.mode)) throw new FormError('Choose Quick or Full');
+    const proposed = input.proposed ?? [];
+    if (!Array.isArray(proposed) || proposed.some((id) => !byId.get(id)?.required)) throw new FormError('Invalid proposed project answers');
     let given = input.answers ?? {};
     validateGiven(given);
     if (edit) {
@@ -103,14 +108,18 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const normalizeFor = (qs) => {
       const answers = edit ? { ...original.answers } : {};
       const defaulted = [];
+      const sources = {};
       for (const asked of [true, false]) for (const q of qs) {
         if (edit && !editable(q)) continue;
-        if (asksIn(q.mode, input.mode) !== asked || !whenMatches(q.when, answers)) continue;
-        const use = Object.hasOwn(given, q.id) && (edit || (asked && !(answers['user.expertise'] === 'layperson' && q.mode === 'F')));
+        if (asksQuestion(q, input.mode) !== asked || !whenMatches(q.when, { ...given, ...answers })) continue;
+        const use = Object.hasOwn(given, q.id) && (edit || isPersonal(q) || (asked && !((given['user.expertise'] ?? answers['user.expertise']) === 'layperson' && q.mode === 'F')));
         answers[q.id] = use ? given[q.id] : q.default;
         if (!use) defaulted.push(q.id);
+        sources[q.id] = edit && Object.hasOwn(original.answers, q.id) && JSON.stringify(answers[q.id]) === JSON.stringify(original.answers[q.id])
+          ? 'saved project setting' : isPersonal(q) && JSON.stringify(answers[q.id]) === JSON.stringify(q.default)
+            ? sourceOf(q, false) : sourceOf(q, use);
       }
-      return { answers: edit ? answers : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted };
+      return { answers: edit ? answers : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted, sources };
     };
     const facts = deriveFacts(normalizeFor(questions).answers);
     let modules = input.modules;
@@ -125,21 +134,27 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     // GitHub owns its own opt-out. Keep that selection-driving answer even when it removes its owner.
     const answerQuestions = questions.filter((q) => selectedIds.has(q.id) ||
       (q.id === 'tasks.use-github' && Object.hasOwn(given, q.id)));
-    const { answers, defaulted } = normalizeFor(answerQuestions);
+    const { answers, defaulted, sources } = normalizeFor(answerQuestions);
     assertSafe(answers, kitRoot);
     const stack = stackProfile(profiles, answers);
-    if (!stack.profile) throw new FormError(`Choose another stack: ${stack.reason}`);
+    const missing = missingAnswers(selected.filter((q) => whenMatches(q.when, answers) && (!edit || editable(q))), answers);
+    const unresolved = [...new Set([...missing, ...proposed])];
+    for (const id of unresolved) sources[id] = missing.includes(id) ? 'unanswered' : 'proposed — needs confirmation';
+    if (!stack.profile && !missing.some((id) => id.startsWith('arch.'))) throw new FormError(`Choose another stack: ${stack.reason}`);
+    if (unresolved.length && !allowIncomplete) throw new FormError(`Essential project answers are missing or need confirmation: ${unresolved.join(', ')}. Choose them or use project planning guidance before applying.`);
     const profile = stack.profile;
     const p = profiles.find((p) => p.name === profile);
     const chosenProfiles = edit && manifest.profiles.includes(profile) ? manifest.profiles : [profile];
-    const doc = { ...(original ?? {}), mode: input.mode, answers, proposal: { ...(original?.proposal ?? {}), status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: chosenProfiles, modules } };
+    const doc = { ...(original ?? {}), mode: input.mode, answers };
+    if (p && !unresolved.length) doc.proposal = { ...(original?.proposal ?? {}), status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: chosenProfiles, modules };
+    else delete doc.proposal;
     const text = stringify(doc);
     try { parseAnswers(text); }
     catch (e) {
       if (e instanceof ProjectError) throw new FormError('Invalid setup answers; select at least one available agent and valid task settings');
       throw e;
     }
-    return { doc, text, defaulted, modules, profile, selected, answerQuestions, gitInit: input.gitInit === true };
+    return { doc, text, defaulted, sources, unresolved, modules, profile, selected, answerQuestions, gitInit: input.gitInit === true };
   }
 
   function secretCatalog(result, rendered = null) {
@@ -155,7 +170,14 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   }
 
   function preview(input, diff = false) {
-    const result = normalize(input);
+    const result = normalize(input, { allowIncomplete: true });
+    if (result.unresolved.length) return {
+      mode: result.doc.mode, profile: result.profile, modules: result.modules, answers: result.doc.answers,
+      defaulted: result.defaulted, sources: result.sources, unresolved: result.unresolved,
+      visible: result.selected.filter((q) => asksQuestion(q, result.doc.mode) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id),
+      files: [], secrets: { names: [], existingFile: false }, footprint: { bytes: 0, baseCopies: 0, note: 'Complete essential project answers to see the file plan.' },
+      ...(diff ? { diff: 'Complete essential project answers before inspecting the file diff.' } : {}),
+    };
     const { desired } = render(result);
     // Noninteractive init never overwrites an existing module output, even when its template differs.
     const files = [...desired].map(([path, d]) => {
@@ -177,11 +199,11 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     files.push({ path: MANIFEST, module: 'core', bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
-    const visible = result.selected.filter((q) => (sections.length || (asksIn(q.mode, result.doc.mode) &&
+    const visible = result.selected.filter((q) => (sections.length || (asksQuestion(q, result.doc.mode) &&
       !(expertise === 'layperson' && q.mode === 'F'))) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
     const output = {
       mode: result.doc.mode, profile: result.profile,
-      modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, visible, files,
+      modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, sources: result.sources, unresolved: [], visible, files,
       secrets: secretCatalog(result, { desired }),
       footprint: {
         bytes: files.reduce((n, f) => n + (f.bytes ?? 0), 0),
@@ -235,7 +257,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       if (schemas().validate('preset.schema.json', doc).length) throw new FormError('Saved preset is invalid; it was not loaded');
     } else throw new FormError('Choose a saved profile or preset');
     validateGiven(doc.answers);
-    return { mode: doc.mode ?? 'quick', answers: doc.answers, modules: doc.proposal?.modules ?? null };
+    return { mode: doc.mode ?? 'quick', answers: doc.answers, modules: doc.proposal?.modules ?? null,
+      ...(kind !== 'profile' ? { proposed: questions.filter((q) => q.required && Object.hasOwn(doc.answers, q.id)).map((q) => q.id) } : {}) };
   }
 
   function bootstrap() {
@@ -250,11 +273,12 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
           const file = join(kitRoot, 'interview', 'help', `${q.help}.md`);
           if (existsSync(file)) help = readFileSync(file, 'utf8').trim();
         }
-        return { ...q, ...(edit && sections.length && editable(q) ? { mode: 'Q' } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
+        return { ...q, ...(edit && sections.length && editable(q) ? { mode: 'Q', reviewPersonal: true } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
       }),
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),
       hasUserProfile: existsSync(join(userDir(env), 'user-profile.yaml')),
+      personalWarning: preferences.warning,
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
       ...(edit ? { editing: true, sections, initial, sectionNames } : {}),
     };

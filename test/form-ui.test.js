@@ -16,7 +16,7 @@ import { main } from '../core/cli/main.js';
 import { verifyProject } from '../core/cli/init.js';
 import { KIT_ROOT, capture, fakeJust, readTree, tmp } from './helpers/fixtures.js';
 
-const setup = (extra = {}) => ({ mode: 'quick', answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local' }, ...extra });
+const setup = (extra = {}) => ({ mode: 'quick', ...extra, answers: { 'idea.text': 'A tiny tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local', ...extra.answers } });
 const fixture = () => {
   const root = tmp('yaw-form-project-'), home = tmp('yaw-form-home-');
   const env = { ...process.env, HOME: home, USERPROFILE: home, YAW_TEST_OFFLINE: '1' };
@@ -142,6 +142,7 @@ test('web model: normalization and browser defaults match the CLI interview', as
       let current;
       const cli = await runInterview({
         questions: normalized.answerQuestions, mode, kitRoot: KIT_ROOT,
+        defaults: Object.fromEntries(Object.entries(input.answers).filter(([id]) => id.startsWith('user.'))),
         prompter: {
           show(text) {
             for (const q of normalized.answerQuestions) if (text.includes(q.label)) current = q;
@@ -367,7 +368,8 @@ test('web API: draft is an explicit private save, can resume, and does not initi
   assert.equal(resumed.answers['arch.language'], 'javascript');
   assert.ok(!Object.hasOwn(resumed, 'profile'));
   assert.deepEqual(readTree(f.home), {});
-  assert.equal((await f.post('apply', resumed)).status, 200);
+  assert.equal((await f.post('apply', resumed)).status, 400);
+  assert.equal((await f.post('apply', { ...resumed, proposed: [] })).status, 200);
   assert.ok(readManifest(f.root));
 });
 
@@ -418,7 +420,7 @@ test('web API: preset roundtrip preserves GitHub opt-out after its module is rem
   assert.ok(!defaultModules(catalog.modules, catalog.questions, resumed.answers, resumed.mode).includes('github'));
   assert.equal((await f.post('draft', resumed)).status, 200);
   assert.equal(parse(readFileSync(join(f.root, DRAFT), 'utf8')).answers['tasks.use-github'], false);
-  const applied = await f.post('apply', resumed);
+  const applied = await f.post('apply', { ...resumed, proposed: [] });
   assert.match(await applied.text(), /"ok":true/);
   assert.equal(parse(readFileSync(join(f.root, '.yaw', 'answers.yaml'), 'utf8')).answers['tasks.use-github'], false);
   assert.ok(!Object.hasOwn(readManifest(f.root).modules, 'github'));

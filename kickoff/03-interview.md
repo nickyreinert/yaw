@@ -1,16 +1,19 @@
 # 03 — Interview Catalogue
 
-Legend: **Q** shown in Quick and Full, **S** and **F** only in Full (ADR-0032: Standard is merged into Full; the `standard` alias still asks Q and S). `→` = module or artefact the answer drives. Questions of a disabled module are never asked. Every question has a default; "don't know" takes it and marks the resulting ADR `Provisional`.
+The Quick/personal boundary in [doc 15 §1](15-project-foundations.md#1-quick-asks-about-this-project) is implemented in the terminal and browser. The catalogue also contains future questions; availability still follows implemented module definitions.
+
+Legend: project **Q** questions are shown in Quick and Full, **S** and **F** only in Full (ADR-0032; `standard` still asks Q and S). **Personal** values are reused in Quick, regardless of their former Q/S designation, and can be reviewed separately. Repository agents (0.0) remain a project choice. `→` = module or artefact the answer drives. Disabled modules have no interview questions. Optional questions have defaults; essential purpose/language/runtime questions start unresolved. “Don't know” calls for help or a proposal to confirm, rather than automatically selecting a stack.
 
 Rules for the interviewer (CLI, form, or agent):
 
-- Batches of 3–6 questions; recommend a default with a one-line trade-off.
+- Batches of 3–6 project questions; suggest a choice with a one-line trade-off when grounded in this project. Do not substitute personal defaults for project facts.
+- Identify answer sources in the summary. Essential unresolved or proposed project choices block Apply; an incomplete browser draft can be saved for later.
 - Ask a follow-up when an answer has security, cost, privacy or irreversibility impact.
 - Never ask for secrets in chat; route them to the secret flow (doc 08).
 
-## 0. User profile (global, asked once, stored in `~/.yaw/user-profile.yaml`)
+## 0. Personal settings and repository agents
 
-Stored only after the opt-in at the end of the CLI interview (doc 02 §5, ADR-0043): the `user.*` answers of this table, merged into the file on every save.
+Personal values can be reviewed using the optional `u` setup-menu entry or Global Settings → Defaults. They are stored in `~/.yaw/user-profile.yaml` only after explicit consent, independently of project-preset saving (doc 02 §5, ADR-0043). Quick reuses explicit project values, then saved personal settings, then documented defaults. Full still offers its deeper review with saved defaults. Existing-project edits preserve saved values. The `user.agents` key is retained for compatibility, but its repository selection is always asked.
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|

@@ -13,6 +13,7 @@ import { stringify } from '../lib/yaml.js';
 import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview, whenMatches } from '../interview/engine.js';
+import { missingAnswers, isPersonal } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -28,7 +29,7 @@ import { kickoffText } from './kickoff.js';
 import { guardFolder } from './folder-guard.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
-import { listPresets, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
+import { listPresets, loadPreferences, saveSetup, secretFindings, userDir } from '../lib/user-store.js';
 import { initWeb } from '../web/init.js';
 import { syncShortcut } from './sync.js';
 import { createFormModel } from '../web/form-model.js';
@@ -75,14 +76,37 @@ async function chooseMode({ prompter }) {
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
   prompter.show(`  ${s.cyan('2)')} full  - long-lived product: the tooling that applies to the project, all questions\n`);
   prompter.show(`  ${s.cyan('p)')} Load a previous setup - clone saved answers, then review them\n`);
+  prompter.show(`  ${s.cyan('u)')} Review and save personal settings (optional)\n`);
   prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   for (;;) {
-    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'full', 'p', 'w'], start: 0 })).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'full', 'p', 'u', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'full') return 'full';
     if (reply === 'p') return 'previous';
+    if (reply === 'u') return 'preferences';
     if (['w', WEB].includes(reply)) return WEB;
     prompter.show('  choose quick, full, p to load a previous setup, or w to continue in the browser\n');
+  }
+}
+
+async function reviewPreferences(io, preferences) {
+  const modules = selectModules({ kitRoot: io.kitRoot, mode: 'full', facts: { team: false, usesGitHub: true } });
+  const questions = collectQuestions(io.kitRoot, modules).filter((q) => q.scope === 'user');
+  io.stdout.write('\nPersonal settings are optional and separate from project setup. Saving here changes defaults for future projects.\n');
+  const result = await runInterview({ questions, mode: 'full', prompter: io.prompter, kitRoot: io.kitRoot, defaults: preferences.answers });
+  if (secretFindings({ answers: result.answers, kitRoot: io.kitRoot }).length) {
+    io.stdout.write('Personal settings were not saved: an answer looks like a secret.\n');
+    return preferences;
+  }
+  for (const [id, value] of Object.entries(result.answers)) io.stdout.write(`  ${id}: ${Array.isArray(value) ? value.join(', ') : value}\n`);
+  if (!(await confirm(io.prompter, 'Save these personal settings globally?'))) return preferences;
+  try {
+    saveSetup({ env: io.env, kitRoot: io.kitRoot, answers: result.answers, mode: 'full', projectRoot: io.cwd, kit: '', preset: false, profile: true });
+    io.stdout.write('Saved personal settings. No project files were written.\n');
+    return loadPreferences({ env: io.env, kitRoot: io.kitRoot });
+  } catch {
+    io.stdout.write('Personal settings could not be saved; the existing profile was left untouched.\n');
+    return preferences;
   }
 }
 
@@ -112,10 +136,10 @@ async function choosePrevious(io) {
 }
 
 // Continue in the browser form with what was answered so far (#162). The folder guard already ran; nothing is written here.
-function handOff({ io, values, mode, answers = {} }) {
+function handOff({ io, values, mode, answers = {}, proposed = [] }) {
   io.prompter.close?.();
   io.stdout.write('\nContinuing in the browser with your answers so far; nothing was written.\n');
-  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers } });
+  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers, ...(proposed.length ? { proposed } : {}) } });
 }
 
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
@@ -136,7 +160,7 @@ function summaryAnswers(questions, given, defaulted) {
   return out;
 }
 
-function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, desired }) {
+function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, sources = {}, desired }) {
   out.write(`\nSummary (${mode} setup)\n`);
   out.write(`  profile: ${profile} (${how})\n`);
   out.write(`  modules: ${modules.join(', ')}\n`);
@@ -146,7 +170,7 @@ function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModule
   const width = Math.max(...Object.keys(answers).map((k) => k.length));
   for (const [id, value] of Object.entries(answers)) {
     const shown = hidden.has(id) ? '(hidden: looks like a secret)' : Array.isArray(value) ? value.join(', ') : String(value);
-    out.write(`    ${id.padEnd(width)}  ${shown === '' ? '(empty)' : shown}${defaulted.has(id) ? '  (default)' : ''}\n`);
+    out.write(`    ${id.padEnd(width)}  ${shown === '' ? '(empty)' : shown}${sources[id] ? `  (${sources[id]})` : defaulted.has(id) ? '  (documented default)' : '  (answered)'}\n`);
   }
   const readme = typeof answers['idea.text'] === 'string' && answers['idea.text'].trim() && !desired.has('README.md');
   const paths = [...desired.keys(), ANSWERS, MANIFEST, ...(readme ? ['README.md'] : [])].sort();
@@ -190,7 +214,7 @@ export async function verifyProject({ root, io }) {
 // Opt-in to ~/.yaw/ (doc 02 §5, ADR-0043): every setup is asked, default no; a "no" writes nothing. No standing yes.
 async function offerSave({ io, root, answersDoc, kit }) {
   const dir = userDir(io.env);
-  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). Each question is asked again the next time.\n`);
+  io.stdout.write(`\nThe kit can keep a copy of your answers in ${dir}/ (answers only, never secrets). Saving a preset and saving personal defaults are separate choices.\n`);
   const preset = await confirm(io.prompter, `  Save this setup as a preset in ${dir}/presets/ and add a line (project path, date, kit version) to ${dir}/history.jsonl?`);
   const profile = await confirm(io.prompter, `  Save your preferences (agents, expertise, language, autonomy, ...) in ${dir}/user-profile.yaml?`);
   if (!preset && !profile) {
@@ -232,6 +256,7 @@ export async function init({ values, positionals, io }) {
   let answersDoc;
   let fileText = null;
   let defaulted = new Set();
+  let sources = {};
   let how;
 
   // collect
@@ -245,33 +270,45 @@ export async function init({ values, positionals, io }) {
   } else {
     io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", w continues in the browser). Nothing is written until you confirm.\n');
     let mode;
-    let defaults = {};
+    let preferences = loadPreferences({ env: io.env, kitRoot });
+    if (preferences.warning) io.stderr.write(`${preferences.warning}\n`);
+    let defaults = { ...preferences.answers };
+    let defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, 'saved personal setting']));
     for (;;) {
       mode = await chooseMode({ prompter: io.prompter });
+      if (mode === 'preferences') {
+        preferences = await reviewPreferences(io, preferences);
+        defaults = { ...preferences.answers };
+        defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, 'saved personal setting']));
+        continue;
+      }
       if (mode === WEB) return handOff({ io, values, mode: 'quick' });
       if (mode !== 'previous') break;
       const previous = await choosePrevious(io);
       if (previous === WEB) return handOff({ io, values, mode: 'quick' });
       if (!previous) continue;
       mode = previous.mode;
-      defaults = previous.answers;
+      defaults = { ...preferences.answers, ...previous.answers };
+      defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, isPersonal({ id, scope: 'user' }) ? 'saved personal setting' : 'proposed — needs confirmation']));
       break;
     }
     // Base questions plus the questions of every module the mode can select (ADR-0009, ADR-0032). The final
     // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
     // not selected is hidden by its `when` (team.session-context needs idea.team = team).
     const questions = withGitHubHint(collectQuestions(kitRoot, selectModules({ kitRoot, mode, facts: { team: true, usesGitHub: true } })), githubStatus({ root, env: io.env }));
-    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, defaults, allowWeb: true });
-    if (r.web) return handOff({ io, values, mode, answers: { ...defaults, ...r.answers } });
+    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, defaults, defaultSources, allowWeb: true });
+    if (r.web) return handOff({ io, values, mode, answers: { ...defaults, ...r.answers }, proposed: questions.filter((q) => q.required && Object.hasOwn(defaults, q.id) && !r.sources[q.id]).map((q) => q.id) });
     if (r.answers['tasks.use-github'] === false && questions.some((q) => q.id === 'tasks.mode')) {
       io.prompter.show('      Task tracking: local (TASKS.md), because GitHub is off for this project.\n');
     }
     defaulted = new Set(r.defaulted);
+    sources = r.sources;
     answersDoc = { mode, answers: r.answers };
   }
 
   // profile and modules (rule-based, no LLM)
   let chosen = answersDoc.proposal?.profiles;
+  if (fromFile && answersDoc.proposal && answersDoc.proposal.status !== 'confirmed') throw new ProjectError('The project proposal is still proposed; review and confirm it before applying.');
   if (chosen) {
     for (const p of chosen) {
       if (!profiles.some((x) => x.name === p)) throw new ProjectError(`profile "${p}" does not exist in this kit (available: ${profiles.map((x) => x.name).join(', ')})`);
@@ -291,6 +328,10 @@ export async function init({ values, positionals, io }) {
     chosen = [r.profile];
     how = stackProfile(profiles, r.answers).reason;
   }
+  if (fromFile && !answersDoc.proposal) {
+    const missing = missingAnswers(collectQuestions(kitRoot, []), answersDoc.answers);
+    if (missing.length) throw new ProjectError(`Essential project answers are missing: ${missing.join(', ')}; provide them or a confirmed project proposal. --yes does not choose project facts.`);
+  }
   const facts = deriveFacts(answersDoc.answers);
   const wanted = answersDoc.proposal?.modules ?? selectModules({ kitRoot, mode: answersDoc.mode, facts });
   const modules = ['core', ...wanted.filter((m) => m !== 'core' && hasModule(kitRoot, m))];
@@ -309,7 +350,7 @@ export async function init({ values, positionals, io }) {
 
   // confirm
   const { desired } = renderInit({ root, kitRoot, answersDoc, modules });
-  printSummary(io.stdout, { kitRoot, mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, desired });
+  printSummary(io.stdout, { kitRoot, mode: answersDoc.mode, profile: chosen.join(', '), how, modules, skippedModules, answers: summaryAnswers(collectQuestions(kitRoot, modules), answersDoc.answers, defaulted), defaulted, sources, desired });
   if (!values.yes) {
     if (!(await confirm(io.prompter, '\nWrite these files?'))) {
       io.stdout.write('cancelled; nothing was written\n');

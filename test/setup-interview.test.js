@@ -1,0 +1,183 @@
+// Quick setup establishes project facts while reusing optional personal settings.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { main } from '../core/cli/main.js';
+import { runInterview } from '../core/interview/engine.js';
+import { collectQuestions } from '../core/render/kit.js';
+import { readAnswers } from '../core/render/project.js';
+import { saveSetup } from '../core/lib/user-store.js';
+import { createFormModel } from '../core/web/form-model.js';
+import { createFormApi, DRAFT } from '../core/web/init.js';
+import { effectiveAnswers, visibleQuestions } from '../core/web/assets/ui-state.js';
+import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
+
+const BASE = { 'idea.text': 'Rename photos safely for a local photographer.', 'arch.language': 'python', 'arch.runs-on': 'local' };
+const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief', 'user.register': 'technical' };
+const fixture = () => ({ root: tmp('yaw-quick-'), kitRoot: KIT_ROOT, env: { HOME: tmp('yaw-quick-home-'), PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':') } });
+function save(f, answers = PERSONAL) {
+  saveSetup({ ...f, answers, mode: 'quick', projectRoot: f.root, kit: '0.1.0', preset: false, profile: true });
+  return join(f.env.HOME, '.yaw/user-profile.yaml');
+}
+function prompts(answers = BASE, { onboarding = false, saveProfile = false } = {}) {
+  const p = scripted(), questions = collectQuestions(KIT_ROOT, ['core', 'communication', 'comfort', 'tasks']);
+  let started = false;
+  p.ask = async (prompt) => {
+    p.asked.push(prompt);
+    assert.ok(p.asked.length < 80, 'interview must make progress');
+    if (/Setup depth/.test(prompt)) {
+      if (onboarding && !started) { started = true; return 'u'; }
+      return 'quick';
+    }
+    if (/Save these personal settings globally/.test(prompt)) return saveProfile ? 'y' : 'n';
+    if (/Write these files/.test(prompt)) return 'y';
+    if (/Save |guidance to kick off/.test(prompt)) return 'n';
+    const screen = [...p.shown].reverse().find((text) => /^  \d+\/\d+ /.test(text));
+    const q = questions.find((q) => screen?.split('\n')[0].endsWith(q.label));
+    assert.ok(q, `unexpected prompt: ${prompt}`);
+    const value = answers[q.id];
+    return value === undefined ? '' : Array.isArray(value) ? value.join(',') : String(value);
+  };
+  return p;
+}
+async function cli(f, prompter, args = ['init', '--skip-verify']) {
+  const stdout = capture(), stderr = capture();
+  const code = await main(args, { ...f, cwd: f.root, stdout, stderr, prompter });
+  return { code, out: stdout.text(), err: stderr.text() };
+}
+
+test('Quick CLI and browser reuse the same saved personal values without asking or saving them', async () => {
+  const f = fixture(), file = save(f), before = readFileSync(file, 'utf8');
+  const p = prompts(), r = await cli(f, p);
+  assert.equal(r.code, 0, r.err);
+  const doc = readAnswers(f.root);
+  for (const [id, value] of Object.entries(PERSONAL)) assert.deepEqual(doc.answers[id], value);
+  const shown = p.shown.join('');
+  for (const label of ['Your experience with software', 'Language for chat', 'How often should the agent ask', 'How long should answers be']) assert.ok(!shown.includes(label));
+  assert.match(shown, /What language do you want to use/);
+  assert.match(shown, /Where will it run/);
+  assert.match(r.out, /user\.language +en +\(saved personal setting\)/);
+  assert.equal(readFileSync(file, 'utf8'), before);
+  assert.ok(!existsSync(join(f.env.HOME, '.yaw/history.jsonl')));
+  const web = createFormModel({ ...f, root: tmp('yaw-quick-web-') });
+  const input = { mode: 'quick', answers: BASE };
+  const preview = web.preview(input), boot = web.bootstrap();
+  assert.deepEqual(web.normalize(input).doc, doc);
+  assert.deepEqual(effectiveAnswers(boot.questions.filter((q) => preview.modules.includes(q.owner)), BASE, 'quick'), doc.answers);
+  assert.equal(preview.sources['user.language'], 'saved personal setting');
+  assert.ok(!visibleQuestions(boot.questions, BASE, 'quick', preview.modules).some((q) => q.id === 'user.language'));
+});
+
+test('partial profiles use documented defaults; explicit project overrides win', () => {
+  const f = fixture(); save(f, { 'user.language': 'en' });
+  const model = createFormModel(f);
+  const preview = model.preview({ mode: 'quick', answers: { ...BASE, 'user.language': 'de' } });
+  assert.equal(preview.answers['user.language'], 'de');
+  assert.equal(preview.sources['user.language'], 'answered');
+  assert.equal(preview.answers['user.expertise'], 'intermediate');
+  assert.equal(preview.sources['user.expertise'], 'documented default');
+});
+
+test('saved layperson expertise keeps Full F-question behavior in sync with the CLI', async () => {
+  const f = fixture(); save(f, { 'user.expertise': 'layperson' });
+  const model = createFormModel(f);
+  const given = { ...BASE, 'idea.team': 'team', 'team.session-context': false };
+  const result = model.normalize({ mode: 'full', answers: given });
+  const questions = result.answerQuestions;
+  let current;
+  const cli = await runInterview({ questions, mode: 'full', kitRoot: KIT_ROOT, prompter: {
+    show(text) { current = questions.find((q) => text.split('\n')[0].endsWith(q.label)) ?? current; },
+    ask: async () => Object.hasOwn(given, current.id) ? String(given[current.id]) : '',
+  } });
+  assert.equal(result.doc.answers['team.session-context'], true);
+  assert.deepEqual(result.doc.answers, cli.answers);
+});
+
+test('editing keeps project preferences when global defaults change', async () => {
+  const f = fixture(); save(f, { 'user.language': 'en' });
+  assert.equal((await cli(f, prompts())).code, 0);
+  const before = readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8');
+  save(f, { 'user.language': 'de' });
+  const model = createFormModel({ ...f, edit: true, sections: ['user'] });
+  const preview = model.preview(model.initial);
+  assert.equal(preview.answers['user.language'], 'en');
+  assert.equal(preview.sources['user.language'], 'saved project setting');
+  assert.equal(readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8'), before);
+});
+
+test('invalid saved preferences are ignored safely in both lanes and never overwritten', async () => {
+  const f = fixture(), file = save(f);
+  writeFileSync(file, 'answers: { user.expertise: invalid }\n');
+  const before = readFileSync(file, 'utf8');
+  const web = createFormModel(f);
+  assert.match(web.bootstrap().personalWarning, /unreadable or invalid/);
+  assert.equal(web.preview({ mode: 'quick', answers: BASE }).answers['user.expertise'], 'intermediate');
+  const r = await cli(f, prompts());
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.err, /unreadable or invalid/);
+  assert.equal(readFileSync(file, 'utf8'), before);
+});
+
+test('empty, skipped and uncertain essential answers need a real selection in the CLI', async () => {
+  const questions = collectQuestions(KIT_ROOT, []).filter((q) => q.required);
+  const p = scripted(['', 'skip', "don't know", BASE['idea.text'], '', 'skip', "don't know", 'python', '', 'local']);
+  const result = await runInterview({ questions, mode: 'quick', kitRoot: KIT_ROOT, prompter: p });
+  assert.deepEqual(result.answers, BASE);
+  assert.match(p.shown.join(''), /No project choice will be guessed/);
+  assert.deepEqual(result.defaulted, []);
+});
+
+test('browser incomplete setup is a draft; Apply cannot invent purpose or stack', async () => {
+  const f = fixture(), model = createFormModel(f);
+  const preview = model.preview({ mode: 'quick', answers: {} });
+  assert.deepEqual(preview.unresolved, ['idea.text', 'arch.language', 'arch.runs-on']);
+  assert.equal(preview.profile, null);
+  assert.deepEqual(preview.files, []);
+  assert.throws(() => model.normalize({ mode: 'quick', answers: {} }), /Essential project answers/);
+  const api = createFormApi({ ...f, skipVerify: true, verify: async () => true, stderr: capture() });
+  await api.action('draft', { mode: 'quick', answers: { 'idea.text': BASE['idea.text'] } });
+  assert.ok(existsSync(join(f.root, DRAFT)));
+  assert.ok(!existsSync(join(f.root, '.yaw/manifest.json')));
+  assert.throws(() => api.prepareApply({ mode: 'quick', answers: {} }), /Essential project answers/);
+  const resume = model.prefill('draft');
+  assert.equal(resume.answers['arch.language'], '');
+  assert.deepEqual(resume.proposed, ['idea.text', 'arch.language', 'arch.runs-on']);
+  await api.close();
+});
+
+test('loaded presets and planning recommendations require confirmation before Apply', () => {
+  const f = fixture();
+  const saved = saveSetup({ ...f, answers: BASE, mode: 'quick', projectRoot: f.root, kit: '0.1.0', preset: true, profile: false });
+  const model = createFormModel(f), input = model.prefill('preset', saved.preset);
+  assert.deepEqual(input.proposed, ['idea.text', 'arch.language', 'arch.runs-on']);
+  assert.throws(() => model.normalize(input), /need confirmation/);
+  const preview = model.preview(input);
+  assert.equal(preview.sources['arch.language'], 'proposed — needs confirmation');
+  assert.equal(model.normalize({ ...input, proposed: [] }).profile, 'python-cli');
+  assert.throws(() => model.normalize({ ...input, proposed: ['user.language'] }), /Invalid proposed/);
+});
+
+test('noninteractive --yes cannot fill missing facts or accept an unconfirmed proposal', async () => {
+  for (const contents of [
+    'mode: quick\nanswers: { user.agents: [codex], arch.language: python, arch.runs-on: local }\n',
+    'mode: quick\nanswers: { user.agents: [codex] }\nproposal: { status: proposed, summary: A tool, profiles: [python-cli], modules: [core] }\n',
+  ]) {
+    const f = fixture(), file = join(tmp('yaw-quick-answers-'), 'answers.yaml'); writeFileSync(file, contents);
+    const r = await cli(f, { interactive: false }, ['init', '--answers', file, '--yes', '--skip-verify']);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /Essential project answers|still proposed/);
+    assert.deepEqual(readdirSync(f.root), []);
+  }
+});
+
+test('optional personal onboarding saves only on explicit consent and creates no project preset', async () => {
+  for (const consent of [false, true]) {
+    const f = fixture();
+    const r = await cli(f, prompts({ ...BASE, ...PERSONAL }, { onboarding: true, saveProfile: consent }));
+    assert.equal(r.code, 0, r.err);
+    assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), consent);
+    assert.ok(!existsSync(join(f.env.HOME, '.yaw/history.jsonl')));
+    assert.equal(readAnswers(f.root).answers['user.language'], consent ? 'en' : 'de');
+  }
+});

@@ -53,6 +53,8 @@ questions:
     type: text
     label: Describe the idea in a few sentences.
     help: idea
+    hint: Include the intended users, their main task, and important data or interface constraints.
+    required: true
     default: ""
   - id: idea.team
     ref: "1.5"
@@ -70,6 +72,7 @@ questions:
     type: choice
     label: What language do you want to use?
     help: stack
+    required: true
     choices:
       - { value: python, label: "Python" }
       - { value: javascript, label: "JavaScript / TypeScript" }
@@ -80,13 +83,14 @@ questions:
       - { value: rust, label: "Rust" }
       - { value: swift, label: "Swift" }
       - { value: java, label: "Java" }
-    default: javascript
+    default: ""
   - id: arch.runs-on
     ref: "3.2"
     mode: Q
     type: choice
     label: Where will it run?
     help: stack
+    required: true
     choices:
       - { value: local, label: "your computer: command-line tools, scripts, data jobs" }
       - { value: self-hosted, label: "your own server: web app or API, usually in Docker" }
@@ -95,4 +99,4 @@ questions:
       - { value: static, label: "static hosting: GitHub Pages, Netlify; no server code" }
       - { value: wordpress, label: "inside WordPress: a plugin for an existing site" }
       - { value: app-store, label: "desktop or mobile app: macOS, Windows, Linux, iOS, Android" }
-    default: local
+    default: ""

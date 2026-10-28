@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', '', ''];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', ''];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
@@ -117,7 +117,8 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
     const login = await fetch(url, { redirect: 'manual' });
     const cookie = login.headers.get('set-cookie').split(';')[0];
     const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
-    assert.deepEqual(boot.handoff, { mode: 'quick', answers: { ...answers, 'user.agents': ['claude'] } });
+    assert.equal(boot.handoff.mode, 'quick');
+    for (const [id, value] of Object.entries({ ...answers, 'user.agents': ['claude'] })) assert.deepEqual(boot.handoff.answers[id], value);
     assert.deepEqual(readdirSync(dir), []);
   } finally {
     process.emit('SIGINT');
@@ -139,8 +140,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
   assert.match(r.out, /profile: node-cli \(tailored stack for javascript on local\)/);
-  assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(default\)$/m, '"skip" is listed as default');
-  assert.doesNotMatch(r.out, /user\.language +en +\(default\)/);
+  assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(documented default\)$/m);
+  assert.match(r.out, /user\.language +de +\(documented default\)/);
   assert.match(r.out, /verification skipped/);
   const answers = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(answers.answers['user.agents'], ['claude']);
@@ -173,7 +174,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: a language that does not run there asks where it runs (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', '', '', '', '', '', 'html', 'local', '', '', '', 'nope', '1', 'y', '', '', 'n']);
+  const prompter = scripted(['', '', 'A static site.', '', 'html', 'local', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /HTML & CSS only does not run there \(local\)/);
@@ -215,23 +216,23 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
   }
 });
 
-test('Quick footprint (ADR-0009, ADR-0010, ADR-0054): 19 files for Claude, 20 with Codex', async () => {
+test('Quick answers-only footprint includes a README for the required purpose', async () => {
   for (const [agents, count] of [['claude', 19], ['claude, codex', 20]]) {
-    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  arch.language: javascript\n  arch.runs-on: local\n`;
+    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, /modules: core, communication, devenv, security, sessions, standards, tasks/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
-    assert.equal(files.length, count, files.join(', '));
+    assert.equal(files.length, count + 1, files.join(', ')); // the required idea also creates README.md
   }
 });
 
 test('answers without a proposal: the stack picks the profile and it is written back', async () => {
-  const text = 'mode: quick\nanswers:\n  user.agents: [codex]\n  arch.language: python\n  arch.runs-on: local\n';
+  const text = 'mode: quick\nanswers:\n  user.agents: [codex]\n  idea.text: A tiny tool.\n  arch.language: python\n  arch.runs-on: local\n';
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /profile: python-cli \(tailored stack for python on local\)/);
-  assert.match(r.out, /user\.language +de +\(default\)/, 'questions missing from the file are listed as default');
+  assert.match(r.out, /user\.language +de +\(documented default\)/, 'questions missing from the file are listed as default');
   const doc = parseDocument(readFileSync(join(r.cwd, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(doc.proposal.profiles, ['python-cli']);
   assert.match(readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8'), /Chat in "de"/);
@@ -375,7 +376,7 @@ test('interview: "web" at a question continues in the browser form with the answ
   const dir = tmp('yaw-proj-');
   const stdout = capture();
   const asked = [];
-  const prompter = scripted(['', 'codex', '', 'web']);
+  const prompter = scripted(['', 'codex', 'web']);
   const ask = prompter.ask;
   prompter.ask = async (q) => { asked.push(q); return ask(q); };
   let url;
@@ -392,7 +393,9 @@ test('interview: "web" at a question continues in the browser form with the answ
   assert.match(asked[1], /\(\? help, skip\) > $/);
   assert.match(prompter.shown.join(''), / {2}w\) Continue in the browser\n/);
   assert.match(prompter.shown.join(''), / {6}w\) Continue in the browser\n/);
-  assert.deepEqual(boot.handoff, { mode: 'quick', answers: { 'user.agents': ['codex'], 'user.expertise': 'intermediate' } });
+  assert.deepEqual(boot.handoff.answers['user.agents'], ['codex']);
+  assert.equal(boot.handoff.answers['user.expertise'], 'intermediate');
+  assert.ok(!Object.hasOwn(boot.handoff.answers, 'arch.language'));
   assert.match(stdout.text(), /Continuing in the browser with your answers so far; nothing was written\./);
   assert.deepEqual(readdirSync(dir), []);
 });

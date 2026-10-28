@@ -69,6 +69,8 @@
         "issue": { "type": "integer", "minimum": 1 },
         "title": { "$ref": "#/$defs/text" },
         "note": { "description": "Size hint and links.", "$ref": "#/$defs/text" },
+        "spec": { "description": "Authoritative project specification reference.", "$ref": "#/$defs/text" },
+        "acceptance": { "description": "Observable acceptance outcome.", "$ref": "#/$defs/text" },
         "model": { "description": "Suggested model tier, e.g. opus, sonnet, a small model (#175).", "$ref": "#/$defs/text" },
         "effort": { "description": "Suggested reasoning effort.", "enum": ["low", "medium", "high", "xhigh", "max"] }
       },

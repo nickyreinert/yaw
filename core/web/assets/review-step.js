@@ -31,13 +31,21 @@ export function renderReview(root, ctx) {
   answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Stack' }), ` ${preview.profile}`), editButton('stack', () => ctx.jump({ stack: true }))));
   for (const id of preview.visible) {
     const q = byId.get(id);
-    if (!q || id.startsWith('arch.') || id.startsWith('quality.review-')) continue;
+    if (!q || id.startsWith('quality.review-')) continue;
     const label = SHORT[id] ?? q.label.replace(/\?$/, '');
-    answers.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[id])}`), editButton(label, () => ctx.jump({ question: id }))));
+    answers.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[id])}`, el('small', { class: 'muted', text: ` (${preview.sources?.[id] ?? 'answered'})` })), editButton(label, () => ctx.jump(id.startsWith('arch.') ? { stack: true } : { question: id }))));
   }
 
-  if (ctx.plan?.tasks || ctx.plan?.idea) {
+  const personal = el('details', {}, el('summary', { text: 'Personal settings used for this project' }));
+  for (const q of ctx.questions.filter((q) => q.scope === 'user' && q.id !== 'user.agents' && Object.hasOwn(preview.answers, q.id))) {
+    personal.append(el('p', { text: `${SHORT[q.id] ?? q.label}: ${answerText(q, preview.answers[q.id])} (${preview.sources?.[q.id] ?? 'documented default'})` }));
+  }
+
+  if (ctx.plan?.tasks || ctx.plan?.idea || ctx.plan?.foundations?.length) {
     answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md, TASKS.md`), editButton('plan', () => ctx.jump({ plan: true }))));
+  }
+  for (const d of ctx.plan?.foundations ?? []) {
+    answers.append(el('li', {}, el('span', { text: `Reviewed ${d.kind}: ${d.path}` }), editButton(d.kind, () => ctx.jump({ plan: true }))));
   }
   const defs = new Map(ctx.modules.map((m) => [m.name, m]));
   const list = el('ul', { class: 'review-modules' });
@@ -58,7 +66,10 @@ export function renderReview(root, ctx) {
     list.append(item);
   }
   root.replaceChildren(
+    ...(preview.unresolved?.length ? [el('p', { role: 'status', text: `Complete before Apply: ${preview.unresolved.join(', ')}. Save draft keeps your progress.` })] : []),
+    ...(ctx.confirmProposal && preview.unresolved?.some((id) => preview.sources?.[id] === 'proposed — needs confirmation')
+      ? [el('button', { type: 'button', text: 'Confirm the proposed project choices shown here', onclick: ctx.confirmProposal })] : []),
     el('p', { class: 'small muted', text: `${count('create', 'update', 'write', 'missing')} files written · ${count('kept')} kept as they are` }),
-    el('h3', { text: 'Your answers' }), answers,
+    el('h3', { text: 'Your answers' }), answers, personal,
     el('h3', { text: 'What YAW adds' }), list);
 }

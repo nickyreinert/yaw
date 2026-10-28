@@ -11,6 +11,7 @@ import { collectQuestions, hasModule } from '../core/render/kit.js';
 import { createFormApi } from '../core/web/init.js';
 import { startFormServer } from '../core/web/form-server.js';
 import { KIT_ROOT, capture, readTree, scripted, tmp } from './helpers/fixtures.js';
+import { saveSetup } from '../core/lib/user-store.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
 const MODULES = readdirSync(join(KIT_ROOT, 'modules')).filter((n) => hasModule(KIT_ROOT, n));
@@ -66,7 +67,9 @@ async function viaCli({ mode, answers }) {
     return Object.hasOwn(answers, q.id) ? reply(answers[q.id]) : '';
   };
   const stderr = capture();
-  const code = await main(['init', '--skip-verify'], { stdout: capture(), stderr, cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-parity-home-') }, kitRoot: KIT_ROOT, prompter: p });
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-parity-home-') };
+  saveSetup({ env, kitRoot: KIT_ROOT, answers: Object.fromEntries(Object.entries(answers).filter(([id]) => id.startsWith('user.'))), mode, projectRoot: cwd, kit: '0.1.0', preset: false, profile: true });
+  const code = await main(['init', '--skip-verify'], { stdout: capture(), stderr, cwd, env, kitRoot: KIT_ROOT, prompter: p });
   assert.equal(code, 0, stderr.text());
   return cwd;
 }

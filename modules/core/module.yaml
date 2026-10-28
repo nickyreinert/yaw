@@ -16,7 +16,7 @@ questions: []
 outputs:
   templates: [AGENTS.md, CLAUDE.md, .gitignore, justfile]
 agentsMd: |
-  - Start every task by reading `TASKS.md` (if present) and running decision retrieval (if enabled).
+  - Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
   - Run `just check` before you report a task as done; `just --list` shows all recipes.
   - Never read, print or commit secrets (`.env*`, keys, tokens); ask the user to enter them.
 agents:

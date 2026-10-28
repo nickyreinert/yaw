@@ -26,7 +26,7 @@ const normalise = (text) => String(text ?? '').replace(/\r\n?/g, '\n').trim();
 
 // ------------------------------------------------------------------ both mode: TASKS.md -> issues
 
-const FIELDS = [['brief', 'Brief'], ['model', 'Model / effort'], ['spec', 'Spec'], ['resume', 'Resume point'], ['note', 'Note']];
+const FIELDS = [['brief', 'Brief'], ['model', 'Model / effort'], ['spec', 'Spec'], ['acceptance', 'Acceptance'], ['resume', 'Resume point'], ['note', 'Note']];
 
 export function issueBody(task) {
   const lines = [taskMark(task.id), ''];
@@ -136,11 +136,13 @@ export function viewFromIssues({ mine, open, owner }) {
   const active = mine.map((issue) => {
     const entries = journalFromComments(issue.comments, owner);
     const task = { id: `#${issue.number}`, title: oneLine(issue.title), status: STATUS[labelValue(issue, 'status:')] ?? 'in progress' };
-    const brief = firstLine(issue.body);
+    const brief = /^\*\*Acceptance:\*\* (.+)$/m.exec(issue.body ?? '')?.[1] ?? firstLine(issue.body);
     if (brief) task.brief = brief;
     const hint = issueModel(issue);
     if (hint.model) task.model = modelEffort(hint.model, hint.effort);
-    if (issue.milestone?.title) task.spec = `Milestone ${oneLine(issue.milestone.title)}`;
+    const spec = /^\*\*Spec:\*\* (.+)$/m.exec(issue.body ?? '')?.[1];
+    if (spec) task.spec = spec;
+    else if (issue.milestone?.title) task.spec = `Milestone ${oneLine(issue.milestone.title)}`;
     const resume = [...entries].reverse().find((e) => e.resume)?.resume;
     if (resume) task.resume = resume;
     if (entries.length > 0) task.journal = entries.slice(-3).map((e) => ({ date: e.date, text: e.text }));
@@ -160,6 +162,10 @@ export function viewFromIssues({ mine, open, owner }) {
       const note = [labelValue(i, 'priority:'), labelValue(i, 'estimate:')].filter(Boolean).join(' · ');
       if (note) item.note = note;
       Object.assign(item, issueModel(i));
+      for (const [key, label] of [['spec', 'Spec'], ['acceptance', 'Acceptance']]) {
+        const value = new RegExp(`^\\*\\*${label}:\\*\\* (.+)$`, 'm').exec(i.body ?? '')?.[1];
+        if (value) item[key] = value;
+      }
       return item;
     });
   return { readOnly: true, active, backlog };

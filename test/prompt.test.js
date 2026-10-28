@@ -86,7 +86,7 @@ test('the browser entry is visible for every question type and accepts w or web'
       const q = { id: 'idea.test', label: 'Test?', type, mode: 'Q', default: '' };
       if (type === 'choice' || type === 'multi') q.choices = ['a', 'b'];
       const result = await runInterview({ questions: [q], mode: 'quick', prompter, allowWeb: true });
-      assert.deepEqual(result, { answers: {}, defaulted: [], web: true });
+      assert.deepEqual(result, { answers: {}, defaulted: [], sources: {}, web: true });
       assert.match(shown, / {6}w\) Continue in the browser\n/);
       assert.doesNotMatch(shown, /3\) Continue in the browser/);
     }
@@ -101,7 +101,7 @@ test('arrow keys can select the browser entry without changing the default', asy
     const running = runInterview({ questions, mode: 'quick', prompter, allowWeb: true });
     await new Promise((r) => setImmediate(r));
     t.input.write('\u001b[A\r');
-    assert.deepEqual(await running, { answers: {}, defaulted: [], web: true });
+    assert.deepEqual(await running, { answers: {}, defaulted: [], sources: {}, web: true });
     assert.match(t.text(), /w\) Continue in the browser/);
   } finally {
     prompter.close();

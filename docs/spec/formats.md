@@ -45,7 +45,8 @@ task        = "### " id [" (#" number ")"] " " title " — " status [" (" percen
 field       = "Brief" | "Model / effort" | "Spec" | "Resume point"
 status      = "todo" | "in progress" | "blocked" | "in review"
 backlog     = "## Backlog" { "- " id [" (#" number ")"] " " title [" — " note]
-                             [ "  model: " tier [" · effort: " effort] ] }
+                             [ "  model: " tier [" · effort: " effort] ]
+                             [ "  spec: " reference ] [ "  acceptance: " outcome ] }
 effort      = "low" | "medium" | "high" | "xhigh" | "max"
 done        = "## Done → " path                          ; one-line archive entries live in that file
 ```
@@ -59,6 +60,20 @@ done        = "## Done → " path                          ; one-line archive en
 Model tier and effort (#175): a backlog item carries them on its indented `model:` line (`just task new "title" --model sonnet --effort medium`); `just task start` copies them into the "Model / effort" field as `sonnet · effort: medium`. On GitHub they are the labels `model:<tier>` and `effort:<level>`, or the body line `**Model / effort:** sonnet · effort: medium` (`just task new` writes it); both-mode sync writes that body line. The rules section is written by `yaw init` (local and GitHub wording) and is kept when the GitHub view is regenerated.
 
 The parsed form (`tasks.schema.json`) is `{ readOnly, active[], backlog[], archive?, rules? }`; `renderTasks(parseTasks(text))` gives the canonical text back (`core/lib/tasks.js`).
+
+Guided kickoff tasks also carry `spec` and `acceptance` (or `yaw task new "title" --spec path#section --acceptance "observable outcome"`). Starting a local task copies these into its active **Spec** and **Brief** fields. GitHub bodies use **Spec** and **Acceptance**; both-mode sync and generated GitHub views preserve them. Legacy tasks need neither field.
+
+## Guided kickoff foundations
+
+Legacy phase/task plans remain accepted. A foundation bundle adds `kickoff-format: 1` under its title and exactly three `## Foundation: <kind>` sections, where kind is `architecture`, `data-model` or `ui-ux`. Each has a project-relative Markdown `path:` and `action: create` with one fenced `markdown` body, or `action: reuse` without a body. Existing equivalent documents may use different paths. Foundation headings and bullets are never tasks. Each phase task in a bundle needs indented `spec: <foundation path[#heading-anchor]>` and `acceptance: <observable outcome>` lines; the importer checks references and heading anchors.
+
+`yaw kickoff import plan.md --dry-run` previews the exact sources and tasks without writes. Actual foundation import requires `--reviewed`; browser setup shows the same document contents and requires an explicit acknowledgement. Existing differing documents are refused; use `reuse` and maintain the established source directly. Reused sources are checked for changes between browser preview and Apply. All documents are preflighted before import; paths must be distinct, bounded, non-secret Markdown regular files with no symlinks.
+
+After review, `.yaw/foundations.json` stores `{ version: 1, practicesVersion: 1, kit, documents: [{ kind, path, hash }] }`. Markdown remains authoritative: this index contains references and review hashes, not duplicate rules. Generated foundations and the index are user-owned manifest entries; kit updates preserve them. Changed hashes produce a review warning in context, while current source text remains visible. Reimport with `action: reuse` after reviewing changes to refresh hashes. Changing registered authoritative paths requires explicitly editing the index.
+
+`yaw kickoff context` displays versioned generic kit practices separately from registered project sources; `--json` returns the same structured context. Sources over 8,000 characters are explicitly excerpted with a path to the complete document. Applicable ADRs and linked knowledge still require retrieval. This provides LLM-readable references without a mandatory embedding service or model call. Existing knowledge search also includes canonical `docs/spec` sources.
+
+`yaw kickoff ux` prints an optional design walkthrough prompt with this context for manual drafting or deliberate use with a local/external model. Review the exact printed package before sharing it. Optional reviewers consume the same two scopes and surface conflicts; neither prompts nor tool gates automatically change approved project behavior. No new per-prompt hook output is introduced.
 
 ## Normalised hook event
 

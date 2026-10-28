@@ -16,6 +16,10 @@ export function createPlanCard(ctx) {
   const summary = el('div', { class: 'plan-summary', hidden: true });
   const panel = el('div', { class: 'plan-panel', hidden: true });
   const toggle = el('button', { type: 'button', id: 'plan-toggle', 'aria-expanded': 'false', 'aria-controls': 'plan-steps', text: 'Get the planning prompt' });
+  const review = el('div', { hidden: true });
+  const reviewed = el('input', { type: 'checkbox', id: 'foundations-reviewed' });
+  let candidate = null;
+  answer.addEventListener('input', () => { candidate = null; reviewed.checked = false; review.hidden = true; });
 
   async function fetchPrompt() {
     const body = await (await ctx.request('kickoff-prompt', { answers: ctx.getAnswers() })).json();
@@ -31,7 +35,17 @@ export function createPlanCard(ctx) {
   } });
   const use = el('button', { type: 'button', text: 'Use this plan', onclick: async () => {
     try {
-      const reply = await (await ctx.request('kickoff-reply', { text: answer.value })).json();
+      const reply = candidate ?? await (await ctx.request('kickoff-reply', { text: answer.value })).json();
+      if (reply.foundations?.length) {
+        if (!candidate) {
+          candidate = reply;
+          review.replaceChildren(...reply.foundations.map((d) => el('details', { open: true }, el('summary', { text: `${d.kind}: ${d.path}` }), el('pre', { text: d.text }))),
+            el('label', {}, reviewed, ' I reviewed these project foundations, including reused documents, and accept them as the baseline.'));
+          review.hidden = false;
+        }
+        if (!reviewed.checked) { status.textContent = 'Review the foundation documents below, acknowledge them, then choose Use this plan.'; return; }
+        reply.foundationsReviewed = true;
+      }
       ctx.onUse(reply, answer.value);
       status.textContent = '';
     } catch (e) { status.textContent = e.message; }
@@ -41,8 +55,9 @@ export function createPlanCard(ctx) {
     el('li', {}, el('strong', { text: 'Copy the prompt' }), el('div', { class: 'plan-actions' }, copy),
       el('details', {}, el('summary', { text: 'Show the prompt' }), promptText)),
     el('li', {}, el('strong', { text: 'Open a chat and paste it' }),
+      el('p', { text: 'You can also use your configured local model or draft the documents manually.' }),
       el('div', { class: 'chat-links' }, ...CHATS.map(([name, href]) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', class: 'chip', text: name })))),
-    el('li', {}, el('strong', { text: 'Paste the answer here' }), answer, el('div', { class: 'plan-actions' }, use)));
+    el('li', {}, el('strong', { text: 'Paste the answer here' }), answer, review, el('div', { class: 'plan-actions' }, use)));
   panel.append(steps, status);
   toggle.addEventListener('click', () => {
     const open = panel.hidden;
@@ -53,7 +68,7 @@ export function createPlanCard(ctx) {
   const node = el('section', { class: 'plan-card', id: 'plan-card', tabindex: '-1', 'aria-labelledby': 'plan-title' },
     el('h3', { id: 'plan-title', text: 'Plan with an AI chat' }), el('span', { class: 'pill', text: 'optional' }),
     el('ul', { class: 'plain-bullets small' },
-      el('li', { text: 'A chat turns your idea into a business description, a stack recommendation and a task list' }),
+      el('li', { text: 'Draft and review architecture/domain, data model and UI/UX foundations, then derive tasks with acceptance criteria' }),
       el('li', { text: 'You copy the prompt and paste the answer: nothing is sent from here' }),
       el('li', { text: 'Only for ideas that are not confidential' })),
     toggle, panel, summary);
@@ -61,15 +76,16 @@ export function createPlanCard(ctx) {
   // info: the parsed reply, or null to show the start again
   function setInfo(info) {
     summary.hidden = !info; toggle.hidden = Boolean(info); panel.hidden = Boolean(info) || panel.hidden;
-    if (!info) { summary.replaceChildren(); return; }
+    if (!info) { summary.replaceChildren(); candidate = null; reviewed.checked = false; review.hidden = true; return; }
     summary.replaceChildren(
       el('p', { class: 'ok-text', text: 'Plan loaded' }),
       el('ul', { class: 'plain-bullets' },
         ...(info.idea ? [el('li', { text: 'Idea filled in above' })] : []),
+        ...(info.foundations?.length ? [el('li', { text: `Reviewed foundations: ${info.foundations.map((d) => d.path).join(', ')}` })] : []),
         ...(info.language || info.runsOn ? [el('li', { text: `Stack: ${info.language ?? '?'} · ${info.runsOn ?? '?'}; check it in step 4` })] : []),
         ...(info.tasks ? [el('li', { text: `${info.tasks} task${info.tasks === 1 ? '' : 's'} in ${info.phases} phase${info.phases === 1 ? '' : 's'}: saved as docs/plan/kickoff.md and added to TASKS.md` })] : []),
         ...info.warnings.map((w) => el('li', { class: 'warn-text', text: w }))),
-      el('button', { type: 'button', text: 'Remove the plan', onclick: () => { ctx.onRemove(); setInfo(null); answer.value = ''; } }));
+      el('button', { type: 'button', text: 'Remove the plan', onclick: () => { ctx.onRemove(); setInfo(null); answer.value = ''; candidate = null; reviewed.checked = false; review.hidden = true; } }));
   }
   return { node, setInfo };
 }

@@ -1,5 +1,7 @@
 # 06 — Design and Aesthetics
 
+**Guided kickoff:** [doc 15 §4](15-project-foundations.md#4-optional-guided-uiux-work) describes the implemented optional user/task and interaction-design prompt (`yaw kickoff ux`). The visual tooling described here uses the reviewed UI/UX foundation as its brief, with generic YAW practices applied within project constraints (ADR-0075).
+
 Goal: products that look **intentional and distinct**, not like a default AI template, with lots of variety from few choices.
 
 Variety = **direction** (one pick) × **knobs** (four sliders) × **brand** (optional) × **seed** (agent's variation within the direction). That gives many distinct outcomes from ≈ 5 inputs.

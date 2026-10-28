@@ -103,8 +103,8 @@ export function renderStack(root, ctx) {
   const hosts = hostQ.choices.map(choiceOf);
   const lang = ctx.answers['arch.language'] ?? langQ.default;
   const host = ctx.answers['arch.runs-on'] ?? hostQ.default;
-  const langName = (k) => shortLabel(langs.find((l) => l.value === k)?.label ?? k);
-  const hostName = (k) => { const s = shortLabel(hosts.find((h) => h.value === k)?.label ?? k); return s[0].toUpperCase() + s.slice(1); };
+  const langName = (k) => k ? shortLabel(langs.find((l) => l.value === k)?.label ?? k) : 'Choose a language';
+  const hostName = (k) => { const s = shortLabel(hosts.find((h) => h.value === k)?.label ?? k ?? ''); return s ? s[0].toUpperCase() + s.slice(1) : 'Choose where it runs'; };
   const fit = (l, h) => {
     const p = profileFor(ctx.profiles, l, h);
     return p ? (p.stack.basic ? 'basic' : 'tailored') : 'none';
@@ -119,7 +119,7 @@ export function renderStack(root, ctx) {
   for (const h of hosts) {
     const f = fit(lang, h.value);
     const p = profileFor(ctx.profiles, lang, h.value);
-    const text = f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : `${langName(lang)} does not run here`;
+    const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : `${langName(lang)} does not run here`;
     hostGrid.append(el('button', { type: 'button', class: 'host', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
     el('strong', { text: hostName(h.value) }),
@@ -130,7 +130,10 @@ export function renderStack(root, ctx) {
   const profile = profileFor(ctx.profiles, lang, host);
   const result = el('div', { class: `stack-result${profile ? (profile.stack.basic ? ' basic' : '') : ' invalid'}`, role: 'status' });
   const needs = (p) => el('li', { text: `Needs ${p.requires?.length ? p.requires.join(', ') : 'nothing extra'} on your computer (yaw doctor checks)` });
-  if (profile && !profile.stack.basic) {
+  if (!lang || !host) {
+    result.append(el('h3', { text: 'Choose a language and where this project will run' }),
+      el('p', { text: 'Not sure? Use the planning guidance in Your project, then review its stack recommendation here.' }));
+  } else if (profile && !profile.stack.basic) {
     result.append(
       el('h3', { text: `Your stack: ${profile.title}` }),
       el('ul', {}, el('li', { text: profile.summary }), needs(profile), el('li', { text: 'Adds its checks to just check and docs/standards.md' })),

@@ -46,6 +46,7 @@
           }
         },
         "default": { "$ref": "common.schema.json#/$defs/answerValue" },
+        "required": { "description": "An essential project answer; empty values cannot be skipped or applied.", "type": "boolean" },
         "when": {
           "description": "Ask only when these earlier answers match (a list means any of its values).",
           "$ref": "common.schema.json#/$defs/answerMap"

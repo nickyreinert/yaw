@@ -12,7 +12,7 @@ import { schemas } from '../core/render/kit.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
-const INTERVIEW = ['', '', '', 'en', 'skip', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', '', ''];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', ''];
 const CANARY = 'ghp_CANARY0123456789abcdefghijklmnopqrst';
 const mode = (p) => statSync(p).mode & 0o777;
 
@@ -37,7 +37,7 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
   const declined = await yaw(['init', '--skip-verify'], { home, prompter: declinedP });
   assert.equal(declined.code, 0, declined.err);
   assert.match(declinedP.asked.join('\n'), /Save this setup as a preset in .*\.yaw\/presets\/ and add a line \(project path, date, kit version\) to .*history\.jsonl\?/);
-  assert.match(declined.out, /Each question is asked again the next time/);
+  assert.match(declined.out, /Saving a preset and saving personal defaults are separate choices/);
   assert.match(declined.out, /not saved; nothing was written to the user folder/);
   assert.deepEqual(readdirSync(home), []);
   // --answers (no interview) never asks and never writes
@@ -62,7 +62,7 @@ test('opt-in yes: profile, preset and history are written with restrictive modes
 
   const profile = parseDocument(readFileSync(join(dir, 'user-profile.yaml'), 'utf8')).value;
   assert.deepEqual(profile.answers['user.agents'], ['claude']);
-  assert.equal(profile.answers['user.language'], 'en');
+  assert.equal(profile.answers['user.language'], 'de');
   assert.equal(profile.answers['user.autonomy'], 'ask-risky');
   assert.equal(Object.hasOwn(profile.answers, 'idea.text'), false, 'the profile holds user.* answers only');
 
@@ -234,7 +234,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   // end to end: the canary typed into the interview is not saved, not printed
   const home = tmp('yaw-home-');
   const interview = [...INTERVIEW];
-  interview[5] = `Deploy with ${CANARY}`;
+  interview[2] = `Deploy with ${CANARY}`;
   const prompter = scripted([...interview, 'y', 'y', 'y', '']);
   const r = await yaw(['init', '--skip-verify'], { home, prompter });
   assert.equal(r.code, 0, r.err);

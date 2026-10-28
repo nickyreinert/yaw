@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { REVIEWERS, reviewTriggers } from '../../../core/render/kit.js';
 import { enabledModules, readAnswers, requireManifest } from '../../../core/render/project.js';
 import { PROMPT_KINDS, PromptError, allPrompts, effectivePrompt } from './prompts.js';
+import { contextText, foundationContext } from '../../../core/lib/foundations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const USAGE = 'usage: yaw review run <quality|logic|ux|feature> [<base>..<head>] | gate [remote] [url] | prompt [rules|quality|logic|ux|feature] | install';
@@ -72,6 +73,7 @@ export function buildPrompt({ root, kind, range, diff, env = process.env }) {
   const parts = [
     reviewerPrompt(kind, { root, env }).trim(),
     reviewerPrompt('rules', { root, env }).trim(),
+    contextText(foundationContext({ root })),
     'Read and report only; never edit, stage, commit or push.',
     'End with exactly one line: `VERDICT: PASS` (nothing that should stop a push) or `VERDICT: FINDINGS`.',
   ];

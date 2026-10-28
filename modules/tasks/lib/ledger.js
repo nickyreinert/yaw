@@ -82,11 +82,18 @@ function find(ledger, id) {
 }
 
 // Add to the end of the backlog. -> the new item
-export function newTask(ledger, title, archiveText = '', { model, effort } = {}) {
+export function newTask(ledger, title, archiveText = '', { model, effort, spec, acceptance } = {}) {
   requireLocal(ledger);
   const clean = oneLine(title).replace(/ — /g, ' - ');
   if (clean === '') throw new LedgerError('a task needs a title');
   const item = { id: nextLocalId(ledger, archiveText), title: clean, ...modelOption({ model, effort }) };
+  for (const [key, value] of Object.entries({ spec, acceptance })) {
+    if (value !== undefined) {
+      const text = oneLine(value);
+      if (!text) throw new LedgerError(`--${key} must not be empty`);
+      item[key] = text;
+    }
+  }
   ledger.backlog.push(item);
   return item;
 }
@@ -106,6 +113,8 @@ export function startTask(ledger, input) {
   active.title = task.title;
   active.status = 'in progress';
   active.progress = 0;
+  if (task.spec !== undefined) active.spec = task.spec;
+  if (task.acceptance !== undefined) active.brief = task.acceptance;
   if (task.model !== undefined) active.model = modelEffort(task.model, task.effort);
   else if (task.note !== undefined) active.model = task.note;
   active.resume = 'Started; nothing logged yet.';
@@ -166,6 +175,7 @@ export function formatLedger(ledger) {
   for (const b of ledger.backlog) {
     out.push(`  ${b.id} ${b.title}${b.note ? ` — ${b.note}` : ''}`);
     if (b.model) out.push(`    model: ${modelEffort(b.model, b.effort)}`);
+    for (const key of ['spec', 'acceptance']) if (b[key]) out.push(`    ${key}: ${b[key]}`);
   }
   return `${out.join('\n')}\n`;
 }

@@ -41,7 +41,7 @@ async function init(replies) {
   return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, doc: text ? parseDocument(text).value : null, text };
 }
 
-const IDEA = { 'Describe the idea': 'A small tool.', 'Preferred or required language': 'javascript', 'Where should it run': 'local' };
+const IDEA = { 'Describe the idea': 'A small tool.', 'What language do you want': 'javascript', 'Where will it run': 'local' };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],
@@ -202,6 +202,6 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('intermediate'), /Shared team rules/);
   assert.doesNotMatch(shown('expert'), /Shared team rules/);
   // the summary lists the layperson default
-  assert.match(runs.layperson.out, /team\.session-context +true +\(default\)/);
-  assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(default\)/);
+  assert.match(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
+  assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);
 });

@@ -143,6 +143,13 @@ export function parseTasksDocument(text, { file } = {}) {
     if (section === 'backlog') {
       if (line.startsWith('  ')) {
         const item = ledger.backlog.at(-1);
+        const field = /^ {2}(spec|acceptance): (\S.*)$/.exec(line);
+        if (item && field) {
+          if (item[field[1]] !== undefined) fail(`duplicate ${field[1]} line for ${item.id}`, idx);
+          item[field[1]] = field[2];
+          pointers.set(`/backlog/${ledger.backlog.length - 1}/${field[1]}`, idx + 1);
+          return;
+        }
         const m = MODEL_LINE.exec(line);
         if (!item || !m) fail('expected "  model: <tier>[ · effort: <level>]" under a backlog line', idx);
         if (item.model !== undefined) fail(`duplicate model line for ${item.id}`, idx);
@@ -206,6 +213,7 @@ export function renderTasks(ledger) {
     const note = b.note !== undefined ? ` — ${b.note}` : '';
     out.push(`- ${b.id}${issue} ${b.title}${note}`);
     if (b.model !== undefined) out.push(`  model: ${modelEffort(b.model, b.effort)}`);
+    for (const key of ['spec', 'acceptance']) if (b[key] !== undefined) out.push(`  ${key}: ${b[key]}`);
   }
   if (ledger.archive !== undefined) out.push('', `## Done → ${ledger.archive}`);
   return `${out.join('\n')}\n`;

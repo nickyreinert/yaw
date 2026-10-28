@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PLAIN } from '../cli/style.js';
+import { asksIn as asksQuestion, isPersonal, resolved, sourceOf } from './policy.js';
 
 export const MAX_BATCH = 6;
 
@@ -163,17 +164,24 @@ const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expert
 // known: answers that already exist; only used to evaluate `when`, never returned.
 // defaults: saved answers to review as question defaults, not automatically accepted answers.
 // allowWeb: "w" or "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
-// -> { answers, defaulted: string[] }  (answers hold every question whose `when` holds, defaults included)
-export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, defaults = {}, allowWeb = false }) {
+// -> { answers, defaulted: string[], sources } (answers hold every applicable question, reused values included)
+export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, defaults = {}, defaultSources = {}, allowWeb = false, reviewPersonal = false }) {
   questions = questions.map((q) => {
     if (!Object.hasOwn(defaults, q.id)) return q;
     if (!validAnswer(q, defaults[q.id])) throw new Error(`Invalid saved answer for ${q.id}`);
-    return { ...q, default: defaults[q.id] };
+    return { ...q, default: defaults[q.id], defaultSource: defaultSources[q.id] ?? 'proposed — needs confirmation' };
   });
   const answers = {};
+  const sources = {};
+  const shouldAsk = (q) => reviewPersonal ? asksIn(q.mode, mode) : asksQuestion(q, mode);
+  // Reused expertise must affect the very first project question.
+  for (const q of questions) if (isPersonal(q) && !q.when && !shouldAsk(q)) {
+    answers[q.id] = q.default;
+    sources[q.id] = sourceOf(q, false);
+  }
   const seen = () => ({ ...known, ...answers }); // `when` may refer to answers given earlier (yaw add)
   const defaulted = [];
-  const asked = questions.filter((q) => asksIn(q.mode, mode));
+  const asked = questions.filter(shouldAsk);
   const askedIds = new Set(asked.map((q) => q.id));
   const total = asked.length;
   let number = 0;
@@ -195,6 +203,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
       if (expertise === 'layperson' && q.mode === 'F') {
         answers[q.id] = q.default;
         defaulted.push(q.id);
+        sources[q.id] = sourceOf(q, false);
         continue;
       }
       number++;
@@ -207,18 +216,29 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
       if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
       for (;;) {
         const reply = await prompter.ask(`      [${style.green(formatDefault(q))}] ${style.dim(`(${options})`)} > `, keys);
-        if (allowWeb && ['w', 'web'].includes(reply.trim().toLowerCase())) return { answers: ordered(), defaulted, web: true };
+        if (allowWeb && ['w', 'web'].includes(reply.trim().toLowerCase())) return { answers: ordered(), defaulted, sources, web: true };
+        if (["don't know", 'dont know', 'unsure', 'you choose', 'auto'].includes(reply.trim().toLowerCase()) && q.required) {
+          prompter.show(`\n${helpText(q, kitRoot)}\nChoose a project answer, or use w for browser planning guidance. No project choice will be guessed.\n`);
+          continue;
+        }
         const r = parseReply(q, reply);
         if (r.help) {
           prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
         } else if (r.error) {
           prompter.show(`      ${r.error}\n`);
         } else if (r.skip) {
+          if (q.required) { prompter.show('      This project answer is required; choose a value, ? for help, or w for browser guidance.\n'); continue; }
           answers[q.id] = q.default;
           defaulted.push(q.id);
+          sources[q.id] = sourceOf(q, false);
           break;
         } else {
+          if (!resolved(q, r.value) || (q.required && !validAnswer(q, r.value))) {
+            prompter.show('      This project answer is required; choose a value, ? for help, or w for browser guidance.\n');
+            continue;
+          }
           answers[q.id] = r.value;
+          sources[q.id] = reply.trim() === '' && q.defaultSource?.startsWith('proposed') ? 'confirmed proposal' : 'answered';
           break;
         }
       }
@@ -228,7 +248,8 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
   for (const q of questions) {
     if (askedIds.has(q.id) || !whenMatches(q.when, seen())) continue;
     answers[q.id] = q.default;
+    sources[q.id] = sourceOf(q, false);
     defaulted.push(q.id);
   }
-  return { answers: ordered(), defaulted };
+  return { answers: ordered(), defaulted, sources };
 }

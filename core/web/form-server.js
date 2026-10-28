@@ -11,6 +11,7 @@ export const CSRF_HEADER = 'x-yaw-token';
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 export const MAX_JSON_BYTES = 256 * 1024;
 const assets = new Map([
+  ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   ['/login.js', ['text/javascript; charset=utf-8', Buffer.from("location.replace('/');\n")]],
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],

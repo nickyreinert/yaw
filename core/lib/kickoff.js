@@ -2,6 +2,7 @@
 // user pastes back. The plan format is the one the prompt asks for; the parser accepts small deviations.
 
 import { EFFORTS } from './tasks.js';
+import { FOUNDATION_PATHS, PRACTICES, PRACTICES_VERSION } from './foundations.js';
 
 export const PLAN_FILE = 'docs/plan/kickoff.md';
 
@@ -24,7 +25,8 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
     `- Work items become ${TASK_TARGET[tasksMode] ?? TASK_TARGET.local}`,
   ].filter(Boolean);
   return [
-    'You are a senior software architect. Turn the idea below into a step-by-step build plan for coding agents.',
+    `YAW guided kickoff prompt, version ${PRACTICES_VERSION}. Draft project foundations, review them with me, then derive a build plan for coding agents.`,
+    PRACTICES,
     '',
     'Idea:',
     idea,
@@ -33,11 +35,17 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
     ...facts,
     '',
     'Rules for the plan:',
+    '- First ask for existing authoritative architecture/domain, data model, UI/UX documents, relevant decisions and selected knowledge. Reuse their paths; do not create competing specifications. Read only material I select. Preview exactly what I would copy to another model; exclude secrets.',
+    '- Draft architecture (purpose, users, domain rules, boundaries, runtime, constraints), data-model (contracts, ownership, invariants, access, lifecycle, compatibility), and ui-ux (main tasks, flows, realistic content, empty/error/recovery states, accessibility, observable review criteria). Link shared concepts rather than duplicating rules.',
+    '- Label supplied facts, recommendations, untested assumptions and unresolved choices. Review the connected foundations with me before planning; resolve blocking choices and give remaining uncertainty an owner or follow-up task. A model draft alone is not agreed ground truth.',
+    '- Scale to the project: a tiny CLI needs only a few bullets and command/error UX; no persistence needs an explicit reason and input/output rules; a machine-only API may mark human UI not applicable and link its contract. Do not fabricate screens or storage.',
+    '- Offer an optional UX walkthrough: start with user evidence, test the main task including failure with realistic content, consider applicable accessibility criteria, and propose a small prototype or user validation for the riskiest assumption. Visual direction follows interaction needs. Guidance: https://www.gov.uk/service-manual/user-research/start-by-learning-user-needs and https://www.w3.org/WAI/WCAG22/quickref/ .',
     '- Split the work into 3 to 8 phases, from a thin working slice to the finished product.',
     '- Each phase has a goal, a suggested model tier and a reasoning effort, and 2 to 8 tasks.',
     '- Model tiers: a frontier model (for example opus) for architecture and hard problems, a mid tier (for example sonnet) for normal features, a small model (for example haiku) for routine edits.',
     `- Reasoning effort is one of: ${EFFORTS.join(', ')}.`,
     '- Each task is one small, testable change with a short imperative title (at most 80 characters).',
+    '- Under every task include spec: <authoritative path#section> and acceptance: <observable outcome>. Use only reviewed foundation paths. Keep foundation documents after the temporary plan is removed.',
     '- A task may override the phase model when it is clearly easier or harder.',
     '- Ask me questions first if the idea is too vague to plan.',
     ...(stack ? [
@@ -50,6 +58,7 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
     'Answer with Markdown in exactly this format and nothing else:',
     '',
     '# Plan: <project name>',
+    'kickoff-format: 1',
     '',
     ...(stack ? [
       '## Idea',
@@ -61,12 +70,22 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
       'why: <one sentence>',
       '',
     ] : []),
+    ...Object.entries(FOUNDATION_PATHS).flatMap(([kind, path]) => [
+      `## Foundation: ${kind}`, `path: ${path}`, 'action: create', '```markdown',
+      `# ${kind}`, '<reviewed project-specific rules; distinguish assumptions and link decisions>', '```', '',
+    ]),
+    'For an established document use action: reuse and its actual path, with no fenced content.',
+    '',
     '## Phase 1: <phase name>',
     'model: <tier> · effort: <effort>',
     'Goal: <one sentence>',
     '',
     '- [ ] <task title>',
+    '  spec: docs/spec/architecture.md#section',
+    '  acceptance: <observable outcome>',
     '- [ ] <task title> (model: <tier> · effort: <effort>)',
+    '  spec: docs/spec/ui-ux.md#section',
+    '  acceptance: <observable outcome>',
     '',
     '## Phase 2: <phase name>',
     '...',
@@ -76,11 +95,12 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
 export function kickoffGuide({ tasksMode = 'local', hasTasks = true } = {}) {
   const target = hasTasks ? TASK_TARGET[tasksMode] ?? TASK_TARGET.local : null;
   return [
-    'Copy the prompt below into a chat with a strong model (only if the idea is not confidential); answer its questions until you get the plan.',
+    'Use the prompt manually, with your configured local model, or copy it into your chosen chat (only if the idea is not confidential). Review the exact material before sharing it; nothing is sent automatically.',
+    'Review the three project foundations and any reused documents before accepting the plan. Generic YAW practices guide the work within these project rules; surface conflicts for a decision.',
     `Save the plan as ${PLAN_FILE} (docs/plan/ holds temporary plans; delete the file when the work is done).`,
     hasTasks
-      ? `Check it with yaw kickoff import ${PLAN_FILE} --dry-run, then run it without --dry-run: each task becomes one of the ${target}, with its model tier and effort.`
-      : `Turn the plan into tasks: add the tasks module (yaw add tasks), then run yaw kickoff import ${PLAN_FILE}.`,
+      ? `Check it with yaw kickoff import ${PLAN_FILE} --dry-run, then run it with --reviewed after reviewing the documents: each task becomes one of the ${target}, with its model tier and effort.`
+      : `Review and import the foundations: yaw kickoff import ${PLAN_FILE} --dry-run, then --reviewed. To create tasks, add the tasks module (yaw add tasks) and import again.`,
     'Then start a cheap agent (a small model) and let it work through the tasks in order; switch to the suggested tier when a task asks for it.',
     'Show the prompt again any time: yaw kickoff.',
   ];
@@ -93,15 +113,54 @@ const stripFence = (text) => {
   const m = /^\s*```[a-z]*\r?\n([\s\S]*?)\r?\n```\s*$/i.exec(text);
   return m ? m[1] : text;
 };
+
+// Foundation bodies are fenced so their headings and bullet rules can never become tasks.
+export function parseFoundations(text) {
+  const marker = /^kickoff-format:\s*(\S+)\s*$/m.exec(text);
+  const hasSections = /^## Foundation:/m.test(text);
+  if (!marker && !hasSections) return [];
+  if (marker?.[1] !== '1') throw new PlanError('Foundations require kickoff-format: 1.');
+  const documents = [];
+  let current = null, fence = false, body = [];
+  for (const raw of text.split('\n')) {
+    if (fence) {
+      if (/^```\s*$/.test(raw)) { fence = false; current.text = body.join('\n'); body = []; }
+      else body.push(raw);
+      continue;
+    }
+    const heading = HEADING.exec(raw);
+    if (heading) {
+      const kind = /^Foundation:\s*(\S+)\s*$/.exec(heading[1])?.[1];
+      current = kind ? { kind } : null;
+      if (current) documents.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (/^```(?:markdown|md)?\s*$/.test(raw)) {
+      if (current.text !== undefined) throw new PlanError('Only one Markdown body per foundation.');
+      fence = true; continue;
+    }
+    const field = /^(path|action):\s*(.+?)\s*$/.exec(raw);
+    if (field) { if (current[field[1]] !== undefined) throw new PlanError('Duplicate foundation field.'); current[field[1]] = field[2]; }
+  }
+  if (fence || documents.length !== 3 || new Set(documents.map((d) => d.kind)).size !== 3 ||
+      documents.some((d) => !Object.hasOwn(FOUNDATION_PATHS, d.kind) || !d.path || !['create', 'reuse'].includes(d.action) ||
+        (d.action === 'create' ? !d.text?.trim() : d.text !== undefined))) throw new PlanError('Provide all three foundations with a path and action: create (fenced Markdown) or reuse (no body).');
+  return documents;
+}
 // The answer of the planning chat -> { idea, language, runsOn, tasks, warnings }. Idea and Stack sections are
 // optional; the tasks come from the Phase sections like `yaw kickoff import`. stack: { languages, hosts } (the
 // accepted values); a value outside the lists is dropped with a warning, never guessed.
 export function parseKickoffReply(raw, { languages = [], hosts = [] } = {}) {
   const text = stripFence(String(raw ?? '')).replace(/\r\n/g, '\n');
+  const foundations = parseFoundations(text);
   const sections = new Map();
   const rest = [];
   let current = null;
+  let fence = false;
   for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) { fence = !fence; rest.push(line); continue; }
+    if (fence) { rest.push(line); continue; }
     const h = HEADING.exec(line);
     if (h && /^(idea|stack)$/i.test(h[1])) { current = h[1].toLowerCase(); sections.set(current, []); continue; }
     if (h) current = null;
@@ -124,9 +183,14 @@ export function parseKickoffReply(raw, { languages = [], hosts = [] } = {}) {
     if (runsOn === null) warnings.push('No usable "runs-on" value in the Stack section; choose it in step 4.');
   }
   let tasks = [];
-  try { tasks = parsePlan(rest.join('\n')); } catch (e) { if (!(e instanceof PlanError)) throw e; warnings.push(e.message); }
-  if (idea === '' && language === null && runsOn === null && tasks.length === 0) throw new PlanError('nothing found: the answer needs an "## Idea" section, a "## Stack" section or "## Phase" sections with "- [ ] task" lines');
-  return { idea: idea.slice(0, 8000), language, runsOn, tasks, warnings, text };
+  try { tasks = parsePlan(rest.join('\n')); } catch (e) { if (!(e instanceof PlanError) || !e.message.startsWith('no tasks found')) throw e; warnings.push(e.message); }
+  if (foundations.length) {
+    for (const t of tasks) {
+      if (!t.spec || !t.acceptance || !foundations.some((d) => t.spec.split('#')[0] === d.path)) throw new PlanError(`Task "${t.title}" needs spec: <foundation path#section> and acceptance: <observable outcome>.`);
+    }
+  }
+  if (idea === '' && language === null && runsOn === null && tasks.length === 0 && !foundations.length) throw new PlanError('nothing found: the answer needs an "## Idea" section, a "## Stack" section or "## Phase" sections with "- [ ] task" lines');
+  return { idea: idea.slice(0, 8000), language, runsOn, tasks, foundations, warnings, text };
 }
 
 const PHASE = /^##\s+(.+?)\s*$/;
@@ -156,7 +220,7 @@ export function parsePlan(text) {
     if (/^\s*```/.test(raw)) fence = !fence;
     if (fence || /^\s*```/.test(raw)) return;
     const h = PHASE.exec(raw);
-    if (h && /^(idea|stack)$/i.test(h[1])) { phase = null; current = null; return; }
+    if (h && /^(idea|stack|foundation:.*)$/i.test(h[1])) { phase = null; current = null; return; }
     if (h) {
       phase = { name: h[1].replace(/^phase\s+\d+\s*[:.-]\s*/i, '').trim(), hint: {} };
       current = null;
@@ -171,7 +235,11 @@ export function parsePlan(text) {
       else if (current) Object.assign(current, hint);
       return;
     }
-    if (indented) return;
+    if (indented) {
+      const field = /^(spec|acceptance):\s*(.+)$/.exec(line);
+      if (current && field) current[field[1]] = field[2].trim();
+      return;
+    }
     const t = TASK.exec(line);
     current = null;
     if (!t || /x/i.test(t[1] ?? '')) return;

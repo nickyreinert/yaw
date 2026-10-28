@@ -181,7 +181,7 @@ export function interviewPreview({ root, kitRoot, env, input }) {
   const model = editModel({ root, kitRoot, env, expected: input?.expected });
   const p = model.preview(setupInput(input), true);
   const diff = p.diff.length > MAX_DIFF ? `${p.diff.slice(0, MAX_DIFF)}\n… diff cut at 256 KiB; run yaw edit in a terminal for the full diff\n` : p.diff;
-  return { profile: p.profile, modules: p.modules, files: p.files.filter((f) => f.action !== 'kept'), kept: p.files.filter((f) => f.action === 'kept').length, diff };
+  return { profile: p.profile, modules: p.modules, unresolved: p.unresolved, sources: p.sources, files: p.files.filter((f) => f.action !== 'kept'), kept: p.files.filter((f) => f.action === 'kept').length, diff };
 }
 
 export async function interviewApply({ root, kitRoot, env, input }) {

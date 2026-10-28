@@ -338,7 +338,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     for (const [p, node] of cards) { node.dataset.pane = p; root.append(node); }
     const actions = el('div', null, 'interview-actions'), status = el('p', '', 'small muted'); status.id = 'interview-status'; status.setAttribute('role', 'status');
     const blocked = interview.folder?.confirm && !state.confirmFolder;
-    const apply = button(interview.fresh ? 'Set up project' : 'Apply', () => applyInterview().catch(fail), 'primary'); apply.id = 'interview-apply'; apply.disabled = blocked || !stackValid || !previewed || previewed.state !== fingerprint();
+    const apply = button(interview.fresh ? 'Set up project' : 'Apply', () => applyInterview().catch(fail), 'primary'); apply.id = 'interview-apply'; apply.disabled = blocked || !stackValid || !previewed || previewed.result.unresolved?.length > 0 || previewed.state !== fingerprint();
     const previewButton = button('Preview changes', () => previewInterview().catch(fail)); previewButton.disabled = !stackValid;
     if (!stackValid) status.textContent = 'This language does not run there; pick another pair under Your stack.';
     actions.append(previewButton, apply, button('Reset', () => loadInterview().catch(report)), status);
@@ -384,7 +384,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   function changed(rerender = false) {
     const apply = $('interview-apply');
     if (rerender) { const id = document.activeElement?.closest?.('.interview-question')?.querySelector('code')?.textContent; renderInterview(); if (id) { const box = [...document.querySelectorAll('.interview-question code')].find((c) => c.textContent === id)?.closest('.interview-question'); (box?.querySelector('input[type=radio]:checked') ?? box?.querySelector('input,select,textarea'))?.focus(); } return; }
-    if (apply) apply.disabled = (interview.folder?.confirm && !state.confirmFolder) || !previewed || previewed.state !== fingerprint();
+    if (apply) apply.disabled = (interview.folder?.confirm && !state.confirmFolder) || !stackValid || !previewed || previewed.result.unresolved?.length > 0 || previewed.state !== fingerprint();
     if (previewed && previewed.state !== fingerprint()) $('interview-status').textContent = 'Changed since the preview; preview again before applying.';
   }
   function fail(e) { const s = $('interview-status'); if (s) s.textContent = e.message; else report(e); }
@@ -392,7 +392,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     $('interview-status').textContent = 'Rendering preview…';
     const result = await api('interview-preview', { ...state, expected: interview.hash });
     previewed = { state: fingerprint(), result };
-    renderInterview(); $('interview-status').textContent = result.files.length ? 'Review the changes, then Apply.' : 'No file would change. Apply still saves the answers.';
+    renderInterview(); $('interview-status').textContent = result.unresolved?.length ? `Complete before Apply: ${result.unresolved.join(', ')}.` : result.files.length ? 'Review the changes, then Apply.' : 'No file would change. Apply still saves the answers.';
   }
   function renderPreview(r) {
     const out = $('interview-preview'), box = el('div', null, 'card');

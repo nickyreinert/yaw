@@ -10,7 +10,7 @@ description: Review a change from a non-technical angle (quality, business logic
 3. Get the instructions: `just review-prompt <kind>` prints the reviewer's prompt and `just review-prompt rules`
    the reporting rules (the project may have adjusted both). Follow them. Read files when you need context, but
    never edit, stage, commit or push.
-4. Report as the rules say.
+4. Read `yaw kickoff context`: apply the kit practices within the project's reviewed foundations, relevant ADRs and selected knowledge. Read complete linked sources where needed. Report conflicts and missing evidence; never silently change project rules to match the code. Report as the rules say.
 5. End with exactly one line: `VERDICT: PASS` (nothing that should block a push) or `VERDICT: FINDINGS`.
 
 `just review <kind>` runs the same reviewer headless through your agent CLI and prints the report.
