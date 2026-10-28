@@ -16,7 +16,7 @@ export function kickoffParts({ root, manifest }) {
   const mode = tasksMode(doc.answers, { teamModule: modules.includes('team') });
   return {
     guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
-    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode }),
+    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks') }),
   };
 }
 
@@ -54,7 +54,7 @@ export async function kickoff({ values, positionals, io }) {
   }
   if (verb === 'ux') {
     if (file || extra.length) throw new UsageError('kickoff ux takes no positional arguments');
-    io.stdout.write(`${contextText(foundationContext({ root, kitRoot: io.kitRoot }))}\n\nOptional UI/UX guidance: review this exact package before copying to your chosen local or external model. Ask for missing user evidence; label assumptions. Walk through the main task with realistic content, empty/error/recovery states and applicable accessibility criteria. Propose a small prototype or user walkthrough for the riskiest assumption. Return a candidate revision to the UI/UX foundation, linked domain/data effects and observable acceptance criteria. Surface conflicts for a project decision; do not change accepted documents automatically.\n`);
+    io.stdout.write(`${contextText(foundationContext({ root, kitRoot: io.kitRoot }))}\n\nOptional UI/UX guidance: review this exact package before copying to your chosen local or external model. Ask for missing user evidence; label assumptions. Before substantial UI implementation, offer a rough wireframe, mockup or clickable example covering layout, content hierarchy, navigation, control placement and key states as well as colours. Review structure and the main flow before visual polish. Walk through the main task with realistic content, empty/error/recovery states and applicable accessibility criteria. Link the accepted example from the UI/UX foundation with observable acceptance criteria, linked domain/data effects and a plan to validate the riskiest assumption. Surface conflicts for a project decision; do not change accepted documents automatically.\n`);
     return 0;
   }
   if (verb === undefined) {

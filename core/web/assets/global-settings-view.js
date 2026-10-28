@@ -231,7 +231,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   }
 
   // Interview --------------------------------------------------------------------------------------------
+  let setupPolicy = null;
   async function loadInterview() {
+    setupPolicy = await get('global/setup-defaults');
     [profile, presets] = await Promise.all([get('global/profile'), get('global/presets')]);
     answers = structuredClone(profile.answers); previewed = null; renderInterview();
   }
@@ -248,7 +250,29 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     actions.append(button('Preview changes', () => previewProfile().catch(fail)), apply, button('Reset', () => loadInterview().catch(report)), s);
     const out = el('div'); out.id = 'gs-preview';
     if (previewed) out.append(previewCard(previewed.result));
-    box.append(actions, out); root.append(box, presetsCard());
+    box.append(actions, out); root.append(box, setupDefaultsCard(), presetsCard());
+  }
+  function setupDefaultsCard() {
+    const box = el('section', null, 'card'); box.append(el('h2', 'Optional tools for new projects'), el('p', 'Undecided tools start off. Quick reuses these defaults; Basic and Pro let you review them. Existing projects keep their selections.', 'small muted'));
+    if (setupPolicy.warning) box.append(el('p', setupPolicy.warning, 'warn'));
+    const selected = new Set(setupPolicy.modules), values = { ...setupPolicy.answers };
+    for (const name of setupPolicy.availableModules) {
+      const label = el('label'), input = el('input'); input.type = 'checkbox'; input.checked = selected.has(name);
+      input.addEventListener('change', () => { if (input.checked) selected.add(name); else selected.delete(name); });
+      label.append(input, document.createTextNode(' ' + name)); box.append(label);
+    }
+    for (const q of setupPolicy.questions) {
+      const label = el('label', q.label), select = el('select');
+      for (const choice of q.type === 'boolean' ? [{ value: 'false', label: 'Off' }, { value: 'true', label: 'On' }] : q.choices) {
+        const option = el('option', typeof choice === 'object' ? choice.label ?? choice.value : choice); option.value = String(typeof choice === 'object' ? choice.value : choice); select.append(option);
+      }
+      select.value = String(values[q.id] ?? q.default);
+      select.addEventListener('change', () => { values[q.id] = q.type === 'boolean' ? select.value === 'true' : select.value; });
+      label.append(select); box.append(label);
+    }
+    const status = el('p', '', 'small muted'); status.setAttribute('role', 'status');
+    box.append(button('Save tool defaults', async () => { try { setupPolicy = await api('setup-defaults-save', { modules: [...selected], answers: values }); status.textContent = 'Saved for future project setups.'; } catch (e) { status.textContent = e.message; } }, 'primary'), status);
+    return box;
   }
   function question(q) {
     const multi = q.type === 'multi', radios = q.type === 'boolean' || (q.type === 'choice' && (q.choices ?? []).length <= RADIO_MAX);

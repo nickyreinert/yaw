@@ -5,22 +5,36 @@ import { join } from 'node:path';
 import { checkRelPath, hashContent, writeAtomic } from '../render/files.js';
 import { readManifest, writeManifest } from '../render/manifest.js';
 import { KIT_ROOT } from '../render/kit.js';
+import { parseAnswers } from '../render/project.js';
 import { loadRules, secretRule, secretValueRule } from '../../modules/security/lib/guards.js';
 
 export const FOUNDATION_INDEX = '.yaw/foundations.json';
-export const PRACTICES_VERSION = 1;
+export const PRACTICES_VERSION = 2;
 const rulesFor = (kitRoot) => loadRules({ kitRoot: kitRoot ?? KIT_ROOT });
 export const FOUNDATION_PATHS = {
   architecture: 'docs/spec/architecture.md',
   'data-model': 'docs/spec/data-model.md',
   'ui-ux': 'docs/spec/ui-ux.md',
 };
+export const CONSTRAINT_FIELDS = [
+  ['arch.hosting-control', 'Hosting control'], ['arch.libraries', 'Library policy'],
+  ['arch.services', 'External application services'], ['arch.cost', 'Cost policy'],
+];
+export function constraintFacts(answers = {}) {
+  return [
+    ...(answers['arch.framework'] ? [`- Required framework / existing stack: ${answers['arch.framework']}`] : []),
+    ...CONSTRAINT_FIELDS.map(([key, label]) => `- ${label}: ${answers[key] || 'undecided (ask before choosing)'}`),
+    ...(answers['arch.cost-limit'] ? [`- Budget cap: ${answers['arch.cost-limit']}`] : []),
+  ];
+}
 export const PRACTICES = `YAW generic practices (version ${PRACTICES_VERSION}):
 - Project scope: the project's reviewed architecture/domain, data contracts, UI/UX, applicable ADRs and knowledge define intended behavior. Read AGENTS.md and run decision retrieval when enabled; follow relevant linked sources.
 - Kit scope: these reusable practices guide implementation within that ground truth. They do not establish product requirements. Identify conflicts, explain the consequence and seek a project decision; never silently rewrite an explicit project rule to fit a preference or the code.
 - Keep one authoritative home for each rule; link shared concepts. Update affected foundations and acceptance criteria with an agreed behavior change; record lasting rationale in decisions when enabled.
 - Choose the smallest design that meets the constraints. Check domain rules, data ownership, access, invariants, failure recovery and compatibility where relevant. Do not invent a database, service or screen for a project that needs none.
+- Respect the project's separate hosting-control, library, external-service and cost policies. Explain build/reuse trade-offs, data flows and ongoing costs; unresolved constraints require a project decision. A permitted paid option is not purchase or provisioning approval.
 - Ground UX in users and their main tasks. Separate evidence from assumptions; walk through realistic success, empty, failure and recovery states. Use clear feedback and prevent costly mistakes.
+- Before substantial UI implementation, offer a proportionate wireframe, mockup or clickable example for review. Show layout, content hierarchy, navigation, control placement and key states as well as colours and typography; review structure before visual polish. Link the accepted example and its observable criteria from the UI/UX foundation. For CLI changes, sample commands and output may be enough.
 - Consider accessibility from the first interaction: structure, labels, keyboard/focus, understandable errors, contrast and input alternatives as applicable. Automated checks supplement human review; they do not prove usability or conformance.
 - Validate the riskiest assumption with a small walkthrough or prototype and, where feasible, users. Review observable outcomes rather than only implementation details.`;
 
@@ -42,6 +56,10 @@ export function foundationPath(path, kitRoot) {
 export function readFoundationFile(root, path, { kitRoot, index = false } = {}) {
   if (index) { if (path !== FOUNDATION_INDEX) throw new FoundationError('Invalid foundation index path.'); }
   else foundationPath(path, kitRoot);
+  return readRegular(root, path, kitRoot);
+}
+
+function readRegular(root, path, kitRoot) {
   let target = root;
   let st;
   for (const part of path.split('/')) {
@@ -142,8 +160,16 @@ export function saveFoundations({ root, prepared, kitRoot }) {
 
 // Same source for humans, JSON consumers and optional reviewers; no model, vector service or hook injection.
 export function foundationContext({ root, kitRoot } = {}) {
-  const result = { version: 1, practicesVersion: PRACTICES_VERSION, practices: PRACTICES, documents: [], warnings: [] };
+  const result = { version: 1, practicesVersion: PRACTICES_VERSION, practices: PRACTICES, constraints: {}, documents: [], warnings: [] };
   const index = readIndex(root, kitRoot);
+  const savedAnswers = readRegular(root, '.yaw/answers.yaml', kitRoot);
+  if (savedAnswers !== null) {
+    const answers = parseAnswers(savedAnswers).answers;
+    for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework']) {
+      if (answers[key] !== undefined) result.constraints[key] = answers[key];
+    }
+    if (secretValueRule(rulesFor(kitRoot), Object.values(result.constraints))) throw new FoundationError('Unsafe setup constraints; nothing was included.');
+  }
   if (!index) { result.warnings.push('No registered foundations. Consult AGENTS.md and existing project documentation; guided kickoff can register authoritative paths.'); return result; }
   for (const d of index.documents) {
     const text = readFoundationFile(root, d.path, { kitRoot });
@@ -156,7 +182,8 @@ export function foundationContext({ root, kitRoot } = {}) {
 }
 
 export function contextText(context) {
-  return [context.practices, '', 'Project ground truth (project-owned sources; supplied as reference material):',
+  return [context.practices, '', 'Setup architecture constraints (project input; resolve differences with reviewed foundations):',
+    ...constraintFacts(context.constraints), '', 'Project ground truth (project-owned sources; supplied as reference material):',
     ...context.documents.map((d) => `--- ${d.kind}: ${d.path}${d.changed ? ' (changed since review)' : ''} ---\n${d.text}${d.truncated ? '\n[Excerpt ends; read the complete source before deciding.]' : ''}`),
     ...context.warnings.map((w) => `Attention: ${w}`)].join('\n');
 }

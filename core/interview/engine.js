@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PLAIN } from '../cli/style.js';
 import { asksIn as asksQuestion, isPersonal, resolved, sourceOf } from './policy.js';
+import { depthOf } from './depth.js';
 
 export const MAX_BATCH = 6;
 
@@ -27,8 +28,8 @@ const SECTION_TITLES = {
 // Q is asked in every mode, S in standard and full, F only in full.
 export function asksIn(questionMode, setupMode) {
   if (questionMode === 'Q') return true;
-  if (questionMode === 'S') return setupMode === 'standard' || setupMode === 'full';
-  return setupMode === 'full';
+  if (questionMode === 'S') return ['standard', 'full', 'basic', 'pro', 'all'].includes(setupMode);
+  return ['full', 'pro', 'all'].includes(setupMode);
 }
 
 // when: { id: value | [values] } against earlier answers.
@@ -200,7 +201,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     for (const q of batch.questions) {
       if (!whenMatches(q.when, seen())) continue;
       const expertise = expertiseOf(seen());
-      if (expertise === 'layperson' && q.mode === 'F') {
+      if (depthOf(mode) !== 'pro' && expertise === 'layperson' && q.mode === 'F') {
         answers[q.id] = q.default;
         defaulted.push(q.id);
         sources[q.id] = sourceOf(q, false);

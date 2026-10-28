@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../lib/yaml.js';
+import { defaultQuestion } from '../interview/depth.js';
 import { tasksMode } from '../lib/tasks.js';
 import { validAnswer } from '../interview/engine.js';
 import { deriveFacts } from '../interview/facts.js';
@@ -115,7 +116,7 @@ export function collectQuestions(kitRoot, modules, definitions) {
     if (seen.has(q.id)) throw new KitError(`question id "${q.id}" is defined twice`);
     seen.add(q.id);
   }
-  return all;
+  return all.map(defaultQuestion);
 }
 
 const AUTONOMY = {
@@ -276,6 +277,9 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     flat[q.id] = q.default;
   }
   Object.assign(flat, answersDoc.answers ?? {});
+  // Preserve explicit GitHub task/module choices in older files without the newer on/off field.
+  if (!Object.hasOwn(answersDoc.answers ?? {}, 'tasks.use-github') &&
+      (['team', 'external-reviewers'].includes(answersDoc.answers?.['idea.team']) || ['github', 'both'].includes(flat['tasks.mode']) || modules.some((name) => ['github', 'team'].includes(name)))) flat['tasks.use-github'] = true;
   const team = modules.includes('team') || deriveFacts(flat).team === true;
   const answers = {};
   for (const [id, value] of Object.entries(flat)) {

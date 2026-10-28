@@ -25,7 +25,7 @@ const fixture = () => {
 
 test('interview UI: concise setup, focus switch and final module review', () => {
   const html = readFileSync(join(KIT_ROOT, 'core/web/assets/index.html'), 'utf8');
-  const app = readFileSync(join(KIT_ROOT, 'core/web/assets/app.js'), 'utf8');
+  const app = readFileSync(join(KIT_ROOT, 'core/web/assets/interview-view.js'), 'utf8');
   const workspace = readFileSync(join(KIT_ROOT, 'core/web/assets/workspace.js'), 'utf8');
   assert.match(html, /class="focus-toggle" role="switch"/);
   assert.match(html, /<h2 id="start-title">Presets<\/h2>/);
@@ -163,18 +163,18 @@ test('web state: toggles add dependencies, cascade removal and immediately hide 
   const m = createFormModel(fixture()), c = m.bootstrap();
   const enabled = toggleModules(c.modules, ['core'], 'team', true);
   for (const n of ['core', 'team', 'tasks', 'github', 'git-hooks']) assert.ok(enabled.includes(n));
-  const questions = visibleQuestions(c.questions, { 'idea.team': 'team' }, 'full', enabled);
+  const questions = visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', enabled);
   assert.ok(questions.some((q) => q.owner === 'team'));
   const removed = toggleModules(c.modules, enabled, 'github', false);
   assert.ok(!removed.includes('team') && !removed.includes('github'));
-  assert.ok(!visibleQuestions(c.questions, { 'idea.team': 'team' }, 'full', removed).some((q) => q.owner === 'team'));
+  assert.ok(!visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', removed).some((q) => q.owner === 'team'));
   assert.throws(() => m.normalize(setup({ modules: ['core', 'team'] })), /depends on/);
-  const full = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team' } }));
-  const lay = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team', 'user.expertise': 'layperson' } }));
-  assert.ok(full.visible.length > lay.visible.length);
+  const full = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team', 'tasks.use-github': true } }));
+  const lay = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team', 'tasks.use-github': true, 'user.expertise': 'layperson' } }));
+  assert.equal(full.visible.length, lay.visible.length);
   const fIds = c.questions.filter((q) => q.mode === 'F').map((q) => q.id);
-  assert.ok(lay.visible.every((id) => !fIds.includes(id)));
-  assert.ok(lay.defaulted.some((id) => fIds.includes(id)));
+  assert.ok(lay.visible.some((id) => fIds.includes(id)));
+  assert.ok(lay.visible.includes('team.session-context'));
 });
 
 test('web dialogs: Escape and native cancel close with cancellation, never a stale confirmation', () => {
@@ -611,7 +611,7 @@ test('planning chat: the prompt carries the answers so far, the reply fills idea
   assert.deepEqual([parsed.idea, parsed.language, parsed.runsOn, parsed.tasks, parsed.phases], ['Booking for bike repairs.', 'javascript', null, 2, 1]);
   assert.equal(parsed.warnings.length, 1);
   assert.equal((await f.post('kickoff-reply', { text: 'hello' })).status, 400);
-  const res = await f.post('apply', { ...setup({ answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.text': parsed.idea } }), plan: reply });
+  const res = await f.post('apply', { ...setup({ modules: ['core', 'tasks'], answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.text': parsed.idea } }), plan: reply });
   const events = (await res.text()).trim().split('\n').map((l) => JSON.parse(l));
   assert.ok(events.some((e) => e.type === 'kickoff' && e.plan?.tasks === 2));
   assert.match(readFileSync(join(f.root, 'docs/plan/kickoff.md'), 'utf8'), /Create the booking form/);

@@ -34,18 +34,17 @@ The LLM only proposes. Collection and application are scripts, so the result is 
 
 | Mode | For | Asks | Typical output |
 |---|---|---|---|
-| **Quick** | Prototypes, MVPs, "spin up a short Python project": the essential baseline | Project idea, agents, explicit language/runtime, and project Q questions of enabled modules; personal values are reused | The existing baseline modules and one selected profile; a purpose README is included |
-| **Full** | Maintained products, teams | The Q, S and F questions of the enabled modules | Quick + the tooling that applies to the project (doc 04 §1, ADR-0032) |
+| **Quick** | Essential project setup | Purpose, language/runtime, required framework and architecture constraints | Core plus explicitly saved optional module defaults and a selected profile |
+| **Basic** | Essential setup with governance choices | Quick plus repository agents, collaboration, GitHub and review gates | Optional modules chosen explicitly or through saved defaults |
+| **Pro / all** | Complete interview | Every applicable implemented question, regardless of expertise | All optional modules are available; none is silently enabled just by depth |
 
-There are two choices (ADR-0032). Standard is merged into Full; `standard` stays a valid value in existing answer files and manifests, with unchanged output, but is no longer offered. Doc 03 question 1.3 pre-selects the choice (prototype or MVP → Quick, long-lived product → Full; built in step 7).
+The stored depths are `quick`, `basic` and `pro`; `all` is accepted as Pro. Existing `full` and `standard` answer files remain readable with their legacy module-selection policy. Installed projects keep their module selections. This replaces the two-depth choice in ADR-0032.
 
-"Mode" (`quick`/`full`, stored as `answers.yaml#mode` and `manifest.json#preset`) is not a "preset": a saved setup is called a preset only in `yaw presets` and `~/.yaw/presets/` (ADR-0009). Files are counted without the `.yaw/base/` copies. Phase-1 contents of the modes: doc 04 §1.
+Unasked settings reuse explicit project values, saved personal/tool defaults, then documented defaults. Optional tools, GitHub, review triggers, comfort and evaluation features start off if never chosen. Global Settings → Defaults saves tool defaults separately from the personal profile. The summary identifies answered, saved, defaulted, proposed and confirmed values. A depth is an interview choice, not purchase, provider or provisioning consent.
 
-**The mode controls the generated output**, not only the questions shown: Quick renders only its baseline modules; Full adds the modules that apply (for example `github` and `ci` only when the project uses GitHub). Unasked personal questions use explicit project values, saved personal settings, then documented defaults. Other unasked questions take their documented defaults. The summary identifies answered, saved personal setting, documented default, proposed and confirmed proposal values. Essential unanswered project facts stay unresolved.
+Quick must establish purpose, language and where the project runs. Language and runtime start unselected; an uncertain answer opens help or guided planning. Framework is an optional explicit constraint. Hosting control, library reuse, external application services and cost policy remain independent architecture choices; they can stay explicitly undecided until guided kickoff. A capped cost policy asks for currency, period and limits. See [doc 03 §3](03-interview.md#3-architecture-agent-proposes-user-may-override).
 
-Quick must establish purpose, language and where the project runs. The idea prompt asks for users, their main task and important data/interface constraints. Language and runtime start unselected. An uncertain answer opens help or guided planning; it never silently chooses JavaScript/local. Planning recommendations and imported project choices must be reviewed and confirmed before Apply. No new baseline module, dependency or hook output is added.
-
-Quick is a baseline, not a limit: `yaw add <module>` later adds a module and asks only that module's questions (ADR-0023). The mode records the **starting depth** chosen at `yaw init`; adding modules does not change it, and the installed modules are read from the manifest, not from the mode.
+The mode records the starting depth. Later `yaw add <module>` and `yaw remove <module>` change installed modules independently. Reproducible `--answers` setup never implicitly merges machine defaults.
 
 ### Reviewing an existing setup
 
@@ -57,7 +56,7 @@ Full editing can change setup depth, profiles and agents. Installed modules rema
 
 ## 3. Two lanes, one schema
 
-Both lanes render the same question schema (`interview/base.yaml` + `modules/*/module.yaml#questions`), so they cannot drift.
+Initial browser setup and Settings → Interview mount one reusable wizard markup/controller, including planning, preview, confirmation and Apply. Settings keeps its workspace running after Apply. Both terminal and browser lanes render the same question schema (`interview/base.yaml` + `modules/*/module.yaml#questions`), so they cannot drift.
 
 Before either lane starts, the target folder is checked (#168): the home folder and the file-system root are refused unless `--force` is given; a non-empty folder without `.git` or `.yaw` (the `--answers` file does not count) needs a confirmation, which `--yes` gives with a warning on stderr. Without a terminal, the browser lane refuses such a folder unless forced.
 
@@ -67,7 +66,7 @@ The idea goes into `README.md` (#171): without a README, init writes one (`# Pro
 
 - Prompts in batches per section (at most six), defaults in brackets, Enter takes a valid default, `?` expands help, and `skip` takes a default only for an optional question. Essential purpose/language/runtime answers cannot be skipped or left empty. Enter on a saved project choice explicitly confirms it. A separate `w) Continue in the browser` entry appears at the setup depth and every question. Handoff carries reused personal settings, answers so far and unreviewed imported project choices. Project files are written only after confirmation; Save draft and personal-settings saves have their own explicit actions.
 - On a terminal the interview uses plain ANSI colour, no dependencies and no emoji (#163): bold titles, cyan option keys, dimmed hints, the default option in green. The up and down arrow keys put the next or previous choice on the input line, starting from the default; typing, `?`, `skip` and `web` work as before. `NO_COLOR`, `TERM=dumb` and non-TTY output give the plain text.
-- The first question is setup depth (Quick or Full; Enter takes Quick), with optional `u) Review and save personal settings` and the existing preset/browser entries. Quick then asks repository agents and project questions of its modules. It reuses personal values, including expertise, from the first project question. Full retains its deeper interview and personal review, using saved personal values as defaults. Conditional module questions remain hidden when irrelevant. Agent choices still come from the phase-aware catalogue.
+- The first question is setup depth (Quick, Basic or Pro / all; Enter takes Quick), with optional `u) Review and save personal settings` and the existing preset/browser entries. Quick asks essential project and architecture choices; Basic also asks repository agents, collaboration, GitHub and review gates. It reuses personal values, including expertise, from the first project question. Pro retains its complete interview and personal review, using saved personal values as defaults. Conditional module questions remain hidden when irrelevant. Agent choices still come from the phase-aware catalogue.
 - The initial menu also offers `p) Load a previous setup`. Choose a previously saved preset (number, name, or arrow keys), or `b` to return. Its saved depth and answers become the interview defaults; Enter keeps an answer and typing replaces it. Review the previous idea before confirming. Loading uses the same validation as browser prefill, copies no project files or secrets, changes no saved preset, and does not grant consent to save again. Browser handoff keeps saved answers that have not yet been reviewed. If no presets were saved, the CLI explains the save offer and the existing `yaw init --answers /path/to/project/.yaw/answers.yaml` alternative.
 - Non-interactive: `yaw init --answers answers.yaml --yes` (CI, repeat setups). Supply purpose plus a valid language/runtime pair, or a confirmed project proposal with known profiles. A `proposed` proposal is refused; `--yes` does not supply missing facts. This reproducible lane uses the file's personal values or documented defaults, never implicitly merges a machine's profile, and preserves a supplied confirmed proposal file byte for byte (ADR-0019).
 
@@ -90,9 +89,9 @@ Each server uses a distinct cookie name, avoiding collisions between tabs for di
 
 Y-7.4 implementation:
 
-- Start with Quick or Full, then New, a saved user profile, an answers-only preset / previous-project snapshot, or a local draft. Loading is read-only and never grants consent to save. A saved `standard` mode remains compatible; selecting Full explicitly migrates the form to Full.
-- Questions and help come from the interview schema and module definitions. Only implemented modules have questions; future catalogue sections and secret onboarding are not fabricated. Phase-3 agents remain disabled. Layperson help/examples expand, expert hints collapse, and F questions use defaults for laypeople.
-- New setups automatically reuse a valid saved personal profile. An absent or partial profile uses documented defaults; an invalid/unreadable profile gives a generic warning and remains untouched. Quick hides personal questions, with an optional project-level review checkbox and a link to Global Settings for future-project defaults. Full retains the deeper review. Existing projects keep their saved settings.
+- Start with Quick, Basic or Pro / all, then New, a saved user profile, an answers-only preset / previous-project snapshot, or a local draft. Loading is read-only and never grants consent to save. Legacy depths remain readable; selecting a new depth explicitly uses the new policy.
+- Questions and help come from the interview schema and module definitions. Only implemented modules have questions; future catalogue sections and secret onboarding are not fabricated. Phase-3 agents remain disabled. Layperson help/examples expand, expert hints collapse, and Pro asks advanced questions even for laypeople.
+- New setups automatically reuse a valid saved personal profile. An absent or partial profile uses documented defaults; an invalid/unreadable profile gives a generic warning and remains untouched. Quick hides personal questions, with an optional project-level review checkbox and a link to Global Settings for future-project defaults. Pro retains the deeper review. Existing projects keep their saved settings.
 - Purpose, language and runtime remain unresolved until supplied. Incomplete preview lists what is needed; *Save draft* can keep that progress, while *Apply*, *Save preset* and file diff require resolved essentials. Loaded drafts/presets and planning recommendations carry pending project choices. Continuing through their project/stack steps, editing those choices, or confirming the choices in the review resolves them. The server independently refuses Apply while essentials are missing or pending confirmation.
 - The profile selector is editable; leaving it on "Suggest from answers" needs a unique rule-based match before saving or applying. Module toggles enable dependencies and disabling a dependency also disables its dependents, including their questions.
 - *Save draft* explicitly writes `.yaw/draft.yaml` with mode 0600, not the canonical answers or a manifest. Restart `yaw init --web` and choose "Resume project draft" to continue.
@@ -104,7 +103,7 @@ Y-7.4 implementation:
 
 ## 4. Expertise levels
 
-Quick reuses expertise from the saved profile or the documented `intermediate` default, so help depth applies from the first project question. Full and optional personal onboarding/review can ask it explicitly. Three levels remain unchanged (ADR-0042); saving globally is a separate opt-in (doc 03 §0). It switches:
+Quick reuses expertise from the saved profile or the documented `intermediate` default, so help depth applies from the first project question. Pro and optional personal onboarding/review can ask it explicitly. Three levels remain unchanged (ADR-0042); saving globally is a separate opt-in (doc 03 §0). It switches:
 
 | Aspect | Layperson | Intermediate | Expert |
 |---|---|---|---|
@@ -112,7 +111,7 @@ Quick reuses expertise from the saved profile or the documented `intermediate` d
 | Hints | Shown | Shown | Collapsed behind `?` (CLI) |
 | Wording (form) | Plain language + one example | Plain language | Technical terms |
 | Defaults (form) | Explained in one sentence | Shown | Shown, rarely explained |
-| Questions | F questions take their default and are listed as "default" in the summary; Q and S are asked | All of the chosen mode | All of the chosen mode |
+| Questions | All applicable questions of the chosen depth; Pro includes advanced questions | All of the chosen mode | All of the chosen mode |
 
 The CLI implements help blocks, hints and questions (Y-7.1); the wording and defaults rows are the form's (Y-7.4).
 

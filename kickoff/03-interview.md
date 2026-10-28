@@ -2,7 +2,7 @@
 
 The Quick/personal boundary in [doc 15 §1](15-project-foundations.md#1-quick-asks-about-this-project) is implemented in the terminal and browser. The catalogue also contains future questions; availability still follows implemented module definitions.
 
-Legend: project **Q** questions are shown in Quick and Full, **S** and **F** only in Full (ADR-0032; `standard` still asks Q and S). **Personal** values are reused in Quick, regardless of their former Q/S designation, and can be reviewed separately. Repository agents (0.0) remain a project choice. `→` = module or artefact the answer drives. Disabled modules have no interview questions. Optional questions have defaults; essential purpose/language/runtime questions start unresolved. “Don't know” calls for help or a proposal to confirm, rather than automatically selecting a stack.
+Legend: Q/S/F annotations describe the catalogue's original question groups. The shared depth policy now governs visibility: **Quick** asks essential purpose and architecture, **Basic** adds repository agents, collaboration, GitHub and review gates, and **Pro / all** asks every applicable implemented question. Saved personal/tool defaults are reused; optional tools are off when never chosen. Pro does not suppress advanced questions for laypeople. Future catalogue entries remain unavailable until implemented. Essential purpose/language/runtime start unresolved; uncertainty calls for help or a proposal to confirm.
 
 Rules for the interviewer (CLI, form, or agent):
 
@@ -13,7 +13,7 @@ Rules for the interviewer (CLI, form, or agent):
 
 ## 0. Personal settings and repository agents
 
-Personal values can be reviewed using the optional `u` setup-menu entry or Global Settings → Defaults. They are stored in `~/.yaw/user-profile.yaml` only after explicit consent, independently of project-preset saving (doc 02 §5, ADR-0043). Quick reuses explicit project values, then saved personal settings, then documented defaults. Full still offers its deeper review with saved defaults. Existing-project edits preserve saved values. The `user.agents` key is retained for compatibility, but its repository selection is always asked.
+Personal values can be reviewed using the optional `u` setup-menu entry or Global Settings → Defaults. They are stored in `~/.yaw/user-profile.yaml` only after explicit consent, independently of project-preset saving (doc 02 §5, ADR-0043). Quick reuses explicit project values, then saved personal settings, then documented defaults. Pro offers its complete review with saved defaults. Existing-project edits preserve saved values. The `user.agents` key is retained for compatibility, but its repository selection is asked in Basic and Pro and reused in Quick.
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|
@@ -41,10 +41,10 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 |---|---|---|---|
 | 1.1 | Describe the idea in a few sentences. (free text) | Q | proposal |
 | 1.2 | Who uses it? (me only / a known group / the public) | Q | privacy, security, scale |
-| 1.3 | Prototype, MVP, or long-lived product? | Q | mode (prototype, MVP → Quick; long-lived product → Full; ADR-0032). The CLI asks it as the first question, the setup depth, before the interview; the answer is `answers.yaml#mode`, not a question key (Y-7.1), gate strictness |
+| 1.3 | Prototype, MVP, or long-lived product? | Q | mode (`quick`, `basic`, `pro`; the interview depth is independent of product lifetime). The CLI asks it as the first question, the setup depth, before the interview; the answer is `answers.yaml#mode`, not a question key (Y-7.1), gate strictness |
 | 1.4 | What does success look like in 3 and 12 months? What is out of scope? | F | ADRs, tasks |
 | 1.5 | Solo or team? Who approves changes? (solo / team / external reviewers) | Q | **team mode (doc 14)**, review policy, branch protection |
-| 1.6 | Budget envelope (hosting, AI, tools): free only / small monthly / flexible | S | vendors, hosting |
+| 1.6 | Budget envelope is collected with architecture cost policy (3.10–3.11), covering hosting, libraries, services, AI and tools | Q | one shared project constraint |
 | 1.7 | Biggest risk you can imagine? | F | notices |
 
 ## 2. Product and domain
@@ -66,6 +66,14 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 | 3.4 | Login needed? Which kind? | S | auth ADR |
 | 3.5 | Expected load and latency needs (tiny / moderate / high) | F | performance budget |
 | 3.6 | Repositories: one / several (frontend, backend, public vs. private) | F | repo ADR |
+| 3.7 | Infrastructure control: on premises / self-managed server or rented infrastructure / managed hosting allowed / **undecided** (`arch.hosting-control`) | Q | deployment and network boundaries |
+| 3.12 | Required framework or existing stack to keep? (`arch.framework`, optional text) | Q | preserve explicit stack constraints during kickoff |
+| 3.8 | Library policy: built-in/standard only / maintained open-source / commercial libraries may be considered / **undecided** (`arch.libraries`) | Q | build/reuse and maintenance choices |
+| 3.9 | External application services: none / explicitly approved only / proposals allowed / **undecided** (`arch.services`) | Q | auth, storage, APIs, SaaS and data flows |
+| 3.10 | Cost policy: no paid components/subscriptions / capped / paid proposals with estimates / **undecided** (`arch.cost`) | Q | architecture and kickoff constraints |
+| 3.11 | Budget cap, currency and period, plus one-off/overage rules; shown only for capped policy (`arch.cost-limit`) | Q | estimates and review |
+
+These four policies are independent: self-hosting can use open-source libraries; managed hosting does not automatically permit external auth or data services; open-source software can still have operating costs. All three depths collect them without personal-profile reuse. `undecided` and a blank cap remain unresolved constraints for guided kickoff, rather than implicit permission. They do not prevent installing a deterministic kit, which provisions no infrastructure or subscriptions. The shared prompt includes the exact saved choices and asks about missing limits or contradictions before committing to an architecture. Permissions to propose paid options never authorize purchases or provisioning.
 
 The proposal shows: chosen profile(s), shape (monolith, static + API, …), data, hosting, and two rejected alternatives with one-line reasons.
 
@@ -97,6 +105,7 @@ The proposal shows: chosen profile(s), shape (monolith, static + API, …), data
 | 6.4 | Density (airy / balanced / compact) and motion (none / subtle / expressive) | S |
 | 6.5 | Accessibility level (default: WCAG 2.2 AA) | S |
 | 6.6 | Reference sites or apps you like (URLs or names) | F |
+| 6.7 | Before substantial UI implementation, review a rough wireframe, screen mockup or clickable example: layout/hierarchy/navigation/control placement/key states as well as colours and typography | Guided kickoff |
 
 ## 7. Privacy (→ doc 07)
 

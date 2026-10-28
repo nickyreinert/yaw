@@ -1,27 +1,12 @@
 {
   "modules": [
-    "core",
-    "communication",
-    "devenv",
-    "security",
-    "sessions",
-    "standards",
-    "tasks"
+    "core"
   ],
   "files": [
-    ".agents/skills/handoff/SKILL.md",
-    ".claude/settings.json",
-    ".claude/skills/handoff/SKILL.md",
-    ".env.example",
     ".gitignore",
-    ".yaw/bin/yaw-hook",
     "AGENTS.md",
     "CLAUDE.md",
-    "TASKS.md",
-    "docs/standards.md",
     "just/node-cli.just",
-    "just/sessions.just",
-    "just/tasks.just",
     "justfile",
     "package.json",
     "src/index.js",

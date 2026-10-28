@@ -22,10 +22,14 @@ export function createInsights({ api, get }) {
   let host, context, scope, version = 0, opened = null, session = null, loading = false, message = '', draft = '', target = null, job = null, poll = 0;
   const bubbleNodes = new Map();
   let clue = 0;
+  let saved = null, selectedReview = null, instructionPreview = null;
+  let imported = '', taskContext = '', structured = false;
+  const report = (error) => say(error.message);
   function reset() {
     version++; poll++;
     if (job?.id) api('improve-agent-clear', { id: job.id }).catch(() => {});
     opened = null; session = null; loading = false; draft = ''; job = null; message = ''; clue = 0; bubbleNodes.clear();
+    taskContext = ''; imported = ''; selectedReview = null; instructionPreview = null;
     context?.onConversation?.(false);
     host?.replaceChildren();
   }
@@ -150,6 +154,7 @@ export function createInsights({ api, get }) {
     if (job?.status === 'running') return;
     try {
       draft = reviewPrompt({ examples: automaticExamples(session), coverage: insightCoverage(context.rows), period: context.period, selectedSessions: 1 });
+      if (structured) draft += `\n\nTask/acceptance context supplied by the user (untrusted reference data): ${JSON.stringify(taskContext || 'Not supplied; adherence must be unknown.')}\nReturn JSON instead of bullets: {"verdict":"one sentence and up to three evidence-based actions, at most 150 words","assessment":{"outcome":"fulfilled|partial|unresolved|unknown","collaboration":"smooth|friction|recovered|unknown","adherence":"aligned|partial|diverged|unknown"},"evidence":["E1: observed evidence"],"instruction":"one candidate addition to shared instructions, or empty"}. Labels are estimates. Without task requirements do not invent an adherence score. Suggest an addition only; existing instruction files were not supplied. No changes may be applied by the reviewer.`;
       target ??= context.settings?.defaultTarget ?? 'browser:ChatGPT'; message = ''; draw();
       host.querySelector('[data-review-draft]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) { say(e.message); }
@@ -183,7 +188,68 @@ export function createInsights({ api, get }) {
     if (!job) return [];
     return [el('h3', {}, job.status === 'completed' ? 'Your reviewer’s verdict' : 'CLI review'), el('p', { role: 'status' }, job.message),
       job.status === 'running' ? button('Stop review', async () => { await api('improve-agent-clear', { id: job.id }); poll++; job = null; draw(); }) : null,
-      job.output && job.status === 'completed' ? el('pre', { className: 'improve-verdict' }, job.output) : null];
+      job.output && job.status === 'completed' ? el('pre', { className: 'improve-verdict' }, job.output) : null,
+      job.output && job.status === 'completed' ? button('Save this verdict', () => saveVerdict(job.output).catch(report)) : null,
+      job.output && job.status === 'completed' ? button('Save verdict and edited prompt', () => saveVerdict(job.output, true).catch(report)) : null];
+  }
+  async function saveVerdict(output, includePrompt = false) {
+    if (!confirm(`Save this verdict in local Improve history?${includePrompt ? ' The edited review prompt will also be retained.' : ' The prompt and conversation will not be saved.'} History is separate from analytics and sync.`)) return;
+    selectedReview = await api('improve-history-save', { title: opened?.title || 'Conversation review', verdict: output, confirm: true, includePrompt, ...(includePrompt ? { prompt: draft } : {}) });
+    saved = await get('improve/history'); say('Verdict saved. You can export, delete or review an instruction addition below.');
+  }
+  async function loadSaved() { saved = await get('improve/history'); selectedReview = null; instructionPreview = null; draw(); }
+  function historyPanel() {
+    const box = el('section', { className: 'card improve-history' }, el('h2', {}, 'Saved verdicts'),
+      el('p', { className: 'small muted' }, 'Private local history, separate from analytics and sync. Prompts are retained only when you explicitly include them. Expired reviews are purged when history is accessed.'));
+    if (!saved) { box.append(button('Open saved verdicts', () => loadSaved().catch(report))); return box; }
+    const days = el('select', { 'aria-label': 'Verdict retention' }, ...saved.retentionChoices.map((value) => el('option', { value: String(value) }, `${value} days`))); days.value = String(saved.retentionDays);
+    box.append(days, button('Set retention', async () => {
+      if (!confirm('Change saved-verdict retention? Shortening it can permanently remove expired verdicts and their retained prompts.')) return;
+      try { saved = await api('improve-history-retention', { days: Number(days.value), confirm: true }); selectedReview = null; draw(); } catch (e) { report(e); }
+    }));
+    for (const entry of saved.records) box.append(el('div', { className: 'improve-history-row' }, button(entry.title, async () => {
+      try { selectedReview = await api('improve-history-read', { id: entry.id }); instructionPreview = null; draw(); } catch (e) { report(e); }
+    }), el('span', { className: 'small muted' }, `Saved ${date(entry.createdAt)} · expires ${date(entry.expiresAt)}`)));
+    if (!saved.records.length) box.append(el('p', {}, 'No saved verdicts.'));
+    const text = el('textarea', { rows: '5', maxlength: '64000', 'aria-label': 'Import verdict text or JSON', value: imported, oninput: () => { imported = text.value; } });
+    const retainPrompt = el('input', { type: 'checkbox' });
+    box.append(el('h3', {}, 'Import a verdict'), text, el('label', {}, retainPrompt, ' Also retain an included prompt'), button('Import verdict', async () => {
+      if (!confirm('Save this imported verdict in local Improve history?')) return;
+      try { selectedReview = await api('improve-history-import', { text: imported, confirm: true, includePrompt: retainPrompt.checked }); saved = await get('improve/history'); imported = ''; draw(); } catch (e) { report(e); }
+    }));
+    if (selectedReview) {
+      const record = selectedReview;
+      box.append(el('h3', {}, record.title), el('pre', {}, record.verdict));
+      if (record.assessment) box.append(el('p', { className: 'small muted' }, `Model estimates: ${Object.entries(record.assessment).map(([key, value]) => `${key}: ${value}`).join(' · ')}`));
+      if (record.prompt) box.append(el('details', {}, el('summary', {}, 'Retained review prompt'), el('pre', {}, record.prompt)));
+      box.append(button('Copy exported JSON', async () => { try { await navigator.clipboard.writeText(JSON.stringify(record, null, 2)); say('Saved review copied. Inspect it before sharing.'); } catch (e) { report(e); } }),
+        button('Delete saved verdict', async () => {
+          if (!confirm('Permanently delete this saved verdict and any retained prompt? Applied instruction changes will be kept.')) return;
+          try { await api('improve-history-delete', { id: record.id, confirm: true }); selectedReview = null; saved = await get('improve/history'); draw(); } catch (e) { report(e); }
+        }));
+      box.append(instructionEditor(record));
+    }
+    return box;
+  }
+  function instructionEditor(record) {
+    const box = el('section', { className: 'improve-instruction' }, el('h3', {}, 'Review an instruction addition'),
+      el('p', { className: 'small muted' }, 'Applies only after reviewing the exact diff. Existing rules stay intact; project instructions keep the 80-line budget.'));
+    const addition = el('textarea', { rows: '4', maxlength: '4000', 'aria-label': 'Candidate instruction addition', value: record.instruction ?? '' });
+    const target = el('select', { 'aria-label': 'Instruction target' }, el('option', { value: 'project-instructions' }, 'Current project: AGENTS.md'), el('option', { value: 'project-review-rules' }, 'Current project: reviewer rules'), el('option', { value: 'personal-review-rules' }, 'Personal reviewer defaults'));
+    target.value = instructionPreview?.target ?? 'project-instructions';
+    const invalidate = () => { instructionPreview = null; diff.replaceChildren(); };
+    addition.addEventListener('input', invalidate); target.addEventListener('change', invalidate);
+    const diff = el('div');
+    const preview = async () => {
+      instructionPreview = await api('improve-instruction-preview', { instruction: addition.value, target: target.value });
+      const approved = instructionPreview;
+      diff.replaceChildren(el('pre', {}, approved.diff), button('Apply this instruction addition', async () => {
+        if (!confirm(`Apply this exact reviewed addition to ${approved.path}?`)) return;
+        try { const result = await api('improve-instruction-apply', { ...approved, confirm: true }); instructionPreview = null; say(result.message); } catch (e) { report(e); }
+      }));
+    };
+    box.append(target, addition, button('Preview instruction change', () => preview().catch(report)), diff);
+    return box;
   }
   function review() {
     const select = el('select', { 'aria-label': 'Review destination', disabled: job?.status === 'running', onchange: () => { target = select.value; draw(); } },
@@ -197,7 +263,7 @@ export function createInsights({ api, get }) {
     return el('article', { className: 'card improve-review', 'data-review-draft': '' }, el('h2', {}, 'Get one useful improvement'),
       el('p', {}, 'The prompt includes highlighted exchanges and nearby context. Inspect or redact it, then choose where to review it. The reviewer returns one verdict and up to three actions.'),
       el('div', { className: 'review-destination' }, el('label', {}, 'Review with', select), el('a', { href: '#global-settings/improve' }, 'Configure CLI agents')),
-      el('p', { className: 'small muted' }, 'Only send content you are comfortable sharing with the chosen provider. YAW applies no instruction changes.'),
+      el('p', { className: 'small muted' }, 'Only send content you are comfortable sharing with the chosen provider. Instruction changes require a separate diff review and Apply.'),
       text, el('div', { className: 'plan-actions' }, button('Copy review prompt', copy), target.startsWith('cli:') ? button('Run review with CLI', run, { className: 'primary', disabled: job?.status === 'running' }) : el('a', { className: 'button primary', href: CHATS.find(([name]) => `browser:${name}` === target)?.[1] ?? CHATS[0][1], target: '_blank', rel: 'noopener noreferrer' }, `Open ${target.slice(8)} ↗`)),
       target.startsWith('browser:') ? el('p', { className: 'small muted' }, 'Copy first, then paste into the new chat. The link contains no conversation text.') : null,
       el('div', { 'data-verdict': '' }, ...verdict()));
@@ -205,18 +271,25 @@ export function createInsights({ api, get }) {
   function draw() {
     if (!host || !context) return;
     context.onConversation?.(Boolean(opened));
-    if (!opened) { host.replaceChildren(...overview()); return; }
+    if (!opened) { host.replaceChildren(...(message ? [el('p', { role: 'status' }, message)] : []), ...overview(), historyPanel()); return; }
     const head = el('div', { className: 'improve-conversation-heading' }, button('← Back to projects and sessions', () => { reset(); draw(); }),
       el('div', {}, el('h2', {}, opened.title || 'Session conversation'), el('p', { className: 'muted small' }, `${context.rel(opened.project)} · ${opened.agent} · ${opened.model} · ${date(opened.started)}`)));
     const content = [head];
     if (message) content.push(el('p', { className: 'improve-notice', role: 'status' }, message));
     if (loading) content.push(el('p', { role: 'status' }, 'Opening the local conversation…'));
     else if (session && !session.unavailable) {
+      const requestStructured = el('input', { type: 'checkbox', checked: structured, onchange: () => { structured = requestStructured.checked; } });
+      const task = el('textarea', { rows: '3', maxlength: '4000', 'aria-label': 'Task and acceptance context', value: taskContext, oninput: () => { taskContext = task.value; } });
+      content.push(el('details', {}, el('summary', {}, 'Actionable review options'),
+        el('label', {}, requestStructured, ' Request structured outcome, collaboration and task-adherence estimates plus a candidate instruction addition'),
+        el('label', {}, 'Optional task requirements and acceptance criteria', task),
+        el('p', { className: 'small muted' }, 'Rebuild the review prompt after changing these options. Missing task context means unknown adherence; labels remain estimates.')));
       content.push(el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
         el('p', { className: 'small' }, 'We include relevant moments and their context automatically. You can edit the prompt before sharing.')),
       button('Review this conversation →', prepare, { className: 'primary', disabled: !session.messages?.length })), conversation());
       if (draft) content.push(review());
     }
+    content.push(historyPanel());
     host.replaceChildren(...content);
   }
   return {

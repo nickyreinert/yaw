@@ -8,6 +8,8 @@ Variety = **direction** (one pick) × **knobs** (four sliders) × **brand** (opt
 
 ## 1. Design directions (catalogue)
 
+Before substantial UI implementation, offer a proportionate example for review. A low-fidelity wireframe can establish **layout**: information hierarchy, navigation, grouping and placement of controls, realistic content, narrow/wide arrangements and the main success/empty/error states. Review this structure and the user flow before polishing colours, typography and spacing. A mockup can cover both structure and visual treatment; a clickable prototype helps where interaction is uncertain. Link the accepted example and observable criteria from the project's UI/UX foundation. Existing approved examples can be reused; a small change does not need a new design exercise. For command-line UX, example help/output and a sample interaction can be sufficient. This is guidance to make intended behavior reviewable before implementation, not evidence that a design has been validated with users.
+
 Each direction is a folder `design/directions/<name>/` with `direction.md` (mood, rules, do/don't), `tokens.base.json`, and a preview card (HTML) for the form.
 
 | Direction | In plain words | Typography | Colour | Shape & motion | Fits |

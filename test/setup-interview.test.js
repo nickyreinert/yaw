@@ -12,6 +12,8 @@ import { createFormModel } from '../core/web/form-model.js';
 import { createFormApi, DRAFT } from '../core/web/init.js';
 import { effectiveAnswers, visibleQuestions } from '../core/web/assets/ui-state.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
+import { kickoffPrompt } from '../core/lib/kickoff.js';
+import { foundationContext } from '../core/lib/foundations.js';
 
 const BASE = { 'idea.text': 'Rename photos safely for a local photographer.', 'arch.language': 'python', 'arch.runs-on': 'local' };
 const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief', 'user.register': 'technical' };
@@ -20,6 +22,39 @@ function save(f, answers = PERSONAL) {
   saveSetup({ ...f, answers, mode: 'quick', projectRoot: f.root, kit: '0.1.0', preset: false, profile: true });
   return join(f.env.HOME, '.yaw/user-profile.yaml');
 }
+
+test('project architecture constraints reach terminal, browser, kickoff and agent context independently of personal settings', async () => {
+  const f = fixture();
+  save(f);
+  const chosen = { ...BASE, 'arch.hosting-control': 'on-premises', 'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month; no overage' };
+  const result = await cli(f, prompts(chosen));
+  assert.equal(result.code, 0, result.err);
+  const answers = readAnswers(f.root).answers;
+  for (const [key, value] of Object.entries(chosen)) assert.equal(answers[key], value);
+  const browser = createFormModel({ ...f, root: tmp() }).normalize({ mode: 'quick', answers: chosen });
+  assert.deepEqual(browser.doc.answers, answers);
+  const prompt = kickoffPrompt({ answers });
+  assert.match(prompt, /Hosting control: on-premises/);
+  assert.match(prompt, /Library policy: open-source/);
+  assert.match(prompt, /External application services: none/);
+  assert.match(prompt, /Cost policy: capped/);
+  assert.match(prompt, /Budget cap: EUR 20 per month; no overage/);
+  assert.equal(foundationContext({ root: f.root }).constraints['arch.services'], 'none');
+  assert.equal(foundationContext({ root: f.root }).constraints['arch.cost-limit'], chosen['arch.cost-limit']);
+});
+
+test('unknown project constraints remain explicit and mockups include layout before visual polish', () => {
+  const model = createFormModel(fixture());
+  const normalized = model.normalize({ mode: 'quick', answers: BASE });
+  for (const id of ['arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost']) assert.equal(normalized.doc.answers[id], 'undecided');
+  assert.equal(Object.hasOwn(normalized.doc.answers, 'arch.cost-limit'), false);
+  const prompt = kickoffPrompt({ answers: BASE });
+  assert.match(prompt, /Cost policy: undecided \(ask before choosing\)/);
+  assert.match(prompt, /wireframe, screen mockup or clickable prototype/);
+  assert.match(prompt, /Mockups cover layout as well as colours/);
+  assert.match(prompt, /Review structure and the main flow before polishing colour/);
+  assert.match(prompt, /never infer a subscription, credit-card, purchase or provisioning approval/);
+});
 function prompts(answers = BASE, { onboarding = false, saveProfile = false } = {}) {
   const p = scripted(), questions = collectQuestions(KIT_ROOT, ['core', 'communication', 'comfort', 'tasks']);
   let started = false;
@@ -52,7 +87,7 @@ test('Quick CLI and browser reuse the same saved personal values without asking 
   const p = prompts(), r = await cli(f, p);
   assert.equal(r.code, 0, r.err);
   const doc = readAnswers(f.root);
-  for (const [id, value] of Object.entries(PERSONAL)) assert.deepEqual(doc.answers[id], value);
+  for (const [id, value] of Object.entries(PERSONAL).filter(([id]) => !['user.length', 'user.register'].includes(id))) assert.deepEqual(doc.answers[id], value);
   const shown = p.shown.join('');
   for (const label of ['Your experience with software', 'Language for chat', 'How often should the agent ask', 'How long should answers be']) assert.ok(!shown.includes(label));
   assert.match(shown, /What language do you want to use/);
@@ -82,7 +117,7 @@ test('partial profiles use documented defaults; explicit project overrides win',
 test('saved layperson expertise keeps Full F-question behavior in sync with the CLI', async () => {
   const f = fixture(); save(f, { 'user.expertise': 'layperson' });
   const model = createFormModel(f);
-  const given = { ...BASE, 'idea.team': 'team', 'team.session-context': false };
+  const given = { ...BASE, 'idea.team': 'team', 'tasks.use-github': true, 'team.session-context': false };
   const result = model.normalize({ mode: 'full', answers: given });
   const questions = result.answerQuestions;
   let current;
@@ -90,7 +125,7 @@ test('saved layperson expertise keeps Full F-question behavior in sync with the 
     show(text) { current = questions.find((q) => text.split('\n')[0].endsWith(q.label)) ?? current; },
     ask: async () => Object.hasOwn(given, current.id) ? String(given[current.id]) : '',
   } });
-  assert.equal(result.doc.answers['team.session-context'], true);
+  assert.equal(result.doc.answers['team.session-context'], false);
   assert.deepEqual(result.doc.answers, cli.answers);
 });
 

@@ -50,6 +50,8 @@ No meaningful persistence means an explicit “No persistent application data”
 
 Existing repositories reuse their established equivalent documents. The kickoff summary lists the authoritative paths; do not create a parallel set that disagrees with them. A concise pointer from `AGENTS.md` makes the foundations discoverable within its existing line budget (ADR-0009).
 
+Architecture inputs now distinguish infrastructure control (`arch.hosting-control`), installed libraries (`arch.libraries`), external application services (`arch.services`) and cost policy (`arch.cost`, plus `arch.cost-limit` when capped). On premises and third-party libraries are compatible choices. Managed hosting, external APIs and paid dependencies each need their own agreement. Unknown choices stay explicit; the planning prompt asks about missing constraints and conflicts rather than assuming permission. Architecture records the agreed build/reuse rationale, data flows, operating/maintenance costs, free-tier/trial/overage limits and exit options. A permitted paid proposal is not purchase or provisioning approval.
+
 ### A proportionate example
 
 For a local photo-renaming script:
@@ -80,6 +82,7 @@ Keep the prompt and a short principle checklist versioned with the kit. Maintain
 
 The guidance should:
 
+- Offer a small example before substantial UI implementation: a rough wireframe, screen mockup or clickable prototype. **Layout is part of the mockup**, including content hierarchy, navigation, grouping and placement of controls, realistic content, responsive arrangements and key states. Review structure and the main flow before colour, typography and spacing. Link the accepted example and criteria from `ui-ux.md`; reuse existing approved examples where appropriate. CLI flows can use sample commands/help/output.
 - Start from real users, their tasks and existing evidence. Label invented personas and untested assumptions. Ask for the most consequential missing information rather than a long generic questionnaire. [GOV.UK's user-needs guidance](https://www.gov.uk/service-manual/user-research/start-by-learning-user-needs) recommends testing ideas with likely users and treating suggestions without user evidence as assumptions.
 - Walk through the main task with realistic content, including failure and recovery. Explain choices in terms of the user's goal, necessary steps, clear feedback, understandable language and prevention of costly mistakes. Propose one small prototype or walkthrough to test the riskiest assumption. [GOV.UK's Service Standard](https://www.gov.uk/service-manual/service-standard/point-1-understand-user-needs) emphasizes understanding the problem and testing assumptions early with prototypes.
 - Include accessibility from the first flow: meaningful structure and labels, keyboard/focus behavior, understandable errors, contrast and relevant input alternatives. For web interfaces, use the project's applicable criteria from the [W3C WCAG 2.2 quick reference](https://www.w3.org/WAI/WCAG22/quickref/); use platform guidance for native interfaces. A checklist or automated scan does not establish full conformance.
@@ -107,3 +110,9 @@ The user selected work packages 1 and 2 together, then 3 and 4 with the two-scop
 4. [x] Connect reviewed paths through `yaw kickoff context` (text/JSON), the core agent instruction, optional reviewer context/skill and `yaw kickoff ux`. Integration fixtures cover a tiny CLI, static site, data-backed app and existing repository, source changes and user-owned file preservation. These verify the workflow, not product design quality or user validation.
 
 ADR-0074 amends the interview selection, expertise timing and personal-profile reuse portions of ADR-0009, ADR-0042 and ADR-0043. Their other rules remain intact. ADR-0075 records foundation import, authority and context behavior. The exact bundle, index and task metadata formats are documented in [formats.md](../docs/spec/formats.md#guided-kickoff-foundations). Kit practices and kickoff guidance are versioned in `core/lib/foundations.js` and `core/lib/kickoff.js`; maintainers review changes with the cited guidance and representative workflow fixtures. Reviewer PASS caching remains per commit (ADR-0056); run an on-request review again when relevant context outside that commit changes.
+
+The subsequent mockup/layout and project architecture-constraint additions are recorded in ADR-0076. Generic practices and kickoff prompt revision 2 keep bundle format 1 compatible.
+
+### Updated depth policy
+
+Quick asks essential project and architecture choices and reuses saved settings. Basic adds repository agents, collaboration, GitHub on/off and review gates. Pro / all asks every applicable implemented question. Optional tools start off when never selected; Global Settings can save explicit tool defaults. Initial setup and Settings → Interview reuse one wizard/controller, including foundation review and Apply. Legacy depths and existing project module selections remain readable.

@@ -34,9 +34,9 @@ yaw init
 
 This installs the current `main` channel, which includes the features described here. The [full guide](docs/getting-started.md) has the pinned v0.1.0 release install if you prefer a fixed version.
 
-`yaw init` asks which language you want to use and where the project will run; that pair picks a tailored stack (for example a Node CLI or a Cloudflare Worker) or a basic one for the language. Then it offers **Quick** or **Full** setup. Review the proposed files before YAW writes them. Prefer a browser form? Run `yaw init --web`, or switch to it during the terminal interview. Setup normally runs the generated `just setup` and `just check` afterward.
+`yaw init` asks which language you want to use and where the project will run; that pair picks a tailored stack (for example a Node CLI or a Cloudflare Worker) or a basic one for the language. Choose **Quick**, **Basic** or **Pro / all** interview depth first. Review the proposed files before YAW writes them. Prefer a browser form? Run `yaw init --web`, or switch to it during the terminal interview. Setup normally runs the generated `just setup` and `just check` afterward.
 
-Quick gives you shared instructions, basic agent configuration, project commands, local tasks and essential guards. Full adds decisions, comfort features, a code map, git hooks and review agents; GitHub and CI integrations depend on your project choices. Both include session history. You can change those choices later with `yaw edit` or the dashboard's **Workspace / Settings / Interview**, preview the diff, and apply it. `yaw add <module>` and `yaw remove <module>` adjust modules without starting over.
+Quick asks essential project and architecture choices. Basic adds GitHub, collaboration and review gates; Pro / all asks every applicable question. Optional tools reuse your saved defaults and otherwise start off. Select tasks, guards, sessions, decisions, hooks and other modules explicitly when needed. You can change those choices later with `yaw edit` or the dashboard's **Workspace / Settings / Interview**, preview the diff, and apply it. `yaw add <module>` and `yaw remove <module>` adjust modules without starting over.
 
 To inspect the installer or follow platform-specific steps, use the [full getting started guide](docs/getting-started.md).
 
@@ -78,7 +78,7 @@ Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **
 
 ## See the setup
 
-<img src="docs/assets/setup-screenshot.png" alt="Current YAW browser setup form with six steps, Quick and Full choices, and a file plan" width="800">
+<img src="docs/assets/setup-screenshot.png" alt="Current YAW browser setup form with six steps, Quick, Basic and Pro choices, and a file plan" width="800">
 
 *The local `yaw init --web` form previews the files before you apply them.*
 
@@ -87,6 +87,6 @@ Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **
 After setup, run `yaw status` to inspect managed files, `yaw apply` to reconcile them with the installed kit, and `yaw web` to open the local dashboard. For day-to-day work, try `yaw kickoff`, `yaw task next` and `yaw sessions analytics`.
 
 - [Website](website/) — standalone static page.
-- [Getting started](docs/getting-started.md) — installation, Quick and Full, maintenance and safety details.
+- [Getting started](docs/getting-started.md) — installation, Quick, Basic and Pro, maintenance and safety details.
 - [Workspace dashboard](docs/workspace-dashboard.md) — workspace and global views, session profiling, knowledge and settings.
 - [Project concept](KICK-OFF.md) — design goals and technical background.

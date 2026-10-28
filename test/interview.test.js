@@ -65,29 +65,29 @@ test('runInterview: Enter, skip, ?, wrong replies; skipped and unasked questions
     q({ id: 'idea.team' }),
     q({ id: 'idea.size', type: 'number', default: 1 }),
     q({ id: 'team.approvals', type: 'number', default: 1, when: { 'idea.team': 'team' } }),
-    q({ id: 'quality.deep', mode: 'F', default: 'x', type: 'text' }),
+    q({ id: 'quality.deep', mode: 'F', default: 'x', type: 'text', when: { 'idea.team': 'solo' } }),
   ];
   const prompter = scripted(['?', 'codex', 'wat', 'team', 'skip', '']);
-  const r = await runInterview({ questions, mode: 'quick', prompter, kitRoot: KIT_ROOT });
-  assert.deepEqual(r.answers, { 'user.agents': ['codex'], 'idea.team': 'team', 'idea.size': 1, 'team.approvals': 1, 'quality.deep': 'x' });
+  const r = await runInterview({ questions, mode: 'pro', prompter, kitRoot: KIT_ROOT });
+  assert.deepEqual(r.answers, { 'user.agents': ['codex'], 'idea.team': 'team', 'idea.size': 1, 'team.approvals': 1 });
   // "skip" and the question this mode does not ask are defaults; Enter on team.approvals is an answer
-  assert.deepEqual(r.defaulted, ['idea.size', 'quality.deep']);
+  assert.deepEqual(r.defaulted, ['idea.size']);
   const shown = prompter.shown.join('');
   assert.match(shown, /Every selected agent gets the files it reads/, '? shows interview/help/agents.md');
   assert.match(shown, /"wat" is not one of: solo, team/);
-  assert.match(shown, /About you \(1\/3\)/);
+  assert.match(shown, /About you \(1\/4\)/);
 });
 
 test('runInterview: a question whose when() does not hold is not asked and not answered', async () => {
   const questions = [q({ id: 'idea.team' }), q({ id: 'team.approvals', type: 'number', default: 1, when: { 'idea.team': 'team' } })];
-  const r = await runInterview({ questions, mode: 'quick', prompter: scripted(['']), kitRoot: KIT_ROOT });
+  const r = await runInterview({ questions, mode: 'pro', prompter: scripted(['']), kitRoot: KIT_ROOT });
   assert.deepEqual(r.answers, { 'idea.team': 'solo' });
   assert.deepEqual(r.defaulted, []);
 });
 
 test('runInterview: input that ends is an error, not a silent exit', async () => {
   const prompter = { ...scripted(), async ask() { throw new Error('input ended before all questions were answered'); } };
-  await assert.rejects(runInterview({ questions: [q()], mode: 'quick', prompter, kitRoot: KIT_ROOT }), /input ended/);
+  await assert.rejects(runInterview({ questions: [q()], mode: 'pro', prompter, kitRoot: KIT_ROOT }), /input ended/);
 });
 
 test('runInterview: saved answers are reviewable defaults without mutating the question definitions', async () => {
@@ -97,11 +97,11 @@ test('runInterview: saved answers are reviewable defaults without mutating the q
     q({ id: 'team.approvals', type: 'number', default: 1, when: { 'idea.team': 'team' } }),
   ];
   const defaults = { 'idea.team': 'team', 'idea.text': 'Saved idea', 'team.approvals': 2 };
-  const r = await runInterview({ questions, mode: 'quick', defaults, prompter: scripted(['', 'New idea', '']) });
+  const r = await runInterview({ questions, mode: 'pro', defaults, prompter: scripted(['', 'New idea', '']) });
   assert.deepEqual(r.answers, { 'idea.team': 'team', 'idea.text': 'New idea', 'team.approvals': 2 });
   assert.equal(questions[0].default, 'solo');
   assert.equal(defaults['idea.text'], 'Saved idea');
-  await assert.rejects(runInterview({ questions, mode: 'quick', defaults: { 'idea.team': 'invalid' }, prompter: scripted() }), /Invalid saved answer for idea.team/);
+  await assert.rejects(runInterview({ questions, mode: 'pro', defaults: { 'idea.team': 'invalid' }, prompter: scripted() }), /Invalid saved answer for idea.team/);
 });
 
 test('facts come only from answers that exist; auto leaves a fact unknown', () => {

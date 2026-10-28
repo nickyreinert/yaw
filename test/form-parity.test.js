@@ -37,18 +37,19 @@ function nonDefaults(overrides = {}) {
 const BASE = { 'idea.text': 'A small tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
 const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
+  { name: 'Quick, self-managed with open-source libraries and a paid cap', mode: 'quick', answers: { ...BASE, 'arch.hosting-control': 'self-hosted', 'arch.libraries': 'open-source', 'arch.services': 'approved-only', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month, no overage' } },
   { name: 'Full solo, defaults', mode: 'full', answers: BASE },
   { name: 'Full solo without GitHub', mode: 'full', answers: { ...BASE, 'tasks.use-github': false } },
   { name: 'Full team', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'team.session-context': false } },
   { name: 'Full team with local Git', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'tasks.use-github': false } },
-  { name: 'Quick team with local Git', mode: 'quick', answers: { ...BASE, 'idea.team': 'team', 'tasks.use-github': false } },
+  { name: 'Basic team with local Git', mode: 'basic', answers: { ...BASE, 'idea.team': 'team', 'tasks.use-github': false } },
   { name: 'Full external reviewers', mode: 'full', answers: { ...BASE, 'idea.team': 'external-reviewers' } },
   { name: 'Full external reviewers with local Git', mode: 'full', answers: { ...BASE, 'idea.team': 'external-reviewers', 'tasks.use-github': false } },
-  { name: 'Quick team', mode: 'quick', answers: { ...BASE, 'idea.team': 'team' } },
+  { name: 'Basic team', mode: 'basic', answers: { ...BASE, 'idea.team': 'team' } },
   { name: 'Full, all agents, expert, both task stores', mode: 'full', answers: { ...BASE, 'user.agents': ['claude', 'codex', 'copilot'], 'user.expertise': 'expert', 'user.language': 'en', 'tasks.mode': 'both' } },
   { name: 'Full, every answer non-default (layperson)', mode: 'full', answers: nonDefaults({ ...BASE, 'user.language': 'en', 'user.expertise': 'layperson' }) },
   { name: 'Full, every answer non-default (expert, solo)', mode: 'full', answers: nonDefaults({ ...BASE, 'user.language': 'en', 'user.expertise': 'expert', 'idea.team': 'solo', 'tasks.mode': 'github' }) },
-  { name: 'Quick, every answer non-default', mode: 'quick', answers: nonDefaults({ ...BASE, 'user.language': 'en' }) },
+  { name: 'Pro, every answer non-default', mode: 'pro', answers: nonDefaults({ ...BASE, 'user.language': 'en' }) },
 ];
 
 async function viaCli({ mode, answers }) {
@@ -57,6 +58,7 @@ async function viaCli({ mode, answers }) {
   p.ask = async (question) => {
     p.asked.push(question);
     if (/Setup depth \[/.test(question)) return mode;
+    if (/^Modules \(comma-separated/.test(question)) return 'none';
     if (/create one now \(git init\)\?/.test(question)) return 'n';
     if (/Write these files\?/.test(question)) return 'y';
     if (/Save /.test(question)) return 'n';

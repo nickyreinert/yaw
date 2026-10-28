@@ -155,8 +155,8 @@ function editModel({ root, kitRoot, env, expected }) {
 }
 const setupInput = (input) => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected interview answers');
-  const { mode, answers, modules, gitInit } = input;
-  return { mode, answers, modules, ...(gitInit === true ? { gitInit } : {}) };
+  const { mode, answers, modules, gitInit, proposed } = input;
+  return { mode, answers, modules, ...(gitInit !== undefined ? { gitInit } : {}), ...(proposed ? { proposed } : {}) };
 };
 // The same folder rules as yaw init (#168): never the home folder or the file-system root; a non-empty folder that
 // is not a project needs an explicit confirmation.
@@ -173,15 +173,15 @@ export function interviewData({ root, kitRoot, env }) {
   const folder = fresh ? freshFolder(root, env) : null;
   if (folder?.refused) return { available: false, fresh, message: folder.refused };
   const b = editModel({ root, kitRoot, env }).bootstrap();
-  const initial = fresh ? { mode: 'full', answers: {}, modules: null } : b.initial;
-  return { available: true, fresh, folder, hash: fresh ? null : answersHash(root), kit: b.kit, profiles: b.profiles, modules: b.modules, questions: b.questions, initial, sectionNames: b.sectionNames ?? [], gitRepo: b.gitRepo };
+  const initial = fresh ? { mode: 'quick', answers: {}, modules: null } : b.initial;
+  return { ...b, available: true, fresh, folder, hash: fresh ? null : answersHash(root), kit: b.kit, profiles: b.profiles, modules: b.modules, questions: b.questions, initial, sectionNames: b.sectionNames ?? [], gitRepo: b.gitRepo };
 }
 
 export function interviewPreview({ root, kitRoot, env, input }) {
   const model = editModel({ root, kitRoot, env, expected: input?.expected });
   const p = model.preview(setupInput(input), true);
   const diff = p.diff.length > MAX_DIFF ? `${p.diff.slice(0, MAX_DIFF)}\n… diff cut at 256 KiB; run yaw edit in a terminal for the full diff\n` : p.diff;
-  return { profile: p.profile, modules: p.modules, unresolved: p.unresolved, sources: p.sources, files: p.files.filter((f) => f.action !== 'kept'), kept: p.files.filter((f) => f.action === 'kept').length, diff };
+  return { ...p, files: p.files, kept: p.files.filter((f) => f.action === 'kept').length, diff };
 }
 
 export async function interviewApply({ root, kitRoot, env, input }) {
@@ -192,19 +192,25 @@ export async function interviewApply({ root, kitRoot, env, input }) {
     if (folder.confirm && input?.confirmFolder !== true) throw new FormError('This folder is not empty and not a project yet; confirm that YAW may write into it');
   }
   const model = editModel({ root, kitRoot, env, expected: input?.expected });
-  const prepared = model.normalize(setupInput(input));
-  if (fresh) assertSafe(prepared.doc.answers, kitRoot);
-  let applied;
-  if (prepared.gitInit && !isGitRepo(root)) {
-    const git = gitInit(root);
-    if (git.error) throw new FormError(`git init failed: ${git.error}`);
+  const { createFormApi } = await import('./init.js');
+  const api = createFormApi({ root, kitRoot, env, edit: !fresh, skipVerify: true });
+  const payload = { ...setupInput(input), ...Object.fromEntries(['plan', 'foundationsReviewed', 'foundationReview', 'secrets'].filter((key) => input[key] !== undefined).map((key) => [key, input[key]])) };
+  const prepared = api.prepareApply(payload);
+  const preview = model.preview(setupInput(input));
+  const events = [];
+  try { await api.apply(prepared, (event) => events.push(event)); } finally { api.close(); }
+  return { events, report: preview.files.filter((f) => f.action !== 'kept'), fresh, hash: answersHash(root), message: `${fresh ? 'Set up' : 'Applied'} the reviewed setup. Run just check in the project folder to verify.` };
+}
+
+export async function interviewAction({ root, kitRoot, env, input }) {
+  const allowed = ['kickoff-prompt', 'kickoff-reply', 'prefill', 'draft', 'preset'];
+  if (!allowed.includes(input.action)) throw new FormError('Unknown interview action');
+  editModel({ root, kitRoot, env, expected: input.expected });
+  if (input.action === 'draft' && !readManifest(root)) {
+    const folder = freshFolder(root, env);
+    if (folder.refused || folder.confirm && input.confirmFolder !== true) throw new FormError(folder.refused ?? 'Confirm this non-empty folder before saving a draft.');
   }
-  try {
-    applied = fresh
-      ? await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules })
-      : await editProject({ root, kitRoot, answers: prepared });
-  } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
-  const report = applied.report.filter((r) => r.action !== 'edited').map(({ path, action, reason }) => ({ path, action, reason: reason ?? null }));
-  if (fresh) return { report, fresh, hash: answersHash(root), message: `Set up: ${report.length} file${report.length === 1 ? '' : 's'} written. Run just setup && just check in the project folder to verify.` };
-  return { report, hash: answersHash(root), message: `Applied: ${report.length ? `${report.length} file${report.length === 1 ? '' : 's'} changed` : 'nothing to do'}. Run just check to verify.` };
+  const { createFormApi } = await import('./init.js');
+  const api = createFormApi({ root, kitRoot, env, edit: Boolean(readManifest(root)), skipVerify: true });
+  try { return await api.action(input.action, input.payload); } finally { api.close(); }
 }

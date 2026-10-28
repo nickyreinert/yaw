@@ -13,7 +13,7 @@ import { allPrompts, effectivePrompt, kitPrompt, removePrompt, savePrompt } from
 import stopReviewHint from '../hooks/stop-review-hint.js';
 
 function answers(modules, extra = '', agents = 'claude, copilot') {
-  return `mode: full\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n${extra}proposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${modules.join(', ')}]\n`;
+  return `mode: full\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n${['quality', 'logic', 'feature'].filter((kind) => !extra.includes('quality.review-' + kind + ':')).map((kind) => '  quality.review-' + kind + ': ' + (kind === 'feature' ? 'request' : 'push') + '\n').join('')}${extra}proposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${modules.join(', ')}]\n`;
 }
 
 async function project(modules, extra) {

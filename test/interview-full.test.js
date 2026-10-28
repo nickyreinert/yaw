@@ -42,6 +42,7 @@ async function init(replies) {
 }
 
 const IDEA = { 'Describe the idea': 'A small tool.', 'What language do you want': 'javascript', 'Where will it run': 'local' };
+const CONSTRAINTS = { 'arch.hosting-control': 'undecided', 'arch.libraries': 'undecided', 'arch.services': 'undecided', 'arch.cost': 'undecided' };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],
@@ -52,36 +53,27 @@ const SOLO_FULL = {
   'idea.team': 'solo',
   'arch.language': 'javascript',
   'arch.runs-on': 'local',
-  'user.comfort': ['hygiene', 'status-line'],
+  'arch.framework': '',
+  ...CONSTRAINTS,
+  'user.comfort': [],
   'user.length': 'balanced',
   'user.register': 'professional',
   'user.examples': 'when-helpful',
   'user.explain': 'short-paragraph',
-  'quality.review-quality': 'push',
-  'quality.review-logic': 'push',
+  'quality.review-quality': 'off',
+  'quality.review-logic': 'off',
   'quality.review-ux': 'off',
-  'quality.review-feature': 'request',
+  'quality.review-feature': 'off',
   'quality.review-gate': 'warn',
   'tasks.use-github': true,
   'tasks.mode': 'local',
 };
 const QUICK = {
-  'user.agents': ['claude'],
-  'user.expertise': 'intermediate',
-  'user.language': 'de',
-  'user.autonomy': 'ask-risky',
-  'idea.text': 'A small tool.',
-  'idea.team': 'solo',
-  'arch.language': 'javascript',
-  'arch.runs-on': 'local',
-  'user.length': 'balanced',
-  'user.register': 'professional',
-  'user.examples': 'when-helpful',
-  'user.explain': 'short-paragraph',
-  'tasks.use-github': true,
-  'tasks.mode': 'local',
+  'user.agents': ['claude'], 'user.expertise': 'intermediate', 'user.language': 'de', 'user.autonomy': 'ask-risky',
+  'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
+  'arch.language': 'javascript', 'arch.runs-on': 'local', 'arch.framework': '', ...CONSTRAINTS,
 };
-const QUICK_MODULES = ['core', 'communication', 'devenv', 'security', 'sessions', 'standards', 'tasks'];
+const QUICK_MODULES = ['core'];
 const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
 
 test('Quick: depth is the first question; answers.yaml holds the Q answers and the Quick modules', async () => {
@@ -97,16 +89,16 @@ test('Quick: depth is the first question; answers.yaml holds the Q answers and t
 test('Quick is the default depth; "1" and "2" work', async () => {
   assert.equal((await init({ depth: '', ...IDEA })).doc.mode, 'quick');
   assert.equal((await init({ depth: '1', ...IDEA })).doc.mode, 'quick');
-  assert.equal((await init({ depth: '2', ...IDEA })).doc.mode, 'full');
+  assert.equal((await init({ depth: '2', ...IDEA })).doc.mode, 'basic');
 });
 
 test('Full solo: Q, S and F answers, GitHub modules on', async () => {
-  const r = await init({ depth: 'full', ...IDEA });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y' });
   assert.equal(r.code, 0, r.err);
   assert.equal(r.doc.mode, 'full');
   assert.deepEqual(r.doc.answers, SOLO_FULL);
   assert.deepEqual(r.doc.proposal.modules, FULL_MODULES);
-  assert.deepEqual(Object.keys(r.doc.answers), Object.keys(SOLO_FULL), 'order follows the question list');
+  assert.ok(Object.keys(r.doc.answers).indexOf('tasks.use-github') < Object.keys(r.doc.answers).indexOf('arch.language'), 'base GitHub question precedes architecture');
 });
 
 test('Full solo without GitHub: github and ci are off and the answer is recorded', async () => {
@@ -116,7 +108,7 @@ test('Full solo without GitHub: github and ci are off and the answer is recorded
 });
 
 test('Full team: team questions and GitHub choice appear, task mode is forced to issues', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Solo or team': 'team', 'Tell the agent the active issue': 'n' });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Tell the agent the active issue': 'n' });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers, {
     ...Object.fromEntries(Object.entries(SOLO_FULL).filter(([k]) => k !== 'tasks.mode')),
@@ -128,15 +120,15 @@ test('Full team: team questions and GitHub choice appear, task mode is forced to
 });
 
 test('teams can select a local Git remote without GitHub and without hidden questions in the summary', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Solo or team': 'team', 'Use GitHub for the repo': 'n' });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Use GitHub for the repo': 'n' });
   assert.equal(r.code, 0, r.err);
   assert.equal(r.doc.answers['tasks.use-github'], false);
   for (const name of ['github', 'ci', 'team']) assert.ok(!r.doc.proposal.modules.includes(name));
   assert.doesNotMatch(r.out, /team\.session-context|tasks\.mode/);
 });
 
-test('Quick team: the choice is recorded; no team questions, Quick modules', async () => {
-  const r = await init({ depth: 'quick', ...IDEA, 'Solo or team': 'team' });
+test('Basic team: the choice is recorded without optional team tooling', async () => {
+  const r = await init({ depth: 'basic', ...IDEA, 'Solo or team': 'team' });
   assert.equal(r.doc.answers['idea.team'], 'team');
   assert.ok(!('team.session-context' in r.doc.answers));
   assert.deepEqual(r.doc.proposal.modules, QUICK_MODULES);
@@ -144,14 +136,14 @@ test('Quick team: the choice is recorded; no team questions, Quick modules', asy
 
 test('agents: each of Claude, Codex and Copilot is selectable alone and together', async () => {
   for (const agents of [['claude'], ['codex'], ['copilot'], ['codex', 'copilot'], ['claude', 'codex', 'copilot']]) {
-    const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': agents.join(', ') });
+    const r = await init({ depth: 'basic', ...IDEA, 'Which coding agents': agents.join(', ') });
     assert.equal(r.code, 0, `${agents}: ${r.err}`);
     assert.deepEqual(r.doc.answers['user.agents'], agents);
   }
 });
 
 test('agents: only Gemini is shown as unavailable, and the interview finishes with a valid agent', async () => {
-  const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': ['gemini', 'codex'] });
+  const r = await init({ depth: 'basic', ...IDEA, 'Which coding agents': ['gemini', 'codex'] });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers['user.agents'], ['codex']);
   const shown = r.prompter.shown.join('');
@@ -170,7 +162,7 @@ test('expertise: a layperson is still asked the Q and S questions', async () => 
 });
 
 test('yaw add team on a solo project fits the budget without committing personal preferences', async () => {
-  const r = await init({ depth: 'full', ...IDEA });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y' });
   const stdout = capture();
   const stderr = capture();
   const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
@@ -186,7 +178,7 @@ test('yaw add team on a solo project fits the budget without committing personal
 test('expertise: each level is recorded; the level changes how the interview is shown', async () => {
   const runs = {};
   for (const level of ['layperson', 'intermediate', 'expert']) {
-    runs[level] = await init({ depth: 'full', ...IDEA, 'Solo or team': 'team', 'Your experience with software': level });
+    runs[level] = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Your experience with software': level });
     assert.equal(runs[level].code, 0, runs[level].err);
     assert.equal(runs[level].doc.answers['user.expertise'], level);
   }
@@ -195,13 +187,13 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('layperson'), /Goes into AGENTS.md as one line/);
   assert.doesNotMatch(shown('expert'), /Goes into AGENTS.md as one line/);
   assert.equal(runs.layperson.doc.answers['team.session-context'], true);
-  assert.doesNotMatch(shown('layperson'), /Tell the agent the active issue/);
+  assert.match(shown('layperson'), /Tell the agent the active issue/);
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
   assert.match(shown('intermediate'), /Shared team rules/);
   assert.doesNotMatch(shown('expert'), /Shared team rules/);
   // the summary lists the layperson default
-  assert.match(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
+  assert.doesNotMatch(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);
 });

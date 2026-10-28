@@ -13,6 +13,8 @@ import { parse, stringify } from '../lib/yaml.js';
 import { secretFindings, listPresets, loadPreferences, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
 import { envFileExists, envNames } from '../lib/env-secrets.js';
 import { loadCapabilities } from '../cli/agents.js';
+import { validDepth } from '../interview/depth.js';
+import { loadSetupDefaults } from '../lib/setup-defaults.js';
 
 export class FormError extends Error {
   constructor(message, status = 400) {
@@ -39,6 +41,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   definitions.sort((a, b) => a.name === 'core' ? -1 : b.name === 'core' ? 1 : a.name.localeCompare(b.name));
   const names = definitions.map((d) => d.name);
   const preferences = edit ? { answers: {}, warning: null } : loadPreferences({ env, kitRoot });
+  const setupPolicy = edit ? { answers: {}, modules: [] } : loadSetupDefaults({ env, kitRoot });
+  preferences.answers = { ...setupPolicy.answers, ...preferences.answers };
   const questions = collectQuestions(kitRoot, names).map((q) => Object.hasOwn(preferences.answers, q.id)
     ? { ...q, default: preferences.answers[q.id], defaultSource: 'saved personal setting' } : q);
   const byId = new Map(questions.map((q) => [q.id, q]));
@@ -88,7 +92,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       throw new FormError('Expected a setup object with mode, answers and optional modules');
     }
     if (input.gitInit !== undefined && typeof input.gitInit !== 'boolean') throw new FormError('gitInit must be true or false');
-    if (!['quick', 'full', 'standard'].includes(input.mode)) throw new FormError('Choose Quick or Full');
+    if (!validDepth(input.mode)) throw new FormError('Choose Quick, Basic or Pro');
     const proposed = input.proposed ?? [];
     if (!Array.isArray(proposed) || proposed.some((id) => !byId.get(id)?.required)) throw new FormError('Invalid proposed project answers');
     let given = input.answers ?? {};
@@ -112,7 +116,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       for (const asked of [true, false]) for (const q of qs) {
         if (edit && !editable(q)) continue;
         if (asksQuestion(q, input.mode) !== asked || !whenMatches(q.when, { ...given, ...answers })) continue;
-        const use = Object.hasOwn(given, q.id) && (edit || isPersonal(q) || (asked && !((given['user.expertise'] ?? answers['user.expertise']) === 'layperson' && q.mode === 'F')));
+        const use = Object.hasOwn(given, q.id);
         answers[q.id] = use ? given[q.id] : q.default;
         if (!use) defaulted.push(q.id);
         sources[q.id] = edit && Object.hasOwn(original.answers, q.id) && JSON.stringify(answers[q.id]) === JSON.stringify(original.answers[q.id])
@@ -121,15 +125,16 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       }
       return { answers: edit ? answers : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted, sources };
     };
-    const facts = deriveFacts(normalizeFor(questions).answers);
+    const all = normalizeFor(questions);
+    const facts = deriveFacts(all.answers);
     let modules = input.modules;
-    if (modules === undefined || modules === null) modules = edit ? initial.modules : selectModules({ kitRoot, mode: input.mode, facts });
+    if (modules === undefined || modules === null) modules = edit ? initial.modules : selectModules({ kitRoot, mode: input.mode, facts, answers: all.answers, defaults: setupPolicy.modules });
     if (!Array.isArray(modules) || modules.length > names.length || new Set(modules).size !== modules.length ||
       !modules.includes('core') || modules.some((n) => !names.includes(n))) throw new FormError('Invalid module selection; core is required');
     modules = names.filter((n) => modules.includes(n));
     try { checkDependencies({ kitRoot, modules }); }
     catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
-    const selected = collectQuestions(kitRoot, modules);
+    const selected = questions.filter((q) => modules.includes(owner.get(q.id) ?? 'core') || asksQuestion(q, input.mode));
     const selectedIds = new Set(selected.map((q) => q.id));
     // GitHub owns its own opt-out. Keep that selection-driving answer even when it removes its owner.
     const answerQuestions = questions.filter((q) => selectedIds.has(q.id) ||
@@ -199,8 +204,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     files.push({ path: MANIFEST, module: 'core', bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
-    const visible = result.selected.filter((q) => (sections.length || (asksQuestion(q, result.doc.mode) &&
-      !(expertise === 'layperson' && q.mode === 'F'))) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
+    const visible = result.selected.filter((q) => (sections.length || asksQuestion(q, result.doc.mode)) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
     const output = {
       mode: result.doc.mode, profile: result.profile,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, sources: result.sources, unresolved: [], visible, files,
@@ -265,7 +269,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return {
       kit: kitVersion(kitRoot),
       profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
-      modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
+      modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
       gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
         let help = '';
@@ -278,7 +282,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),
       hasUserProfile: existsSync(join(userDir(env), 'user-profile.yaml')),
-      personalWarning: preferences.warning,
+      personalWarning: [preferences.warning, setupPolicy.warning].filter(Boolean).join(' ') || null,
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
       ...(edit ? { editing: true, sections, initial, sectionNames } : {}),
     };

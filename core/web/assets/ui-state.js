@@ -1,5 +1,6 @@
 // Pure browser state helpers; also tested without a DOM.
 import { asksIn, isPersonal } from '../../interview/policy.js';
+import { selectedByPolicy } from '../../interview/depth.js';
 export { asksIn };
 export const choiceValue = (c) => typeof c === 'object' ? c.value : c;
 // The value stays visible (as in the terminal) unless the label already starts with it: "edge — code on a CDN ...".
@@ -29,19 +30,19 @@ export function effectiveAnswers(questions, given, mode) {
   const answers = {};
   for (const asked of [true, false]) for (const q of questions) {
     if (asksIn(q, mode) !== asked || !matches(q.when, answers)) continue;
-    const use = (isPersonal(q) || (asked && !((given['user.expertise'] ?? answers['user.expertise']) === 'layperson' && q.mode === 'F'))) && Object.hasOwn(given, q.id);
+    const use = Object.hasOwn(given, q.id);
     answers[q.id] = use ? given[q.id] : q.default;
   }
   return answers;
 }
 export function visibleQuestions(questions, given, mode, modules) {
-  const selected = questions.filter((q) => modules.includes(q.owner));
+  const selected = questions.filter((q) => modules.includes(q.owner) || ['pro', 'all'].includes(mode) && asksIn(q, mode));
   const answers = effectiveAnswers(selected, given, mode);
-  return selected.filter((q) => !q.editHidden && asksIn(q, mode) && matches(q.when, answers) &&
-    !(answers['user.expertise'] === 'layperson' && q.mode === 'F'));
+  return selected.filter((q) => !q.editHidden && asksIn(q, mode) && matches(q.when, answers));
 }
 export function defaultModules(definitions, questions, given, mode) {
   const a = effectiveAnswers(questions, given, mode);
+  if (['quick', 'basic', 'pro', 'all'].includes(mode)) return selectedByPolicy(definitions, { answers: a, modules: definitions.filter((d) => d.savedDefault).map((d) => d.name) });
   const facts = { team: ['team', 'external-reviewers'].includes(a['idea.team']), usesGitHub: a['tasks.use-github'] !== false };
   if (a['arch.language'] && a['arch.language'] !== 'auto') facts.language = a['arch.language'];
   if (a['arch.runs-on'] && a['arch.runs-on'] !== 'auto') {

@@ -1,0 +1,86 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DEPTHS, depthOf } from '../core/interview/depth.js';
+import { collectQuestions } from '../core/render/kit.js';
+import { runInterview } from '../core/interview/engine.js';
+import { asksIn } from '../core/interview/policy.js';
+import { createFormModel } from '../core/web/form-model.js';
+import { interviewShell } from '../core/web/interview-shell.js';
+import { interviewApply, interviewData, interviewPreview } from '../core/web/settings.js';
+import { saveSetupDefaults } from '../core/lib/setup-defaults.js';
+import { visibleQuestions } from '../core/web/assets/ui-state.js';
+import { main } from '../core/cli/main.js';
+import { readAnswers } from '../core/render/project.js';
+import { KIT_ROOT, tmp, capture, scripted } from './helpers/fixtures.js';
+const base = { 'idea.text': 'A project.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'arch.framework': 'none' };
+const f = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: { HOME: tmp(), PATH: process.env.PATH } });
+
+test('Quick asks only project essentials and architecture; Basic adds GitHub/reviews; Pro asks all applicable questions', () => {
+  const questions = collectQuestions(KIT_ROOT, ['core', 'tasks', 'review', 'communication', 'team']);
+  assert.deepEqual(DEPTHS.map((d) => d.value), ['quick', 'basic', 'pro']);
+  const ids = (mode) => questions.filter((q) => asksIn(q, mode)).map((q) => q.id);
+  assert.ok(ids('quick').every((id) => id === 'idea.text' || id.startsWith('arch.')));
+  assert.ok(ids('basic').includes('tasks.use-github'));
+  assert.ok(ids('basic').includes('quality.review-quality'));
+  assert.equal(ids('pro').length, questions.length);
+  const bootstrap = createFormModel(f()).bootstrap();
+  const proVisible = visibleQuestions(bootstrap.questions, {}, 'pro', ['core']);
+  assert.ok(proVisible.some((q) => q.id === 'user.comfort'));
+  assert.equal(depthOf('full'), 'pro'); assert.equal(depthOf('standard'), 'pro'); assert.equal(depthOf('all'), 'pro');
+});
+
+test('optional tools default off and explicit saved tool defaults drive both rendering and interview values', () => {
+  const fixture = f();
+  const initial = createFormModel(fixture).normalize({ mode: 'quick', answers: base });
+  assert.deepEqual(initial.modules, ['core']);
+  assert.equal(initial.doc.answers['tasks.use-github'], false);
+  saveSetupDefaults(fixture, { modules: ['tasks', 'review'], answers: { 'tasks.use-github': false, 'quality.review-quality': 'request' } });
+  const saved = createFormModel(fixture).normalize({ mode: 'quick', answers: base });
+  assert.ok(saved.modules.includes('tasks')); assert.ok(saved.modules.includes('review'));
+  assert.equal(saved.doc.answers['quality.review-quality'], 'request');
+});
+
+test('Basic choices select review/GitHub modules and Pro does not suppress questions for laypeople', async () => {
+  const fixture = f();
+  const chosen = createFormModel(fixture).normalize({ mode: 'basic', answers: { ...base, 'tasks.use-github': true, 'quality.review-logic': 'push' } });
+  assert.ok(chosen.modules.includes('github')); assert.ok(chosen.modules.includes('review'));
+  const q = { id: 'team.extra', mode: 'F', label: 'Extra?', type: 'boolean', default: false };
+  let asked = 0;
+  const result = await runInterview({ questions: [q], mode: 'pro', known: { 'user.expertise': 'layperson' }, prompter: { show() {}, async ask() { asked++; return 'y'; } } });
+  assert.equal(asked, 1); assert.equal(result.answers[q.id], true);
+});
+
+test('init and Settings use the same canonical wizard and controller; Settings preserves optimistic concurrency', async () => {
+  const shell = interviewShell();
+  assert.match(shell, /class="wizard-layout"/); assert.match(shell, /id="setup-depth"/); assert.match(shell, /id="apply-dialog"/);
+  for (const file of ['app.js', 'settings-view.js']) assert.match(readFileSync(join(KIT_ROOT, 'core/web/assets', file), 'utf8'), /mountInterview/);
+  assert.doesNotMatch(readFileSync(join(KIT_ROOT, 'core/web/assets/settings-view.js'), 'utf8'), /function renderInterview\(/);
+  const fixture = f();
+  const data = interviewData(fixture), input = { mode: 'basic', answers: base, expected: data.hash };
+  const preview = interviewPreview({ ...fixture, input });
+  assert.ok(preview.files.length); assert.ok(preview.questions || preview.answers);
+  const result = await interviewApply({ ...fixture, input });
+  assert.ok(result.events.some((e) => e.type === 'done' && e.ok));
+  await assert.rejects(interviewApply({ ...fixture, input }), (e) => e.status === 409);
+});
+
+test('Quick terminal and browser both reuse a saved review trigger without a redundant module selection', async () => {
+  const fixture = f();
+  saveSetupDefaults(fixture, { modules: [], answers: { 'quality.review-quality': 'request' } });
+  const browser = createFormModel(fixture).normalize({ mode: 'quick', answers: base });
+  const p = scripted(), questions = collectQuestions(KIT_ROOT, ['core', 'review']);
+  p.ask = async (prompt) => {
+    if (/Setup depth/.test(prompt)) return 'quick';
+    if (/Write these files/.test(prompt)) return 'y';
+    if (/Save |guidance to kick off/.test(prompt)) return 'n';
+    const screen = [...p.shown].reverse().find((s) => /^  \d+\/\d+ /.test(s));
+    const q = questions.find((q) => screen?.split('\n')[0].endsWith(q.label));
+    return q && Object.hasOwn(base, q.id) ? String(base[q.id]) : '';
+  };
+  const stderr = capture();
+  const code = await main(['init', '--skip-verify'], { ...fixture, cwd: fixture.root, stdout: capture(), stderr, prompter: p });
+  assert.equal(code, 0, stderr.text());
+  assert.deepEqual(readAnswers(fixture.root), browser.doc);
+});

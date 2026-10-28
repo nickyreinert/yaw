@@ -59,7 +59,7 @@ test('Improve starts from saved classified sessions and opens the actual highlig
   assert.match(host.text, /I changed the renderer/); assert.match(host.text, /My mistake/);
   assert.doesNotMatch(host.text, /Users\/example/);
   assert.equal(host.all((n) => n.tag === 'mark' && n.attrs.title === 'Possible admission').length, 1);
-  assert.equal(host.all((n) => n.tag === 'input' && ['number', 'checkbox'].includes(n.attrs.type)).length, 0);
+  assert.equal(host.all((n) => n.tag === 'input' && n.attrs.type === 'number').length, 0);
   await button(host, 'Review this conversation →').fire('click');
   const prompt = field(host, 'Review prompt');
   assert.match(prompt.value, /150 words maximum/); assert.match(prompt.value, /Parser please/);

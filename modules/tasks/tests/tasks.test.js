@@ -461,7 +461,7 @@ test('team mode forces github even when the answer says local', async () => {
   const r = await task(root, ['sync'], { gh: fakeGh().gh });
   assert.equal(r.code, 0, r.err);
   assert.equal(parseTasks(read(root, 'TASKS.md')).readOnly, true);
-  assert.deepEqual(moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') }).map((q) => q.id), ['tasks.use-github', 'tasks.mode']);
+  assert.deepEqual(moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') }).map((q) => q.id), ['tasks.mode']);
 });
 
 // ---------------------------------------------------------------- hooks
@@ -570,7 +570,7 @@ test('remove: zero residue, answers kept, re-add asks the question again with th
     assert.equal(readAnswers(root).answers['tasks.mode'], mode, 'answers.yaml keeps the answer');
 
     const asked = moduleQuestions({ root, definition: loadModule(KIT_ROOT, 'tasks') });
-    assert.deepEqual(asked.map((q) => [q.id, q.default]), [['tasks.use-github', true], ['tasks.mode', mode]]);
+    assert.deepEqual(asked.map((q) => [q.id, q.default]), [['tasks.mode', mode]]);
     await addModule({ root, module: 'tasks' });
     assert.deepEqual(readTree(root), before);
   }

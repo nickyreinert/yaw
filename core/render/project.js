@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseDocument, stringify } from '../lib/yaml.js';
 import { matchFacts } from '../interview/facts.js';
+import { selectedByPolicy } from '../interview/depth.js';
 import { formatError } from '../lib/schema.js';
 import { tasksMode } from '../lib/tasks.js';
 import { BASE_DIR, MANIFEST, hashContent, pruneEmptyDirs, readProjectFile, writeAtomic } from './files.js';
@@ -174,9 +175,10 @@ export function updateProject({ root, kitRoot = KIT_ROOT, ...options }) {
 
 // Choose the modules a mode starts with: every module the kit has whose default for the mode is true or
 // whose facts condition matches (doc 04 §1). `appliesTo` hides a module whose facts do not match.
-export function selectModules({ kitRoot = KIT_ROOT, mode, facts = {} }) {
+export function selectModules({ kitRoot = KIT_ROOT, mode, facts = {}, answers = {}, defaults = [] }) {
   const dir = join(kitRoot, 'modules');
   const names = existsSync(dir) ? readdirSync(dir).filter((n) => hasModule(kitRoot, n)).sort() : [];
+  if (['quick', 'basic', 'pro', 'all'].includes(mode)) return selectedByPolicy(names.map((name) => loadModule(kitRoot, name)), { answers, modules: defaults });
   const chosen = [];
   for (const name of names) {
     const def = loadModule(kitRoot, name);

@@ -64,6 +64,13 @@ questions:
     hint: Shared team rules; with GitHub enabled, Full also requires issues and PRs (doc 14). Git can use a remote in another local folder instead.
     choices: [solo, team, external-reviewers]
     default: solo
+  - id: tasks.use-github
+    ref: "10.2"
+    mode: Q
+    type: boolean
+    label: Use GitHub for the repo?
+    hint: "GitHub is optional; off keeps development local. This does not create a remote repository."
+    default: false
   # The stack is language x runs-on (ADR-0054): together they pick exactly one profile, tailored or basic.
   # A pair no profile covers is rejected with the places that language can run.
   - id: arch.language
@@ -99,4 +106,67 @@ questions:
       - { value: static, label: "static hosting: GitHub Pages, Netlify; no server code" }
       - { value: wordpress, label: "inside WordPress: a plugin for an existing site" }
       - { value: app-store, label: "desktop or mobile app: macOS, Windows, Linux, iOS, Android" }
+    default: ""
+  - id: arch.framework
+    ref: "3.12"
+    mode: Q
+    type: text
+    label: Any required framework or existing stack to keep?
+    hint: Name an existing framework or write none; leave blank to discuss during kickoff. Language and runtime still select the kit profile.
+    default: ""
+  - id: arch.hosting-control
+    ref: "3.7"
+    mode: Q
+    type: choice
+    label: Who should control the deployment infrastructure?
+    hint: Independent of language and runtime. Self-hosting can still use third-party libraries.
+    choices:
+      - { value: on-premises, label: "On premises: infrastructure controlled by us, with network boundaries to agree" }
+      - { value: self-hosted, label: "Self-managed: our own server or rented infrastructure" }
+      - { value: managed, label: "Managed hosting is allowed" }
+      - { value: undecided, label: "Not decided: discuss during kickoff" }
+    default: undecided
+  - id: arch.libraries
+    ref: "3.8"
+    mode: Q
+    type: choice
+    label: Which third-party libraries may the project use?
+    hint: A library installed in your deployment is different from a hosted API or subscription.
+    choices:
+      - { value: standard-only, label: "Built-in or standard libraries only" }
+      - { value: open-source, label: "Suitable maintained open-source libraries" }
+      - { value: commercial-allowed, label: "Commercial libraries may also be considered, within the budget" }
+      - { value: undecided, label: "Not decided: discuss during kickoff" }
+    default: undecided
+  - id: arch.services
+    ref: "3.9"
+    mode: Q
+    type: choice
+    label: May application features or data rely on external services?
+    hint: Auth, databases, APIs and SaaS outside our deployment; hosting is a separate choice.
+    choices:
+      - { value: none, label: "No external application services" }
+      - { value: approved-only, label: "Only explicitly approved services" }
+      - { value: allowed, label: "External services may be proposed, within data and budget constraints" }
+      - { value: undecided, label: "Not decided: discuss during kickoff" }
+    default: undecided
+  - id: arch.cost
+    ref: "3.10"
+    mode: Q
+    type: choice
+    label: What cost policy should architecture choices follow?
+    hint: Include hosting, libraries, subscriptions, usage-based APIs and AI. This does not authorize purchases.
+    choices:
+      - { value: free-only, label: "No paid components or subscriptions; explain free-tier limits and operating costs" }
+      - { value: capped, label: "Paid components allowed within an agreed cap" }
+      - { value: flexible, label: "Propose paid options with a cost estimate for review" }
+      - { value: undecided, label: "Not decided: ask before proposing a paid dependency" }
+    default: undecided
+  - id: arch.cost-limit
+    ref: "3.11"
+    mode: Q
+    type: text
+    label: What is the budget cap, currency and billing period?
+    hint: For example EUR 20 per month plus EUR 50 one-off; leave blank to resolve during kickoff.
+    when: { arch.cost: capped }
     default: ""

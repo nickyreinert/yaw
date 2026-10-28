@@ -45,7 +45,7 @@ test('github status names each reason: gh missing, not logged in, no GitHub remo
 });
 
 test('init without GitHub shows the check, hides the task-mode choice and says tasks are local (#166)', async () => {
-  const p = scripted(['', '', 'A tool.', '', 'javascript', 'local', 'n', 'n']);
+  const p = scripted(['basic', '', 'A tool.', '', 'n', 'javascript', 'local', '', '', '', '', '', '', '', '', '', '', 'n']);
   const code = await main(['init', '--skip-verify'], { stdout: capture(), stderr: capture(), cwd: tmp('yaw-proj-'), env: { PATH: tmp('yaw-empty-'), HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: p });
   assert.equal(code, 1, 'declined at "Write these files?"');
   const shown = p.shown.join('');

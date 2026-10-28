@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', '', 'Rename photos by EXIF date.', '', 'javascript', 'local', '', ''];
+const INTERVIEW = ['', 'Rename photos by EXIF date.', 'javascript', 'local', '', '', '', '', ''];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
@@ -57,7 +57,7 @@ test('init: p loads a saved setup as editable defaults, asks before writing and 
   assert.equal(readFileSync(file, 'utf8'), source);
   assert.match(prompter.shown.join(''), /p\) Load a previous setup/);
   assert.match(prompter.shown.join(''), /Saved answers are defaults/);
-  assert.match(prompter.asked.join('\n'), /\[codex\]/);
+  assert.ok(!prompter.shown.join('').includes('Which coding agents'));
 });
 
 test('init: a saved Full setup keeps its mode and can be declined without any writes', async () => {
@@ -108,7 +108,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
   const stdout = capture();
   let url;
   const running = main(['init', '--skip-verify'], {
-    cwd: dir, env, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter: scripted(['p', '1', 'claude', 'w']),
+    cwd: dir, env, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter: scripted(['p', '1', 'w']),
     openBrowser: async (u) => { url = u; return true; },
   });
   try {
@@ -118,7 +118,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
     const cookie = login.headers.get('set-cookie').split(';')[0];
     const boot = await (await fetch(new URL('/api/bootstrap', url), { headers: { cookie } })).json();
     assert.equal(boot.handoff.mode, 'quick');
-    for (const [id, value] of Object.entries({ ...answers, 'user.agents': ['claude'] })) assert.deepEqual(boot.handoff.answers[id], value);
+    for (const [id, value] of Object.entries(answers)) assert.deepEqual(boot.handoff.answers[id], value);
     assert.deepEqual(readdirSync(dir), []);
   } finally {
     process.emit('SIGINT');
@@ -150,17 +150,17 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     status: 'confirmed',
     summary: 'node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.',
     profiles: ['node-cli'],
-    modules: ['core', 'communication', 'devenv', 'security', 'sessions', 'standards', 'tasks'],
+    modules: ['core'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
   // Quick = core + communication + standards + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
-  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), ['.claude/settings.json', '.claude/skills/handoff/SKILL.md', '.yaw/bin/yaw-hook']);
-  assert.equal(readManifest(dir).files.length, 19);
+  assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), []);
+  assert.equal(readManifest(dir).files.length, 10);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
   // kickoff guidance (#173): asked last, the prompt carries the idea and the task store
   assert.match(prompter.asked.at(-1), /guidance to kick off/);
   assert.match(r.out, /yaw kickoff prints a planning prompt/);
-  assert.match(r.out, /----- prompt -----\n[\s\S]*\nRename photos by EXIF date\.\n[\s\S]*Work items become local tasks in TASKS\.md[\s\S]*----- end of prompt -----/);
+  assert.match(r.out, /----- prompt -----\n[\s\S]*\nRename photos by EXIF date\.\n[\s\S]*Tasks are not enabled[\s\S]*----- end of prompt -----/);
   assert.match(r.out, /yaw kickoff import docs\/plan\/kickoff\.md --dry-run/);
 });
 
@@ -174,7 +174,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: a language that does not run there asks where it runs (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', 'A static site.', '', 'html', 'local', '', '', 'nope', '1', 'y', '', '', 'n']);
+  const prompter = scripted(['', 'A static site.', 'html', 'local', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /HTML & CSS only does not run there \(local\)/);
@@ -217,11 +217,11 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
 });
 
 test('Quick answers-only footprint includes a README for the required purpose', async () => {
-  for (const [agents, count] of [['claude', 19], ['claude, codex', 20]]) {
+  for (const [agents, count] of [['claude', 10], ['claude, codex', 10]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /modules: core, communication, devenv, security, sessions, standards, tasks/);
+    assert.match(r.out, /modules: core\n/);
     const files = Object.keys(readTree(r.cwd)).filter((p) => !p.startsWith('.yaw/base/'));
     assert.equal(files.length, count + 1, files.join(', ')); // the required idea also creates README.md
   }
@@ -376,7 +376,7 @@ test('interview: "web" at a question continues in the browser form with the answ
   const dir = tmp('yaw-proj-');
   const stdout = capture();
   const asked = [];
-  const prompter = scripted(['', 'codex', 'web']);
+  const prompter = scripted(['basic', 'codex', 'web']);
   const ask = prompter.ask;
   prompter.ask = async (q) => { asked.push(q); return ask(q); };
   let url;

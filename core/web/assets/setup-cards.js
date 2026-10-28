@@ -166,7 +166,7 @@ export function renderModuleGroups(root, ctx) {
   const hasGit = ctx.gitRepo || ctx.gitInit;
   const bar = el('div', { class: 'module-bar' },
     el('div', { class: 'presets', role: 'group', 'aria-label': 'Preset' },
-      el('button', { type: 'button', disabled: ctx.readOnly, title: 'The basics plus task list and session history: what most projects need.', onclick: () => ctx.onPreset('quick'), text: 'Quick' }),
+      el('button', { type: 'button', disabled: ctx.readOnly, title: 'Use saved optional tool defaults; otherwise keep optional tools off.', onclick: () => ctx.onPreset('quick'), text: 'Quick' }),
       el('button', { type: 'button', disabled: ctx.readOnly, title: 'Every module that fits your answers, including commit checks and review agents.', onclick: () => ctx.onPreset('full'), text: 'Everything that fits' })),
     el('label', { class: 'small', title: 'Compact hides the examples and costs, for users who already know the modules.' },
       el('input', { type: 'checkbox', checked: ctx.compact, onchange: (e) => ctx.onCompact(e.target.checked) }), ' Compact view'));

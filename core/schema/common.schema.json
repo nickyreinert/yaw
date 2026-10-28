@@ -70,7 +70,7 @@
     },
     "mode": {
       "description": "Setup mode (doc 02 §2).",
-      "enum": ["quick", "standard", "full"]
+      "enum": ["quick", "basic", "pro", "all", "standard", "full"]
     },
     "questionId": {
       "description": "<group>.<name>; group is a doc 03 section name. Words that suggest secrets are not allowed.",

@@ -1,3 +1,4 @@
+import { interviewShell } from './interview-shell.js';
 // Local form transport (Y-7.3/7.4, ADR-0044). Only explicit API save/apply actions write files.
 // Handshake: GET /?t=<start token> (valid once) sets a session cookie and redirects to /.
 // Every later request needs the cookie; a POST also needs the same secret in the X-YAW-Token header.
@@ -11,6 +12,9 @@ export const CSRF_HEADER = 'x-yaw-token';
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 export const MAX_JSON_BYTES = 256 * 1024;
 const assets = new Map([
+  ['/interview-shell.html', ['text/html; charset=utf-8', Buffer.from(interviewShell())]],
+  ['/interview-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/interview-view.js', import.meta.url))]],
+  ['/interview/depth.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/depth.js', import.meta.url))]],
   ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   ['/login.js', ['text/javascript; charset=utf-8', Buffer.from("location.replace('/');\n")]],
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],

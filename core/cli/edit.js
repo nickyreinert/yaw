@@ -34,11 +34,11 @@ export async function edit({ values, positionals: sections, io }) {
   }
   if (!sections.length) {
     for (;;) {
-      const mode = (await io.prompter.ask(`Setup depth [${state.mode}] (quick/full, w for browser) > `)).trim().toLowerCase();
+      const mode = (await io.prompter.ask(`Setup depth [${state.mode}] (quick/basic/pro, w for browser) > `)).trim().toLowerCase();
       if (['w', 'web'].includes(mode)) return browser();
       if (mode === '') break;
-      if (['quick', 'full'].includes(mode)) { state.mode = mode; break; }
-      io.prompter.show('choose quick, full or w\n');
+      if (['quick', 'basic', 'pro', 'all', 'full', 'standard'].includes(mode)) { state.mode = mode; break; }
+      io.prompter.show('choose quick, basic, pro/all or w\n');
     }
   }
   const questions = withGitHubHint(collectQuestions(io.kitRoot, state.modules), githubStatus({ root: io.cwd, env: io.env }))

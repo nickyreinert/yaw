@@ -11,7 +11,7 @@ import { browseFolders } from './browse.js';
 import { kickoffParts } from '../cli/kickoff.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
 import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
-import { interviewApply, interviewData, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
+import { interviewApply, interviewData, interviewAction, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
 import { ProjectError } from '../render/project.js';
 import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
@@ -21,10 +21,12 @@ import { createImproveRunner, improveSettings, saveImproveSettings } from './imp
 import { remoteSettings, saveRemoteSettings } from '../lib/remote-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
+import { loadSetupDefaults, saveSetupDefaults } from '../lib/setup-defaults.js';
+import { improveHistory, savedImprovement, saveImprovement, importImprovement, deleteImprovement, retainImprovements, previewImprovement, applyImprovement } from '../lib/improve-store.js';
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-preview', 'interview-apply',
-  'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings'];
+export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
+  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -58,11 +60,13 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     close: () => { reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
       '/api/global/features': () => ({ remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')) }),
+      '/api/improve/history': () => improveHistory({ env }),
       '/api/improve/settings': () => improveSettings(env),
       '/api/improve/job': () => reviewer.read(),
       '/api/global/session-sources': () => sourcesView(env),
       '/api/global/sync': (params) => syncStatus({ env, selected: params?.get('device') }),
       '/api/sessions': (params) => sessionsData({ root: rootOf(params?.get('workspace')), kitRoot, env, projects }),
+      '/api/global/setup-defaults': () => loadSetupDefaults({ env, kitRoot }),
       '/api/global/profile': () => profileData({ kitRoot, env }),
       '/api/global/presets': () => presetsData({ env }),
       '/api/global/files': () => globalFiles({ env }),
@@ -103,6 +107,19 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name.startsWith('improve-history-')) {
+        try {
+          const ctx = { env, kitRoot, input };
+          if (name === 'improve-history-read') return savedImprovement({ env, id: input.id });
+          if (name === 'improve-history-save') return saveImprovement(ctx);
+          if (name === 'improve-history-import') return importImprovement(ctx);
+          if (name === 'improve-history-delete') return deleteImprovement(ctx);
+          if (name === 'improve-history-retention') return retainImprovements(ctx);
+        } catch (e) { throw new FormError(e.message, e.status ?? 400); }
+      }
+      if (name === 'setup-defaults-save') {
+        try { return saveSetupDefaults({ env, kitRoot }, input); } catch (e) { throw new FormError(e.message); }
+      }
       if (name === 'remote-settings') {
         const { workspace, ...settings } = input;
         try { return saveRemoteSettings(env, settings); } catch (e) { throw new FormError(e.message); }
@@ -136,6 +153,10 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         return name === 'review-prompt-save' ? saveReviewPrompt({ root: null, kitRoot, env, input }) : removeReviewPrompt({ root: null, env, input });
       }
       const root = rootOf(input.workspace);
+      if (name === 'improve-instruction-preview' || name === 'improve-instruction-apply') {
+        try { return (name === 'improve-instruction-preview' ? previewImprovement : applyImprovement)({ root, env, kitRoot, input }); }
+        catch (e) { throw new FormError(e.message, e.status ?? 400); }
+      }
       if (name === 'insights-review') {
         if (input.confirm !== true) throw new FormError('Confirm reading the selected local transcripts for temporary review');
         if (running) throw new FormError('A session scan or review is already running', 409);
@@ -149,6 +170,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       input = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'workspace'));
       if (name === 'knowledge-save') return saveKnowledge({ root, kitRoot, env, input: input.record });
       if (name === 'taxonomy-save') return userError(() => saveTaxonomy({ root, kitRoot, input }));
+      if (name === 'interview-action') return userError(() => interviewAction({ root, kitRoot, env, input }));
       if (name === 'interview-preview') return userError(() => interviewPreview({ root, kitRoot, env, input }));
       if (name === 'interview-apply') {
         if (running) throw new FormError('Another workspace action is running', 409);

@@ -93,13 +93,13 @@ test('Quick and Full register exactly the expected hook modules and skills for e
       const modules = selectModules({ mode, facts: deriveFacts(doc.answers) });
       const { desired } = renderInit({ root: NO_PROJECT, answersDoc: doc, modules });
       const path = agent === 'codex' ? '.codex/hooks.json' : '.claude/settings.json';
-      const actual = [...new Set([...desired.get(path).content.toString().matchAll(/--module ([a-z-]+)/g)].map((m) => m[1]))].sort();
-      const expected = mode === 'quick' ? ['security', 'sessions', 'tasks'] : agent === 'copilot' ? ['security', 'sessions', 'tasks'] : ['comfort', 'decisions', 'review', 'security', 'sessions', 'tasks'];
+      const actual = [...new Set([...(desired.get(path)?.content.toString().matchAll(/--module ([a-z-]+)/g) ?? [])].map((m) => m[1]))].sort();
+      const expected = mode === 'quick' ? [] : agent === 'copilot' ? ['security', 'sessions', 'tasks'] : ['comfort', 'decisions', 'review', 'security', 'sessions', 'tasks'];
       assert.deepEqual(actual, expected, `${agent}/${mode}`);
       const skills = [...desired.keys()].filter((p) => p.endsWith('/SKILL.md'));
       const names = ['epic-plan', 'handoff', 'issue-create', 'issue-triage', 'review'];
       const directories = agent === 'claude' ? ['.agents', '.claude'] : ['.agents'];
-      const expectedSkills = mode === 'quick' ? ['handoff'] : names;
+      const expectedSkills = mode === 'quick' ? [] : names;
       assert.deepEqual(skills.sort(), directories.flatMap((dir) => expectedSkills.map((name) => `${dir}/skills/${name}/SKILL.md`)).sort(), `${agent}/${mode} skills`);
     }
   }

@@ -204,7 +204,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
       // The same kickoff guide and planning prompt `yaw init` prints on a terminal.
       const mode = tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') });
       emit({ type: 'kickoff', guide: kickoffGuide({ tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
-        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode }),
+        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
         plan: prepared.plan ? { tasks: prepared.plan.tasks.length, file: PLAN_FILE } : null });
       emit({ type: 'done', ok, message });
     },

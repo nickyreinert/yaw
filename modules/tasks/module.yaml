@@ -13,13 +13,6 @@ example: { when: "TASKS.md has", run: "- [ ] Add CSV export", then: "the next se
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions:
-  - id: tasks.use-github
-    ref: "10.2"
-    mode: Q
-    type: boolean
-    label: Use GitHub for the repo?
-    hint: "No: git and tasks stay local; GitHub modules are skipped."
-    default: true
   # GitHub teams use issues; teams without GitHub use the local ledger. Without GitHub the mode is local (#166),
   # so the question is hidden and init says why.
   - id: tasks.mode

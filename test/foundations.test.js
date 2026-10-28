@@ -195,4 +195,8 @@ test('unsafe or malformed inputs fail before writes or browser source previews',
   api.close();
   writeTree(root, { [FOUNDATION_INDEX]: 'null' });
   assert.throws(() => foundationContext({ root }), /Invalid foundation index/);
+  const linked = tmp();
+  writeTree(linked, { 'other.md': 'A regular file.', '.yaw/placeholder.md': 'A folder fixture.' });
+  symlinkSync(join(linked, 'other.md'), join(linked, '.yaw/answers.yaml'));
+  assert.throws(() => foundationContext({ root: linked }), /symbolic links/);
 });

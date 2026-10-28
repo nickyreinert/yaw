@@ -59,7 +59,7 @@ From the root of a new project:
 yaw init
 ```
 
-Answer the interview, review the proposed files and confirm to apply them. YAW asks which language you want to use and where the project will run (your computer, your own server, serverless, edge, static hosting, WordPress, or desktop/mobile). Pairs YAW knows well get a tailored stack; other valid pairs get a basic stack for the language; impossible pairs (for example Rust inside WordPress) cannot be continued. YAW does not install the language; `yaw doctor` tells you what is missing. Then it offers **Quick** or **Full** setup. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
+Answer the interview, review the proposed files and confirm to apply them. YAW asks which language you want to use and where the project will run (your computer, your own server, serverless, edge, static hosting, WordPress, or desktop/mobile). Pairs YAW knows well get a tailored stack; other valid pairs get a basic stack for the language; impossible pairs (for example Rust inside WordPress) cannot be continued. YAW does not install the language; `yaw doctor` tells you what is missing. Choose **Quick**, **Basic** or **Pro / all** interview depth first. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
 
 Run `yaw init` inside the project folder. YAW refuses your home folder and the file-system root, and asks before writing into a non-empty folder that is not yet a Git repository or YAW project (for example a folder that holds several projects); `--force` overrides both checks.
 
@@ -74,11 +74,15 @@ To plan the work, `yaw kickoff` prints a versioned prompt to draft and review ar
 
 `yaw web` opens the local dashboard in any folder without starting setup or writing project files. In an uninitialized folder, first-time setup is an explicit action under Workspace → Settings → Interview, with preview and folder confirmation before writing. The dashboard shows project setup, tasks, decisions and session statistics (`~/.yaw/yaw.db`). `yaw sessions import --dry-run`, then `yaw sessions import`, loads the past sessions of any project folder (also one without YAW) from the local history of Claude Code, Codex and Copilot: times, model and token counts only, never prompt content.
 
-## Quick and Full
+## Quick, Basic and Pro
 
-**Quick** is the minimal setup: `core`, `communication`, `standards`, `devenv`, `tasks`, `sessions` and minimal `security`. It provides project instructions, basic agent configuration, development commands, session history and security guards without selecting GitHub-specific integrations.
+**Quick** asks purpose, language/runtime, any framework constraint and architecture choices. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
 
-**Full** includes Quick plus `git-hooks`, `decisions`, `comfort`, `code-map` and `review`. The `github` and `ci` modules are selected when the project uses GitHub; the GitHub-specific `team` enforcement module is selected for teams and external reviewers using GitHub. Full can also be customized in the interview. The legacy `standard` name remains an alias for Full.
+**Basic** adds repository agents, collaboration, GitHub on/off and review gates. **Pro / all** asks every applicable implemented question and exposes every optional module. Pro asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
+
+Save future-project tool defaults under Global Settings → Defaults. They are separate from personal preferences. Existing project modules remain selected; legacy `full` and `standard` answer files stay readable with their legacy module policy. Confirmed explicit module proposals continue to work unchanged.
+
+Initial browser setup and Workspace → Settings → Interview use the same reusable wizard, including drafts, planning, foundations, preview and Apply. Settings remains open after applying.
 
 Git and GitHub are separate choices. Answer **no** to "Use GitHub for the repo?" to use local tasks and Git without GitHub integrations, including team projects with a bare remote in another folder. YAW leaves your Git remotes unchanged. Existing team setups without this answer retain their GitHub defaults.
 

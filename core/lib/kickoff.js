@@ -2,7 +2,7 @@
 // user pastes back. The plan format is the one the prompt asks for; the parser accepts small deviations.
 
 import { EFFORTS } from './tasks.js';
-import { FOUNDATION_PATHS, PRACTICES, PRACTICES_VERSION } from './foundations.js';
+import { constraintFacts, FOUNDATION_PATHS, PRACTICES, PRACTICES_VERSION } from './foundations.js';
 
 export const PLAN_FILE = 'docs/plan/kickoff.md';
 
@@ -15,14 +15,16 @@ const TASK_TARGET = {
 // answers: the answers of .yaw/answers.yaml; summary: the confirmed proposal summary (profile - description).
 // stack (web setup, before the stack is chosen): { languages, hosts } as [{ value, label }]; the prompt then also asks
 // for the idea in business words and a stack recommendation, in a format parseKickoffReply understands.
-export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local', stack = null } = {}) {
+export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local', hasTasks = true, stack = null } = {}) {
   const idea = String(answers['idea.text'] ?? '').trim() || '(describe the idea here)';
   const facts = [
     summary && `- Stack: ${summary}`,
     !stack && answers['arch.language'] && `- Language: ${answers['arch.language']}`,
     !stack && answers['arch.runs-on'] && `- Runs on: ${answers['arch.runs-on']}`,
+    answers['arch.framework'] && `- Required framework / existing stack: ${answers['arch.framework']}`,
     answers['idea.team'] && `- Team: ${answers['idea.team']}`,
-    `- Work items become ${TASK_TARGET[tasksMode] ?? TASK_TARGET.local}`,
+    ...constraintFacts(answers),
+    hasTasks ? `- Work items become ${TASK_TARGET[tasksMode] ?? TASK_TARGET.local}` : '- Tasks are not enabled; keep work items in the reviewed plan until the tasks module is explicitly added.',
   ].filter(Boolean);
   return [
     `YAW guided kickoff prompt, version ${PRACTICES_VERSION}. Draft project foundations, review them with me, then derive a build plan for coding agents.`,
@@ -37,9 +39,12 @@ export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local',
     'Rules for the plan:',
     '- First ask for existing authoritative architecture/domain, data model, UI/UX documents, relevant decisions and selected knowledge. Reuse their paths; do not create competing specifications. Read only material I select. Preview exactly what I would copy to another model; exclude secrets.',
     '- Draft architecture (purpose, users, domain rules, boundaries, runtime, constraints), data-model (contracts, ownership, invariants, access, lifecycle, compatibility), and ui-ux (main tasks, flows, realistic content, empty/error/recovery states, accessibility, observable review criteria). Link shared concepts rather than duplicating rules.',
+    '- Treat hosting control, libraries, external application services and cost as separate project constraints. Self-hosting can use third-party open-source libraries; an open-source component can still require paid hosting or operations. Respect on-premises/network and data boundaries independently of the runtime profile. Ask about unknowns and conflicts before committing to an architecture.',
+    '- Compare build versus reuse within those constraints. For external or paid components, explain data flows, maintenance, applicable license constraints, recurring and one-off costs, free-tier limits, trial expiry, overage and an exit/export option. A missing budget cap needs clarification; never infer a subscription, credit-card, purchase or provisioning approval. Record agreed choices and rationale in the architecture foundation.',
     '- Label supplied facts, recommendations, untested assumptions and unresolved choices. Review the connected foundations with me before planning; resolve blocking choices and give remaining uncertainty an owner or follow-up task. A model draft alone is not agreed ground truth.',
     '- Scale to the project: a tiny CLI needs only a few bullets and command/error UX; no persistence needs an explicit reason and input/output rules; a machine-only API may mark human UI not applicable and link its contract. Do not fabricate screens or storage.',
     '- Offer an optional UX walkthrough: start with user evidence, test the main task including failure with realistic content, consider applicable accessibility criteria, and propose a small prototype or user validation for the riskiest assumption. Visual direction follows interaction needs. Guidance: https://www.gov.uk/service-manual/user-research/start-by-learning-user-needs and https://www.w3.org/WAI/WCAG22/quickref/ .',
+    '- Before substantial UI implementation, offer a small example to review: a rough wireframe, screen mockup or clickable prototype. Mockups cover layout as well as colours: content hierarchy, navigation, placement and grouping of controls, realistic content, narrow/wide arrangements and important interaction states. Review structure and the main flow before polishing colour, typography and spacing. Link the accepted example from ui-ux.md and derive implementation criteria from it; visual approval alone does not prove usability or accessibility. For CLI UX, example help/output and a sample interaction can serve the same purpose.',
     '- Split the work into 3 to 8 phases, from a thin working slice to the finished product.',
     '- Each phase has a goal, a suggested model tier and a reasoning effort, and 2 to 8 tasks.',
     '- Model tiers: a frontier model (for example opus) for architecture and hard problems, a mid tier (for example sonnet) for normal features, a small model (for example haiku) for routine edits.',

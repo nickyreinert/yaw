@@ -61,7 +61,8 @@ test('parsePlan: a plan without tasks or with a bad effort is refused', () => {
 test('kickoffPrompt: carries the idea, the stack and the task store; asks for the parseable format', () => {
   const p = kickoffPrompt({ answers: { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.team': 'solo' }, summary: 'node-cli - Node CLI', tasksMode: 'github' });
   assert.match(p, /Idea:\nRename photos\.\n/);
-  assert.match(p, /- Stack: node-cli - Node CLI\n- Language: javascript\n- Runs on: local\n- Team: solo\n- Work items become GitHub issues/);
+  assert.match(p, /- Stack: node-cli - Node CLI\n- Language: javascript\n- Runs on: local\n- Team: solo/);
+  assert.match(p, /- Work items become GitHub issues/);
   assert.match(p, /## Phase 1: <phase name>\nmodel: <tier> · effort: <effort>/);
   assert.match(p, /low, medium, high, xhigh, max/);
   // the format the prompt asks for is the one the parser reads
@@ -85,7 +86,7 @@ test('yaw kickoff prints the guide and the prompt; without the tasks module impo
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /^Kickoff\n {2}1\. /);
   assert.match(r.out, /A small command-line tool that renames photos by their EXIF date\./);
-  assert.match(r.out, /Work items become local tasks in TASKS\.md/);
+  assert.match(r.out, /Tasks are not enabled; keep work items in the reviewed plan/);
   assert.match(r.out, /add the tasks module \(yaw add tasks\)/);
   const refused = await yaw(['kickoff', 'import', 'plan.md'], dir);
   assert.equal(refused.code, 1);
