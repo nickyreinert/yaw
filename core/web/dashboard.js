@@ -27,6 +27,7 @@ const DASHBOARD_ASSETS = new Map([
   ['/interview/depth.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/depth.js', import.meta.url))]],
   ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   asset('dashboard.js', 'text/javascript; charset=utf-8'),
+  asset('yaw-theme.css', 'text/css; charset=utf-8'),
   asset('app.css', 'text/css; charset=utf-8'),
   asset('workspace.js', 'text/javascript; charset=utf-8'),
   asset('settings-view.js', 'text/javascript; charset=utf-8'),

@@ -18,6 +18,7 @@ const assets = new Map([
   ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   ['/login.js', ['text/javascript; charset=utf-8', Buffer.from("location.replace('/');\n")]],
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],
+  ['/yaw-theme.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/yaw-theme.css', import.meta.url))]],
   ['/app.css', ['text/css; charset=utf-8', readFileSync(new URL('./assets/app.css', import.meta.url))]],
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
   ['/setup-cards.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/setup-cards.js', import.meta.url))]],

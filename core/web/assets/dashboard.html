@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="yaw-csrf" content="YAW_CSRF"><title>YAW dashboard</title><link rel="stylesheet" href="/app.css"><script type="module" src="/dashboard.js"></script></head><body data-mode="dashboard">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="yaw-csrf" content="YAW_CSRF"><title>YAW dashboard</title><link rel="icon" href="/yaw-shark.svg" type="image/svg+xml"><link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/yaw-theme.css"><script type="module" src="/dashboard.js"></script></head><body data-mode="dashboard">
   <a class="skip" href="#overview-title">Skip to content</a>
   <aside class="sidebar">
-    <a class="brand" href="#overview" aria-label="YAW overview"><img src="/yaw-shark.svg" width="38" height="38" alt=""><span class="brand-name">YAW</span></a>
+    <a class="brand" href="#overview" aria-label="YAW overview"><img src="/yaw-shark.svg" width="38" height="38" alt=""><span class="brand-lockup"><span class="brand-name">YAW</span><span class="brand-tagline">Small fin. Big plans.</span></span></a>
     <div class="side-search" role="search"><label><span class="sr-only">Search pages and settings</span><input type="search" id="side-search" placeholder="Search…  ( / )" maxlength="100" autocomplete="off"></label></div>
     <div id="side-results" class="side-results" aria-label="Search results" hidden></div>
     <nav id="side-nav" aria-label="Workspace">
@@ -27,6 +27,7 @@
       <p id="classifier-job-message" class="small" role="status" aria-live="polite"></p>
       <div id="classifier-job-controls"></div>
     </details>
+    <div class="shark-waterline" aria-hidden="true"><svg viewBox="0 0 180 28" fill="none"><path d="M0 21h51l15-17 8 17h106M0 27h180" stroke="currentColor" stroke-width="1.5"/><circle cx="153" cy="10" r="2" fill="currentColor"/></svg><span>YAW / LOCAL WATERS</span></div>
   </aside>
   <div class="workspace">
     <header class="topbar"><div>Workspace <span aria-hidden="true">/</span> <strong id="breadcrumb">Overview</strong></div><div class="topbar-actions"><div class="project-switch" id="project-switch"><button type="button" class="project-chip" id="project-chip" aria-haspopup="true" aria-expanded="false" title="Current workspace"><strong id="project-name">Local project</strong><span id="project-state" class="small muted">Reading project…</span></button><button type="button" class="icon-button" id="project-search" aria-label="Find a project" title="Find a project" hidden><svg aria-hidden="true" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/></svg></button><button type="button" class="icon-button" id="project-add" aria-label="Add project folder" title="Add project folder" hidden><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg></button></div><span class="local-badge"><span class="local-dot"></span> Local workspace</span><button type="button" id="refresh" aria-label="Refresh workspace data">↻ <span>Refresh</span></button></div></header>
