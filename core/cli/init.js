@@ -42,8 +42,8 @@ const WEB = 'web';
 
 const choiceLabel = (q, value) => q?.choices?.find((c) => (c.value ?? c) === value)?.label ?? value;
 
-// The stack is language x runs-on (ADR-0054). Show the profile it picks; when the pair does not work, ask
-// again where it runs, listing only the places that language can run. -> { profile, answers } | WEB
+// The stack is language x runs-on (ADR-0054). Show the profile it picks; when the kit has no matching profile, ask
+// again where it runs, listing the hosting targets covered by this kit. -> { profile, answers } | WEB
 export async function confirmStack({ prompter, profiles, questions, answers }) {
   const s = prompter.style ?? PLAIN;
   const langQ = questions.find((q) => q.id === 'arch.language');
@@ -54,13 +54,14 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
     const hit = profileForStack(profiles, language, next['arch.runs-on']);
     if (hit) {
       prompter.show(`\n${s.bold('Stack')}: ${s.green(hit.title)} (${hit.name}; ${hit.stack.basic ? 'basic: the standard tools of the language' : 'tailored'})\n`);
+      if (hit.stack.notes?.[next['arch.runs-on']]) prompter.show(`  ${hit.stack.notes[next['arch.runs-on']]}\n`);
       const tools = (hit.requires ?? []).filter((r) => !r.startsWith('just'));
       if (tools.length) prompter.show(`  Needs on your computer: ${tools.join(', ')}. yaw doctor tells you what is missing.\n`);
       return { profile: hit.name, answers: next };
     }
     const hosts = hostsFor(profiles, language, (hostQ?.choices ?? []).map((c) => c.value ?? c));
     if (hosts.length === 0) throw new ProjectError(`no stack for ${language} in this kit`);
-    prompter.show(`\n${choiceLabel(langQ, language)} does not run there (${next['arch.runs-on']}). ${s.bold('Where will it run?')}\n`);
+    prompter.show(`\nNo YAW profile for ${choiceLabel(langQ, language)} on ${next['arch.runs-on']}. ${s.bold('Where will it run?')}\n`);
     hosts.forEach((h, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${choiceLabel(hostQ, h)} - ${profileForStack(profiles, language, h).title}\n`));
     prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
     const reply = (await prompter.ask('  Runs on > ', { choices: [...hosts, 'w'], start: 0 })).trim();

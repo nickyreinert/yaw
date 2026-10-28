@@ -390,7 +390,7 @@ function update() {
       if (current !== revision) return;
       if (e.message.startsWith('Choose another stack')) {
         $('summary').replaceChildren(element('p', 'Your file plan appears once language and place fit together (step 4).'), element('p', `Suggested modules: ${selectedModules().join(', ')}`));
-        status('This language does not run there; pick another pair in step 4.');
+        status('YAW has no profile for this combination; review your stack choices.');
       } else {
         $('summary').textContent = 'Preview unavailable. Fix the error before saving or applying.';
         error(e.message); status('Nothing was saved or applied.');

@@ -24,6 +24,7 @@ const asset = (name, type) => [`/${name}`, [type, readFileSync(new URL(`./assets
 const DASHBOARD_ASSETS = new Map([
   ['/interview-shell.html', ['text/html; charset=utf-8', Buffer.from(interviewShell())]],
   ['/interview-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/interview-view.js', import.meta.url))]],
+  ['/interview/suggest.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/suggest.js', import.meta.url))]],
   ['/interview/depth.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/depth.js', import.meta.url))]],
   ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   asset('dashboard.js', 'text/javascript; charset=utf-8'),

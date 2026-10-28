@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asksIn, batchesOf, parseReply, runInterview, whenMatches } from '../core/interview/engine.js';
 import { deriveFacts, matchFacts } from '../core/interview/facts.js';
+import { profileFor as browserProfileFor } from '../core/web/assets/setup-cards.js';
 import { stackProfile } from '../core/interview/suggest.js';
 import { collectQuestions, listProfiles, loadBaseQuestions } from '../core/render/kit.js';
 import { KIT_ROOT, scripted } from './helpers/fixtures.js';
@@ -112,7 +113,7 @@ test('facts come only from answers that exist; auto leaves a fact unknown', () =
   assert.deepEqual(matchFacts({ language: ['python'], runsOn: ['local'], hasUI: [false] }, { language: 'python', runsOn: 'edge' }), { matched: 1, mismatched: 1 });
 });
 
-test('stack: language x runs-on picks exactly one profile, tailored or basic; other pairs are invalid', () => {
+test('stack: language x runs-on picks exactly one profile, tailored or basic; uncovered pairs describe kit coverage', () => {
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': runsOn }).profile;
   assert.equal(pick('javascript', 'local'), 'node-cli');
@@ -123,8 +124,24 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; ot
   assert.equal(pick('kotlin', 'app-store'), 'android-kotlin');
   assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-basic');
   for (const language of ['swift', 'go', 'rust', 'java']) assert.equal(pick(language, 'local'), `${language}-basic`);
-  assert.equal(pick('html', 'local'), null);
-  assert.match(stackProfile(profiles, { 'arch.language': 'html', 'arch.runs-on': 'local' }).reason, /does not run on local; choose static/);
+  for (const host of ['local', 'self-hosted', 'serverless', 'edge', 'static']) {
+    assert.equal(pick('html', host), 'static-site', host);
+    assert.ok(profiles.find((p) => p.name === 'static-site').stack.notes[host], host);
+  }
+  assert.equal(pick('html', 'wordpress'), null);
+  assert.match(stackProfile(profiles, { 'arch.language': 'html', 'arch.runs-on': 'wordpress' }).reason, /no YAW profile for html on wordpress; choose/);
   assert.equal(stackProfile(profiles, {}).profile, null);
 });
 
+
+test('stack catalogue has unique pairs and browser selection agrees with CLI for every choice', () => {
+  const profiles = listProfiles(KIT_ROOT);
+  const questions = loadBaseQuestions(KIT_ROOT);
+  const choices = (id) => questions.find((q) => q.id === id).choices.map((c) => c.value ?? c);
+  for (const language of choices('arch.language')) for (const host of choices('arch.runs-on')) {
+    const matches = profiles.filter((p) => p.stack.language.includes(language) && p.stack.runsOn.includes(host));
+    assert.ok(matches.length <= 1, `${language} on ${host} has overlapping profiles`);
+    const cli = stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': host }).profile;
+    assert.equal(browserProfileFor(profiles, language, host)?.name ?? null, cli, `${language} on ${host}`);
+  }
+});

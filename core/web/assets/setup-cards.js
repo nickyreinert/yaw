@@ -2,6 +2,8 @@
 // module cards with the review agents. DOM only through createElement (CSP: no innerHTML, no inline styles).
 // Shared by the setup form (app.js) and Settings → Interview (settings-view.js).
 
+import { profileForStack } from '../../interview/suggest.js';
+
 export const GROUPS = [
   // Git & GitHub first: the answers there decide which other modules apply.
   ['github', 'Git & GitHub', 'Repository, commit checks and, on GitHub, issues and team rules.'],
@@ -87,7 +89,7 @@ const ARCH_DECISIONS = {
 
 // The profile for a (language, runsOn) pair, or null (ADR-0054: at most one).
 export function profileFor(profiles, language, runsOn) {
-  return profiles.find((p) => p.stack?.language?.includes(language) && p.stack?.runsOn?.includes(runsOn)) ?? null;
+  return profileForStack(profiles, language, runsOn);
 }
 
 // One-of-few choices as radio buttons (a dropdown only beyond RADIO_MAX).
@@ -162,7 +164,7 @@ export function renderStack(root, ctx) {
   for (const h of hosts) {
     const f = fit(lang, h.value);
     const p = profileFor(ctx.profiles, lang, h.value);
-    const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : `${langName(lang)} does not run here`;
+    const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : 'No YAW profile yet';
     hostGrid.append(el('button', { type: 'button', class: 'host', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
     decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone' })[h.value]),
@@ -180,7 +182,7 @@ export function renderStack(root, ctx) {
   } else if (profile && !profile.stack.basic) {
     result.append(
       el('h3', { text: `Your stack: ${profile.title}` }),
-      el('ul', {}, el('li', { text: profile.summary }), needs(profile), el('li', { text: 'Adds its checks to just check and docs/standards.md' })),
+      el('ul', {}, el('li', { text: profile.summary }), profile.stack.notes?.[host] ? el('li', { text: profile.stack.notes[host] }) : null, needs(profile), el('li', { text: 'Adds its checks to just check and docs/standards.md' })),
       el('p', { class: 'small muted' }, `${langName(lang)} · ${hostName(host)} → `, el('code', { text: profile.name })));
   } else if (profile) {
     result.append(
@@ -191,8 +193,8 @@ export function renderStack(root, ctx) {
     const other = hosts.filter((h) => fit(lang, h.value) !== 'none').map((h) => hostName(h.value));
     const here = langs.filter((l) => fit(l.value, host) !== 'none').map((l) => langName(l.value));
     result.append(
-      el('h3', { text: `${langName(lang)} does not run on ${hostName(host)}` }),
-      el('ul', {}, el('li', { text: `${langName(lang)} runs on: ${other.join(', ') || 'nothing yet'}` }), el('li', { text: `${hostName(host)} runs: ${here.join(', ') || 'nothing yet'}` })));
+      el('h3', { text: `No YAW profile for ${langName(lang)} on ${hostName(host)}` }),
+      el('ul', {}, el('li', { text: `${langName(lang)} profiles available for: ${other.join(', ') || 'nothing yet'}` }), el('li', { text: `Profiles for ${hostName(host)}: ${here.join(', ') || 'nothing yet'}` })));
   }
   root.replaceChildren(
     el('h3', { class: 'stack-step', text: `1 · ${langQ.label}` }), langRow,

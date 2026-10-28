@@ -1,5 +1,5 @@
 // The stack (ADR-0054): language x runs-on picks exactly one profile. No LLM, no scoring: every pair
-// belongs to at most one profile (profile.yaml `stack`); a pair without a profile is not a valid stack.
+// belongs to at most one profile (profile.yaml `stack`); a pair without a profile is not covered by this kit, not necessarily impossible.
 
 const covers = (p, language, runsOn) => Boolean(p.stack?.language?.includes(language) && p.stack?.runsOn?.includes(runsOn));
 
@@ -8,7 +8,7 @@ export function profileForStack(profiles, language, runsOn) {
   return profiles.find((p) => covers(p, language, runsOn)) ?? null;
 }
 
-// Places a language can run, in the order of `hosts` (the arch.runs-on choices). -> [runsOn]
+// Hosting targets covered by this kit for a language, in the order of `hosts` (the arch.runs-on choices). -> [runsOn]
 export function hostsFor(profiles, language, hosts) {
   return hosts.filter((h) => profiles.some((p) => covers(p, language, h)));
 }
@@ -21,5 +21,5 @@ export function stackProfile(profiles, answers = {}) {
   const hit = profileForStack(profiles, language, runsOn);
   if (hit) return { profile: hit.name, reason: `${hit.stack.basic ? 'basic' : 'tailored'} stack for ${language} on ${runsOn}` };
   const fits = profiles.flatMap((p) => (p.stack?.language?.includes(language) ? p.stack.runsOn : []));
-  return { profile: null, reason: fits.length ? `${language} does not run on ${runsOn}; choose ${[...new Set(fits)].join(', ')}` : `no stack for ${language}` };
+  return { profile: null, reason: fits.length ? `no YAW profile for ${language} on ${runsOn}; choose ${[...new Set(fits)].join(', ')}` : `no YAW profile for ${language}` };
 }

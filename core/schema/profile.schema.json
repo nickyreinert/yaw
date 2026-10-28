@@ -16,6 +16,12 @@
       "properties": {
         "language": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/language" }, "minItems": 1, "uniqueItems": true },
         "runsOn": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/runsOn" }, "minItems": 1, "uniqueItems": true },
+        "notes": {
+          "description": "Hosting-specific guidance and limits shown in CLI and browser setup.",
+          "type": "object",
+          "patternProperties": { "^(local|self-hosted|serverless|edge|static|wordpress|app-store)$": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        },
         "basic": { "description": "Standard language tools only, no framework or host setup.", "type": "boolean" }
       },
       "additionalProperties": false

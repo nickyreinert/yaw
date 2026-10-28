@@ -172,14 +172,15 @@ test('interview: declining writes nothing and exits 1', async () => {
   assert.deepEqual(readdirSync(dir), []);
 });
 
-test('interview: a language that does not run there asks where it runs (by number)', async () => {
+test('interview: an uncovered combination offers available YAW profiles (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', 'A static site.', 'html', 'local', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
+  const prompter = scripted(['', 'A static site.', 'html', 'wordpress', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
-  assert.match(prompter.shown.join(''), /HTML, CSS & JavaScript does not run there \(local\)/);
-  assert.match(prompter.shown.join(''), /choose one of: static/);
-  assert.match(r.out, /profile: static-site \(tailored stack for html on static\)/);
+  assert.match(prompter.shown.join(''), /No YAW profile for HTML, CSS & JavaScript on wordpress/);
+  assert.match(prompter.shown.join(''), /choose one of: local, self-hosted, serverless, edge, static/);
+  assert.match(r.out, /profile: static-site \(tailored stack for html on local\)/);
+  assert.match(prompter.shown.join(''), /Preview public\/ on your computer/);
   assert.ok(existsSync(join(dir, 'public')));
 });
 

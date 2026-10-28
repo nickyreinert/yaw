@@ -1,12 +1,18 @@
 # profiles/static-site/profile.yaml
-# Picked for HTML, CSS & JavaScript x static hosting (ADR-0054, was ADR-0034): static files only, e.g. GitHub Pages or Netlify.
+# Browser frontend; hosting targets serve the same public/ assets. Provider setup is separate.
 name: static-site
 title: Landing page, portfolio or docs
 dependencyEcosystems: [npm]
 summary: Landing page, portfolio or docs; plain HTML, CSS and browser JavaScript; html-validate, stylelint, link check.
 stack:
   language: [html]
-  runsOn: [static]
+  runsOn: [local, self-hosted, serverless, edge, static]
+  notes:
+    local: "Preview public/ on your computer with just dev; JavaScript runs in the browser."
+    self-hosted: "Serve public/ from your web server; JavaScript runs in the browser. Server configuration is not generated."
+    serverless: "Host public/ alongside functions on your provider; browser JavaScript stays in the frontend. Function code and provider configuration are not generated."
+    edge: "Serve public/ through an edge/CDN asset host, such as Workers Static Assets. Worker code and provider configuration are not generated."
+    static: "Publish public/ to a static host; JavaScript runs in the browser. Hosting configuration is not generated."
 defaults:
   modules: { devenv: false, ui-design: true, backup: false }
 requires: [node>=22.13, just]
