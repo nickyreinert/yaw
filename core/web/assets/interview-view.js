@@ -513,12 +513,6 @@ async function start() {
   $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { do { stepIndex--; } while (stepIndex > 0 && skipped(stepIndex)); renderWizard(true); } });
   $('back-to-review').addEventListener('click', () => { stepIndex = REVIEW; renderWizard(true); });
   $('next-step-button').addEventListener('click', advance);
-  $('setup').addEventListener('keydown', (event) => {
-    if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-    event.preventDefault();
-    if (event.key === 'ArrowRight') advance();
-    else if (stepIndex > 0) { do { stepIndex--; } while (stepIndex > 0 && skipped(stepIndex)); renderWizard(true); }
-  });
   $('setup').addEventListener('submit', (e) => e.preventDefault());
   root.querySelectorAll('input[name=mode]').forEach((input) => input.addEventListener('change', () => {
     state.mode = input.value;
