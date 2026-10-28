@@ -36,10 +36,15 @@ export function renderReview(root, ctx) {
     answers.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[id])}`, el('small', { class: 'muted', text: ` (${preview.sources?.[id] ?? 'answered'})` })), editButton(label, () => ctx.jump(id.startsWith('arch.') ? { stack: true } : { question: id }))));
   }
 
-  const personal = el('details', {}, el('summary', { text: 'Personal settings used for this project' }));
-  for (const q of ctx.questions.filter((q) => q.scope === 'user' && q.id !== 'user.agents' && Object.hasOwn(preview.answers, q.id))) {
-    personal.append(el('p', { text: `${SHORT[q.id] ?? q.label}: ${answerText(q, preview.answers[q.id])} (${preview.sources?.[q.id] ?? 'documented default'})` }));
+  const unasked = ctx.questions.filter((q) => !preview.visible.includes(q.id) && Object.hasOwn(preview.answers, q.id));
+  const defaults = el('details', { open: true }, el('summary', { text: `Settings not asked at this depth (${unasked.length})` }));
+  const defaultsList = el('ul', { class: 'review-list' });
+  for (const q of unasked) {
+    const label = SHORT[q.id] ?? q.label.replace(/\?$/, '');
+    defaultsList.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[q.id])}`, el('small', { class: 'muted', text: ` (${preview.sources?.[q.id] ?? 'documented default'})` })),
+      ...(q.editHidden ? [] : [editButton(label, () => ctx.jump({ question: q.id }))])));
   }
+  defaults.append(el('p', { class: 'small muted', text: 'These values are included in the generated setup. Edit opens the depth needed for that question; your answers and tool choices are kept.' }), defaultsList);
 
   if (ctx.plan?.tasks || ctx.plan?.idea || ctx.plan?.foundations?.length) {
     answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md, TASKS.md`), editButton('plan', () => ctx.jump({ plan: true }))));
@@ -70,6 +75,6 @@ export function renderReview(root, ctx) {
     ...(ctx.confirmProposal && preview.unresolved?.some((id) => preview.sources?.[id] === 'proposed — needs confirmation')
       ? [el('button', { type: 'button', text: 'Confirm the proposed project choices shown here', onclick: ctx.confirmProposal })] : []),
     el('p', { class: 'small muted', text: `${count('create', 'update', 'write', 'missing')} files written · ${count('kept')} kept as they are` }),
-    el('h3', { text: 'Your answers' }), answers, personal,
+    el('h3', { text: 'Your answers' }), answers, ...(unasked.length ? [defaults] : []),
     el('h3', { text: 'What YAW adds' }), list);
 }

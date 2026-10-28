@@ -1,7 +1,7 @@
 import { choiceValue, choiceLabel, available, asksIn, matches, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 import { isPreference } from '../../interview/policy.js';
 
-import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
 import { renderReview } from './review-step.js';
 import { DEPTHS, depthOf } from '../../interview/depth.js';
@@ -53,7 +53,11 @@ function renderWizard(focus = false) {
   $('setup').hidden = finished; $('finished').hidden = !finished;
   if (stepIndex === REVIEW) reviewReturn = false;
   $('back-to-review').hidden = !reviewReturn || stepIndex >= REVIEW;
-  for (const id of ['setup-depth', 'start', 'stack', 'module-section', 'confirm']) $(id).hidden = !step.ids.includes(id) || (id === 'start' && !hasPresets());
+  for (const id of ['start', 'stack', 'module-section', 'confirm']) $(id).hidden = !step.ids.includes(id) || (id === 'start' && !hasPresets());
+  const visible = visibleQuestions(catalog.questions, state.answers, state.mode, selectedModules());
+  const ids = new Set(visible.map((q) => q.id));
+  const extra = visibleQuestions(catalog.questions, state.answers, 'pro', selectedModules()).filter((q) => !ids.has(q.id)).length;
+  $('depth-coverage').textContent = `${DEPTHS.find((d) => d.value === depthOf(state.mode))?.description ?? ''} ${visible.length} questions at this depth${extra ? ` · ${extra} more in Pro` : ''}.`;
   for (const [group, section] of sections) section.node.hidden = !section.applicable || !belongs(step, group);
   $('sections').replaceChildren();
   let ordinal = 0;
@@ -78,7 +82,7 @@ function renderWizard(focus = false) {
   $('next-step-button').title = blocked ? 'Pick a language and a place where it can run' : '';
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
-    const heading = visibleSection?.querySelector('h2') ?? $(step.ids[0])?.querySelector('h2, legend');
+    const heading = $(step.ids[0])?.querySelector('h2, legend') ?? visibleSection?.querySelector('h2');
     if (heading) { heading.tabIndex = -1; heading.focus(); heading.scrollIntoView({ block: 'start', behavior: 'instant' }); }
   }
 }
@@ -112,7 +116,10 @@ function error(message) {
   $('error').hidden = !message;
 }
 function status(message) { $('status').textContent = message; }
-function actions(enabled) { actionIds.forEach((id) => { $(id).disabled = !enabled || busy || (id !== 'draft' && Boolean(lastPreview?.unresolved?.length)); }); }
+function actions(enabled) {
+  actionIds.forEach((id) => { $(id).disabled = !enabled || busy || (id !== 'draft' && Boolean(lastPreview?.unresolved?.length)); });
+  root.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = busy || sectionEditing(); });
+}
 async function request(action, input = state) {
   if (options.request) return options.request(action, input);
   const response = await fetch(`/api/${action}`, {
@@ -306,13 +313,25 @@ function renderModules() {
   });
 }
 // Where a review item is configured: the step and the control to focus.
-const stepFor = (q) => isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, q.id.split('.')[0]));
+const stepFor = (q) => q.id.startsWith('arch.') ? STACK : isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, q.id.split('.')[0]));
+function setDepth(mode) {
+  state.mode = mode;
+  root.querySelectorAll('input[name=mode]').forEach((input) => { input.checked = input.value === depthOf(mode); });
+  const wasSkipped = skipped(stepIndex);
+  while (skipped(stepIndex) && stepIndex < REVIEW) stepIndex++;
+  update();
+  if (wasSkipped) renderWizard(true);
+}
 function jump(target) {
   let step, focusId;
   if (target.stack) { step = STACK; focusId = 'stack-title'; }
   else if (target.plan) { step = steps.findIndex((st) => st.groups?.includes('idea')); focusId = 'plan-card'; }
   else if (target.module) { step = WORKFLOW; focusId = `module-${target.module}`; }
-  else { const c = controls.get(target.question); step = stepFor(c.q); focusId = c.inputs[0]?.id; }
+  else {
+    const c = controls.get(target.question);
+    if (!asksIn(c.q, state.mode) || skipped(stepFor(c.q))) setDepth(asksIn(c.q, 'basic') ? 'basic' : 'pro');
+    step = stepFor(c.q); focusId = c.inputs[0]?.id;
+  }
   stepIndex = step; reviewReturn = true; renderWizard();
   const node = $(focusId);
   if (node) { if (node.tabIndex < 0) node.tabIndex = -1; node.focus(); node.scrollIntoView({ block: 'center', behavior: 'instant' }); }
@@ -492,10 +511,10 @@ async function start() {
   }
   const depthCards = $('setup-depth').querySelector('.depth-options');
   depthCards.replaceChildren(...DEPTHS.map((depth) => {
-    const label = element('label', undefined, { class: 'depth-card' });
+    const label = element('label', undefined, { class: 'depth-card', title: depth.description });
     const input = element('input', undefined, { type: 'radio', name: 'mode', value: depth.value });
     input.checked = depth.value === depthOf(state.mode);
-    const text = element('span'); text.append(element('strong', depth.label), element('span', depth.description)); label.append(input, text); return label;
+    label.append(input, decisionIcon(({ quick: 'bolt', basic: 'shield', pro: 'box' })[depth.value]), element('strong', depth.label)); return label;
   }));
   if (catalog.editing) {
     if (!options.persistent) document.title = 'YAW edit setup';
@@ -523,9 +542,7 @@ async function start() {
   $('next-step-button').addEventListener('click', advance);
   $('setup').addEventListener('submit', (e) => e.preventDefault());
   root.querySelectorAll('input[name=mode]').forEach((input) => input.addEventListener('change', () => {
-    state.mode = input.value;
-    if (!catalog.editing) state.modules = null;
-    update();
+    setDepth(input.value);
   }));
   $('load').addEventListener('click', async () => {
     try {
