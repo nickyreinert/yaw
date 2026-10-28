@@ -141,12 +141,12 @@ export function checkTaskReferences(tasks, prepared) {
   }
 }
 
-export function saveFoundations({ root, prepared, kitRoot }) {
+export function saveFoundations({ root, prepared, kitRoot, setupHash }) {
   if (!prepared) return;
   assertFoundationsUnchanged(root, prepared, kitRoot);
   const manifest = readManifest(root);
   if (!manifest) throw new FoundationError('Initialize the project before importing foundations.');
-  const index = { version: 1, practicesVersion: PRACTICES_VERSION, kit: manifest.kit,
+  const index = { version: 1, practicesVersion: PRACTICES_VERSION, kit: manifest.kit, ...(setupHash ? { setupHash } : {}),
     documents: prepared.entries.map(({ kind, path, hash }) => ({ kind, path, hash })) };
   const indexText = `${JSON.stringify(index, null, 2)}\n`;
   for (const d of prepared.entries) if (d.expected === null) writeAtomic(root, d.path, d.text);
@@ -171,6 +171,7 @@ export function foundationContext({ root, kitRoot } = {}) {
     if (secretValueRule(rulesFor(kitRoot), Object.values(result.constraints))) throw new FoundationError('Unsafe setup constraints; nothing was included.');
   }
   if (!index) { result.warnings.push('No registered foundations. Consult AGENTS.md and existing project documentation; guided kickoff can register authoritative paths.'); return result; }
+  if (index.setupHash) result.setupHash = index.setupHash;
   for (const d of index.documents) {
     const text = readFoundationFile(root, d.path, { kitRoot });
     if (text === null) { result.warnings.push(`${d.path}: missing reviewed source; resolve before relying on it.`); continue; }

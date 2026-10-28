@@ -14,8 +14,8 @@ import { saveSetup, seedPersonalPreferences } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
 import { printReport } from '../cli/commands.js';
 import { printNextSteps } from '../cli/next-steps.js';
-import { kickoffGuide, kickoffPrompt, parseKickoffReply, PLAN_FILE, PlanError } from '../lib/kickoff.js';
-import { importTasks } from '../cli/kickoff.js';
+import { kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
+import { importTasks, kickoffParts } from '../cli/kickoff.js';
 import { tasksMode } from '../lib/tasks.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
@@ -57,7 +57,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   async function savePlan({ prepared, output }) {
     const { plan } = prepared;
     assertPlanUnchanged(prepared);
-    saveFoundations({ root, prepared: prepared.foundations, kitRoot });
+    saveFoundations({ root, prepared: prepared.foundations, kitRoot, setupHash: prepared.planBasisHash });
     if (prepared.foundations) output.write(`Registered reviewed project foundations: ${prepared.foundations.entries.map((d) => d.path).join(', ')}\n`);
     writeAtomic(root, PLAN_FILE, plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`);
     const manifest = readManifest(root);
@@ -91,10 +91,12 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     prepareApply(input) {
       ensureNew();
       if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
-      const { secrets, plan, foundationsReviewed, foundationReview, ...setup } = input;
+      const { secrets, plan, planBasis, foundationsReviewed, foundationReview, ...setup } = input;
       const prepared = model.normalize(setup);
       if (plan !== undefined && plan !== null) {
         prepared.plan = replyOf(plan);
+        assertSafe(planningFacts(planBasis ?? prepared.doc.answers), kitRoot);
+        prepared.planBasisHash = hashContent(JSON.stringify(planningFacts(planBasis ?? prepared.doc.answers)));
         try {
           prepared.foundations = prepareFoundations({ root, kitRoot, documents: prepared.plan.foundations, reviewed: foundationsReviewed });
           checkTaskReferences(prepared.plan.tasks, prepared.foundations);
@@ -208,10 +210,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         profiles: prepared.doc.proposal?.profiles ?? [], files: result.manifest.files.map((f) => f.path),
       });
       // The same kickoff guide and planning prompt `yaw init` prints on a terminal.
-      const mode = tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') });
-      emit({ type: 'kickoff', guide: kickoffGuide({ tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
-        prompt: kickoffPrompt({ answers: prepared.doc.answers, summary: prepared.doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: prepared.modules.includes('tasks') }),
-        plan: prepared.plan ? { tasks: prepared.plan.tasks.length, file: PLAN_FILE } : null });
+      emit({ type: 'kickoff', ...kickoffParts({ root, manifest: readManifest(root) }) });
       emit({ type: 'done', ok, message });
     },
     failed(error) {

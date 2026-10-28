@@ -1,10 +1,10 @@
 // `yaw kickoff` (#173): print the kickoff guide and the planning prompt; `yaw kickoff import <plan.md>` turns
 // the plan into tasks through `yaw task new`, so every task store (local, both, github) works the same way.
 
-import { kickoffGuide, kickoffPrompt, parseKickoffReply, PlanError } from '../lib/kickoff.js';
+import { kickoffGuide, kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
 import { checkTaskReferences, contextText, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { modelEffort, parseTasks, tasksMode } from '../lib/tasks.js';
-import { readProjectFile } from '../render/files.js';
+import { hashContent, readProjectFile } from '../render/files.js';
 import { enabledModules, readAnswers, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 import { task } from './tasks.js';
@@ -14,9 +14,20 @@ export function kickoffParts({ root, manifest }) {
   const doc = readAnswers(root);
   const modules = enabledModules(manifest);
   const mode = tasksMode(doc.answers, { teamModule: modules.includes('team') });
+  const previousPlan = readFoundationFile(root, PLAN_FILE) ?? '';
+  const context = foundationContext({ root });
+  let plan = null;
+  if (previousPlan) {
+    const parsed = parseKickoffReply(previousPlan);
+    const warnings = context.warnings.slice();
+    if (context.setupHash && context.setupHash !== hashContent(JSON.stringify(planningFacts(doc.answers)))) warnings.push('Project choices changed since this plan was reviewed. Reconcile the saved plan with the current setup.');
+    const complete = parsed.tasks.length > 0 && parsed.foundations.length === 3 && context.documents.length === 3 && !warnings.length;
+    plan = { file: PLAN_FILE, tasks: parsed.tasks.length, foundations: context.documents.map((d) => d.path), complete, warnings };
+  }
   return {
+    plan,
     guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
-    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks') }),
+    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks'), previousPlan, projectContext: context.documents.length ? contextText(context) : '' }),
   };
 }
 
@@ -81,7 +92,7 @@ export async function kickoff({ values, positionals, io }) {
   checkTaskReferences(plan.tasks, prepared);
   if (prepared) {
     for (const d of prepared.entries) io.stdout.write(`Foundation ${d.kind}: ${d.path}\n${d.text}\n`);
-    if (!values['dry-run']) saveFoundations({ root, prepared, kitRoot: io.kitRoot });
+    if (!values['dry-run']) saveFoundations({ root, prepared, kitRoot: io.kitRoot, setupHash: hashContent(JSON.stringify(planningFacts(readAnswers(root).answers))) });
   }
   if (!hasTasks) {
     io.stdout.write(`kickoff import: ${values['dry-run'] ? 'would save' : 'saved'} reviewed foundations; tasks remain in ${file}. Add the tasks module (yaw add tasks), then import again to create them.\n`);

@@ -139,11 +139,16 @@ export function source(text) {
 // ------------------------------------------------------------------------------- kickoff
 
 // The kickoff guide and the planning prompt, shared by Settings → Kickoff and the last setup step.
-export function kickoffCard({ guide, prompt }) {
+export function kickoffCard({ guide, prompt, plan }) {
   const card = el('section', null, 'card kickoff');
-  card.append(el('h2', 'Plan your project'),
+  card.append(el('h2', plan?.complete ? 'Project plan ready' : plan ? 'Continue your project plan' : 'Plan your project'),
     el('p', 'Copy this prompt into any LLM to turn your idea into a build plan. It returns Markdown drafts for three project documents — architecture/domain, data model and UI/UX — plus phased tasks with acceptance criteria.'),
     el('p', 'Review the reply, then import it into YAW to save the documents and create work items when Tasks is enabled.', 'small muted'));
+  if (plan) {
+    card.append(el('p', `${plan.tasks} planned tasks · ${plan.foundations.length}/3 reviewed foundations · ${plan.file}`, 'small muted'));
+    for (const warning of plan.warnings) card.append(el('p', warning, 'warn'));
+    if (plan.complete) card.append(el('p', 'Your setup already supplied the foundations and build plan. No second planning round is needed.', 'ok-text'));
+  }
   const steps = el('ol', null, 'kickoff-guide');
   for (const line of guide) steps.append(el('li', line));
   const status = el('span', '', 'small muted'); status.setAttribute('role', 'status');
@@ -154,7 +159,9 @@ export function kickoffCard({ guide, prompt }) {
   const bar = el('div', null, 'interview-actions'); bar.append(copy, status);
   const preview = el('details'); preview.append(el('summary', 'Preview prompt'), text);
   const instructions = el('details'); instructions.append(el('summary', 'How to import the reply'), steps);
-  card.append(bar, chatLinks(), el('p', 'Paste the copied prompt into your coding agent, a local model or a chat. Nothing is sent automatically.', 'small muted'), preview, instructions);
+  const handoff = el('details', null, 'planning-handoff'); handoff.open = !plan?.complete;
+  handoff.append(el('summary', plan?.complete ? 'Refine the existing plan (optional)' : plan ? 'Continue with the saved work' : 'Start planning'), bar, chatLinks(), el('p', 'Paste the copied prompt into your coding agent, a local model or a chat. Nothing is sent automatically.', 'small muted'), preview, instructions);
+  card.append(handoff);
   return card;
 }
 

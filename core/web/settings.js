@@ -194,7 +194,7 @@ export async function interviewApply({ root, kitRoot, env, input }) {
   const model = editModel({ root, kitRoot, env, expected: input?.expected });
   const { createFormApi } = await import('./init.js');
   const api = createFormApi({ root, kitRoot, env, edit: !fresh, skipVerify: true });
-  const payload = { ...setupInput(input), ...Object.fromEntries(['plan', 'foundationsReviewed', 'foundationReview', 'secrets'].filter((key) => input[key] !== undefined).map((key) => [key, input[key]])) };
+  const payload = { ...setupInput(input), ...Object.fromEntries(['plan', 'planBasis', 'foundationsReviewed', 'foundationReview', 'secrets'].filter((key) => input[key] !== undefined).map((key) => [key, input[key]])) };
   const prepared = api.prepareApply(payload);
   const preview = model.preview(setupInput(input));
   const events = [];

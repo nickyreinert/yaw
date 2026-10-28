@@ -149,6 +149,7 @@ function buildPlan() {
       if (reply.language) state.answers['arch.language'] = reply.language;
       if (reply.runsOn) state.answers['arch.runs-on'] = reply.runsOn;
       state.proposed = ['idea.text', 'arch.language', 'arch.runs-on'].filter((id) => Object.hasOwn(state.answers, id));
+      planInfo.basis = structuredClone(state.answers);
       planCard.setInfo(reply); update();
     },
     onRemove() { plan = null; planInfo = null; update(); },
@@ -426,7 +427,7 @@ function finish({ ok, message }, kickoff) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet(options.persistent ? 'The workspace remains open.' : 'This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
-  $('kickoff-box').replaceChildren(...(kickoff && !kickoff.plan ? [kickoffCard(kickoff)] : []));
+  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff)] : []));
   status(message);
   renderWizard(true);
 }
@@ -442,7 +443,7 @@ async function apply() {
   for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
   let outcome = null, started = false, failure = '', kickoff = null;
   try {
-    const response = await request('apply', { ...state, ...(plan ? { plan, foundationsReviewed: planInfo?.foundationsReviewed === true, foundationReview: planInfo?.foundationReview } : {}), secrets: secretValues });
+    const response = await request('apply', { ...state, ...(plan ? { plan, planBasis: planInfo?.basis, foundationsReviewed: planInfo?.foundationsReviewed === true, foundationReview: planInfo?.foundationReview } : {}), secrets: secretValues });
     started = true;
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = '';

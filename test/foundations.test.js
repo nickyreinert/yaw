@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse, stringify } from '../core/lib/yaml.js';
 import { main } from '../core/cli/main.js';
+import { kickoffParts } from '../core/cli/kickoff.js';
 import { parseKickoffReply, parsePlan } from '../core/lib/kickoff.js';
 import { FOUNDATION_INDEX, FOUNDATION_PATHS, assertFoundationsUnchanged, checkTaskReferences, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../core/lib/foundations.js';
 import { readManifest } from '../core/render/manifest.js';
@@ -199,4 +201,23 @@ test('unsafe or malformed inputs fail before writes or browser source previews',
   writeTree(linked, { 'other.md': 'A regular file.', '.yaw/placeholder.md': 'A folder fixture.' });
   symlinkSync(join(linked, 'other.md'), join(linked, '.yaw/answers.yaml'));
   assert.throws(() => foundationContext({ root: linked }), /symbolic links/);
+});
+
+test('one reviewed planning reply completes setup; project changes require continuation, personal changes do not', async () => {
+  const root = tmp(), env = { HOME: tmp() }, api = createFormApi({ root, kitRoot: KIT_ROOT, env, skipVerify: true });
+  try {
+    const text = bundle(CLI), preview = await api.action('kickoff-reply', { text });
+    const answers = { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+    const events = [];
+    await api.apply(api.prepareApply({ mode: 'quick', modules: ['core'], answers, plan: text, planBasis: answers, foundationsReviewed: true, foundationReview: preview.foundationReview }), (e) => events.push(e));
+    assert.equal(events.find((e) => e.type === 'kickoff').plan.complete, true);
+    const facts = kickoffParts({ root, manifest: readManifest(root) });
+    assert.match(facts.prompt, /Continue the existing planning work/); assert.match(facts.prompt, /Previous plan/);
+    const answerFile = join(root, '.yaw/answers.yaml'), before = readFileSync(answerFile, 'utf8');
+    const personal = parse(before); personal.answers['user.length'] = 'brief'; writeFileSync(answerFile, stringify(personal));
+    assert.equal(kickoffParts({ root, manifest: readManifest(root) }).plan.complete, true);
+    writeFileSync(answerFile, before.replace('arch.language: javascript', 'arch.language: python'));
+    const changed = kickoffParts({ root, manifest: readManifest(root) }).plan;
+    assert.equal(changed.complete, false); assert.match(changed.warnings.join(' '), /choices changed/);
+  } finally { api.close(); }
 });
