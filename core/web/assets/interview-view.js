@@ -88,7 +88,7 @@ function renderWizard(focus = false) {
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
     const heading = $(step.ids[0])?.querySelector('h2, legend') ?? visibleSection?.querySelector('h2');
-    if (heading) { heading.tabIndex = -1; heading.focus(); heading.scrollIntoView({ block: 'start', behavior: 'instant' }); }
+    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   }
 }
 function advance() {
@@ -285,7 +285,7 @@ function renderStackStep() {
   const result = renderStack($('stack-cards'), {
     profiles: catalog.profiles, questions: catalog.questions, answers,
     disabled: sectionEditing() && !catalog.sections.some((s) => s === 'arch' || s.startsWith('arch.')),
-    onChange: (id, value) => { state.answers[id] = value; state.proposed = (state.proposed ?? []).filter((key) => key !== id); update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus(); },
+    onChange: (id, value) => { state.answers[id] = value; state.proposed = (state.proposed ?? []).filter((key) => key !== id); update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus({ preventScroll: true }); },
   });
   stackValid = result.valid;
 }
@@ -376,7 +376,7 @@ function update() {
   $('diff-panel').hidden = true; $('diff-output').textContent = '';
   renderQuestions(); renderStackStep(); renderModules(); renderWizard(); scopeIds();
   // Cards are rebuilt on every change; keep the keyboard where it was.
-  if (activeId && document.activeElement?.id !== activeId) $(activeId)?.focus();
+  if (activeId && document.activeElement?.id !== activeId) $(activeId)?.focus({ preventScroll: true });
   clearTimeout(timer);
   const current = revision;
   timer = setTimeout(async () => {
