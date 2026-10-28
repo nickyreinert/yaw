@@ -53,7 +53,7 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 | Work across projects | `yaw web --background` runs one local dashboard server. Switch YAW workspaces in the sidebar and use global views for projects, sessions and task snapshots. |
 | Sync devices | `yaw sync setup`, `yaw sync run` and **Global / Settings / Sync** exchange presets and personal defaults through a folder/NAS or private GitHub repository, and merge numerical statistics by named device. See [scope and conflict handling](docs/workspace-dashboard.md#sync-between-devices). |
 | Get notified after a long run | The optional comfort module can send Telegram notifications. Preferences are personal; credentials stay in environment variables. |
-| Control agents on a private server | `yaw remote serve` provides a browser/Telegram controller, Claude and Codex execution adapters, and an authoritative portable-data hub. Managed workers require Linux and bubblewrap. See [setup and recovery](docs/remote-control.md). |
+| Optionally control agents on a private server | Enable **Global / Settings / Features / Remote Control** first; it is off and hidden from CLI help by default. `yaw remote serve` then provides a browser/Telegram controller and data hub. Managed workers require Linux and bubblewrap. See [setup and recovery](docs/remote-control.md). |
 
 Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.
 
