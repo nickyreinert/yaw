@@ -39,7 +39,7 @@ const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · proj
 
 const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
 const FILTERS = ['path', ...FACET_KEYS, 'period', 'from', 'to', 'split'];
-const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: [...FACET_KEYS, 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
@@ -94,7 +94,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function readQuery(qs) {
     const p = new URLSearchParams(qs);
     for (const k of Object.keys(DEFAULTS)) if (!FACET_KEYS.includes(k)) state[k] = p.get(k) ?? DEFAULTS[k];
-    Object.assign(state, readFacets(p));
+    Object.assign(state, readFacets(p, locked() ? 'workspace' : 'global'));
     for (const k of Object.keys(tables)) delete tables[k];
     for (const [k, v] of p) {
       const m = /^(q|sort|page)\.([\w-]+)$/.exec(k); if (!m) continue;
@@ -297,17 +297,19 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         select('Project', 'project', PROJECTS.filter(inPath), 'All projects', rel));
     } else {
       bar.classList.add('analytics-filter');
-      bar.append(renderFacetBrowser({ rows: scopeRows(), selection: state, root: ROOTP,
+      if (locked()) bar.classList.add('workspace-filter');
+      const facets = renderFacetBrowser({ rows: scopeRows(), selection: state, scope: locked() ? 'workspace' : 'global', root: ROOTP,
         label: (key, value) => value === UNAVAILABLE ? 'Unavailable (synced)' : key === 'device' ? deviceLabel(value) : key === 'project' ? (PROJECTS.filter((p) => base(p) === base(value)).length > 1 ? `${base(value)} · ${rel(value)}` : base(value)) : key === 'folder' ? rel(value) || base(value) : value,
         onChange: (key, values) => {
           const rows = scopeRows();
           set(changeFacet(rows, state, key, values, ROOTP));
-        } }),
-      h('div', { class: 'analytics-dates' },
+        } });
+      const dates = h('div', { class: 'analytics-dates' },
         seg('Period', 'period', [['7', '7 d'], ['30', '30 d'], ['90', '90 d'], ['all', 'All']]),
         h('label', {}, 'From', h('input', { type: 'date', value: state.from, on: { change: (e) => set({ from: e.target.value }) } })),
         h('label', {}, 'To', h('input', { type: 'date', value: state.to, on: { change: (e) => set({ to: e.target.value }) } })),
-        seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS)));
+        seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS));
+      bar.append(...(locked() ? [h('div', { class: 'workspace-filter-row' }, facets, dates)] : [facets, dates]));
     }
     bar.append(h('div', { class: 'gfilter-end' }, mode === 'tasks' ? null : h('strong', {}, `${fmt(filtered().length)} sessions`),
       ['sessions', 'improve', 'overview'].includes(mode) ? collectControls() : null,

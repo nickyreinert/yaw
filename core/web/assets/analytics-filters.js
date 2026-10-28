@@ -3,6 +3,7 @@
 export const FACETS = [['device', 'Device'], ['folder', 'Folders'], ['project', 'Projects'],
   ['language', 'Programming language'], ['agent', 'Agent'], ['model', 'Model']];
 export const FACET_KEYS = FACETS.map(([key]) => key);
+export const facetsForScope = (scope = 'global') => scope === 'workspace' ? FACETS.filter(([key]) => ['agent', 'model'].includes(key)) : FACETS;
 export const UNAVAILABLE = '(unavailable)';
 export function facetValues(row, key, root = '') {
   if (key === 'device') return [row.deviceId ?? 'local'];
@@ -41,12 +42,13 @@ export function changeFacet(rows, selection, key, values, root = '') {
   }
   return next;
 }
-export function readFacets(params) {
-  return Object.fromEntries(FACET_KEYS.map((key) => [key, [...new Set(params.getAll(key).filter(Boolean))]]));
+export function readFacets(params, scope = 'global') {
+  const allowed = new Set(facetsForScope(scope).map(([key]) => key));
+  return Object.fromEntries(FACET_KEYS.map((key) => [key, allowed.has(key) ? [...new Set(params.getAll(key).filter(Boolean))] : []]));
 }
-export function renderFacetBrowser({ rows, selection, root = '', label = (_key, value) => value, onChange }) {
-  const browser = document.createElement('div'); browser.className = 'facet-browser';
-  for (const [key, title] of FACETS) {
+export function renderFacetBrowser({ rows, selection, scope = 'global', root = '', label = (_key, value) => value, onChange }) {
+  const browser = document.createElement('div'); browser.className = `facet-browser${scope === 'workspace' ? ' workspace-facets' : ''}`;
+  for (const [key, title] of facetsForScope(scope)) {
     const field = document.createElement('fieldset'); field.className = 'facet-column';
     const legend = document.createElement('legend'); legend.textContent = title;
     const list = document.createElement('div'); list.className = 'facet-list';

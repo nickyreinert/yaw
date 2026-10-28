@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { changeFacet, facetOptions, matchesFacets, readFacets, UNAVAILABLE } from '../core/web/assets/analytics-filters.js';
+import { changeFacet, facetOptions, matchesFacets, readFacets, facetsForScope, UNAVAILABLE } from '../core/web/assets/analytics-filters.js';
 const rows = [
   { deviceId: 'local', project: '/work/apps/one', language: 'javascript', agent: 'codex', model: 'a' },
   { deviceId: 'local', project: '/work/apps/two', language: 'python', agent: 'claude', model: 'b' },
@@ -27,4 +27,16 @@ test('synced rows never invent folder/project paths and repeated URL filters rou
   const params = new URLSearchParams();
   for (const [key, values] of Object.entries(selected)) for (const value of values) params.append(key, value);
   assert.deepEqual(readFacets(params), selected);
+});
+
+test('workspace scope keeps agent/model filters and clears hidden global filters from old URLs', () => {
+  assert.deepEqual(facetsForScope('workspace').map(([key]) => key), ['agent', 'model']);
+  assert.deepEqual(facetsForScope().map(([key]) => key), ['device', 'folder', 'project', 'language', 'agent', 'model']);
+  const params = new URLSearchParams('device=other&folder=/unrelated&project=/unrelated/old&language=python&agent=codex&model=a&model=c');
+  const selection = readFacets(params, 'workspace');
+  for (const key of ['device', 'folder', 'project', 'language']) assert.deepEqual(selection[key], []);
+  assert.deepEqual(selection.agent, ['codex']);
+  assert.deepEqual(selection.model, ['a', 'c']);
+  assert.deepEqual(rows.filter((row) => matchesFacets(row, selection)), [rows[0], rows[2]]);
+  assert.deepEqual([...facetOptions(rows, changeFacet(rows, selection, 'agent', ['claude']), 'model').keys()], ['b']);
 });
