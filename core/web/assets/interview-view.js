@@ -87,7 +87,7 @@ function renderWizard(focus = false) {
   $('next-step-button').title = blocked ? 'Pick a language and a place where it can run' : '';
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
-    const heading = $(step.ids[0])?.querySelector('h2, legend') ?? visibleSection?.querySelector('h2');
+    const heading = (step.ids[0] ? $(step.ids[0])?.querySelector('h2, legend') : null) ?? visibleSection?.querySelector('h2');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   }
 }
