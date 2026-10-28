@@ -69,6 +69,7 @@ function device(env, name) {
 }
 // Tasks and knowledge hold your own text, so they are opt-in.
 export function configureSync({ env, target, github, name, scopes = ['settings', 'presets', 'statistics'] }) {
+  if (scopes.some((s) => readUserData(env, 'hub-sync.json')?.scopes?.includes(s))) throw new Error('These datasets have migrated to the hub; use yaw remote sync');
   if (Boolean(target) === Boolean(github)) throw new Error('Choose a folder or a GitHub repository');
   if (!Array.isArray(scopes) || !scopes.length || scopes.some((s) => !SCOPES.includes(s))) throw new Error(`Scopes: ${SCOPES.join(',')}`);
   if (github && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(github)) throw new Error('GitHub repository must be owner/repository');
@@ -169,7 +170,7 @@ export function mergeRecords(local, remote, base, resolution) {
   }
   return { records, conflicts };
 }
-function validateVault(v, kitRoot) {
+export function validateVault(v, kitRoot) {
   if (!v || v.version !== 1 || !v.records || !v.devices || Array.isArray(v.records) || Array.isArray(v.devices) || Object.keys(v).some((k) => !['version', 'records', 'devices'].includes(k))) throw new Error('Unsupported sync vault');
   for (const [k, value] of Object.entries(v.records)) v.records[k] = portable(k, value, kitRoot);
   for (const [id, d] of Object.entries(v.devices)) {
@@ -228,8 +229,10 @@ function totals(devices, selected) {
 }
 // Sessions other devices contributed, for the Sessions pages: the most complete copy of each, none of this device's own.
 export function syncedSessions(env) {
-  if (!readUserData(env, 'sync-config.json')?.scopes?.includes('statistics')) return [];
-  const state = readUserData(env, 'sync-state.json'), me = readUserData(env, 'sync-device.json')?.id;
+  const hub = readUserData(env, 'hub-sync.json');
+  if (![...(readUserData(env, 'sync-config.json')?.scopes ?? []), ...(hub?.scopes ?? [])].includes('statistics')) return [];
+  const state = hub?.scopes.includes('statistics') ? readUserData(env, 'hub-sync-state.json') : readUserData(env, 'sync-state.json');
+  const me = hub?.scopes.includes('statistics') ? state?.deviceId : readUserData(env, 'sync-device.json')?.id;
   const rows = new Map();
   for (const [id, d] of Object.entries(state?.devices ?? {}).sort()) {
     if (id === me) continue;
@@ -242,8 +245,10 @@ export function syncedSessions(env) {
 }
 // Task snapshots of other devices' projects: [{ device, name, active, backlog }]
 export function syncedTasks(env) {
-  if (!readUserData(env, 'sync-config.json')?.scopes?.includes('tasks')) return [];
-  const state = readUserData(env, 'sync-state.json'), me = readUserData(env, 'sync-device.json')?.id;
+  const hub = readUserData(env, 'hub-sync.json');
+  if (![...(readUserData(env, 'sync-config.json')?.scopes ?? []), ...(hub?.scopes ?? [])].includes('tasks')) return [];
+  const state = hub?.scopes.includes('tasks') ? readUserData(env, 'hub-sync-state.json') : readUserData(env, 'sync-state.json');
+  const me = hub?.scopes.includes('tasks') ? state?.deviceId : readUserData(env, 'sync-device.json')?.id;
   return Object.entries(state?.devices ?? {}).sort().filter(([id]) => id !== me).flatMap(([, d]) => (d.tasks ?? []).map((t) => ({ device: d.name, ...t })));
 }
 export function syncStatus({ env, selected } = {}) {
@@ -263,6 +268,8 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
   if (resolution !== undefined && !['local', 'remote'].includes(resolution)) throw new Error('Resolution must be local or remote');
   const cfg = readUserData(env, 'sync-config.json');
   if (!cfg) throw new Error('Configure sync first');
+  cfg.scopes = cfg.scopes.filter((s) => !readUserData(env, 'hub-sync.json')?.scopes?.includes(s));
+  if (!cfg.scopes.length) throw new Error('These datasets have migrated to the hub; use yaw remote sync');
   const d = device(env, name);
   const home = safe(userDataDir(env));
   const lock = join(home, 'sync.lock');
@@ -304,7 +311,22 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
       execute('git', ['-c', 'core.hooksPath=/dev/null', 'push'], dir, env);
     }
     if (!equal(local, localRecords(env, cfg.scopes, kitRoot))) throw new Error('Local settings changed during sync; retry');
-    for (const [key, value] of Object.entries(merged.records)) {
+    applyPortableRecords({ env, records: merged.records });
+    writeUserData(env, 'sync-state.json', { base: { ...(state.base ?? {}), ...merged.records }, devices: stats || tasks ? vault.devices : {}, lastSync: new Date().toISOString(), conflicts: [] });
+    return { ...syncStatus({ env }), message: 'Sync complete.' };
+  } finally {
+    if (remoteLock) rmdirSync(remoteLock);
+    rmdirSync(lock);
+  }
+}
+
+export function portableSnapshot({ env, kitRoot, scopes, name }) {
+  return { records: localRecords(env, scopes, kitRoot), device: { name: device(env, name).name, updated: new Date().toISOString(),
+    rows: scopes.includes('statistics') ? statistics(env) : [], ...(scopes.includes('tasks') ? { tasks: cleanTasks(readUserData(env, 'session-analysis.json')?.tasks, kitRoot) } : {}) } };
+}
+export const portableScope = scopeOf;
+export function applyPortableRecords({ env, records }) {
+    for (const [key, value] of Object.entries(records)) {
       const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : key.startsWith('knowledge/') ? join(...key.split('/')) : `${key}.yaml`);
       if (value === null) {
         const previous = read(path);
@@ -321,10 +343,4 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
         write(path, stringify(doc));
       }
     }
-    writeUserData(env, 'sync-state.json', { base: { ...(state.base ?? {}), ...merged.records }, devices: stats || tasks ? vault.devices : {}, lastSync: new Date().toISOString(), conflicts: [] });
-    return { ...syncStatus({ env }), message: 'Sync complete.' };
-  } finally {
-    if (remoteLock) rmdirSync(remoteLock);
-    rmdirSync(lock);
-  }
 }

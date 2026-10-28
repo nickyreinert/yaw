@@ -23,11 +23,13 @@ import { sessionStart } from './team.js';
 import { presets } from './presets.js';
 import { web } from './web.js';
 import { knowledge } from './knowledge.js';
+import { remote } from './remote.js';
 
 const yes = { yes: { type: 'boolean', short: 'y' } };
 
 // The phase-1 command list (ADR-0019). Help and hook are dispatched separately.
 export const COMMANDS = [
+  { name: 'remote', args: 'serve [--port 4318] | sync [--hub http://127.0.0.1:4318 --token-env YAW_HUB_TOKEN --scopes settings,presets,statistics --migrate] [--resolve local|remote] | status', summary: 'private data hub and agent-independent browser/Telegram controller (Linux workers)', options: { port: { type: 'string' }, hub: { type: 'string' }, 'token-env': { type: 'string' }, scopes: { type: 'string' }, migrate: { type: 'boolean' }, resolve: { type: 'string' } }, run: remote },
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--sync <folder|owner/repo>] [--skip-verify] [--force]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, sync: { type: 'string' }, 'skip-verify': { type: 'boolean' }, force: { type: 'boolean' }, ...yes }, run: init },
   { name: 'web', args: '[--background | --stop] [--sync <folder|owner/repo>]', summary: 'open the local dashboard; configure an uninitialized folder in Workspace → Settings → Interview; --background keeps it running, --stop stops it', options: { background: { type: 'boolean' }, stop: { type: 'boolean' }, sync: { type: 'string' } }, run: web },
   { name: 'apply', args: '[--yes] [--strategy keep|take|merge] [--restore <path>] [--forget <path>]', summary: 're-render managed files from saved answers and the installed kit', options: { ...yes, strategy: { type: 'string' }, restore: { type: 'string', multiple: true }, forget: { type: 'string', multiple: true } }, run: update },
@@ -61,7 +63,7 @@ export const COMMANDS = [
 export const HELP_GROUPS = [
   { title: 'Project setup and maintenance', names: ['init', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'review', 'sessions'] },
-  { title: 'Monitoring and collaboration', names: ['web', 'session-start', 'gh', 'hygiene', 'notify'] },
+  { title: 'Monitoring and collaboration', names: ['web', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
   { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
 ];

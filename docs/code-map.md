@@ -174,7 +174,7 @@ Describe this area's responsibility.
 
 ## adapters
 
-Describe this area's responsibility.
+Agent configuration templates and optional execution-provider packages. `remote-claude` pins the Claude SDK separately from the dependency-free core.
 
 <!-- yaw:map:begin area-adapters -->
 - Paths: `adapters/**`
@@ -184,6 +184,7 @@ Describe this area's responsibility.
 - ADRs: -
 - Directories:
   - `adapters/`
+  - `adapters/remote-claude/`
 <!-- yaw:map:end area-adapters -->
 
 ## bin
@@ -202,7 +203,7 @@ Describe this area's responsibility.
 
 ## core
 
-Describe this area's responsibility.
+CLI commands, setup rendering, shared libraries and browser applications. `remote` contains the private hub, shared execution supervisor, isolated provider workers and Telegram transport; it keeps execution metadata separate from session analytics.
 
 <!-- yaw:map:begin area-core -->
 - Paths: `core/**`
@@ -216,6 +217,7 @@ Describe this area's responsibility.
   - `core/hooks/`
   - `core/interview/`
   - `core/lib/`
+  - `core/remote/`
   - `core/render/`
   - `core/schema/`
   - `core/web/`

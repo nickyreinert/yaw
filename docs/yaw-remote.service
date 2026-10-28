@@ -1,0 +1,31 @@
+[Unit]
+Description=YAW private data hub and agent controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yaw
+Group=yaw
+WorkingDirectory=/srv/yaw/kit
+Environment=HOME=/var/lib/yaw
+Environment=YAW_HOME=/var/lib/yaw/.yaw
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/yaw/remote.conf
+ExecStart=/usr/bin/node /srv/yaw/kit/bin/yaw remote serve --port 4318
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/yaw /srv/yaw/projects
+MemoryMax=4G
+TasksMax=256
+LimitFSIZE=1073741824
+
+[Install]
+WantedBy=multi-user.target

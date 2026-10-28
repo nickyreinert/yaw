@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YAW Remote</title><link rel="stylesheet" href="/remote.css"><script type="module" src="/remote.js"></script></head>
+<body>
+<header><a href="/" class="brand">YAW <span>Remote</span></a><span class="tag">Private workspace</span><button id="logout" hidden>Sign out all browsers</button></header>
+<main>
+  <section id="login" class="card narrow"><p class="eyebrow">YOUR NAS, YOUR WORK</p><h1>Pick up where you left off.</h1><p>Sign in to your private controller. Work continues when you close the browser.</p><form id="login-form"><label>Owner credential<input id="owner-token" type="password" autocomplete="current-password" required></label><button class="primary">Sign in</button></form><p class="muted">Use the credential you set on the server. Connect through your SSH tunnel.</p></section>
+  <div id="workspace" hidden>
+    <div class="heading"><div><p class="eyebrow">WORKSPACE CONTROL</p><h1>Your agents, in one place.</h1></div><button id="settings-toggle">Manage hub</button></div>
+    <div class="layout">
+      <aside class="card"><div class="section-title"><h2>Sessions</h2><button id="new-session">+ New</button></div><div id="sessions"></div><p class="muted">One managed writer per checkout. Register a separate checkout for parallel work.</p></aside>
+      <section class="card conversation"><div class="section-title"><h2 id="session-title">New session</h2><span id="session-state" class="tag">Ready</span></div>
+        <div id="new-options"><label>Project<select id="project" required></select></label><div class="row"><label>Agent<select id="agent"></select></label><label>Model (optional)<input id="model" placeholder="Provider default" maxlength="120"></label></div><p class="muted">Provider permission checks and owner decisions remain active. Execution uses an isolated Linux worker.</p></div>
+        <div id="messages" role="log" aria-live="polite"><p class="muted">Choose a project and tell an agent what to work on.</p></div>
+        <div id="decisions"></div>
+        <form id="prompt-form"><label for="prompt">Message</label><textarea id="prompt" rows="4" maxlength="24000" placeholder="What would you like to do?" required></textarea><div class="actions"><button id="send" class="primary">Start session</button><button type="button" id="resume" hidden>Resume exact session</button><button type="button" id="interrupt" hidden>Interrupt turn</button><button type="button" id="stop" hidden>Stop worker</button></div></form>
+      </section>
+    </div>
+    <section id="settings" class="card" hidden><h2>Hub settings</h2><div class="settings-grid">
+      <section><h3>Registered NAS checkouts</h3><p>Initialize YAW in a checkout on the server, then register its absolute path.</p><form id="project-form"><label>Checkout path<input id="project-path" placeholder="/srv/yaw/projects/my-project" required></label><button>Register checkout</button></form><div id="projects-list"></div></section>
+      <section><h3>Paired devices</h3><p>Devices can exchange portable records. They cannot control agents. Copy a new credential once and enter it privately on that device.</p><form id="device-form"><label>Device name<input id="device-name" maxlength="64" required></label><button>Pair device</button></form><output id="device-secret"></output><div id="devices-list"></div></section>
+      <section><h3>Import a portable vault</h3><p>Back up your existing vault, import it into an empty hub, then explicitly migrate each client. Repositories and credentials are not imported.</p><label>yaw-sync.json<input id="vault-file" type="file" accept="application/json,.json"></label><button id="import-vault">Import into empty hub</button><p id="hub-revision"></p></section>
+      <section><h3>Telegram owner</h3><p>Use a dedicated polling bot configured on the service. Pair your numeric user ID and private chat ID.</p><form id="telegram-form"><label>Telegram user ID<input id="telegram-user" inputmode="numeric" required></label><label>Private chat ID<input id="telegram-chat" inputmode="numeric" required></label><button>Pair Telegram</button></form><button id="telegram-clear">Revoke Telegram pairing</button><p id="telegram-status"></p></section>
+    </div></section>
+  </div>
+  <p id="notice" role="status" aria-live="polite"></p>
+</main><footer>YAW Remote · Temporary live output · Changes stay in your NAS checkout</footer>
+</body></html>
