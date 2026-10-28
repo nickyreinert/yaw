@@ -177,7 +177,7 @@ test('interview: a language that does not run there asks where it runs (by numbe
   const prompter = scripted(['', 'A static site.', 'html', 'local', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
-  assert.match(prompter.shown.join(''), /HTML & CSS only does not run there \(local\)/);
+  assert.match(prompter.shown.join(''), /HTML, CSS & JavaScript does not run there \(local\)/);
   assert.match(prompter.shown.join(''), /choose one of: static/);
   assert.match(r.out, /profile: static-site \(tailored stack for html on static\)/);
   assert.ok(existsSync(join(dir, 'public')));

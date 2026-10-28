@@ -1,4 +1,4 @@
-- Plain HTML and CSS in `public/`; add a build tool or framework only with a written reason (ADR).
+- Plain HTML, CSS and browser JavaScript in `public/`; add a build tool or framework only with a written reason (ADR).
 - Every page has `lang`, a `<title>`, a viewport meta tag and one `<h1>`; images have `alt` text.
 - Relative links and assets only for your own pages; `just test` fails on a broken local link or anchor.
 - No inline scripts or third-party scripts without a reason; no tracking without consent (privacy module).

@@ -82,10 +82,10 @@ questions:
     required: true
     choices:
       - { value: python, label: "Python" }
-      - { value: javascript, label: "JavaScript / TypeScript" }
+      - { value: javascript, label: "TypeScript" }
       - { value: php, label: "PHP" }
       - { value: kotlin, label: "Kotlin" }
-      - { value: html, label: "HTML & CSS only" }
+      - { value: html, label: "HTML, CSS & JavaScript" }
       - { value: go, label: "Go" }
       - { value: rust, label: "Rust" }
       - { value: swift, label: "Swift" }

@@ -2,4 +2,4 @@
 - Tailored stack for a common pair (Python on your own server: FastAPI); other pairs get a basic stack with the language's standard tools
 - A pair that does not work (Python inside WordPress) is refused, with the places that language can run
 - The toolchain must be on your computer (Go, Rust, a JDK, Xcode ...); yaw doctor shows what is missing
-- Example: a script for your machine is "local"; a GitHub Pages site is HTML & CSS on "static"
+- Example: a script for your machine is "local"; a GitHub Pages site is HTML, CSS & JavaScript on "static"
