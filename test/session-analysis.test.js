@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary } from '../core/lib/session-analysis.js';
+import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary, userOutcome } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { dashboardData, sessionsData, startDashboard } from '../core/web/dashboard.js';
 import { main } from '../core/cli/main.js';
@@ -179,6 +179,97 @@ test('classifier settings are validated, applied to requests and probed with a m
   assert.match(probe.message, /Laya answered at http:\/\/127\.0\.0\.1:8000/);
   assert.doesNotMatch(seen[0][1].state, /Fix the parser/);
   await assert.rejects(probeClassifier({}, async () => Response.json({ answers: {} })), (e) => !/no classification result was saved/.test(e.message));
+});
+
+test('outcome classification defines evidence for each label and uses the next user message as feedback', async () => {
+  await classifyMessages(messages, { fetchFn: async (_url, options) => {
+    const { state, questions } = JSON.parse(options.body);
+    assert.deepEqual(JSON.parse(state), { prompt: 'Fix the parser', answer: 'Parser fixed.', nextPrompt: 'Thanks, works' });
+    const { instructions, criteria } = questions.outcome;
+    assert.match(instructions, /user reaction in nextPrompt/);
+    assert.match(instructions, /Classify this request, not the entire session/);
+    assert.match(instructions, /not verified code or test results/);
+    assert.match(criteria.fulfilled, /confirms success/);
+    assert.match(criteria.partially, /specific requirement remains/);
+    assert.match(criteria.not_fulfilled, /reports failure/);
+    assert.match(criteria.abandoned, /explicitly cancels/);
+    assert.match(criteria.unknown, /bare thanks/);
+    assert.deepEqual(Object.keys(criteria), LABELS.outcome);
+    return Response.json(responseFor());
+  } });
+});
+
+test('preceding context is supplied only when the full current turn still fits the byte budget', async () => {
+  const dialogue = [
+    { role: 'user', text: 'Fix the parser' }, { role: 'assistant', text: 'Which input fails?' },
+    { role: 'user', text: 'Empty arrays' }, { role: 'assistant', text: 'Fixed empty arrays.' },
+    { role: 'user', text: 'That works' },
+  ];
+  const states = [];
+  const fetchFn = async (_url, options) => { states.push(JSON.parse(JSON.parse(options.body).state)); return Response.json(responseFor()); };
+  await classifyMessages(dialogue, { fetchFn });
+  assert.deepEqual(states[1], { previousPrompt: 'Fix the parser', previousAnswer: 'Which input fails?', prompt: 'Empty arrays', answer: 'Fixed empty arrays.', nextPrompt: 'That works' });
+  states.length = 0;
+  const large = [{ role: 'user', text: '😀'.repeat(300) }, ...dialogue.slice(1)];
+  const result = await classifyMessages(large, { fetchFn, maxTurnBytes: 1000 });
+  assert.equal(result.skipped, 2); // Oversized first turn and final user message without an answer.
+  assert.equal(result.classified, 1);
+  assert.deepEqual(states, [{ prompt: 'Empty arrays', answer: 'Fixed empty arrays.', nextPrompt: 'That works' }]);
+});
+
+test('UNKNOWN reasons distinguish model abstention from threshold rejection without lowering the threshold', async () => {
+  const cases = [
+    { choice: 'unknown', probabilities: { fulfilled: 0.1, partially: 0.1, not_fulfilled: 0, abandoned: 0, unknown: 0.8 }, reason: 'model' },
+    { choice: 'unknown', probabilities: { fulfilled: 0.3, partially: 0.3, not_fulfilled: 0, abandoned: 0, unknown: 0.4 }, reason: 'model' },
+    { choice: 'fulfilled', probabilities: { fulfilled: 0.6, partially: 0, not_fulfilled: 0, abandoned: 0, unknown: 0.4 }, reason: 'lowConfidence' },
+    { choice: 'not_fulfilled', probabilities: { fulfilled: 0, partially: 0, not_fulfilled: 0.65, abandoned: 0, unknown: 0.35 }, reason: null },
+  ];
+  for (const { reason, ...outcome } of cases) {
+    const response = responseFor(); response.answers.outcome = outcome;
+    const result = await classifyMessages(messages, { includeTurns: true, fetchFn: async () => Response.json(response) });
+    assert.equal(result.threshold, 0.65);
+    assert.deepEqual(result.outcomeUnknown, { model: Number(reason === 'model'), lowConfidence: Number(reason === 'lowConfidence'), noVerdict: 0 });
+    assert.equal(result.counts.outcome[reason ? 'unknown' : outcome.choice], 1);
+    assert.equal(result.turns[0].predictions.outcome.unknownReason ?? null, reason);
+    assert.doesNotMatch(JSON.stringify({ ...result, turns: undefined }), /Fix the parser|Parser fixed/);
+  }
+});
+
+test('saved UNKNOWN diagnostics reach Learn as metadata without conversation text', async () => {
+  const env = environment(), root = tmp(); fixture(env, root);
+  const response = responseFor();
+  response.answers.outcome = { choice: 'fulfilled', probabilities: { fulfilled: 0.6, partially: 0, not_fulfilled: 0, abandoned: 0, unknown: 0.4 } };
+  await collectAnalysis({ root, env, classify: true, fetchFn: async () => Response.json(response) });
+  const saved = readAnalysis(env), data = await sessionsData({ root, kitRoot: KIT_ROOT, env });
+  assert.deepEqual(saved.rows[0].evaluation.outcomeUnknown, { model: 0, lowConfidence: 1, noVerdict: 0 });
+  assert.deepEqual(data.rows[0].evaluation.outcomeUnknown, saved.rows[0].evaluation.outcomeUnknown);
+  assert.doesNotMatch(JSON.stringify([saved, data]), /Fix the parser|Parser fixed|Thanks, works/);
+});
+
+test('whole-message user verdicts resolve clear feedback without matching quotes, qualifications or new requests', () => {
+  for (const text of ['That works.', 'Thanks, that works!', 'Looks good', 'Fixed now.', 'Das funktioniert jetzt, danke.', 'Problem solved.']) assert.equal(userOutcome(text), 'fulfilled', text);
+  for (const text of ['It is still broken.', 'Still broken!', 'It doesn’t work.', 'That is not what I asked for.', 'Das funktioniert nicht.']) assert.equal(userOutcome(text), 'not_fulfilled', text);
+  for (const text of ['Stop, forget this task.', 'Please cancel this task.', 'Vergiss diese Aufgabe.']) assert.equal(userOutcome(text), 'abandoned', text);
+  for (const text of ['', 'Thanks.', 'Thank you!', 'Danke.']) assert.equal(userOutcome(text), 'unknown', text);
+  for (const text of ['That works?', 'That works, but saving fails.', 'Looks good, now add sorting.', 'Say "that works".', 'The documentation says: that works.', '```that works```', '> That works.', 'Not fixed now.', 'That works in staging only.', 'Thanks, that does not look good.']) assert.equal(userOutcome(text), null, text);
+});
+
+test('user verdict rules override uncertain or contrary model outcomes transparently, without affecting other dimensions', async () => {
+  const response = responseFor();
+  response.answers.outcome = { choice: 'unknown', probabilities: { fulfilled: 0.2, partially: 0.1, not_fulfilled: 0.1, abandoned: 0.1, unknown: 0.5 } };
+  for (const [feedback, expected] of [['That works.', 'fulfilled'], ['It is still broken.', 'not_fulfilled'], ['Stop, forget this task.', 'abandoned'], ['Thanks.', 'unknown'], ['', 'unknown']]) {
+    const dialogue = [messages[0], messages[1], ...(feedback ? [{ role: 'user', text: feedback }] : [])];
+    const result = await classifyMessages(dialogue, { includeTurns: true, fetchFn: async () => Response.json(response) });
+    const prediction = result.turns[0].predictions.outcome;
+    assert.equal(prediction.choice, 'unknown'); assert.equal(prediction.confidence, 0.5);
+    assert.equal(prediction.prediction, expected); assert.equal(prediction.source, 'userFeedback');
+    assert.equal(result.outcomeFeedback, 1);
+    assert.equal(result.outcomeUnknown.noVerdict, Number(expected === 'unknown'));
+    assert.equal(result.counts.sentiment.positive, 1);
+  }
+  const result = await classifyMessages([messages[0], messages[1]], { includeTurns: true, fetchFn: async () => Response.json(responseFor()) });
+  assert.equal(result.turns[0].predictions.outcome.choice, 'fulfilled');
+  assert.equal(result.turns[0].predictions.outcome.prediction, 'unknown', 'an assistant claim without a user reaction cannot establish acceptance');
 });
 
 test('Laya sample preview uses selected saved sessions and does not persist transcripts or predictions', async () => {

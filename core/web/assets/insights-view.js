@@ -56,7 +56,11 @@ export function createInsights({ api, get }) {
         return el('div', { className: 'improve-bar' }, el('span', {}, label.replaceAll('_', ' ')), bar, el('strong', {}, number(n)));
       }) : el('p', { className: 'muted' }, 'Classify sessions to see this pattern.'),
       series?.keys.length > 1 ? el('div', { className: 'legend' }, ...series.keys.map((group) => { const dot = el('i'); dot.style.background = series.color(group); return el('span', {}, dot, group); })) : null,
-      el('p', { className: 'small muted' }, `${number(coverage.classifiedTurns)} classified turns · ${number(coverage.skippedTurns)} skipped. Estimated labels.`));
+      el('p', { className: 'small muted' }, `${number(coverage.classifiedTurns)} classified turns · ${number(coverage.skippedTurns)} skipped. Estimated labels.`),
+      dimension === 'outcome' ? el('p', { className: 'small muted' },
+        `Each label estimates one request and its response; it does not verify code or tests. ${number(coverage.outcomeFeedback)} labels from explicit user feedback or absence of a verdict; remaining labels estimated by Laya.`,
+        counts.unknown ? ` Unknown: ${number(coverage.outcomeUnknown.model)} model uncertain · ${number(coverage.outcomeUnknown.lowConfidence)} below confidence threshold · ${number(coverage.outcomeUnknown.noVerdict)} no user verdict` : '',
+        coverage.outcomeUnknown.unrecorded ? ` · ${number(coverage.outcomeUnknown.unrecorded)} reason unavailable from older or synced results. Reclassify local sessions to update.` : '') : null);
   }
   function overview() {
     const coverage = insightCoverage(context.rows), attention = context.rows.filter(hasFriction);

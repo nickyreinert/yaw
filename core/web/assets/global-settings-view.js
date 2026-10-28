@@ -402,7 +402,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   function sampleReview(values) {
     const card = el('section', null, 'card'), samples = classifierSamples ?? [];
     card.append(el('h2', 'Try Laya on saved sessions'));
-    card.append(el('p', 'Choose up to three sessions from your last scan. YAW sends up to three turns per session to the configured loopback Laya service, then shows the top label, confidence, and short prompt/answer excerpts. This is a preview only: predictions and excerpts are not saved, and it does not train or change Laya.', 'small muted'));
+    card.append(el('p', 'Choose up to three sessions from your last scan. YAW sends up to three turns per session to local Laya, then shows model labels and confidence alongside applied labels, their source, UNKNOWN reasons, and short excerpts. Clear whole-message user verdicts can determine outcome; other categories use Laya. This preview is not saved and does not train Laya.', 'small muted'));
     const select = document.createElement('select'); select.multiple = true; select.size = Math.min(8, Math.max(3, samples.length)); select.setAttribute('aria-label', 'Sessions to preview');
     for (const sample of samples) {
       const option = document.createElement('option'); option.value = sample.id;
@@ -429,8 +429,10 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
             const detail = el('div', null, 'setup-step');
             detail.append(el('h4', `Turn ${turn.turn}`), el('strong', 'Prompt excerpt'), el('pre', turn.prompt),
               el('strong', 'Answer excerpt'), el('pre', turn.answer),
-              grid(['Category', 'Top label', 'Confidence', 'Applied label'], Object.entries(turn.predictions).map(([key, prediction]) => [
+              grid(['Category', 'Model label', 'Model confidence', 'Applied label', 'Source', 'Unknown reason'], Object.entries(turn.predictions).map(([key, prediction]) => [
                 key, prediction.choice, `${(prediction.confidence * 100).toFixed(1)}%`, prediction.prediction,
+                prediction.source === 'userFeedback' ? 'User feedback rule' : 'Laya',
+                prediction.unknownReason === 'model' ? 'Model uncertain' : prediction.unknownReason === 'lowConfidence' ? 'Below confidence threshold' : prediction.unknownReason === 'noVerdict' ? 'No user verdict' : '—',
               ])));
             section.append(detail);
           }

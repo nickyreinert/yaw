@@ -28,7 +28,7 @@ function compact(r) {
     medianAnswer: m?.medianAnswerChars ?? null, p95Answer: m?.p95AnswerChars ?? null,
     medianResp: seconds(m?.medianResponseMs), p95Resp: seconds(m?.p95ResponseMs), partial: Boolean(m?.limited),
     outcome: e ? outcomeOf(e.counts?.outcome) : null,
-    evaluation: e ? { classified: e.classified, skipped: e.skipped, counts: e.counts, evaluated: e.evaluated } : null,
+    evaluation: e ? { classified: e.classified, skipped: e.skipped, counts: e.counts, outcomeUnknown: e.outcomeUnknown, outcomeFeedback: e.outcomeFeedback, evaluated: e.evaluated } : null,
   };
 }
 

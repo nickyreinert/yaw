@@ -218,7 +218,19 @@ test('coverage retains mixed and unknown outcomes and separate collaboration cou
   assert.deepEqual([c.sessions, c.measuredSessions, c.partialSessions, c.unclassifiedSessions, c.classifiedTurns, c.skippedTurns], [2, 1, 1, 1, 3, 1]);
   assert.deepEqual(c.counts.outcome, { fulfilled: 1, not_fulfilled: 1, unknown: 1 });
   assert.equal(c.counts.behaviour.admits_error, 2); assert.equal(c.meanPromptChars, 100);
+  assert.deepEqual(c.outcomeUnknown, { model: 0, lowConfidence: 0, noVerdict: 0, unrecorded: 1 });
   assert.doesNotMatch(JSON.stringify(c), /private\/project/);
+});
+
+test('UNKNOWN coverage combines new diagnostics and legacy rows without inventing reasons', () => {
+  const evaluation = (unknown, outcomeUnknown) => ({ classified: unknown, skipped: 0, counts: { outcome: { unknown } }, outcomeUnknown });
+  const coverage = insightCoverage([
+    { evaluation: evaluation(3, { model: 1, lowConfidence: 2 }) },
+    { source: 'synced', evaluation: evaluation(4) },
+    { evaluation: evaluation(2, { model: 1 }) },
+  ]);
+  assert.equal(coverage.counts.outcome.unknown, 9);
+  assert.deepEqual(coverage.outcomeUnknown, { model: 2, lowConfidence: 2, noVerdict: 0, unrecorded: 5 });
 });
 
 test('review prompt exports only edited anonymous examples and asks for short, evidence-based verdicts', () => {

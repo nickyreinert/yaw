@@ -29,6 +29,17 @@ export function insightCoverage(rows) {
   const classified = rows.filter((r) => r.evaluation);
   const classifiedTurns = sum(classified, (r) => r.evaluation.classified);
   const skippedTurns = sum(classified, (r) => r.evaluation.skipped);
+  const outcomeUnknown = { model: 0, lowConfidence: 0, noVerdict: 0, unrecorded: 0 };
+  for (const row of classified) {
+    let remaining = row.evaluation.counts?.outcome?.unknown ?? 0;
+    for (const reason of ['model', 'lowConfidence', 'noVerdict']) {
+      const value = row.evaluation.outcomeUnknown?.[reason];
+      const n = Number.isFinite(value) ? Math.max(0, Math.min(remaining, value)) : 0;
+      outcomeUnknown[reason] += n;
+      remaining -= n;
+    }
+    outcomeUnknown.unrecorded += remaining;
+  }
   const counts = {};
   for (const key of ['outcome', 'sentiment', 'behaviour', 'failure']) {
     counts[key] = {};
@@ -39,7 +50,8 @@ export function insightCoverage(rows) {
   return { sessions: rows.length, measuredSessions: measured.length, unmeasuredSessions: rows.length - measured.length,
     partialSessions: measured.filter((r) => r.partial).length, prompts: sum(measured, (r) => r.prompts), answers: sum(measured, (r) => r.answers),
     meanPromptChars: sum(measured, (r) => r.prompts) ? Math.round(sum(measured, (r) => r.promptChars) / sum(measured, (r) => r.prompts)) : null,
-    classifiedSessions: classified.length, unclassifiedSessions: rows.length - classified.length, classifiedTurns, skippedTurns, counts,
+    classifiedSessions: classified.length, unclassifiedSessions: rows.length - classified.length, classifiedTurns, skippedTurns, counts, outcomeUnknown,
+    outcomeFeedback: sum(classified, (r) => r.evaluation.outcomeFeedback),
     groups: { projects: new Set(rows.filter((r) => r.source !== 'synced' && r.project).map((r) => r.project)).size,
       agents: new Set(rows.map((r) => r.agent)).size, models: new Set(rows.map((r) => r.model)).size },
   };

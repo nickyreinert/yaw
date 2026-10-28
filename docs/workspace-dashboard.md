@@ -292,17 +292,33 @@ The **Try Laya on saved sessions** preview lists up to 30 recent sessions from
 the last Refresh. Select up to three and confirm to send up to three eligible
 turns per session to the local Laya service, using the current form values
 (saved or not). It shows short prompt/answer excerpts, Laya's top label and
-confidence, and the label applied at the configured threshold. Preview
+model confidence, the applied label, its source, and any UNKNOWN reason. Preview
 excerpts and predictions are temporary and are not saved. This is prompt
 calibration, not model training: it does not update Laya's weights or teach it
 from your choices. Use **Save** to keep prompt guidance for later evaluation.
 
 YAW sends eligible prompt/answer turns plus the next prompt to
 `POST /v1/systemone`, selects `multilingual`, and requests the configured
-`max_len` (Laya caps it with `LAYA_MAX_TOKEN_BUDGET`). Turns above the largest
+`max_len` (Laya caps it with `LAYA_MAX_TOKEN_BUDGET`). The preceding prompt and
+answer are also included when they fit in the same byte limit; optional context
+never causes an otherwise eligible turn to be skipped. Turns above the largest
 turn size are skipped, never silently shortened. The service must confirm
 untruncated multilingual inference and return valid choice probabilities.
-Predictions below the threshold become `unknown`. Results count outcomes,
+For outcome only, narrow English/German whole-message user verdict rules apply
+inside the existing classifier: for example, "that works" means `fulfilled`,
+"still broken" means `not_fulfilled`, and "cancel this task" means `abandoned`.
+Missing feedback and bare thanks remain `unknown`. Quotes, qualifications and
+additional requests do not match these rules; Laya handles those cases with
+explicit outcome criteria. Model predictions below the unchanged threshold become
+`unknown`. A rule never fabricates a model confidence: the preview retains the
+original model label and confidence alongside the applied label and source.
+Other classification categories continue to use Laya.
+
+Learn shows aggregate UNKNOWN reasons: model uncertainty, threshold rejection,
+or no user verdict. Older evaluations may have no recorded reason; use
+**Reclassify** on the matching local sessions to update them. Refresh alone does
+not reclassify. Only aggregate reason and rule-use counts are saved.
+Results count outcomes,
 sentiment, assistant behaviour and failure types per session; they are not
 verified task-success measurements. No raw model response or message text is
 saved. A fresh scan retains classifications only when its message fingerprint

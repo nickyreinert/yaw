@@ -127,3 +127,16 @@ test('chart splitting uses the selected series rather than ignoring the shared s
   assert.equal(bars[0].children.length, 2);
   assert.equal(bars[0].children[0].style.width, '50%');
 });
+
+test('Learn explains UNKNOWN causes and tells users how to update older results', (t) => {
+  const { host, context } = environment(t);
+  const fresh = { ...row, evaluation: { classified: 3, skipped: 0, counts: { outcome: { unknown: 3 } }, outcomeUnknown: { model: 1, lowConfidence: 2 } } };
+  const view = createInsights({ api: () => { throw new Error('Metadata only'); } });
+  view.render(host, { ...context, rows: [row, fresh] });
+  assert.match(host.text, /Each label estimates one request and its response/);
+  assert.match(host.text, /Unknown: 1 model uncertain · 2 below confidence threshold/);
+  assert.match(host.text, /1 reason unavailable from older or synced results/);
+  assert.match(host.text, /Reclassify local sessions to update/);
+  view.render(host, { ...context, rows: [fresh] });
+  assert.doesNotMatch(host.text, /reason unavailable/);
+});
