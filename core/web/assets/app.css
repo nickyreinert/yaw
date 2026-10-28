@@ -267,8 +267,10 @@ td { font-variant-numeric: tabular-nums; }
 @media (max-width: 900px) { .overview-grid, .knowledge-layout { grid-template-columns: 1fr; } #knowledge-detail { position: static; max-height: none; } .filters { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .sidebar { width: 100%; position: static; padding: 14px 18px 0; } .workspace { margin-left: 0; } .brand img { width: 30px; height: 30px; } .brand .brand-name { font-size: 1.4rem; } .content { padding: 22px 18px; } .topbar { padding: 0 18px; } .sidebar nav button { padding: 8px 10px; } #overview-metrics { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 1.65rem; } .card, .interview-form { padding: 17px; } .knowledge-search { grid-column: 1 / -1; } .pager { flex-wrap: wrap; } .knowledge-layout { display: block; } }
 .interview-heading { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-.interview-heading h1 { flex: 0 1 auto; margin: 0; font-size: 1.7rem; }
+.interview-heading :is(h1, h2) { flex: 0 1 auto; margin: 0; font-size: 1.7rem; }
 .interview-heading .focus-toggle { margin-left: 0; display: inline-flex; align-items: center; gap: 8px; padding: 5px 9px; font-size: .74rem; background: #fff; }
+.wizard-nav .interview-heading { flex-direction: column; align-items: flex-start; margin-bottom: 22px; }
+.wizard-nav .focus-toggle { width: auto; border: 1px solid var(--line); }
 .focus-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .switch-track { display: inline-flex; width: 30px; height: 17px; padding: 2px; border-radius: 999px; background: #bdc9c2; transition: background .15s; }
 .switch-track > span { width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: transform .15s; }

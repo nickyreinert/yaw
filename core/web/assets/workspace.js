@@ -314,7 +314,10 @@ async function load() {
   }
 }
 export function startWorkspace() {
-  document.querySelectorAll('.focus-toggle').forEach((button) => button.addEventListener('click', () => setInterviewFocus(!document.body.classList.contains('interview-focus'))));
+  // Settings mounts the shared interview after startup, so include its sidebar switch.
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.focus-toggle')) setInterviewFocus(!document.body.classList.contains('interview-focus'));
+  });
   document.querySelectorAll('[data-route]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.route)));
   $('refresh').addEventListener('click', () => {
     load();

@@ -23,6 +23,11 @@ function scopeIds() {
   }
 }
 scopeIds();
+for (const button of root.querySelectorAll('.focus-toggle')) {
+  const on = document.body.classList.contains('interview-focus');
+  button.setAttribute('aria-checked', String(on));
+  button.setAttribute('aria-label', on ? 'Focus mode on' : 'Focus mode off');
+}
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
 let catalog, state = { mode: 'quick', answers: {}, modules: null };
 let stackValid = true, compact = localStorage.getItem('yaw.setup.compact') === '1';
