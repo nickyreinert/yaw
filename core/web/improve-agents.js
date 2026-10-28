@@ -14,6 +14,8 @@ const CLIS = {
     '--disable', 'shell_tool', '--disable', 'apps', '--disable', 'multi_agent', '--disable', 'hooks', '-c', 'web_search="disabled"', '-'] },
 };
 export const REVIEW_RUN_LIMITS = Object.freeze({ prompt: 24000, output: 32000, timeoutMs: 180000, retentionMs: 15 * 60000 });
+export const PLANNING_RUN_LIMITS = Object.freeze({ ...REVIEW_RUN_LIMITS, prompt: 100000, output: 100000 });
+export const planningAgents = (env = process.env) => Object.entries(CLIS).map(([id, spec]) => ({ id, name: spec.name, installed: Boolean(executable(id, env)) }));
 function executable(name, env) {
   for (const directory of (env.PATH ?? '').split(delimiter).filter(isAbsolute)) {
     const file = join(directory, name);
@@ -34,7 +36,9 @@ export function saveImproveSettings(env, input) {
   writeUserData(env, 'improve-settings.json', { enabledAgents: settings.enabledAgents, defaultTarget: settings.defaultTarget });
   return settings;
 }
-export function createImproveRunner({ env = process.env, spawnFn = spawn, timeoutMs = REVIEW_RUN_LIMITS.timeoutMs }) {
+export function createImproveRunner({ env = process.env, spawnFn = spawn, timeoutMs = REVIEW_RUN_LIMITS.timeoutMs, purpose = 'review' }) {
+  const planning = purpose === 'planning', limits = planning ? PLANNING_RUN_LIMITS : REVIEW_RUN_LIMITS;
+  const noun = planning ? 'plan' : 'review';
   let job = null, child = null, timer = null, forceTimer = null, expiry = null;
   const publicJob = () => job && ({ id: job.id, agent: job.agent, status: job.status, output: job.output, message: job.message });
   const kill = () => {
@@ -46,31 +50,31 @@ export function createImproveRunner({ env = process.env, spawnFn = spawn, timeou
     read: publicJob,
     clear() {
       clearTimeout(expiry);
-      if (job?.status === 'running') { job.status = 'stopped'; job.output = ''; job.message = 'Review stopped.'; kill(); }
+      if (job?.status === 'running') { job.status = 'stopped'; job.output = ''; job.message = `${planning ? 'Planning' : 'Review'} stopped.`; kill(); }
       else job = null;
       return publicJob();
     },
     start(input) {
-      if (input.confirm !== true) throw new Error('Confirm sending this review prompt to the selected CLI provider');
-      if (job?.status === 'running' || child) throw new Error('A CLI review is already running');
-      const settings = improveSettings(env), agent = input.agent;
-      if (!Object.hasOwn(CLIS, agent) || !settings.enabledAgents.includes(agent)) throw new Error('Enable this CLI reviewer in Global Settings → Improve first');
+      if (input.confirm !== true) throw new Error(`Confirm sending this ${noun} prompt to the selected CLI provider`);
+      if (job?.status === 'running' || child) throw new Error(`A CLI ${noun} is already running`);
+      const agent = input.agent;
+      if (!Object.hasOwn(CLIS, agent) || !planning && !improveSettings(env).enabledAgents.includes(agent)) throw new Error(planning ? 'Choose a supported installed coding agent' : 'Enable this CLI reviewer in Global Settings → Learn first');
       const file = executable(agent, env);
-      if (!file) throw new Error('This CLI is not installed on the dashboard server PATH');
-      if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > REVIEW_RUN_LIMITS.prompt) throw new Error('Review prompt must contain 1–24,000 characters');
-      const cwd = mkdtempSync(join(tmpdir(), 'yaw-improve-'));
+      if (!file) throw new Error('This CLI is not available on the computer running yaw web');
+      if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > limits.prompt) throw new Error(`The ${noun} prompt must contain 1–${limits.prompt.toLocaleString('en')} characters`);
+      const cwd = mkdtempSync(join(tmpdir(), planning ? 'yaw-plan-' : 'yaw-improve-'));
       clearTimeout(expiry);
-      job = { id: randomUUID(), agent, status: 'running', output: '', message: 'Waiting for the reviewer…' };
+      job = { id: randomUUID(), agent, status: 'running', output: '', message: planning ? 'Drafting the project plan…' : 'Waiting for the reviewer…' };
       const current = job;
       let settled = false;
       const finish = (ok) => {
         if (settled) return; settled = true;
         clearTimeout(timer); clearTimeout(forceTimer); child = null;
         try { rmdirSync(cwd); } catch { /* never recursively delete files an external CLI might create */ }
-        expiry = setTimeout(() => { if (job === current) job = null; }, REVIEW_RUN_LIMITS.retentionMs); expiry.unref?.();
+        expiry = setTimeout(() => { if (job === current) job = null; }, limits.retentionMs); expiry.unref?.();
         if (current.status !== 'running') return;
         current.status = ok && current.output.trim() ? 'completed' : 'failed';
-        current.message = current.status === 'completed' ? 'Review complete. Nothing was applied.' : 'CLI review failed. Check CLI version and sign-in in your terminal; no changes were applied.';
+        current.message = current.status === 'completed' ? planning ? 'Plan draft ready. Review it before applying.' : 'Review complete. Nothing was applied.' : `CLI ${noun} failed. Check CLI version and sign-in in your terminal; no changes were applied.`;
         if (current.status === 'failed') current.output = '';
       };
       try {
@@ -78,8 +82,8 @@ export function createImproveRunner({ env = process.env, spawnFn = spawn, timeou
         child.stdout.setEncoding('utf8');
         child.stdout.on('data', (text) => {
           if (current.status !== 'running') return;
-          if (current.output.length + text.length > REVIEW_RUN_LIMITS.output) {
-            current.status = 'failed'; current.output = ''; current.message = 'Reviewer output exceeded the limit. Try the browser prompt instead.'; kill();
+          if (current.output.length + text.length > limits.output) {
+            current.status = 'failed'; current.output = ''; current.message = 'Agent output exceeded the limit. Try the browser prompt instead.'; kill();
           } else current.output += text;
         });
         // Vendor errors can echo prompt text or credentials. Drain stderr without storing or returning it.
@@ -90,7 +94,7 @@ export function createImproveRunner({ env = process.env, spawnFn = spawn, timeou
         child.stdin.end(input.prompt);
         timer = setTimeout(() => {
           if (current.status !== 'running') return;
-          current.status = 'failed'; current.output = ''; current.message = 'Review timed out. Try again or use a browser chat.'; kill();
+          current.status = 'failed'; current.output = ''; current.message = `The ${noun} timed out. Try again or use a browser chat.`; kill();
         }, timeoutMs); timer.unref?.();
       } catch { finish(false); }
       return publicJob();

@@ -608,6 +608,8 @@ test('planning chat: the prompt carries the answers so far, the reply fills idea
   const secret = await f.post('kickoff-prompt', { answers: { 'idea.text': `key ${'sk-'}${'a1b2c3d4'.repeat(5)}` } });
   assert.equal(secret.status, 400, 'a secret never goes into a prompt that leaves the machine');
   const reply = '```markdown\n# Plan: Bikes\n\n## Idea\nBooking for bike repairs.\n\n## Stack\nlanguage: javascript\nruns-on: nonsense\n\n## Phase 1: Core\nmodel: sonnet · effort: low\n- [ ] Create the booking form\n- [ ] Store bookings\n```';
+  const unconfirmed = await f.post('planning-start', { agent: 'claude', prompt: 'Draft a simple project plan.', confirm: false });
+  assert.equal(unconfirmed.status, 400); assert.match((await unconfirmed.json()).error, /Confirm sending/);
   const parsed = await (await f.post('kickoff-reply', { text: reply })).json();
   assert.deepEqual([parsed.idea, parsed.language, parsed.runsOn, parsed.tasks, parsed.phases], ['Booking for bike repairs.', 'javascript', null, 2, 1]);
   assert.equal(parsed.warnings.length, 1);

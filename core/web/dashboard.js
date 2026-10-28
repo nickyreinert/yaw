@@ -42,6 +42,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('search.js', 'text/javascript; charset=utf-8'),
   asset('folder-picker.js', 'text/javascript; charset=utf-8'),
   asset('review-step.js', 'text/javascript; charset=utf-8'),
+  asset('planning-handoff.js', 'text/javascript; charset=utf-8'),
   asset('plan-card.js', 'text/javascript; charset=utf-8'),
   asset('review-prompts-view.js', 'text/javascript; charset=utf-8'),
   asset('yaw-shark.svg', 'image/svg+xml'),

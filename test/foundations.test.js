@@ -4,6 +4,7 @@ import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from '../core/lib/yaml.js';
 import { main } from '../core/cli/main.js';
+import { previewPlanning, applyPlanning } from '../core/web/planning.js';
 import { kickoffParts } from '../core/cli/kickoff.js';
 import { parseKickoffReply, parsePlan } from '../core/lib/kickoff.js';
 import { FOUNDATION_INDEX, FOUNDATION_PATHS, assertFoundationsUnchanged, checkTaskReferences, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../core/lib/foundations.js';
@@ -220,4 +221,24 @@ test('one reviewed planning reply completes setup; project changes require conti
     const changed = kickoffParts({ root, manifest: readManifest(root) }).plan;
     assert.equal(changed.complete, false); assert.match(changed.warnings.join(' '), /choices changed/);
   } finally { api.close(); }
+});
+
+test('later planning previews then completes a partial plan, preserving reviewed sources and rejecting stale imports', async () => {
+  const root = await project(), env = { HOME: tmp() }, file = join(root, 'docs/plan/kickoff.md');
+  writeTree(root, { 'docs/plan/kickoff.md': '# Plan: Early idea\n## Phase 1: Start\n- [ ] Explore the main flow\n' });
+  assert.equal(kickoffParts({ root, manifest: readManifest(root) }).plan.complete, false);
+  const text = bundle(CLI), preview = previewPlanning({ root, kitRoot: KIT_ROOT, input: { text } });
+  assert.equal(existsSync(join(root, FOUNDATION_PATHS.architecture)), false);
+  const ctx = { root, kitRoot: KIT_ROOT, env, input: { text, expected: preview.expected, reviewed: true } };
+  await assert.rejects(applyPlanning({ ...ctx, input: { ...ctx.input, reviewed: false } }), /Review/);
+  writeFileSync(file, '# Plan: Concurrent update');
+  await assert.rejects(applyPlanning(ctx), /changed since preview/);
+  assert.equal(existsSync(join(root, FOUNDATION_PATHS.architecture)), false);
+  writeFileSync(file, '# Plan: Early idea\n## Phase 1: Start\n- [ ] Explore the main flow\n');
+  const result = await applyPlanning(ctx); assert.equal(result.plan.complete, true);
+  assert.match(readFileSync(join(root, 'TASKS.md'), 'utf8'), /Implement the main task/);
+  const reuse = bundle(CLI, FOUNDATION_PATHS, true), again = previewPlanning({ root, kitRoot: KIT_ROOT, input: { text: reuse } });
+  writeFileSync(join(root, FOUNDATION_PATHS.architecture), '# architecture\nHuman revision.\n');
+  await assert.rejects(applyPlanning({ ...ctx, input: { text: reuse, expected: again.expected, reviewed: true } }), /changed since preview/);
+  assert.match(readFileSync(join(root, FOUNDATION_PATHS.architecture), 'utf8'), /Human revision/);
 });

@@ -47,7 +47,7 @@ export function renderReview(root, ctx) {
   defaults.append(el('p', { class: 'small muted', text: 'These values are included in the generated setup. Edit opens the depth needed for that question; your answers and tool choices are kept.' }), defaultsList);
 
   if (ctx.plan?.tasks || ctx.plan?.idea || ctx.plan?.foundations?.length) {
-    answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md, TASKS.md`), editButton('plan', () => ctx.jump({ plan: true }))));
+    answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md${preview.modules.includes('tasks') ? ', with work items in the configured task store' : ' (Tasks is off; work items stay in the plan)'}`), editButton('plan', () => ctx.jump({ plan: true }))));
   }
   for (const d of ctx.plan?.foundations ?? []) {
     answers.append(el('li', {}, el('span', { text: `Reviewed ${d.kind}: ${d.path}` }), editButton(d.kind, () => ctx.jump({ plan: true }))));

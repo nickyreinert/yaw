@@ -762,3 +762,24 @@ a.button.primary { background: var(--accent); color: #fff; }
 @media (max-width: 1150px) { .metrics.overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .metrics.overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .overview-metrics .metric:last-child { grid-column: 1 / -1; } }
 #notification-settings > label:has(select) { max-width: 24rem; }
+
+/* Identical planning handoff in the interview, completion and project settings. */
+.plan-card { border: 1px solid var(--line); padding: 20px; background: var(--paper); }
+.plan-card > h2, .plan-card > h3 { display: block; margin: 0 0 10px; }
+.plan-workflow > summary { cursor: pointer; font-weight: 650; font-size: .85rem; margin: 16px 0; }
+.planning-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 24px; counter-reset: planning; }
+.planning-steps > li { counter-increment: planning; padding-top: 16px; border-top: 1px solid var(--line); }
+.planning-steps > li > strong { font-size: .88rem; display: block; margin-bottom: 12px; }
+.planning-steps > li > strong::before { content: counter(planning) '. '; color: var(--muted); }
+.planning-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.planning-controls label { display: grid; gap: 6px; font-size: .8rem; flex: 1 1 220px; max-width: 24rem; margin: 0; }
+.planning-controls select { margin: 0; }
+.planning-preview { margin: 14px 0; font-size: .82rem; }
+.planning-preview summary { cursor: pointer; }
+.plan-card textarea { box-sizing: border-box; width: 100%; font: .8rem/1.6 ui-monospace, monospace; margin-top: 12px; }
+.plan-card pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+.plan-card .plan-actions { display: flex; gap: 10px; margin-top: 12px; }
+.plan-card .setting-toggle { font-size: .82rem; line-height: 1.5; margin: 16px 0; }
+.plan-card > p { line-height: 1.6; }
+
+.plan-card > h2, .plan-card > h3 { font-size: 1rem; }

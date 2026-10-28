@@ -68,3 +68,17 @@ test('Codex reviewer is ephemeral and disables command execution, apps, hooks an
   assert.ok(args.includes('--ephemeral')); assert.ok(args.includes('read-only')); assert.ok(args.includes('--ignore-user-config'));
   for (const flag of ['shell_tool', 'apps', 'multi_agent', 'hooks']) assert.ok(args.includes(flag));
 });
+
+test('planning runs independently of Learn preferences and keeps the same restricted CLI sandbox', async (t) => {
+  const env = fixture(undefined, 'codex');
+  saveImproveSettings(env, { enabledAgents: [], defaultTarget: 'browser:ChatGPT' });
+  const runner = createImproveRunner({ env, purpose: 'planning' }); t.after(() => runner.clear());
+  assert.throws(() => runner.start({ agent: 'codex', prompt: 'Plan' }), /Confirm/);
+  const prompt = 'Draft the supplied project foundations. ' + 'Context. '.repeat(3000);
+  runner.start({ agent: 'codex', prompt, confirm: true });
+  const job = await finished(runner), result = JSON.parse(job.output);
+  assert.equal(job.status, 'completed'); assert.equal(result.text, prompt);
+  assert.ok(result.args.includes('read-only')); assert.ok(result.args.includes('--ephemeral'));
+  assert.ok(result.args.includes('shell_tool')); assert.equal(existsSync(result.cwd), false);
+  assert.deepEqual(readUserData(env, 'improve-settings.json').enabledAgents, []);
+});

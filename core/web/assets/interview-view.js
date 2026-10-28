@@ -427,7 +427,7 @@ function finish({ ok, message }, kickoff) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet(options.persistent ? 'The workspace remains open.' : 'This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
-  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff)] : []));
+  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff, { request: options.persistent ? request : undefined })] : []));
   status(message);
   renderWizard(true);
 }

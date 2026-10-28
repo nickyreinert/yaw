@@ -75,3 +75,9 @@ Writes are CSRF-protected actions that carry the SHA-256 of the content they sta
 - `taxonomy-save` validates `.decisions/taxonomy.json`, requires a keyword for each new pair, and refuses removing or renaming a pair still used by a decision (409, listing the IDs).
 - `review-prompt-save` / `review-prompt-remove` (ADR-0056) write or delete a review prompt: `scope: project` is `.yaw/review/<kind>.md` in the workspace, `scope: global` the blueprint `~/.yaw/review/<kind>.md` (0600). GET `/api/review-prompts?workspace=` and `/api/global/review-prompts` return every layer per kind. The store (`modules/review/lib/prompts.js`) refuses symbolic links, empty text, more than 32 KiB and secret-rule matches.
 - `interview-preview` renders the `yaw edit` plan and diff (capped at 256 KiB) without writing; `interview-apply` applies it through `editProject` with the keep strategy. Only one apply runs at a time.
+
+## Connected project planning
+
+Setup, completion and Settings → Kickoff share `plan-card.js` and `planning-handoff.js`. A complete reviewed reply supplies the idea/stack, foundations and build plan once. A saved partial plan or changed project context produces a continuation prompt containing existing work. Foundation review records a hash of relevant setup facts; personal preferences are excluded. Standalone setup still stops after Apply; completion offers manual handoff and directs live drafting/import to the workspace.
+
+`planning-agents/start/job/clear` use a separate restricted runner from Learn, with explicit provider confirmation and 100,000-character prompt/output bounds. `planning-preview/apply` validate the exact reply, foundation sources, plan, manifest, answers and task ledger before explicit import. Existing foundation content is never replaced. Browser links carry no prompts. No model output is automatically treated as reviewed ground truth.

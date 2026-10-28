@@ -6,7 +6,7 @@ import { notificationSettings, saveNotifications, testNotifications } from '../.
 import { sessionsData, tasksSection } from './dashboard.js';
 import { readManifest } from '../render/manifest.js';
 import { enabledModules } from '../render/project.js';
-import { FormError } from './form-model.js';
+import { FormError, assertSafe } from './form-model.js';
 import { browseFolders } from './browse.js';
 import { kickoffParts } from '../cli/kickoff.js';
 import { parseMap } from '../../modules/code-map/lib/map.js';
@@ -17,7 +17,8 @@ import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './revie
 import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
-import { createImproveRunner, improveSettings, saveImproveSettings } from './improve-agents.js';
+import { createImproveRunner, improveSettings, saveImproveSettings, planningAgents } from './improve-agents.js';
+import { previewPlanning, applyPlanning } from './planning.js';
 import { remoteSettings, saveRemoteSettings } from '../lib/remote-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
@@ -25,7 +26,7 @@ import { loadSetupDefaults, saveSetupDefaults } from '../lib/setup-defaults.js';
 import { improveHistory, savedImprovement, saveImprovement, importImprovement, deleteImprovement, retainImprovements, previewImprovement, applyImprovement } from '../lib/improve-store.js';
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
-export const WORKSPACE_ACTIONS = ['collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
+export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
   'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
@@ -44,7 +45,7 @@ const sourcesView = (env, data = sourcesData(env)) => {
   return { ...data, found };
 };
 export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn, spawnFn }) {
-  const reviewer = createImproveRunner({ env, spawnFn });
+  const reviewer = createImproveRunner({ env, spawnFn }), planner = createImproveRunner({ env, spawnFn, purpose: 'planning' });
   let running = false;
   let classifierJob = null, resumePaused = null;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
@@ -57,7 +58,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
   const resume = () => { const release = resumePaused; resumePaused = null; release?.(); };
   return {
     actions: WORKSPACE_ACTIONS,
-    close: () => { reviewer.clear(); classifierJob?.controller.abort(); resume(); },
+    close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
       '/api/global/features': () => ({ remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')) }),
       '/api/improve/history': () => improveHistory({ env }),
@@ -90,7 +91,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         const root = rootOf(params?.get('workspace'));
         const manifest = readManifest(root);
         if (!manifest) return { available: false, message: 'This folder has no YAW setup. Run yaw init here.' };
-        return { available: true, ...kickoffParts({ root, manifest }) };
+        return { available: true, agents: planningAgents(env), ...kickoffParts({ root, manifest }) };
       }),
       '/api/browse': (params) => browseFolders(params?.get('path')),
       '/api/interview': (params) => userError(() => interviewData({ root: rootOf(params?.get('workspace')), kitRoot, env })),
@@ -107,6 +108,17 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     },
     async action(name, input) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected action settings');
+      if (name.startsWith('planning-')) {
+        try {
+          if (name === 'planning-agents') return { agents: planningAgents(env) };
+          if (name === 'planning-job') return planner.read();
+          if (name === 'planning-start') { assertSafe({ 'idea.text': input.prompt }, kitRoot); return planner.start(input); }
+          if (name === 'planning-clear') { if (input.id !== planner.read()?.id) throw new FormError('This planning run is no longer active', 409); return planner.clear(); }
+          const ctx = { root: rootOf(input.workspace), kitRoot, env, input };
+          if (name === 'planning-preview') return previewPlanning(ctx);
+          if (name === 'planning-apply') return await applyPlanning(ctx);
+        } catch (e) { throw new FormError(e.message, e.status ?? 400); }
+      }
       if (name.startsWith('improve-history-')) {
         try {
           const ctx = { env, kitRoot, input };

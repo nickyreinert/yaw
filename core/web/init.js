@@ -6,9 +6,9 @@ import { createFormModel, assertSafe, FormError } from './form-model.js';
 import { startFormServer } from './form-server.js';
 import { editProject, initProject } from '../render/project.js';
 import { gitInit, isGitRepo } from '../lib/git-init.js';
-import { readManifest, writeManifest } from '../render/manifest.js';
+import { readManifest } from '../render/manifest.js';
 import { hashContent, writeAtomic } from '../render/files.js';
-import { assertFoundationsUnchanged, checkTaskReferences, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
+import { assertFoundationsUnchanged, checkTaskReferences, prepareFoundations, readFoundationFile } from '../lib/foundations.js';
 import { kitVersion } from '../render/kit.js';
 import { saveSetup, seedPersonalPreferences } from '../lib/user-store.js';
 import { validateSecretValues, writeEnvSecrets } from '../lib/env-secrets.js';
@@ -20,6 +20,8 @@ import { tasksMode } from '../lib/tasks.js';
 import { dashboardData } from './dashboard.js';
 import { knowledgeData } from './knowledge.js';
 import { createWorkspaceApi, WORKSPACE_ACTIONS } from './workspace-api.js';
+import { planningAgents } from './improve-agents.js';
+import { savePlanningFiles } from './planning.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 
 export const DRAFT = '.yaw/draft.yaml';
@@ -39,7 +41,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     return lists;
   };
   const replyOf = (text) => {
-    if (typeof text !== 'string' || text.length > 100000) throw new FormError('Paste the answer of the planning chat (at most 100,000 characters).');
+    if (typeof text !== 'string' || Buffer.byteLength(text) > 100000) throw new FormError('Paste the answer of the planning chat (at most 100,000 UTF-8 bytes).');
     if (secretValueRule(loadRules({ kitRoot }), text)) throw new FormError('The plan looks like it contains a secret; remove it before importing.');
     try { return parseKickoffReply(text, { languages: stackLists().languages, hosts: stackLists().hosts }); }
     catch (e) { if (e instanceof PlanError) throw new FormError(e.message); throw e; }
@@ -57,14 +59,8 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
   async function savePlan({ prepared, output }) {
     const { plan } = prepared;
     assertPlanUnchanged(prepared);
-    saveFoundations({ root, prepared: prepared.foundations, kitRoot, setupHash: prepared.planBasisHash });
+    savePlanningFiles({ root, kitRoot, plan, foundations: prepared.foundations, setupHash: prepared.planBasisHash });
     if (prepared.foundations) output.write(`Registered reviewed project foundations: ${prepared.foundations.entries.map((d) => d.path).join(', ')}\n`);
-    writeAtomic(root, PLAN_FILE, plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`);
-    const manifest = readManifest(root);
-    if (!manifest.files.some((f) => f.path === PLAN_FILE)) {
-      manifest.files.push({ path: PLAN_FILE, module: 'core', managed: false, hash: hashContent(plan.text.endsWith('\n') ? plan.text : `${plan.text}\n`) });
-      writeManifest(root, manifest);
-    }
     output.write(`Saved the plan as ${PLAN_FILE}\n`);
     if (!prepared.modules.includes('tasks')) { output.write(`No task list yet: yaw add tasks, then yaw kickoff import ${PLAN_FILE}\n`); return; }
     if (tasksMode(prepared.doc.answers, { teamModule: prepared.modules.includes('team') }) === 'github') {
@@ -210,7 +206,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         profiles: prepared.doc.proposal?.profiles ?? [], files: result.manifest.files.map((f) => f.path),
       });
       // The same kickoff guide and planning prompt `yaw init` prints on a terminal.
-      emit({ type: 'kickoff', ...kickoffParts({ root, manifest: readManifest(root) }) });
+      emit({ type: 'kickoff', agents: planningAgents(env), ...kickoffParts({ root, manifest: readManifest(root) }) });
       emit({ type: 'done', ok, message });
     },
     failed(error) {
