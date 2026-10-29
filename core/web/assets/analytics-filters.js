@@ -46,12 +46,16 @@ export function readFacets(params, scope = 'global') {
   const allowed = new Set(facetsForScope(scope).map(([key]) => key));
   return Object.fromEntries(FACET_KEYS.map((key) => [key, allowed.has(key) ? [...new Set(params.getAll(key).filter(Boolean))] : []]));
 }
-export function renderFacetBrowser({ rows, selection, scope = 'global', root = '', label = (_key, value) => value, onChange }) {
+export function renderFacetBrowser({ rows, selection, scope = 'global', root = '', searches = {}, label = (_key, value) => value, onChange }) {
   const browser = document.createElement('div'); browser.className = `facet-browser${scope === 'workspace' ? ' workspace-facets' : ''}`;
   for (const [key, title] of facetsForScope(scope)) {
     const field = document.createElement('fieldset'); field.className = 'facet-column';
     const legend = document.createElement('legend'); legend.textContent = title;
+    const search = document.createElement('input'); search.type = 'search'; search.className = 'facet-search';
+    search.setAttribute('aria-label', `Search ${title}`); search.placeholder = 'Search…'; search.maxLength = 100; search.value = searches[key] ?? '';
     const list = document.createElement('div'); list.className = 'facet-list';
+    const options = [];
+    const empty = document.createElement('p'); empty.className = 'facet-empty'; empty.textContent = 'No matches'; empty.setAttribute('role', 'status');
     const counts = facetOptions(rows, selection, key, root), selected = selection[key] ?? [];
     const add = (value, text, count) => {
       const option = document.createElement('label'), input = document.createElement('input');
@@ -64,13 +68,22 @@ export function renderFacetBrowser({ rows, selection, scope = 'global', root = '
       const name = document.createElement('span'); name.textContent = text; name.title = value ?? text;
       const total = document.createElement('small'); total.textContent = count;
       option.append(input, name, total); list.append(option);
+      if (value !== null) options.push({ node: option, text: `${text} ${value}`.toLocaleLowerCase() });
     };
     const eligible = rows.filter((r) => matchesFacets(r, selection, FACET_KEYS.slice(0, FACET_KEYS.indexOf(key)), root));
     add(null, 'All', eligible.length);
     for (const value of [...new Set([...counts.keys(), ...selected])].sort((a, b) => label(key, a).localeCompare(label(key, b)))) {
       add(value, label(key, value), counts.get(value) ?? 0);
     }
-    field.append(legend, list); browser.append(field);
+    const filterList = () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      for (const option of options) option.node.hidden = !option.text.includes(query);
+      empty.hidden = options.some((option) => !option.node.hidden);
+      list.scrollTop = 0;
+    };
+    search.addEventListener('input', () => { searches[key] = search.value; filterList(); });
+    list.append(empty); filterList();
+    field.append(legend, search, list); browser.append(field);
   }
   return browser;
 }

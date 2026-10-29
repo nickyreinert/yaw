@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { changeFacet, facetOptions, matchesFacets, readFacets, facetsForScope, UNAVAILABLE } from '../core/web/assets/analytics-filters.js';
+import { changeFacet, facetOptions, matchesFacets, readFacets, facetsForScope, renderFacetBrowser, UNAVAILABLE } from '../core/web/assets/analytics-filters.js';
 const rows = [
   { deviceId: 'local', project: '/work/apps/one', language: 'javascript', agent: 'codex', model: 'a' },
   { deviceId: 'local', project: '/work/apps/two', language: 'python', agent: 'claude', model: 'b' },
@@ -39,4 +39,38 @@ test('workspace scope keeps agent/model filters and clears hidden global filters
   assert.deepEqual(selection.model, ['a', 'c']);
   assert.deepEqual(rows.filter((row) => matchesFacets(row, selection)), [rows[0], rows[2]]);
   assert.deepEqual([...facetOptions(rows, changeFacet(rows, selection, 'agent', ['claude']), 'model').keys()], ['b']);
+});
+
+test('list search is instant, case-insensitive and independent of session selection; queries survive redraws', (t) => {
+  class Element {
+    constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.events = {}; }
+    append(...nodes) { this.children.push(...nodes); }
+    setAttribute(key, value) { this.attrs[key] = value; }
+    addEventListener(name, handler) { this.events[name] = handler; }
+    fire(name) { this.events[name]({ target: this }); }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag) => new Element(tag) } });
+  t.after(() => previous ? Object.defineProperty(globalThis, 'document', previous) : delete globalThis.document);
+  const selection = { model: ['b'] }, searches = {}, changes = [];
+  const context = { rows, selection, searches, label: (key, value) => key === 'project' ? value.split('/').at(-1) : value, onChange: (...change) => changes.push(change) };
+  const find = (browser, title) => browser.children.find((field) => field.children[0].textContent === title);
+  const model = find(renderFacetBrowser(context), 'Model');
+  const search = model.children[1], list = model.children[2];
+  const visible = () => list.children.filter((node) => node.tag === 'label' && !node.hidden).map((node) => node.children[1].textContent);
+  search.value = ' A '; search.fire('input');
+  assert.deepEqual(visible(), ['All', 'a']);
+  assert.equal(list.children[1].children[0].checked, false);
+  assert.equal(list.children[2].children[0].checked, true, 'hidden selected values remain selected');
+  assert.deepEqual(selection, { model: ['b'] }); assert.deepEqual(changes, []);
+  list.children[1].children[0].checked = true; list.children[1].children[0].fire('change');
+  assert.deepEqual(changes, [['model', ['b', 'a']]], 'only an explicit checkbox selection changes the session filters');
+  search.value = 'missing'; search.fire('input');
+  assert.deepEqual(visible(), ['All']); assert.equal(list.children.at(-1).hidden, false);
+  assert.equal(find(renderFacetBrowser(context), 'Model').children[1].value, 'missing');
+  search.value = ''; search.fire('input'); assert.deepEqual(visible(), ['All', 'a', 'b', 'c', 'd']);
+  assert.equal(list.children.at(-1).hidden, true);
+  const projects = find(renderFacetBrowser(context), 'Projects');
+  projects.children[1].value = '/WORK/APPS/ONE'; projects.children[1].fire('input');
+  assert.deepEqual(projects.children[2].children.filter((node) => node.tag === 'label' && !node.hidden).map((node) => node.children[1].textContent), ['All', 'one'], 'full paths match even when labels show only project names');
 });

@@ -48,7 +48,7 @@ const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
   const insights = createInsights({ api, get });
-  const state = { ...DEFAULTS }, tables = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
+  const state = { ...DEFAULTS }, tables = {}, facetSearches = {}, autoDone = new Set(), job = { busy: null, message: '', error: false };
   let prefs = null, improvePrefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
   let ROOT = '/', ROOTP = '', PROJECTS = [], DEVICES = [], S;
@@ -124,7 +124,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function set(changes) {
     const active = document.activeElement, browser = active?.closest('.facet-browser');
     const focus = browser ? active.getAttribute('aria-label') : null;
-    const slot = browser?.parentElement.parentElement;
+    const slot = browser?.closest('.gfilter-slot');
     const scrolls = browser ? [...browser.querySelectorAll('.facet-list')].map((n) => n.scrollTop) : [];
     for (const key of FACET_KEYS) if (key in changes && !Array.isArray(changes[key])) changes[key] = changes[key] ? [changes[key]] : [];
     Object.assign(state, changes); for (const t of Object.values(tables)) t.page = 1; writeUrl(); render();
@@ -298,7 +298,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     } else {
       bar.classList.add('analytics-filter');
       if (locked()) bar.classList.add('workspace-filter');
-      const facets = renderFacetBrowser({ rows: scopeRows(), selection: state, scope: locked() ? 'workspace' : 'global', root: ROOTP,
+      const facets = renderFacetBrowser({ rows: scopeRows(), selection: state, scope: locked() ? 'workspace' : 'global', root: ROOTP, searches: facetSearches[route] ??= {},
         label: (key, value) => value === UNAVAILABLE ? 'Unavailable (synced)' : key === 'device' ? deviceLabel(value) : key === 'project' ? (PROJECTS.filter((p) => base(p) === base(value)).length > 1 ? `${base(value)} · ${rel(value)}` : base(value)) : key === 'folder' ? rel(value) || base(value) : value,
         onChange: (key, values) => {
           const rows = scopeRows();
@@ -313,7 +313,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     }
     bar.append(h('div', { class: 'gfilter-end' }, mode === 'tasks' ? null : h('strong', {}, `${fmt(filtered().length)} sessions`),
       ['sessions', 'improve', 'overview'].includes(mode) ? collectControls() : null,
-      h('button', { type: 'button', title: 'Clear all filters and the chart split', on: { click: () => set({ ...DEFAULTS, table: state.table }) } }, 'Reset')));
+      h('button', { type: 'button', title: 'Clear filters, list searches and chart split', on: { click: () => { facetSearches[route] = {}; set({ ...DEFAULTS, table: state.table }); } } }, 'Reset')));
     if (['sessions', 'improve', 'overview'].includes(mode)) bar.append(collectStatus());
     return bar;
   }

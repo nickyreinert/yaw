@@ -802,3 +802,6 @@ a.button.primary { background: var(--accent); color: #fff; }
 .settings-preview { margin: 14px 0; }
 .settings-preview > summary { font-weight: 600; }
 .settings-preview[open] > summary { margin-bottom: 16px; }
+
+.gfilter .facet-column input.facet-search { width: calc(100% - 16px); max-width: none; margin: 4px 8px 8px; font-size: .76rem; }
+.facet-empty { margin: 10px; font-size: .76rem; color: var(--muted); }
