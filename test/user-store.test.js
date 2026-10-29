@@ -258,3 +258,11 @@ test('secret rules: no ReDoS on 100k-character values, and flags cannot be dupli
   assert.deepEqual(schemas().validate('guards.schema.json', rule('im')), []);
   assert.notDeepEqual(schemas().validate('guards.schema.json', rule('ii')), []);
 });
+
+test('preset listings display the All label for stored pro depth', async () => {
+  const home = tmp('yaw-home-');
+  saveSetup({ env: { HOME: home }, kitRoot: KIT_ROOT, answers: { 'idea.team': 'solo' }, mode: 'pro', projectRoot: '/work/all-tools', kit: '0.0.0', now: new Date('2026-10-29T10:00:00Z') });
+  const list = await yaw(['presets', 'list'], { home });
+  assert.equal(list.code, 0, list.err);
+  assert.match(list.out, /^2026-10-29-all-tools +all {2}/m);
+});

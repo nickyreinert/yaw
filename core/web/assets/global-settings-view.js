@@ -5,6 +5,7 @@ import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { GROUPS, RADIO_MAX, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
+import { depthLabel } from '../../interview/depth.js';
 import { CHATS } from './chat-services.js';
 
 const $ = (id) => document.getElementById(id);
@@ -382,7 +383,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
           if (!confirm(`Delete preset ${p.name}? This removes ~/.yaw/presets/${p.name}.yaml.`)) return;
           const r = await api('preset-delete', { name: p.name, confirm: true }); presets = await get('global/presets'); files = null; renderInterview(); status(r.message);
         }), 'danger'));
-      return [code(p.name), p.description || '—', p.mode || '—', p.created ? day(p.created) : '—', tools];
+      return [code(p.name), p.description || '—', depthLabel(p.mode) || '—', p.created ? day(p.created) : '—', tools];
     }));
     t.classList.add('preset-table'); box.append(t, msg); return box;
   }

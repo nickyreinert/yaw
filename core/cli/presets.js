@@ -1,6 +1,7 @@
 // `yaw presets list|show|delete` (Y-7.2, ADR-0043): saved setups in ~/.yaw/presets/.
 
 import { deletePreset, listPresets, readPreset, userDir } from '../lib/user-store.js';
+import { depthLabel } from '../interview/depth.js';
 import { confirm } from './prompt.js';
 import { UsageError } from './commands.js';
 
@@ -12,7 +13,7 @@ export async function presets({ values, positionals, io }) {
     const all = listPresets(io.env);
     if (all.length === 0) io.stdout.write(`no saved setups (${userDir(io.env)}/presets/)\n`);
     const width = Math.max(0, ...all.map((p) => p.name.length));
-    for (const p of all) io.stdout.write(`${p.name.padEnd(width)}  ${[p.mode, p.created, p.description].filter(Boolean).join('  ')}\n`);
+    for (const p of all) io.stdout.write(`${p.name.padEnd(width)}  ${[p.mode ? depthLabel(p.mode).toLowerCase() : p.mode, p.created, p.description].filter(Boolean).join('  ')}\n`);
     return 0;
   }
   if (action === 'show') {

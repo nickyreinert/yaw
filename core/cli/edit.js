@@ -1,6 +1,7 @@
 import { collectQuestions, listProfiles } from '../render/kit.js';
 import { stackProfile } from '../interview/suggest.js';
 import { editProject } from '../render/project.js';
+import { depthLabel } from '../interview/depth.js';
 import { runInterview } from '../interview/engine.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { createFormModel } from '../web/form-model.js';
@@ -34,7 +35,7 @@ export async function edit({ values, positionals: sections, io }) {
   }
   if (!sections.length) {
     for (;;) {
-      const mode = (await io.prompter.ask(`Setup depth [${state.mode === 'pro' || state.mode === 'full' || state.mode === 'standard' ? 'all' : state.mode}] (quick/basic/all, w for browser) > `)).trim().toLowerCase();
+      const mode = (await io.prompter.ask(`Setup depth [${depthLabel(state.mode).toLowerCase()}] (quick/basic/all, w for browser) > `)).trim().toLowerCase();
       if (['w', 'web'].includes(mode)) return browser();
       if (mode === '') break;
       if (['quick', 'basic', 'pro', 'all', 'full', 'standard'].includes(mode)) { state.mode = mode; break; }
@@ -57,7 +58,7 @@ export async function edit({ values, positionals: sections, io }) {
     state.answers = stack.answers;
   }
   const preview = model.preview(state, true);
-  io.stdout.write(`\nSummary (${state.mode} setup)\n  stack: ${preview.profile}\n  modules: ${preview.modules.join(', ')}\n`);
+  io.stdout.write(`\nSummary (${depthLabel(state.mode).toLowerCase()} setup)\n  stack: ${preview.profile}\n  modules: ${preview.modules.join(', ')}\n`);
   for (const [id, value] of Object.entries(preview.answers)) {
     io.stdout.write(`  ${id}: ${Array.isArray(value) ? value.join(', ') : String(value)}\n`);
   }

@@ -5,6 +5,7 @@ export const DEPTHS = [
   { value: 'pro', label: 'All', description: 'Every applicable question and optional tool.' },
 ];
 export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[mode] ?? mode);
+export const depthLabel = (mode) => DEPTHS.find((depth) => depth.value === depthOf(mode))?.label ?? mode;
 export const validDepth = (mode) => ['quick', 'basic', 'pro'].includes(depthOf(mode));
 export const BASIC_QUESTIONS = new Set(['user.agents', 'idea.team', 'tasks.use-github', 'tasks.mode', 'quality.review-quality', 'quality.review-logic', 'quality.review-ux', 'quality.review-feature', 'quality.review-gate']);
 export function asksAtDepth(q, mode) {
