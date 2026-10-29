@@ -167,8 +167,9 @@ const expertiseOf = (answers) => (EXPERTISE_LEVELS.includes(answers['user.expert
 // known: answers that already exist; only used to evaluate `when`, never returned.
 // defaults: saved answers to review as question defaults, not automatically accepted answers.
 // allowWeb: "w" or "web" stops the interview (#162) -> { answers so far, defaulted, web: true }; the caller hands over to the form.
+// askQuestion: optional visibility predicate; hidden questions retain saved/factory defaults.
 // -> { answers, defaulted: string[], sources } (answers hold every applicable question, reused values included)
-export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, defaults = {}, defaultSources = {}, allowWeb = false, reviewPersonal = false }) {
+export async function runInterview({ questions, mode, prompter, kitRoot, known = {}, defaults = {}, defaultSources = {}, allowWeb = false, reviewPersonal = false, askQuestion = null }) {
   questions = questions.map((q) => {
     if (!Object.hasOwn(defaults, q.id)) return q;
     if (!validAnswer(q, defaults[q.id])) throw new Error(`Invalid saved answer for ${q.id}`);
@@ -176,7 +177,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
   });
   const answers = {};
   const sources = {};
-  const shouldAsk = (q) => reviewPersonal ? asksIn(q.mode, mode) : asksQuestion(q, mode);
+  const shouldAsk = (q) => (!askQuestion || askQuestion(q)) && (reviewPersonal ? asksIn(q.mode, mode) : asksQuestion(q, mode));
   // Reused expertise must affect the very first project question.
   for (const q of questions) if (isPersonal(q) && !q.when && !shouldAsk(q)) {
     answers[q.id] = q.default;

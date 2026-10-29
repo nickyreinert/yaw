@@ -78,7 +78,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
   assert.match(communication, /label: Should the agent use examples and analogies\?/);
   assert.match(communication, /Only when useful/);
-  assert.match(communication, /Always asks for a plain-language example with each explanation/);
+  assert.match(communication, /Examples and analogies in agent explanations/);
 });
 async function serverFixture(t, extra = {}) {
   const f = fixture();
@@ -104,8 +104,8 @@ test('web model: schema catalogue, local help, ownership and phase-3 choices', (
   assert.deepEqual(c.questions[0].choices.map((x) => x.value), ['claude', 'codex', 'copilot', 'gemini']);
   assert.ok(!c.questions[0].choices.find((x) => x.value === 'gemini').phase);
   assert.match(c.questions[0].helpText, /agent/i);
-  assert.match(c.questions.find((q) => q.id === 'user.expertise').helpText, /does not change security rules/i);
-  assert.match(c.questions.find((q) => q.id === 'user.autonomy').helpText, /does not override tool permissions/i);
+  assert.match(c.questions.find((q) => q.id === 'user.expertise').helpText, /Tool permissions stay unchanged/i);
+  assert.match(c.questions.find((q) => q.id === 'user.autonomy').helpText, /Tool permissions and required approvals still apply/i);
   assert.match(c.questions.find((q) => q.id === 'user.comfort').helpText, /optional helpers for you while coding/i);
   const comm = c.modules.find((m) => m.name === 'communication');
   assert.ok(c.modules.every((m) => m.adds.length > 0), 'every module lists what it adds');
@@ -230,7 +230,7 @@ test('web API: preview and diff are read-only, rendered file list and bytes are 
 
 test('web API: authenticated assets only; CSP, schema bootstrap and no outside assets', async (t) => {
   const f = await serverFixture(t);
-  for (const path of ['/app.js', '/ui-state.js', '/app.css', '/api/bootstrap']) {
+  for (const path of ['/app.js', '/ui-state.js', '/app.css', '/interview/module-groups.js', '/api/bootstrap']) {
     assert.equal((await fetch(f.origin + path)).status, 403);
     const r = await fetch(f.origin + path, { headers: { cookie: f.cookie } });
     assert.equal(r.status, 200);

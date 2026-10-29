@@ -25,7 +25,7 @@ function prompts({ mode = 'basic', answers = PERSONAL, apply = true, offer = tru
     assert.ok(p.asked.length < 100);
     if (/Would you like to enter personal defaults/.test(prompt)) return offer ? 'y' : 'n';
     if (/Setup depth/.test(prompt)) return mode;
-    if (/^Modules /.test(prompt)) return 'none';
+    if (/^\s*Modules /.test(prompt)) return 'none';
     if (/Write these files/.test(prompt)) return apply ? 'y' : 'n';
     if (/Save these personal defaults/.test(prompt)) return save ? 'y' : 'n';
     if (/Save |guidance to kick off|create one now/.test(prompt)) return 'n';

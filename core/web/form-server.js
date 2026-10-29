@@ -16,6 +16,7 @@ const assets = new Map([
   ['/interview-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/interview-view.js', import.meta.url))]],
   ['/interview/suggest.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/suggest.js', import.meta.url))]],
   ['/interview/depth.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/depth.js', import.meta.url))]],
+  ['/interview/module-groups.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/module-groups.js', import.meta.url))]],
   ['/interview/policy.js', ['text/javascript; charset=utf-8', readFileSync(new URL('../interview/policy.js', import.meta.url))]],
   ['/login.js', ['text/javascript; charset=utf-8', Buffer.from("location.replace('/');\n")]],
   ['/app.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/app.js', import.meta.url))]],

@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'n', 'javascript', 'local'];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'javascript', 'local', 'n'];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
@@ -174,7 +174,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: an uncovered combination offers available YAW profiles (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', '', 'A static site.', 'n', 'html', 'wordpress', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
+  const prompter = scripted(['', '', 'A static site.', 'html', 'wordpress', 'n', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No YAW profile for HTML, CSS & JavaScript on wordpress/);

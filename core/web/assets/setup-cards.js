@@ -4,14 +4,8 @@
 
 import { profileForStack } from '../../interview/suggest.js';
 
-export const GROUPS = [
-  // Git & GitHub first: the answers there decide which other modules apply.
-  ['github', 'Git & GitHub', 'Repository, commit checks and, on GitHub, issues and team rules.'],
-  ['basics', 'The basics', 'Recommended for every project.'],
-  ['memory', 'Remember the work', 'Pick up where you left off.'],
-  ['quality', 'Reviews', 'Reviewers check what a linter cannot.'],
-  ['comfort', 'Comfort', 'Personal helpers on your machine; no model tokens.'],
-];
+import { GROUPS } from '../../interview/module-groups.js';
+export { GROUPS };
 export const REVIEWERS = [
   ['quality', 'Quality', 'Readability, naming, duplication, missing tests and error handling: what a linter cannot judge.', '"parseDate swallows errors; add a test for an empty string."'],
   ['logic', 'Business logic', 'Checks the change against your rules and the business-logic notices in .decisions/.', '"Discount is applied after tax; NOTICE-0004 says before."'],

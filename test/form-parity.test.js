@@ -51,16 +51,16 @@ const SCENARIOS = [
   { name: 'Full, all agents, expert, both task stores', mode: 'full', answers: { ...BASE, 'user.agents': ['claude', 'codex', 'copilot'], 'user.expertise': 'expert', 'user.language': 'en', 'tasks.mode': 'both' } },
   { name: 'Full, every answer non-default (layperson)', mode: 'full', answers: nonDefaults({ ...BASE, 'user.language': 'en', 'user.expertise': 'layperson' }) },
   { name: 'Full, every answer non-default (expert, solo)', mode: 'full', answers: nonDefaults({ ...BASE, 'user.language': 'en', 'user.expertise': 'expert', 'idea.team': 'solo', 'tasks.mode': 'github' }) },
-  { name: 'Pro, every answer non-default', mode: 'pro', answers: nonDefaults({ ...BASE, 'user.language': 'en' }) },
+  { name: 'All, every answer non-default with all tools selected', mode: 'pro', modules: MODULES, answers: nonDefaults({ ...BASE, 'user.language': 'en' }) },
 ];
 
-async function viaCli({ mode, answers }) {
+async function viaCli({ mode, answers, modules }) {
   const cwd = tmp('yaw-parity-cli-');
   const p = scripted();
   p.ask = async (question) => {
     p.asked.push(question);
     if (/Setup depth \[/.test(question)) return mode;
-    if (/^Modules \(comma-separated/.test(question)) return 'none';
+    if (/^\s*Modules \[/.test(question)) return modules ? modules.filter((name) => name !== 'core').join(',') : 'none';
     if (/create one now \(git init\)\?/.test(question)) return 'n';
     if (/Write these files\?/.test(question)) return 'y';
     if (/Save /.test(question)) return 'n';
@@ -78,7 +78,7 @@ async function viaCli({ mode, answers }) {
   return cwd;
 }
 
-async function viaForm({ mode, answers }) {
+async function viaForm({ mode, answers, modules }) {
   const root = tmp('yaw-parity-web-');
   const home = tmp('yaw-parity-home-');
   const api = createFormApi({ root, kitRoot: KIT_ROOT, env: { PATH: NODE_ONLY, HOME: home }, skipVerify: true, verify: async () => true, stderr: capture() });
@@ -90,7 +90,7 @@ async function viaForm({ mode, answers }) {
     const response = await fetch(`${origin}/api/apply`, {
       method: 'POST',
       headers: { cookie, origin, 'Content-Type': 'application/json', 'X-YAW-Token': csrf },
-      body: JSON.stringify({ mode, answers, modules: null }), // what app.js posts when no module was toggled
+      body: JSON.stringify({ mode, answers, modules: modules ?? null }), // what app.js posts when no module was toggled
     });
     const events = (await response.text()).trim().split('\n').map((l) => JSON.parse(l));
     assert.equal(response.status, 200, JSON.stringify(events));

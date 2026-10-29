@@ -186,15 +186,15 @@ test('expertise: each level is recorded; the level changes how the interview is 
   }
   const shown = (level) => runs[level].prompter.shown.join('');
   // layperson: help of a question is shown without asking; F questions take their default
-  assert.match(shown('layperson'), /Goes into AGENTS.md as one line/);
-  assert.doesNotMatch(shown('expert'), /Goes into AGENTS.md as one line/);
+  assert.match(shown('layperson'), /Saved as the project purpose in AGENTS.md/);
+  assert.doesNotMatch(shown('expert'), /Saved as the project purpose in AGENTS.md/);
   assert.equal(runs.layperson.doc.answers['team.session-context'], true);
   assert.match(shown('layperson'), /Tell the agent the active issue/);
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
-  assert.match(shown('intermediate'), /Shared team rules/);
-  assert.doesNotMatch(shown('expert'), /Shared team rules/);
+  assert.match(shown('intermediate'), /Solo or shared project rules/);
+  assert.doesNotMatch(shown('expert'), /Solo or shared project rules/);
   // the summary lists the layperson default
   assert.doesNotMatch(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);

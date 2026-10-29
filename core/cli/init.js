@@ -17,7 +17,7 @@ import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
 import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
-import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
+import { collectQuestions, hasModule, listProfiles, loadModule } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
 import { gitInit, isGitRepo, wantsGit } from '../lib/git-init.js';
@@ -35,6 +35,7 @@ import { listPresets, loadPreferences, seedPersonalPreferences, saveSetup, secre
 import { initWeb } from '../web/init.js';
 import { syncShortcut } from './sync.js';
 import { createFormModel } from '../web/form-model.js';
+import { chooseInitModules } from './init-modules.js';
 import { PLAIN } from './style.js';
 
 // Reply that hands the interview over to the browser form (#162).
@@ -121,10 +122,10 @@ async function choosePrevious(io) {
 }
 
 // Continue in the browser form with what was answered so far (#162). The folder guard already ran; nothing is written here.
-function handOff({ io, values, mode, answers = {}, proposed = [] }) {
+function handOff({ io, values, mode, answers = {}, proposed = [], modules }) {
   io.prompter.close?.();
   io.stdout.write('\nContinuing in the browser with your answers so far; nothing was written.\n');
-  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers, ...(proposed.length ? { proposed } : {}) } });
+  return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, handoff: { mode, answers, ...(modules ? { modules } : {}), ...(proposed.length ? { proposed } : {}) } });
 }
 
 // Every question with its answer; one the answers file does not have takes its default and is marked as such.
@@ -283,17 +284,40 @@ export async function init({ values, positionals, io }) {
     // modules depend on the answers (team, GitHub), so the team case is included; a question of a module that is
     // not selected is hidden by its `when` (team.session-context needs idea.team = team).
     const potential = readdirSync(resolve(kitRoot, 'modules')).filter((name) => hasModule(kitRoot, name)).sort();
-    if (depthOf(mode) === 'pro' && mode === 'pro') {
-      io.prompter.show(`\nOptional modules: ${potential.filter((name) => name !== 'core').join(', ')}\n`);
-      const reply = (await io.prompter.ask(`Modules (comma-separated, none or all) [${moduleDefaults.join(',') || 'none'}] > `)).trim();
-      if (reply) moduleDefaults = reply === 'none' ? [] : reply === 'all' ? potential.filter((name) => name !== 'core') : reply.split(',').map((name) => name.trim());
-      if (moduleDefaults.some((name) => !potential.includes(name))) throw new ProjectError('Choose only listed module names');
-    }
     const reusedModules = selectModules({ kitRoot, mode, facts: deriveFacts(defaults), answers: defaults, defaults: moduleDefaults });
     const interviewModules = depthOf(mode) === 'pro' ? potential : depthOf(mode) === 'basic' ? [...new Set(['core', 'communication', 'tasks', 'review', ...moduleDefaults])] : [...new Set([...reusedModules, ...(hasModule(kitRoot, 'communication') ? ['communication'] : [])])];
     const questions = withGitHubHint(collectQuestions(kitRoot, interviewModules), githubStatus({ root, env: io.env }));
-    const r = await runInterview({ questions, mode, prompter: io.prompter, kitRoot, defaults, defaultSources, allowWeb: true });
-    if (r.web) return handOff({ io, values, mode, answers: { ...defaults, ...r.answers }, proposed: questions.filter((q) => q.required && Object.hasOwn(defaults, q.id) && !r.sources[q.id]).map((q) => q.id) });
+    // Match the browser: personal choices, project, stack, then workflow/tools.
+    const isFoundation = (q) => isPreference(q) || q.id === 'user.agents' || /^(idea|arch)\./.test(q.id);
+    const rank = (q) => q.id.startsWith('user.') && isFoundation(q) ? 0 : q.id.startsWith('idea.') ? 1 : q.id.startsWith('arch.') ? 2 : 3;
+    const ordered = [...questions].sort((a, b) => rank(a) - rank(b));
+    const r = { answers: {}, defaulted: [], sources: {} };
+    let selectedModules;
+    const interview = async (subset, askQuestion = null) => {
+      const result = await runInterview({ questions: subset, mode, prompter: io.prompter, kitRoot,
+        known: r.answers, defaults, defaultSources, allowWeb: true, askQuestion });
+      Object.assign(r.answers, result.answers); Object.assign(r.sources, result.sources);
+      r.defaulted.push(...result.defaulted);
+      return result.web;
+    };
+    const browser = () => handOff({ io, values, mode, answers: { ...defaults, ...r.answers }, modules: selectedModules ? selectModules({ kitRoot, mode, answers: r.answers, defaults: moduleDefaults }) : undefined,
+      proposed: questions.filter((q) => q.required && Object.hasOwn(defaults, q.id) && !r.sources[q.id]).map((q) => q.id) });
+    if (['pro', 'all'].includes(mode)) {
+      if (await interview(ordered.filter(isFoundation))) return browser();
+      const stack = await confirmStack({ prompter: io.prompter, profiles, questions, answers: r.answers });
+      if (stack === WEB) return browser();
+      Object.assign(r.answers, stack.answers);
+      if (await interview(ordered.filter((q) => q.id === 'tasks.use-github'))) return browser();
+      const selection = await chooseInitModules({ prompter: io.prompter, definitions: potential.map((name) => loadModule(kitRoot, name)), defaults: moduleDefaults, answers: r.answers });
+      if (selection.web) return browser();
+      moduleDefaults = selection.modules;
+      selectedModules = selectModules({ kitRoot, mode, answers: r.answers, defaults: moduleDefaults });
+      const owners = new Map(potential.flatMap((name) => (loadModule(kitRoot, name).questions ?? []).map((q) => [q.id, name])));
+      if (await interview(ordered.filter((q) => !isFoundation(q) && q.id !== 'tasks.use-github'),
+        (q) => selectedModules.includes(owners.get(q.id) ?? 'core'))) return browser();
+    } else if (await interview(ordered)) return browser();
+    // Keep saved answer order identical to the shared browser catalogue.
+    r.answers = Object.fromEntries(questions.filter((q) => Object.hasOwn(r.answers, q.id)).map((q) => [q.id, r.answers[q.id]]));
     if (r.answers['tasks.use-github'] === false && questions.some((q) => q.id === 'tasks.mode')) {
       io.prompter.show('      Task tracking: local (TASKS.md), because GitHub is off for this project.\n');
     }
@@ -317,7 +341,9 @@ export async function init({ values, positionals, io }) {
     how = stack.reason;
   } else {
     const before = answersDoc.answers['arch.runs-on'];
-    const r = await confirmStack({ prompter: io.prompter, profiles, questions: collectQuestions(kitRoot, []), answers: answersDoc.answers });
+    const r = ['pro', 'all'].includes(answersDoc.mode)
+      ? { answers: answersDoc.answers, profile: stackProfile(profiles, answersDoc.answers).profile }
+      : await confirmStack({ prompter: io.prompter, profiles, questions: collectQuestions(kitRoot, []), answers: answersDoc.answers });
     if (r === WEB) return handOff({ io, values, mode: answersDoc.mode, answers: answersDoc.answers });
     if (r.answers['arch.runs-on'] !== before) defaulted.delete('arch.runs-on');
     answersDoc = { ...answersDoc, answers: r.answers };
