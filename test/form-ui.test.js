@@ -40,8 +40,8 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   const cards = readFileSync(join(KIT_ROOT, 'core/web/assets/setup-cards.js'), 'utf8');
   const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
   // Review: bullet lists with a jump to where each item is configured and a file preview, no scroll area.
-  assert.match(review, /review-adds/);
-  assert.match(review, /ctx\.jump\(\{ module: name \}\)/);
+  assert.match(review, /review-tree/);
+  assert.match(review, /module: name/);
   assert.match(review, /review-file/);
   assert.ok(!/#summary ul \{[^}]*overflow/.test(css));
   assert.match(css, /\.review-file pre \{ max-height: none; overflow: visible/);

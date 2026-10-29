@@ -193,3 +193,27 @@ meter::-webkit-meter-optimum-value { background: var(--accent); }
 .language-chip .language-icon { width: 16px; height: 16px; flex: 0 0 16px; color: currentColor; }
 .module-group-title { display: flex; align-items: center; gap: 8px; }
 .module-head .decision-icon { width: 20px; height: 20px; flex: 0 0 20px; }
+.review-search { margin-bottom: 14px; }
+.review-search input[type=search] { max-width: none; margin: 0; }
+.review-tree { display: grid; gap: 10px; }
+.review-branch { padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.review-summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.review-summary::-webkit-details-marker { display: none; }
+.review-summary::before { content: '›'; color: var(--accent); font: 1.2rem var(--mono); }
+.review-branch[open] > .review-summary::before { transform: rotate(90deg); }
+.review-summary > .decision-icon { width: 19px; height: 19px; flex: 0 0 19px; }
+.review-branch-label { font-weight: 650; overflow-wrap: anywhere; min-width: 0; }
+.review-count { margin-left: auto; color: var(--muted); font-weight: 400; }
+.review-children { display: grid; gap: 8px; padding: 0 12px 12px 22px; }
+.review-children .review-branch { background: #f7faff; }
+.review-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.review-value { display: grid; gap: 3px; min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: .82rem; }
+.review-edit { display: inline-flex; align-items: center; justify-content: center; padding: 6px; color: var(--accent); border: 1px solid var(--line); border-radius: 6px; flex: 0 0 auto; }
+.review-edit .decision-icon { width: 17px; height: 17px; }
+.review-edit:hover { background: var(--wash); border-color: var(--accent); }
+.review-children pre { margin: 0; max-height: none; overflow: visible; }
+@media (max-width: 700px) { .review-children { padding-left: 10px; } .review-count { font-size: .65rem; } .review-summary { padding: 10px 8px; gap: 6px; } }
+
+.review-file-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; flex-wrap: wrap; }
+.review-file-row > code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.review-file-row .decision-icon { width: 19px; height: 19px; flex: 0 0 19px; }

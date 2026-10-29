@@ -1,14 +1,15 @@
-// Review step: the answers and what YAW adds as bullet lists, each with a jump to where it is configured, and a
-// file preview per module. DOM only through createElement (CSP: no innerHTML). Preview text is shown as text nodes.
-import { el, radioChoices } from './setup-cards.js';
+// Shared, searchable review tree. All content is rendered as text; expansion is user-controlled.
+import { el, radioChoices, decisionIcon, moduleIcon, GROUPS } from './setup-cards.js';
 
 const SHORT = {
-  'user.agents': 'Agents', 'user.expertise': 'Experience', 'user.language': 'Chat language', 'user.autonomy': 'Asks before acting',
+  'user.agents': 'Agents', 'user.expertise': 'Experience', 'user.language': 'Chat language', 'user.autonomy': 'Autonomy',
   'user.length': 'Answer length', 'user.register': 'Wording', 'user.examples': 'Examples', 'user.explain': 'Explanations',
-  'user.comfort': 'Comfort helpers', 'idea.text': 'Idea', 'idea.team': 'Team', 'tasks.use-github': 'GitHub', 'tasks.mode': 'Task tracking',
-  'team.session-context': 'Issue at session start',
+  'user.comfort': 'Comfort helpers', 'idea.text': 'Purpose', 'idea.team': 'Team', 'tasks.use-github': 'GitHub', 'tasks.mode': 'Task tracking',
+  'team.session-context': 'Session context', 'arch.language': 'Language', 'arch.runs-on': 'Runtime', 'arch.framework': 'Framework',
+  'arch.hosting-control': 'Hosting', 'arch.libraries': 'Dependencies', 'arch.services': 'Services', 'arch.cost': 'Budget policy', 'arch.cost-limit': 'Budget cap',
 };
-const ACTION = { create: 'new', update: 'changed', write: 'written', kept: 'kept', missing: 'restored', delete: 'removed' };
+const ACTION = { create: 'new', update: 'changed', write: 'write', kept: 'kept', missing: 'restore', delete: 'remove' };
+const OPEN = new WeakMap();
 
 export function answerText(q, value) {
   if (q.type === 'boolean') return value === false || value === 'false' ? 'No' : 'Yes';
@@ -19,62 +20,114 @@ export function answerText(q, value) {
   return text.length > 90 ? `${text.slice(0, 87)}…` : text || '—';
 }
 
-const editButton = (what, onclick) => el('button', { type: 'button', class: 'link', 'aria-label': `Edit ${what}`, onclick, text: 'Edit' });
+export function filePurpose(path) {
+  if (path === 'AGENTS.md') return 'Agent entry point';
+  if (['CLAUDE.md', 'GEMINI.md'].includes(path)) return 'Rules import';
+  if (path === 'justfile' || path.endsWith('.just')) return 'Project commands';
+  if (path === '.gitignore') return 'Ignored files';
+  if (path === '.yaw/answers.yaml') return 'Project choices';
+  if (path === '.yaw/manifest.json') return 'Generated file index';
+  if (path.endsWith('SKILL.md')) return 'Agent skill';
+  if (path.includes('/ISSUE_TEMPLATE/')) return 'Issue form';
+  if (path.endsWith('pull_request_template.md')) return 'PR template';
+  if (path.endsWith('hooks.json') || path.endsWith('settings.json')) return 'Agent configuration';
+  if (path.includes('docs/spec/')) return 'Project specification';
+  if (path.includes('docs/standards')) return 'Coding standards';
+  if (path.includes('docs/plan/')) return 'Project plan';
+  if (path.endsWith('README.md')) return 'Project overview';
+  if (path.endsWith('package.json')) return 'Dependencies and scripts';
+  if (path.startsWith('src/') || path.startsWith('public/')) return 'Starter code';
+  return 'Project file';
+}
 
-// ctx: { preview, modules (catalog), questions, jump({ module } | { question } | { stack: true }) }
+const editButton = (what, onclick) => el('button', { type: 'button', class: 'review-edit', 'aria-label': `Edit ${what}`, title: `Edit ${what}`,
+  onclick: (event) => { event.preventDefault(); event.stopPropagation(); onclick(); } }, decisionIcon('edit'));
+const sectionOf = (id) => id.startsWith('user.') ? 'agents' : /^(idea|arch)\./.test(id) ? 'project' : 'workflow';
+const sections = [['project', 'Project', 'box'], ['agents', 'Agents & preferences', 'users'], ['workflow', 'Workflow', 'branch']];
+const subgroupOf = (id) => id === 'user.agents' ? 'Coding agents' : id.startsWith('user.') ? 'Preferences' : id.startsWith('idea.') ? 'Purpose & team'
+  : ['arch.language', 'arch.runs-on'].includes(id) ? 'Stack' : id.startsWith('arch.') ? 'Architecture' : id.startsWith('quality.') ? 'Reviews' : 'Repository & tasks';
+
 export function renderReview(root, ctx) {
   const { preview } = ctx;
-  const byId = new Map(ctx.questions.map((q) => [q.id, q]));
-  const count = (...actions) => preview.files.filter((f) => actions.includes(f.action)).length;
+  let state = OPEN.get(root);
+  if (!state) { state = { query: '', expanded: new Set() }; OPEN.set(root, state); }
+  const record = (node, search, children = [], key = null) => ({ node, search: search.toLocaleLowerCase(), children, key });
+  const leaf = (label, value, source, target, search = '') => record(el('div', { class: 'review-item' },
+    el('div', { class: 'review-value' }, el('strong', { text: label }), el('span', { text: value }), source ? el('small', { class: 'muted', text: source }) : null),
+    target ? editButton(label, () => ctx.jump(target)) : null), `${label} ${value} ${source ?? ''} ${search}`);
+  const branch = (label, key, children, icon = 'box', target = null, note = '') => {
+    const summary = el('summary', { class: 'review-summary' }, typeof icon === 'string' ? decisionIcon(icon) : icon,
+      el('span', { class: 'review-branch-label', text: label }), el('small', { class: 'review-count', text: note || String(children.length) }),
+      target ? editButton(label, () => ctx.jump(target)) : null);
+    const node = el('details', { class: 'review-branch', 'data-review-key': key }, summary,
+      el('div', { class: 'review-children' }, ...children.map((child) => child.node)));
+    summary.addEventListener('click', (event) => {
+      if (event.defaultPrevented || state.query) return;
+      if (node.open) state.expanded.delete(key); else state.expanded.add(key);
+    });
+    return record(node, label, children, key);
+  };
 
-  const answers = el('ul', { class: 'review-list' });
-  answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Stack' }), ` ${preview.profile}`), editButton('stack', () => ctx.jump({ stack: true }))));
-  for (const id of preview.visible) {
-    const q = byId.get(id);
-    if (!q || id.startsWith('quality.review-')) continue;
-    const label = SHORT[id] ?? q.label.replace(/\?$/, '');
-    answers.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[id])}`, el('small', { class: 'muted', text: ` (${preview.sources?.[id] ?? 'answered'})` })), editButton(label, () => ctx.jump(id.startsWith('arch.') ? { stack: true } : { question: id }))));
+  const asked = new Set(preview.visible), groups = new Map(sections.map(([key]) => [key, new Map()])), defaults = new Map();
+  const add = (map, title, row) => { if (!map.has(title)) map.set(title, []); map.get(title).push(row); };
+  add(groups.get('project'), 'Stack', leaf('Profile', preview.profile ?? '—', '', { stack: true }));
+  for (const q of ctx.questions) {
+    if (!Object.hasOwn(preview.answers, q.id)) continue;
+    const label = SHORT[q.id] ?? q.label.replace(/\?| \(comma-separated\)/g, '');
+    const target = q.editHidden ? null : q.id.startsWith('arch.') ? { stack: true } : { question: q.id };
+    const row = leaf(label, answerText(q, preview.answers[q.id]), preview.sources?.[q.id] ?? (asked.has(q.id) ? 'answered' : 'default'), target, `${q.id} ${JSON.stringify(preview.answers[q.id])}`);
+    if (asked.has(q.id)) add(groups.get(sectionOf(q.id)), subgroupOf(q.id), row);
+    else add(defaults, sections.find(([key]) => key === sectionOf(q.id))[1], row);
   }
-
-  const unasked = ctx.questions.filter((q) => !preview.visible.includes(q.id) && Object.hasOwn(preview.answers, q.id));
-  const defaults = el('details', {}, el('summary', { text: `Settings not asked at this depth (${unasked.length})` }));
-  const defaultsList = el('ul', { class: 'review-list' });
-  for (const q of unasked) {
-    const label = SHORT[q.id] ?? q.label.replace(/\?$/, '');
-    defaultsList.append(el('li', {}, el('span', {}, el('strong', { text: label }), ` ${answerText(q, preview.answers[q.id])}`, el('small', { class: 'muted', text: ` (${preview.sources?.[q.id] ?? 'documented default'})` })),
-      ...(q.editHidden ? [] : [editButton(label, () => ctx.jump({ question: q.id }))])));
-  }
-  defaults.append(el('p', { class: 'small muted', text: 'These values are included in the generated setup. Edit opens the depth needed for that question; your answers and tool choices are kept.' }), defaultsList);
-
   if (ctx.plan?.tasks || ctx.plan?.idea || ctx.plan?.foundations?.length) {
-    answers.append(el('li', {}, el('span', {}, el('strong', { text: 'Plan' }), ` ${ctx.plan.tasks} task${ctx.plan.tasks === 1 ? '' : 's'} → docs/plan/kickoff.md${preview.modules.includes('tasks') ? ', with work items in the configured task store' : ' (Tasks is off; work items stay in the plan)'}`), editButton('plan', () => ctx.jump({ plan: true }))));
+    add(groups.get('project'), 'Plan', leaf('Tasks', `${ctx.plan.tasks ?? 0} · docs/plan/kickoff.md`, '', { plan: true }));
+    for (const document of ctx.plan.foundations ?? []) add(groups.get('project'), 'Plan', leaf(document.kind, document.path, 'reviewed', { plan: true }));
   }
-  for (const d of ctx.plan?.foundations ?? []) {
-    answers.append(el('li', {}, el('span', { text: `Reviewed ${d.kind}: ${d.path}` }), editButton(d.kind, () => ctx.jump({ plan: true }))));
+  const entries = sections.map(([key, title, icon]) => branch(title, key,
+    [...groups.get(key)].map(([name, rows]) => branch(name, `${key}/${name}`, rows, icon)), icon)).filter((entry) => entry.children.length);
+
+  const defs = new Map(ctx.modules.map((m) => [m.name, m])), owners = new Map();
+  for (const file of preview.files) add(owners, file.module ?? 'core', file);
+  for (const name of preview.modules) if (!owners.has(name)) owners.set(name, []);
+  const tools = new Map();
+  for (const [name, files] of owners) {
+    const module = defs.get(name), label = module?.title ?? name.replace(/^profile:/, '');
+    const children = files.map((file) => {
+      const note = `${filePurpose(file.path)} · ${ACTION[file.action] ?? file.action}`;
+      if (!file.excerpt) return record(el('div', { class: 'review-file-row', 'data-review-file': file.path }, decisionIcon('file'), el('code', { text: file.path }), el('small', { class: 'muted', text: note })), `${file.path} ${note}`);
+      const item = branch(file.path, `file/${file.path}`, [record(el('pre', { class: 'review-file', text: file.excerpt }), file.excerpt)], 'file', null, note);
+      item.node.setAttribute('data-review-file', file.path);
+      item.search += ` ${note.toLocaleLowerCase()}`;
+      return item;
+    });
+    const target = name === 'core' ? null : module ? { module: name } : { stack: true };
+    add(tools, module?.group ?? 'basics', branch(label, `module/${name}`, children, moduleIcon(name), target, `${files.length} files`));
   }
-  const defs = new Map(ctx.modules.map((m) => [m.name, m]));
-  const list = el('ul', { class: 'review-modules' });
-  for (const name of preview.modules) {
-    const m = defs.get(name);
-    if (!m) continue;
-    const files = preview.files.filter((f) => f.module === name);
-    const bullets = m.adds?.length ? m.adds : [m.what ?? m.description];
-    const item = el('li', { class: 'review-module' },
-      el('div', { class: 'review-head' }, el('strong', { text: m.title ?? name }), name === 'core' ? el('span', { class: 'pill', text: 'required' }) : editButton(m.title ?? name, () => ctx.jump({ module: name }))),
-      el('ul', { class: 'review-adds' }, ...bullets.map((b) => el('li', { text: b }))));
-    if (files.length) {
-      item.append(el('details', { class: 'review-files' }, el('summary', { text: `${files.length} file${files.length === 1 ? '' : 's'}` }),
-        ...files.map((f) => f.excerpt
-          ? el('details', { class: 'review-file' }, el('summary', {}, el('code', { text: f.path }), el('span', { class: 'small muted', text: ` ${ACTION[f.action] ?? f.action}` })), el('pre', { text: f.excerpt }))
-          : el('p', { class: 'review-file' }, el('code', { text: f.path }), el('span', { class: 'small muted', text: ` ${ACTION[f.action] ?? f.action}` })))));
-    }
-    list.append(item);
-  }
-  root.replaceChildren(
-    ...(preview.unresolved?.length ? [el('p', { role: 'status', text: `Complete before Apply: ${preview.unresolved.join(', ')}. Save draft keeps your progress.` })] : []),
+  const output = [...tools].map(([key, modules]) => branch(GROUPS.find(([id]) => id === key)?.[1] ?? key, `tools/${key}`, modules));
+  if (output.length) entries.push(branch('Tools & files', 'tools', output, 'file', null, `${preview.files.length} files`));
+  if (defaults.size) entries.push(branch('Saved & default settings', 'defaults', [...defaults].map(([title, rows]) => branch(title, `defaults/${title}`, rows, 'book')), 'book'));
+
+  const input = el('input', { type: 'search', maxlength: 100, placeholder: 'Search choices and files…', 'aria-label': 'Search review' }); input.value = state.query;
+  const empty = el('p', { class: 'small muted', text: 'No matches', role: 'status', hidden: true });
+  const filter = () => {
+    const query = state.query.trim().toLocaleLowerCase();
+    const visit = (entry, inherited = false) => {
+      const own = Boolean(query && entry.search.includes(query)), matched = inherited || own;
+      const childMatches = entry.children.map((child) => visit(child, matched));
+      const visible = !query || matched || childMatches.some(Boolean);
+      entry.node.hidden = !visible;
+      if (entry.key) entry.node.open = query ? visible : state.expanded.has(entry.key);
+      return visible;
+    };
+    empty.hidden = entries.map((entry) => visit(entry)).some(Boolean);
+  };
+  input.addEventListener('input', () => { state.query = input.value; filter(); });
+  const needed = (preview.unresolved ?? []).map((id) => SHORT[id] ?? ctx.questions.find((q) => q.id === id)?.label ?? id);
+  root.replaceChildren(el('div', { class: 'review-search' }, input),
+    ...(needed.length ? [el('p', { class: 'warn', role: 'status', text: `Still needed: ${needed.join(', ')}` })] : []),
     ...(ctx.confirmProposal && preview.unresolved?.some((id) => preview.sources?.[id] === 'proposed — needs confirmation')
-      ? [el('button', { type: 'button', text: 'Confirm the proposed project choices shown here', onclick: ctx.confirmProposal })] : []),
-    el('p', { class: 'small muted', text: `${count('create', 'update', 'write', 'missing')} files written · ${count('kept')} kept as they are` }),
-    el('h3', { text: 'Your answers' }), answers, ...(unasked.length ? [defaults] : []),
-    el('h3', { text: 'What YAW adds' }), list);
+      ? [el('button', { type: 'button', text: 'Confirm proposed choices', onclick: ctx.confirmProposal })] : []),
+    el('p', { class: 'small muted', text: `${preview.files.length} files · ${preview.files.filter((file) => file.action === 'kept').length} kept` }),
+    el('div', { class: 'review-tree' }, ...entries.map((entry) => entry.node)), empty);
+  filter();
 }
