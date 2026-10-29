@@ -12,8 +12,8 @@ import { userDir } from '../../../core/lib/user-store.js';
 import { loadRules, secretValueRule } from '../../security/lib/guards.js';
 
 const KIT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const PROMPT_KINDS = ['rules', 'quality', 'logic', 'ux', 'feature'];
-export const PROMPT_LABELS = { rules: 'Reporting rules (all reviewers)', quality: 'Quality', logic: 'Business logic', ux: 'UI/UX', feature: 'Feature fit' };
+export const PROMPT_KINDS = ['rules', 'quality', 'logic', 'ux', 'feature', 'security'];
+export const PROMPT_LABELS = { rules: 'Reporting rules (all reviewers)', quality: 'Quality', logic: 'Business logic', ux: 'UI/UX', feature: 'Feature fit', security: 'Security' };
 export const PROJECT_DIR = '.yaw/review';
 const MAX_BYTES = 32 * 1024;
 const hash = (text) => `sha256:${createHash('sha256').update(text).digest('hex')}`;

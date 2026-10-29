@@ -1,13 +1,13 @@
-# modules/review/module.yaml (ADR-0055): review sub-agents (quality, business logic, UI/UX, feature fit) that read
+# modules/review/module.yaml (ADR-0055): review sub-agents (quality, business logic, UI/UX, feature fit, security) that read
 # a change and report; on request, as a hint when work is done, or as a gate before `git push`.
 name: review
-description: "Review sub-agents for quality, business logic, UI/UX and feature fit: `just review <kind>` on request, a user-visible hint at the end of a session, and an optional pre-push gate (`yaw review gate`) that runs the required reviewers headless through the agent CLI and warns or blocks. Prompts are layered: project `.yaw/review/`, your blueprint `~/.yaw/review/`, kit default `prompts/`."
+description: "Review sub-agents for quality, business logic, UI/UX, feature fit and security: `just review <kind>` on request, a user-visible hint at the end of a session, and an optional pre-push gate (`yaw review gate`) that runs the required reviewers headless through the agent CLI and warns or blocks. Prompts are layered: project `.yaw/review/`, your blueprint `~/.yaw/review/`, kit default `prompts/`."
 title: Review agents
 group: quality
 short: "Read-only reviewers, optional push gate"
-what: "Sub-agents that look at a change from a non-technical angle. They only read and report; they never edit. Run them on request, get a hint when work is done, or make them the gate before a push."
+what: "Sub-agents that look at a change from a focused perspective. They only read and report; they never edit. Run them on request, get a hint when work is done, or make them the gate before a push."
 adds:
-  - "Four read-only review agents: quality, business logic, UI / UX, feature fit"
+  - "Five read-only review agents: quality, business logic, UI / UX, feature fit, security"
   - "Optional gate before git push"
   - "Hint when a task is done"
 details:
@@ -70,6 +70,18 @@ questions:
       - { value: suggest, label: Suggest when a task is done }
       - { value: push, label: Required before push }
     default: request
+  - id: quality.review-security
+    mode: Q
+    type: choice
+    label: "Security reviewer: trust boundaries, access control, unsafe inputs, secrets and dependencies"
+    hint: Applicable OWASP ASVS checks and security regression tests.
+    help: review
+    choices:
+      - { value: "off", label: "Off" }
+      - { value: request, label: On request }
+      - { value: suggest, label: Suggest when a task is done }
+      - { value: push, label: Required before push }
+    default: "off"
   - id: quality.review-gate
     mode: Q
     type: choice
@@ -89,10 +101,12 @@ outputs:
     - .claude/agents/review-logic.md
     - .claude/agents/review-ux.md
     - .claude/agents/review-feature.md
+    - .claude/agents/review-security.md
     - .github/agents/review-quality.agent.md
     - .github/agents/review-logic.agent.md
     - .github/agents/review-ux.agent.md
     - .github/agents/review-feature.agent.md
+    - .github/agents/review-security.agent.md
   skills: [review]
   hooks:
     # Comfort, not a block: a hint for the user, once per session, when "suggest" reviewers are set.
@@ -105,7 +119,7 @@ outputs:
         codex: { support: native, via: "Stop systemMessage (user-visible only)" }
         copilot: { support: none, note: "no user message on Stop; the AGENTS.md rule applies (tier 2)" }
 agentsMd: |
-  - Reviews: reviewers only read and report. Run one with `just review <quality|logic|ux|feature>` or the `review` skill; never edit `.git/yaw/reviews.json`, never push with `--no-verify` or `YAW_REVIEW=skip` unless the user says so.
+  - Reviews: reviewers only read and report. Run one with `just review <quality|logic|ux|feature|security>` or the `review` skill; never edit `.git/yaw/reviews.json`, never push with `--no-verify` or `YAW_REVIEW=skip` unless the user says so.
 agents:
   claude:  { support: native, via: ".claude/agents/review-*.md sub-agents + review skill + pre-push gate (claude -p)" }
   codex:   { support: native, via: "review skill + pre-push gate (codex exec)" }

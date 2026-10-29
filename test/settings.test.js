@@ -101,7 +101,7 @@ test('review prompts API: project override and global blueprint through workspac
   const e = env(), api = createWorkspaceApi({ root, kitRoot: KIT_ROOT, env: e });
   const data = await api.get['/api/review-prompts'](new URLSearchParams());
   assert.equal(data.enabled, true);
-  assert.deepEqual(data.prompts.map((p) => p.kind), ['rules', 'quality', 'logic', 'ux', 'feature']);
+  assert.deepEqual(data.prompts.map((p) => p.kind), ['rules', 'quality', 'logic', 'ux', 'feature', 'security']);
   assert.ok(data.prompts.every((p) => p.effective.source === 'kit'));
 
   const g = await api.action('review-prompt-save', { scope: 'global', kind: 'ux', text: 'Blueprint UX', expected: null });

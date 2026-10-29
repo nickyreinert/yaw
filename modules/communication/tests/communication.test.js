@@ -120,7 +120,8 @@ test('removing communication removes optional artifacts, keeps core preferences 
   assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication|yaw:standards/);
   assert.match(read(root, 'AGENTS.md'), /Keep answers short/, 'core still applies personal preferences without an optional output style');
   assert.equal(readAnswers(root).answers['user.length'], 'brief'); // user answers kept
-  assert.equal(existsSync(join(root, '.yaw/base/docs')), false);
+  assert.equal(existsSync(join(root, '.yaw/base/docs/standards.md')), false);
+  assert.equal(existsSync(join(root, '.yaw/base/docs/engineering.md')), true, 'core engineering baseline survives removing optional modules');
   await addModule({ root, kitRoot: KIT_ROOT, module: 'communication' });
   await addModule({ root, kitRoot: KIT_ROOT, module: 'standards' });
   assert.deepEqual(readTree(root), withBoth); // same result as before the removal

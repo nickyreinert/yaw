@@ -838,3 +838,13 @@ button.decision-option[aria-pressed="true"] { background: var(--yellow, #ffe178)
 .hosts button.decision-option { align-items: flex-start; }
 
 .interview-form .plan-card { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+
+/* Personal preferences are configured once; workflow cards keep one shared grid. */
+.communication-card-holder { display: block; }
+.communication-card-holder .card-questions { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.interview-form .practice-grid > .question { padding: 14px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.module-grid .module-card.reviewer, .module-grid .module-card.push-gate { grid-column: auto; min-width: 0; }
+.module-grid .module-card :is(h4, .decision-options) { margin: 0 0 12px; }
+.module-grid .module-card .decision-options { margin-top: auto; }
+.compact-control { display: inline-flex; align-items: center; gap: 8px; }
+.module-card .card-more { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }

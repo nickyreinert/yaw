@@ -457,7 +457,7 @@ test('path safety: a symlinked TASKS.md is never read, a symlinked yaw.db is ref
   assert.equal(row.title, null, 'no title from a linked ledger');
   assert.equal(row.transcript, null, 'a relative transcript path is not stored');
   assert.equal(readRegular(root, 'TASKS.md'), null);
-  mkdirSync(join(root, 'docs'));
+  mkdirSync(join(root, 'docs'), { recursive: true });
   symlinkSync(outside, join(root, 'linked'));
   writeFileSync(join(outside, 'x.md'), 'x');
   assert.equal(readRegular(root, 'linked/x.md'), null, 'a symlinked directory in the path');

@@ -11,21 +11,16 @@ export function createPlanningHandoff(ctx) {
   });
   const controls = el('div', { class: 'planning-controls' }, copy);
   if (ctx.chat) {
-    const destinations = el('div', { class: 'decision-options', role: 'group', 'aria-label': 'Chat service' });
+    const destination = el('select', { 'aria-label': 'Chat service' },
+      ...CHATS.map(([name, href]) => el('option', { value: href, text: name })));
     const open = el('a', { target: '_blank', rel: 'noopener noreferrer', class: 'button', href: CHATS[0][1] }, decisionIcon('message'), el('span', { text: 'Open chat' }));
-    for (const [i, [name, href]] of CHATS.slice(0, 3).entries()) {
-      const button = el('button', { type: 'button', class: 'decision-option', 'aria-pressed': String(i === 0) }, decisionIcon('message'), el('span', { text: name }));
-      button.addEventListener('click', () => {
-        for (const b of destinations.children) b.setAttribute('aria-pressed', String(b === button));
-        open.href = href;
-      }); destinations.append(button);
-    }
+    destination.addEventListener('change', () => { open.href = destination.value; });
+    controls.prepend(el('label', {}, 'Use with', destination));
     controls.append(open);
-    return build(destinations);
   }
   return build();
-  function build(destinations) {
-    const node = el('div', { class: 'planning-handoff' }, prompt, destinations, controls, status);
+  function build() {
+    const node = el('div', { class: 'planning-handoff' }, prompt, controls, status);
     return { node, setPrompt(text, message = '') { prompt.value = text; copy.disabled = !text; status.textContent = message; } };
   }
 }

@@ -355,6 +355,7 @@ test('malformed markers abort update without writing, with file:line', async () 
 
 test('a change to docs/code-map.md while update runs aborts the update and loses nothing', async () => {
   const { root, env } = await project();
+  const beforeDocs = readdirSync(join(root, 'docs')).sort();
   const io = () => ({ root, kitRoot: KIT_ROOT, env, stdout: capture(), stderr: capture() });
   writeTree(root, { 'src/zz/x.js': 'x\n' });
   const edited = `${mapText(root)}\nA concurrent edit.\n`;
@@ -363,7 +364,7 @@ test('a change to docs/code-map.md while update runs aborts the update and loses
   assert.equal(code, 1);
   assert.match(i.stderr.text(), /changed during update/);
   assert.equal(mapText(root), edited);
-  assert.equal(readdirSync(join(root, 'docs')).filter((f) => f !== 'code-map.md').length, 0, 'no temp file left');
+  assert.deepEqual(readdirSync(join(root, 'docs')).sort(), beforeDocs, 'no temporary file left; existing docs preserved');
 });
 
 test('parallel update and show runs leave a valid cache and an intact map', async () => {

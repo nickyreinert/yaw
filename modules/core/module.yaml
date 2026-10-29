@@ -9,12 +9,13 @@ adds:
   - "AGENTS.md — agent entry point"
   - "CLAUDE.md / GEMINI.md — selected agent imports"
   - "justfile — project commands"
+  - "docs/engineering.md — project testing, errors, logs and maintenance rules"
   - ".gitignore — ignored files"
 depends: []
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:
-  templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile]
+  templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile, docs/engineering.md]
 agentsMd: |
   - Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
   - Run `just check` before you report a task as done; `just --list` shows all recipes.

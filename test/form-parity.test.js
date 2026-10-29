@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { RETIRED_ARCHITECTURE } from '../core/interview/depth.js';
 import { main } from '../core/cli/main.js';
 import { collectQuestions, hasModule } from '../core/render/kit.js';
 import { createFormApi } from '../core/web/init.js';
@@ -25,6 +26,7 @@ const reply = (v) => Array.isArray(v) ? v.join(',') : String(v);
 function nonDefaults(overrides = {}) {
   const answers = {};
   for (const q of QUESTIONS) {
+    if (RETIRED_ARCHITECTURE.has(q.id)) continue;
     if (q.type === 'boolean') answers[q.id] = !q.default;
     else if (q.type === 'multi') answers[q.id] = q.choices.filter(available).map(valueOf);
     else if (q.type === 'choice') answers[q.id] = q.choices.filter(available).map(valueOf).find((v) => v !== q.default);
@@ -39,7 +41,7 @@ const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
   { name: 'Quick, Gemini and GitHub', mode: 'quick', answers: { ...BASE, 'user.agents': ['gemini'], 'tasks.use-github': true } },
   ...['local', 'self-hosted', 'serverless', 'edge', 'static'].map((host) => ({ name: `Quick browser frontend on ${host}`, mode: 'quick', answers: { ...BASE, 'arch.language': 'html', 'arch.runs-on': host } })),
-  { name: 'Pro, self-managed with open-source libraries and a paid cap', mode: 'pro', answers: { ...BASE, 'arch.hosting-control': 'self-hosted', 'arch.libraries': 'open-source', 'arch.services': 'approved-only', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month, no overage' } },
+  { name: 'Pro, Docker with reusable libraries and file logs', mode: 'pro', answers: { ...BASE, 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true, 'quality.log-output': 'file', 'quality.documentation': 'detailed' } },
   { name: 'Full solo, defaults', mode: 'full', answers: BASE },
   { name: 'Full solo without GitHub', mode: 'full', answers: { ...BASE, 'tasks.use-github': false } },
   { name: 'Full team', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'team.session-context': false } },

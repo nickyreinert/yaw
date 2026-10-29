@@ -181,7 +181,7 @@ test('init records every written file with its SHA-256 and a pristine base copy'
   const root = tmp('yaw-proj-');
   await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-ans-')) });
   const manifest = readManifest(root);
-  assert.deepEqual(manifest.files.map((f) => f.path), ['.gitignore', '.yaw/answers.yaml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js']);
+  assert.deepEqual(manifest.files.map((f) => f.path), ['.gitignore', '.yaw/answers.yaml', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'docs/engineering.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js']);
   for (const f of manifest.files) {
     assert.equal(hashContent(read(root, f.path)), f.hash, f.path);
     if (f.managed) assert.equal(read(root, `.yaw/base/${f.path}`), read(root, f.path));

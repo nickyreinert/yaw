@@ -87,3 +87,27 @@ Interview choices use native buttons with `aria-pressed` and hand-drawn `current
 ## YAW visual identity
 
 `yaw-theme.css` supplies the shared brand treatment after `app.css` in setup and the dashboard: navy ink, chart-paper dots, cobalt, sunny yellow selection/action states and coral fin details. The recoloured SVG shark, wordmark, waterline and interview mascot make the identity visible across the workspace. Trebuchet headings and monospace metadata use local font fallbacks; no font CDN or runtime dependency is added. Keep focus visible on dark and light surfaces, preserve semantic warning/success colours, and respect reduced motion. Component geometry and responsive layout stay in `app.css`.
+
+## Setup preferences and engineering baseline
+
+About you separates agent/experience choices from Communication style; the communication module card appears only there. Architecture asks for language/runtime, Build or reuse and Require Docker. Framework, hosting-control, service and budget fields remain readable for saved legacy projects but are not offered in fresh interviews. Basic and All expose Docker, library strategy and the three project practice choices; Quick keeps those defaults. Docker is an architecture requirement handed to the local coding agent, not a claim that the kit provisioned containers.
+
+Workflow restores the persisted Compact switch. Details mode shows module descriptions, examples, costs and dependencies; active-setting help stays visible in either mode. Five reviewer cards and the push gate use the same grid width. Security supports the existing off/request/suggest/push triggers, prompt layers, agent adapters, per-commit cache and warn/block push gate. Its reference baseline is applicable OWASP ASVS 5.0.0 (stable release checked 2026-10-29), plus the OWASP Logging and Error Handling Cheat Sheets; this is a review aid, not a security certification.
+
+Core always generates `docs/engineering.md` and links it from AGENTS.md, including when optional Coding standards is off. User-facing error detail, console/file/both log destination and essential/detailed internal documentation are project choices. Detailed errors still exclude internal traces and secrets. Structured logs require safe bounded context, redaction, appropriate access, rotation and retention. Testing instructions cover changed behavior, business rules, regression cases, boundaries, failures/recovery and security-sensitive paths, with appropriate unit/integration/interaction tests and `just check`; no universal 100% target is imposed. The kickoff prompt carries the same rules and selected values.
+
+### Review of the supplied Copilot reference
+
+| Reference rule | YAW treatment |
+| --- | --- |
+| Structured named logging and explicit error handling | Adopted as project preferences plus a safe baseline; no silent catches or success-shaped fallback after failure. |
+| Input/file-size validation, protected credentials, transaction rollback | Retained and strengthened at applicable trust boundaries; Security review covers these checks and relevant tests. |
+| Type hints, style rules and asynchronous I/O | Use the selected stack's formatter/linter/type system and I/O model; do not impose Python or async everywhere. |
+| Small files/functions and internal documentation | Split by responsibility; maintain setup, contracts, decisions and recovery instructions. Detailed documentation additionally covers architecture, module responsibilities, operations and troubleshooting. No blanket 30-line function or 100/200-line file cap. |
+| Inline comments and file overviews | Explain intent and non-obvious behavior; update useful comments with changes rather than preserving stale text or restating every statement. |
+| No direct SQL / no globals | Prefer parameterized queries, transactions and explicit state ownership; no universal ban on SQL or module constants. |
+| Disabled authentication, unprotected admin and absent rate limiting | Reference-project limitations, never generated defaults. |
+| Catch an exception, log it and return None | Not adopted as a generic pattern: preserve failure semantics, recover deliberately or propagate an actionable error. |
+| No emojis/examples and confirmation before calling work final | Personal communication choices and explicit review/apply boundaries govern these; they are not universal coding constraints. |
+
+Security references: https://asvs.owasp.org/; https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html; https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html.

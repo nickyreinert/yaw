@@ -1,3 +1,4 @@
+import { codingPractices, architecturePractices } from './coding-practices.js';
 import { architectureApplies } from '../interview/policy.js';
 // Two scopes: versioned kit practices and project-owned, reviewed Markdown sources.
 // The index contains references and review hashes, never a second copy of project rules.
@@ -23,6 +24,8 @@ export const CONSTRAINT_FIELDS = [
 ];
 export function constraintFacts(answers = {}) {
   return [
+    ...architecturePractices(answers).map((text) => `- ${text}`),
+    ...codingPractices(answers).map((text) => `- ${text}`),
     ...(answers['arch.framework'] ? [`- Required framework / existing stack: ${answers['arch.framework']}`] : []),
     ...CONSTRAINT_FIELDS.filter(([key]) => architectureApplies(key, answers)).map(([key, label]) => `- ${label}: ${answers[key] === 'no-preference' ? 'no preference (recommend a suitable option with rationale)' : answers[key] || 'undecided (ask before choosing)'}`),
     ...(architectureApplies('arch.cost-limit', answers) && answers['arch.cost-limit'] ? [`- Budget cap: ${answers['arch.cost-limit']}`] : []),
@@ -166,7 +169,7 @@ export function foundationContext({ root, kitRoot } = {}) {
   const savedAnswers = readRegular(root, '.yaw/answers.yaml', kitRoot);
   if (savedAnswers !== null) {
     const answers = parseAnswers(savedAnswers).answers;
-    for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework']) {
+    for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework', 'arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation']) {
       if (answers[key] !== undefined && architectureApplies(key, answers)) result.constraints[key] = answers[key];
     }
     if (secretValueRule(rulesFor(kitRoot), Object.values(result.constraints))) throw new FoundationError('Unsafe setup constraints; nothing was included.');

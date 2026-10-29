@@ -211,3 +211,22 @@ test('gate and `yaw review prompt` use the project prompt', async () => {
   assert.match(list.out.stdout, /quality\s+\.yaw\/review\/quality\.md/);
   assert.match(list.out.stdout, /logic\s+kit default/);
 });
+
+test('security reviewer renders agent adapters, participates in the gate and honors layered prompts', async () => {
+  const root = await project(['core', 'review'], '  quality.review-quality: "off"\n  quality.review-logic: "off"\n  quality.review-feature: "off"\n  quality.review-security: push\n  quality.review-gate: block\n');
+  const tree = readTree(root);
+  for (const path of ['.claude/agents/review-security.md', '.github/agents/review-security.agent.md']) assert.match(tree[path], /just review-prompt security/);
+  assert.match(kitPrompt('security'), /ASVS 5\.0\.0/);
+  const ctx = { root, env: { HOME: tmp('yaw-security-prompt-') }, kitRoot: KIT_ROOT };
+  const layers = allPrompts(ctx).find((p) => p.kind === 'security');
+  savePrompt({ ...ctx, scope: 'project', kind: 'security', text: 'Check object-level authorization in changed handlers.', expected: layers.project?.hash ?? null });
+  assert.match(effectivePrompt('security', ctx).text, /object-level authorization/);
+  const stdin = committed(root);
+  const findings = io(root, { YAW_REVIEW_CMD: 'cat >/dev/null; echo "handler.js:8 missing authorization"; echo "VERDICT: FINDINGS"', YAW_REVIEW_NO_TTY: '1' });
+  assert.equal(runReview({ verb: 'gate', io: findings.io, stdin }), 1);
+  assert.match(findings.out.stderr, /Security/);
+  const pass = io(root, { YAW_REVIEW_CMD: 'cat >/dev/null; echo "VERDICT: PASS"' });
+  assert.equal(runReview({ verb: 'gate', io: pass.io, stdin }), 0);
+  const cache = JSON.parse(readFileSync(join(root, '.git/yaw/reviews.json'), 'utf8'));
+  assert.deepEqual(Object.values(cache)[0], ['security']);
+});

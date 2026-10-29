@@ -1,0 +1,17 @@
+# Engineering practices
+
+Project implementation requirements. Keep these aligned with the architecture and accepted decisions.
+
+## Behavior and maintenance
+
+<% each codingPractices as practice %>
+- <%= practice %>
+<% end %>
+
+## Dependencies and runtime
+
+<% each architecturePractices as practice %>
+- <%= practice %>
+<% end %>
+
+Use stack-appropriate linting, formatting, type checks and test recipes. Run `just check` before reporting completion; passing checks and an AI review do not prove complete correctness or security.

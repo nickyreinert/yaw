@@ -1,5 +1,5 @@
 // Pure interview rules shared by the terminal, server and browser (ADR-0072).
-import { asksAtDepth } from './depth.js';
+import { asksAtDepth, RETIRED_ARCHITECTURE } from './depth.js';
 export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.register', 'user.examples', 'user.explain'];
 export const isPreference = (q) => PERSONAL_PREFERENCES.includes(typeof q === 'string' ? q : q.id);
 export function orderSetupQuestions(questions) {
@@ -28,6 +28,7 @@ export function architectureApplies(id, answers = {}) {
   return true;
 }
 export function questionApplies(q, answers = {}) {
+  if (RETIRED_ARCHITECTURE.has(q.id) && !q.reviewSelected && !Object.hasOwn(answers, q.id)) return false;
   return architectureApplies(q.id, answers) && Object.entries(q.when ?? {}).every(([id, wanted]) => {
     const accepted = Array.isArray(wanted) ? wanted : [wanted];
     return Array.isArray(answers[id]) ? answers[id].some((v) => accepted.includes(v)) : accepted.includes(answers[id]);

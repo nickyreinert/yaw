@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../lib/yaml.js';
+import { codingPractices, architecturePractices } from '../lib/coding-practices.js';
 import { defaultQuestion } from '../interview/depth.js';
 import { tasksMode } from '../lib/tasks.js';
 import { validAnswer } from '../interview/engine.js';
@@ -303,6 +304,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     composedVerbs: composedVerbs(profiles),
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
+    codingPractices: codingPractices(flat),
+    architecturePractices: architecturePractices(flat),
     stack,
     rules: {
       autonomy: AUTONOMY[flat['user.autonomy']] ?? '',
@@ -346,8 +349,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   };
 }
 
-export const REVIEWERS = ['quality', 'logic', 'ux', 'feature'];
-export const REVIEW_DEFAULTS = { quality: 'push', logic: 'push', ux: 'off', feature: 'request' };
+export const REVIEWERS = ['quality', 'logic', 'ux', 'feature', 'security'];
+export const REVIEW_DEFAULTS = { quality: 'push', logic: 'push', ux: 'off', feature: 'request', security: 'off' };
 
 // Trigger per reviewer (off | request | suggest | push) from the quality.review-* answers (ADR-0055).
 export function reviewTriggers(flat) {

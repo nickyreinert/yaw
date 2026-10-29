@@ -1,0 +1,5 @@
+- These project choices become engineering rules and architecture requirements for the coding agent.
+- Detailed errors add safe recovery guidance; secrets and internal stack traces stay out of public interfaces.
+- Logs are structured and redacted. File logs need access controls, size limits, rotation and retention.
+- Essential docs cover setup, contracts and non-obvious decisions. Detailed docs add module responsibilities, operations and troubleshooting.
+- Tests cover changed behavior, important boundaries and failure paths; percentages and file/function line limits do not prove quality.

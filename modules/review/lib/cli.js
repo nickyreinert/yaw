@@ -15,7 +15,7 @@ import { PROMPT_KINDS, PromptError, allPrompts, effectivePrompt } from './prompt
 import { contextText, foundationContext } from '../../../core/lib/foundations.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const USAGE = 'usage: yaw review run <quality|logic|ux|feature> [<base>..<head>] | gate [remote] [url] | prompt [rules|quality|logic|ux|feature] | install';
+export const USAGE = 'usage: yaw review run <quality|logic|ux|feature|security> [<base>..<head>] | gate [remote] [url] | prompt [rules|quality|logic|ux|feature|security] | install';
 const ZERO = /^0+$/;
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 const MAX_DIFF = 120_000;
@@ -33,7 +33,7 @@ const AGENT_CLIS = {
   codex: ['codex', ['exec', '--sandbox', 'read-only', '--ephemeral', '-']],
   copilot: ['copilot', ['-s', '--no-ask-user', '--deny-tool=write', '--allow-tool=shell(git diff),shell(git log),shell(git show)']],
 };
-const LABEL = { quality: 'Quality', logic: 'Business logic', ux: 'UI/UX', feature: 'Feature fit' };
+const LABEL = { quality: 'Quality', logic: 'Business logic', ux: 'UI/UX', feature: 'Feature fit', security: 'Security' };
 
 export class ReviewUsageError extends Error {
   constructor(message) {

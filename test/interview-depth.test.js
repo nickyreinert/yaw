@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEPTHS, depthOf, depthLabel } from '../core/interview/depth.js';
+import { DEPTHS, depthOf, depthLabel, RETIRED_ARCHITECTURE } from '../core/interview/depth.js';
 import { collectQuestions } from '../core/render/kit.js';
 import { runInterview } from '../core/interview/engine.js';
 import { asksIn } from '../core/interview/policy.js';
@@ -40,11 +40,12 @@ test('Quick asks only project essentials and architecture; Basic adds GitHub/rev
   assert.deepEqual(ids('quick'), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on']);
   for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {
     assert.ok(!ids('basic').includes(id), `${id} belongs to Pro`);
-    assert.ok(ids('pro').includes(id));
+    assert.ok(!ids('pro').includes(id), `${id} is retained only for legacy answers`);
   }
   assert.ok(ids('basic').includes('tasks.use-github'));
   assert.ok(ids('basic').includes('quality.review-quality'));
-  assert.equal(ids('pro').length, questions.length);
+  assert.equal(ids('pro').length, questions.filter((q) => !RETIRED_ARCHITECTURE.has(q.id)).length);
+  for (const id of ['arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.review-security']) assert.ok(ids('basic').includes(id), id);
   const bootstrap = createFormModel(f()).bootstrap();
   const proVisible = visibleQuestions(bootstrap.questions, {}, 'pro', ['core']);
   assert.ok(proVisible.some((q) => q.id === 'user.comfort'));

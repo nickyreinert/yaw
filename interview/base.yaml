@@ -103,13 +103,60 @@ questions:
     required: true
     choices:
       - { value: local, label: "your computer: command-line tools, scripts, data jobs" }
-      - { value: self-hosted, label: "your own server: web app or API, usually in Docker" }
+      - { value: self-hosted, label: "your own server: web app or API" }
       - { value: serverless, label: "serverless functions: Vercel, Netlify Functions, AWS Lambda" }
       - { value: edge, label: "edge / CDN: Cloudflare Workers, close to users" }
       - { value: static, label: "static hosting: GitHub Pages, Netlify; no server code" }
       - { value: wordpress, label: "inside WordPress: a plugin for an existing site" }
       - { value: app-store, label: "desktop or mobile app: macOS, Windows, Linux, iOS, Android" }
     default: ""
+  - id: arch.library-strategy
+    mode: S
+    type: choice
+    label: Build or reuse?
+    hint: Prefer built-in tools and your own code, or suitable external libraries.
+    choices:
+      - { value: prefer-built-in, label: Prefer built-in and own code }
+      - { value: prefer-libraries, label: Use suitable libraries }
+    default: prefer-built-in
+  - id: arch.docker
+    mode: S
+    type: boolean
+    label: Require Docker?
+    hint: A requirement for the architecture plan; no containers are started here.
+    default: false
+  - id: quality.error-detail
+    mode: S
+    type: choice
+    label: User-facing errors
+    hint: Recovery detail for users; internal traces stay private.
+    help: engineering
+    choices:
+      - { value: concise, label: Concise }
+      - { value: detailed, label: Detailed guidance }
+    default: concise
+  - id: quality.log-output
+    mode: S
+    type: choice
+    label: Diagnostic logs
+    hint: Structured diagnostics with redaction and bounded retention.
+    help: engineering
+    choices:
+      - { value: console, label: Console }
+      - { value: file, label: Files }
+      - { value: both, label: Console and files }
+    default: console
+  - id: quality.documentation
+    mode: S
+    type: choice
+    label: Internal documentation
+    hint: Setup and contracts, or fuller maintenance guides.
+    help: engineering
+    choices:
+      - { value: essential, label: Essential }
+      - { value: detailed, label: Detailed }
+    default: essential
+  # Legacy project answers remain readable; these questions are no longer asked.
   - id: arch.framework
     ref: "3.12"
     mode: F

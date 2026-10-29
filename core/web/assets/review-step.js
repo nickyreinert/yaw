@@ -6,6 +6,7 @@ const SHORT = {
   'user.length': 'Answer length', 'user.register': 'Wording', 'user.examples': 'Examples', 'user.explain': 'Explanations',
   'user.comfort': 'Comfort helpers', 'idea.text': 'Purpose', 'idea.team': 'Team', 'tasks.use-github': 'GitHub', 'tasks.mode': 'Task tracking',
   'team.session-context': 'Session context', 'arch.language': 'Language', 'arch.runs-on': 'Runtime', 'arch.framework': 'Framework',
+  'arch.library-strategy': 'Build or reuse', 'arch.docker': 'Docker required', 'quality.error-detail': 'User-facing errors', 'quality.log-output': 'Diagnostic logs', 'quality.documentation': 'Internal documentation',
   'arch.hosting-control': 'Hosting', 'arch.libraries': 'Dependencies', 'arch.services': 'Services', 'arch.cost': 'Budget policy', 'arch.cost-limit': 'Budget cap',
 };
 const ACTION = { create: 'new', update: 'changed', write: 'write', kept: 'kept', missing: 'restore', delete: 'remove' };

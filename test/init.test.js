@@ -155,7 +155,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
   // Quick = core + communication + standards + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), []);
-  assert.equal(readManifest(dir).files.length, 10);
+  assert.equal(readManifest(dir).files.length, 11);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
   // kickoff guidance (#173): asked last, the prompt carries the idea and the task store
   assert.match(prompter.asked.at(-1), /guidance to kick off/);
@@ -218,7 +218,7 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
 });
 
 test('Quick answers-only footprint includes a README for the required purpose', async () => {
-  for (const [agents, count] of [['claude', 10], ['claude, codex', 10]]) {
+  for (const [agents, count] of [['claude', 11], ['claude, codex', 11]]) {
     const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n  arch.language: javascript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);

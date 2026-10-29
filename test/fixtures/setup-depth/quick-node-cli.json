@@ -6,6 +6,7 @@
     ".gitignore",
     "AGENTS.md",
     "CLAUDE.md",
+    "docs/engineering.md",
     "just/node-cli.just",
     "justfile",
     "package.json",

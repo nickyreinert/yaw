@@ -42,7 +42,7 @@ async function init(replies) {
 }
 
 const IDEA = { 'Describe the idea': 'A small tool.', 'What language do you want': 'javascript', 'Where will it run': 'local' };
-const CONSTRAINTS = { 'arch.libraries': 'undecided', 'arch.services': 'undecided' };
+const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential' };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],
@@ -53,7 +53,6 @@ const SOLO_FULL = {
   'idea.team': 'solo',
   'arch.language': 'javascript',
   'arch.runs-on': 'local',
-  'arch.framework': '',
   ...CONSTRAINTS,
   'user.comfort': [],
   'user.length': 'balanced',
@@ -64,6 +63,7 @@ const SOLO_FULL = {
   'quality.review-logic': 'off',
   'quality.review-ux': 'off',
   'quality.review-feature': 'off',
+  'quality.review-security': 'off',
   'quality.review-gate': 'warn',
   'tasks.use-github': true,
   'tasks.mode': 'local',
@@ -71,7 +71,7 @@ const SOLO_FULL = {
 const QUICK = {
   'user.agents': ['claude'], 'user.expertise': 'intermediate', 'user.language': 'de', 'user.autonomy': 'ask-risky',
   'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
-  'arch.language': 'javascript', 'arch.runs-on': 'local', 'arch.framework': '', ...CONSTRAINTS,
+  'arch.language': 'javascript', 'arch.runs-on': 'local', ...CONSTRAINTS,
 };
 Object.assign(QUICK, { 'user.length': 'balanced', 'user.register': 'professional', 'user.examples': 'when-helpful', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];

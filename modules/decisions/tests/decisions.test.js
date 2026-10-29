@@ -357,7 +357,7 @@ test('path safety: symlinked journal, records, taxonomy or index are refused; in
 
 test('path safety: references are only checked with lstat; links and .git are reported, nothing is read', async () => {
   const root = await project();
-  mkdirSync(join(root, 'docs'));
+  mkdirSync(join(root, 'docs'), { recursive: true });
   writeFileSync(join(root, 'docs/spec.md'), 'spec\n');
   symlinkSync('/etc', join(root, 'docs/etc'));
   await yaw(root, ADR({ ref: 'spec:docs/spec.md#forward-only' }));

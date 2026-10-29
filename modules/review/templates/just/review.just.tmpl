@@ -1,10 +1,10 @@
 # review module (ADR-0055): reviewers read a change and report; they never edit.
-# `just review <quality|logic|ux|feature> [range]` runs one headless through your agent CLI.
+# `just review <quality|logic|ux|feature|security> [range]` runs one headless through your agent CLI.
 [positional-arguments]
 review *args:
     @if command -v yaw >/dev/null 2>&1; then yaw review run "$@"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" review run "$@"; else echo "review: the YAW kit is not installed"; exit 1; fi
 
-# Print a reviewer's prompt (rules|quality|logic|ux|feature); without a kind, list where each comes from.
+# Print a reviewer's prompt (rules|quality|logic|ux|feature|security); without a kind, list where each comes from.
 # Project overrides live in .yaw/review/, your blueprint in ~/.yaw/review/; edit both in yaw web.
 [positional-arguments]
 review-prompt *args:

@@ -27,7 +27,7 @@ function save(f, answers = PERSONAL) {
 test('project architecture constraints reach terminal, browser, kickoff and agent context independently of personal settings', async () => {
   const f = fixture();
   save(f);
-  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.hosting-control': 'on-premises', 'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month; no overage' };
+  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true, 'quality.log-output': 'file' };
   const result = await cli(f, prompts(chosen, 'pro'));
   assert.equal(result.code, 0, result.err);
   const answers = readAnswers(f.root).answers;
@@ -35,19 +35,19 @@ test('project architecture constraints reach terminal, browser, kickoff and agen
   const browser = createFormModel({ ...f, root: tmp() }).normalize({ mode: 'pro', answers: chosen });
   assert.deepEqual(browser.doc.answers, answers);
   const prompt = kickoffPrompt({ answers });
-  assert.match(prompt, /Hosting control: on-premises/);
-  assert.match(prompt, /Library policy: open-source/);
-  assert.match(prompt, /External application services: none/);
-  assert.match(prompt, /Cost policy: capped/);
-  assert.match(prompt, /Budget cap: EUR 20 per month; no overage/);
-  assert.equal(foundationContext({ root: f.root }).constraints['arch.services'], 'none');
-  assert.equal(foundationContext({ root: f.root }).constraints['arch.cost-limit'], chosen['arch.cost-limit']);
+  assert.match(prompt, /Use suitable maintained libraries/);
+  assert.match(prompt, /Docker is required/);
+  assert.match(prompt, /structured log files/);
+  assert.equal(foundationContext({ root: f.root }).constraints['arch.docker'], true);
+  assert.equal(foundationContext({ root: f.root }).constraints['quality.log-output'], 'file');
 });
 
 test('unknown project constraints remain explicit and mockups include layout before visual polish', () => {
   const model = createFormModel(fixture());
   const normalized = model.normalize({ mode: 'quick', answers: BASE });
-  for (const id of ['arch.libraries', 'arch.services']) assert.equal(normalized.doc.answers[id], 'undecided');
+  for (const id of ['arch.libraries', 'arch.services']) assert.ok(!Object.hasOwn(normalized.doc.answers, id));
+  assert.equal(normalized.doc.answers['arch.library-strategy'], 'prefer-built-in');
+  assert.equal(normalized.doc.answers['arch.docker'], false);
   for (const id of ['arch.hosting-control', 'arch.cost']) assert.equal(Object.hasOwn(normalized.doc.answers, id), false);
   assert.equal(Object.hasOwn(normalized.doc.answers, 'arch.cost-limit'), false);
   const prompt = kickoffPrompt({ answers: BASE });
@@ -70,7 +70,7 @@ test('no preference invites recommendations and explicit Pro answers survive a s
     assert.match(prompt, /Hosting control: no preference \(recommend a suitable option with rationale\)/);
     assert.match(prompt, /Neither authorizes a purchase or provisioning/);
     const visible = visibleQuestions(model.bootstrap().questions, answers, mode, normalized.modules).map((q) => q.id);
-    assert.equal(visible.includes('arch.hosting-control'), mode === 'pro');
+    assert.equal(visible.includes('arch.hosting-control'), false);
     assert.ok(!visible.includes('arch.cost-limit'));
   }
 });
@@ -239,7 +239,8 @@ test('runtime context hides irrelevant hosting/cost answers and preserves valid 
     for (const id of ['arch.hosting-control', 'arch.cost', 'arch.cost-limit']) assert.equal(Object.hasOwn(normalized.doc.answers, id), false, `${language}: ${id}`);
     assert.equal(normalized.doc.answers['arch.libraries'], 'open-source');
     const visible = visibleQuestions(model.bootstrap().questions, input, 'pro', normalized.modules).map((q) => q.id);
-    assert.ok(visible.includes('arch.libraries'));
+    assert.ok(visible.includes('arch.library-strategy'));
+    assert.ok(!visible.includes('arch.libraries'));
     assert.ok(!visible.includes('arch.hosting-control') && !visible.includes('arch.cost'));
     const prompt = kickoffPrompt({ answers: input });
     assert.doesNotMatch(prompt, /Hosting control: managed|Cost policy: capped|Budget cap: USD 50/);

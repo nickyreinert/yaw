@@ -10,6 +10,7 @@ export const REVIEWERS = [
   ['quality', 'Quality', 'Readability, naming, duplication, missing tests and error handling: what a linter cannot judge.', '"parseDate swallows errors; add a test for an empty string."'],
   ['logic', 'Business logic', 'Checks the change against your rules and the business-logic notices in .decisions/.', '"Discount is applied after tax; NOTICE-0004 says before."'],
   ['ux', 'UI / UX', 'Labels, empty and error states, keyboard use, contrast and consistency of screens.', '"The delete button has no confirmation and no focus style."'],
+  ['security', 'Security', 'Access control, unsafe inputs, secrets, dependencies and applicable OWASP ASVS requirements.', '"A caller can read another user’s record; enforce object-level authorization."'],
   ['feature', 'Feature fit', 'Compares the result with the task or issue: is every acceptance point done, is anything extra?', '"Task asks for CSV and JSON export; only CSV is done."'],
 ];
 export const TRIGGERS = [['off', 'Off'], ['request', 'On request'], ['suggest', 'Suggest when a task is done'], ['push', 'Required before push']];
@@ -125,6 +126,7 @@ export function choiceIcon(name, value) {
   return ({ true: 'shield', false: 'unplug', solo: 'terminal', team: 'users', 'external-reviewers': 'users',
     claude: 'terminal', codex: 'terminal', copilot: 'terminal', gemini: 'terminal',
     layperson: 'book', intermediate: 'ruler', expert: 'building', off: 'unplug', request: 'message',
+    concise: 'message', detailed: 'book', console: 'terminal', file: 'file', essential: 'file', 'prefer-built-in': 'box', 'prefer-libraries': 'book',
     suggest: 'bell', push: 'branch', warn: 'bell', block: 'shield', local: 'file', github: 'branch', both: 'list',
     'ask-often': 'message', 'ask-risky': 'shield', 'act-and-report': 'bolt', short: 'list', medium: 'file', long: 'book' })[value]
     ?? (name.startsWith('user.') ? 'message' : 'box');
@@ -233,6 +235,11 @@ export function renderStack(root, ctx) {
 
 // ctx: { modules (catalog), selected: string[], answers, questions, gitRepo, gitInit, usesGitHub,
 //   readOnly, onToggle(name, on), onAnswer(id, value), onExplain(title, content) }
+export function renderCommunicationCard(root, ctx) {
+  const module = ctx.modules.find((m) => m.name === 'communication');
+  root.replaceChildren(...(module ? [moduleCard(module, ctx, new Set(ctx.selected), ctx.gitRepo || ctx.gitInit)] : []));
+}
+
 export function renderModuleGroups(root, ctx) {
   const selected = new Set(ctx.selected);
   const hasGit = ctx.gitRepo || ctx.gitInit;
@@ -242,11 +249,15 @@ export function renderModuleGroups(root, ctx) {
     const intro = ctx.groupNodes?.(id) ?? [];
     if (!mods.length && !intro.length) continue;
     const grid = el('div', { class: 'module-grid' });
-    for (const m of mods) grid.append(moduleCard(m, ctx, selected, hasGit));
+    for (const m of mods) {
+      grid.append(moduleCard(m, ctx, selected, hasGit));
+      if (m.name === 'review') grid.append(...reviewerCards(ctx, selected.has('review'), hasGit));
+    }
     groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })), el('p', { class: 'small muted lead', text: lead }),
       ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []), grid));
   }
-  root.replaceChildren(groups);
+  const compact = el('input', { id: 'compact-modules', type: 'checkbox', role: 'switch', class: 'module-switch', checked: ctx.compact, onchange: (event) => ctx.onCompact(event.target.checked) });
+  root.replaceChildren(el('div', { class: 'module-bar' }, el('label', { class: 'compact-control' }, compact, ' Compact')), groups);
 }
 
 function moduleCard(m, ctx, selected, hasGit) {
@@ -258,7 +269,7 @@ function moduleCard(m, ctx, selected, hasGit) {
   const input = el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
   const questions = ctx.questionNodes?.(m.name, on) ?? [];
-  const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' ? ' wide' : ''}` },
+  const card = el('article', { class: `module-card${on ? ' on' : ''}` },
     el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));
@@ -273,28 +284,33 @@ function moduleCard(m, ctx, selected, hasGit) {
 
   card.append(el('p', { class: 'what', text: m.short ?? m.what ?? m.description }));
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
-  if (m.name === 'review') card.append(reviewerGrid(ctx, on, hasGit));
+  if (ctx.compact === false) card.append(el('div', { class: 'card-more' }, ...more()));
   for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
   const explain = () => ctx.onExplain?.(m.title ?? m.name, more());
   card.addEventListener('focusin', (e) => { if (!e.target.closest('.question')) explain(); }); card.addEventListener('mouseenter', explain);
   return card;
 }
 
-function reviewerGrid(ctx, on, hasGit) {
+function reviewerCards(ctx, on, hasGit) {
   const trig = (k) => ctx.answers[`quality.review-${k}`] ?? ctx.questions.find((q) => q.id === `quality.review-${k}`)?.default ?? 'off';
-  const grid = el('div', { class: 'reviewers' });
+  const cards = [];
   for (const [k, title, what, example] of REVIEWERS) {
-    const { node: select } = choiceField({ name: `review-trigger-${k}`, id: `review-${k}`, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
+    const { node: choices } = choiceField({ name: `review-trigger-${k}`, id: `review-${k}`, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
       choices: TRIGGERS.map(([value, label]) => ({ value, label: value === 'push' && !hasGit ? `${label} (needs git)` : label, disabled: value === 'push' && !hasGit })),
       onChange: (value) => ctx.onAnswer(`quality.review-${k}`, value) });
-    grid.append(el('div', { class: `reviewer${trig(k) === 'off' ? ' off' : ''}`, title: `${what} ${example}` }, el('strong', { text: title }), select));
+    const explain = () => ctx.onExplain?.(title, [el('p', { text: what }), el('p', { text: example })]);
+    cards.push(el('article', { class: `module-card reviewer${trig(k) === 'off' ? ' off' : ''}`, onfocusin: explain, onmouseenter: explain },
+      el('h4', { class: 'module-group-title' }, decisionIcon(k === 'security' ? 'shield' : 'file'), el('span', { text: title })),
+      choices, ctx.compact === false ? el('p', { class: 'small', text: what }) : null));
   }
   const gated = REVIEWERS.some(([k]) => trig(k) === 'push');
-  if (!hasGit) return el('div', {}, grid, el('div', { class: 'gate muted' }, el('small', { text: 'The push gate needs a git repository.' })));
-  const gate = ctx.answers['quality.review-gate'] ?? 'warn';
-  const field = choiceField({ name: 'review-gate', id: 'review-gate', label: 'Push gate', value: gate,
-    disabled: !on || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
+  const field = choiceField({ name: 'review-gate', id: 'review-gate', label: 'Push gate', value: ctx.answers['quality.review-gate'] ?? 'warn',
+    disabled: !on || !hasGit || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
     onChange: (value) => ctx.onAnswer('quality.review-gate', value) });
-  return el('div', {}, grid, el('div', { class: `gate${gated ? '' : ' muted'}` }, el('b', { text: 'Push gate' }), field.node,
-    ...(gated ? [] : [el('small', { text: 'Set a reviewer to "Required before push" to use it.' })])));
+  const gateHelp = 'Warn asks before a push with findings; Block stops it. The gate requires Git and at least one reviewer required before push.';
+  const explainGate = () => ctx.onExplain?.('Push gate', [el('p', { text: gateHelp })]);
+  cards.push(el('article', { class: 'module-card push-gate', onfocusin: explainGate, onmouseenter: explainGate },
+    el('h4', { class: 'module-group-title' }, decisionIcon('branch'), el('span', { text: 'Push gate' })), field.node,
+    ctx.compact === false || !hasGit || !gated ? el('p', { class: 'small muted', text: !hasGit ? 'Needs a Git repository.' : !gated ? 'Set a reviewer to Required before push.' : gateHelp }) : null));
+  return cards;
 }

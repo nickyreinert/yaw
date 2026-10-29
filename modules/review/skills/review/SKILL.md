@@ -5,7 +5,7 @@ description: Review a change from a non-technical angle (quality, business logic
 
 # Review
 
-1. Pick the reviewer: `quality`, `logic`, `ux` or `feature` (the user names it, or use the ones the project suggests).
+1. Pick the reviewer: `quality`, `logic`, `ux`, `feature` or `security` (the user names it, or use the ones the project suggests).
 2. Get the change: `git diff HEAD` for uncommitted work; for commits, `git diff <base>..HEAD`.
 3. Get the instructions: `just review-prompt <kind>` prints the reviewer's prompt and `just review-prompt rules`
    the reporting rules (the project may have adjusted both). Follow them. Read files when you need context, but

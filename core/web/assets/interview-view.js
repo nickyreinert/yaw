@@ -1,7 +1,7 @@
 import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 import { isPreference, questionApplies } from '../../interview/policy.js';
 
-import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderCommunicationCard, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
 import { renderReview } from './review-step.js';
 import { DEPTHS, depthOf } from '../../interview/depth.js';
@@ -31,15 +31,15 @@ for (const button of root.querySelectorAll('.focus-toggle')) {
 }
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
 let catalog, state = { mode: 'quick', answers: {}, modules: null };
-let stackValid = true;
+let stackValid = true, compact = localStorage.getItem('yaw.setup.compact') !== '0';
 let revision = 0, timer, busy = false, lastPreview;
 const controls = new Map(), sections = new Map();
 const actionIds = ['draft', 'preset', 'diff', 'apply'];
 const steps = [
   { title: 'Starting point', hint: 'Choose your starting depth', ids: ['setup-depth', 'start'], groups: [] },
-  { title: 'About you', hint: 'Agents, preferences & guidance', ids: [], groups: ['user'] },
+  { title: 'About you', hint: 'Agents, preferences & guidance', ids: [], groups: ['user', 'communication'] },
   { title: 'Your project', hint: 'The idea and who it’s for', ids: [], groups: ['idea'] },
-  { title: 'Architecture', hint: 'Language, runtime and constraints', ids: ['stack'], groups: ['arch', 'quality'] },
+  { title: 'Architecture', hint: 'Language, runtime and constraints', ids: ['stack'], groups: ['arch'] },
   { title: 'Your workflow', hint: 'Modules, tasks & collaboration', ids: ['module-section'], groups: null },
   { title: 'Review & apply', hint: 'Inspect what will be written', ids: ['confirm'], groups: [] },
   { title: 'Finished', hint: 'What happened and what to do next', ids: ['finished'], groups: [] },
@@ -52,7 +52,13 @@ let promptRevision = 0;
 // edit: answering; applying: the log streams; done: the server has stopped.
 let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
-const belongs = (step, group) => step.groups === null ? !['user', 'idea', 'arch', 'quality'].includes(group) : step.groups.includes(group);
+const sectionOf = (question) => {
+  const id = typeof question === 'string' ? question : question.id;
+  if (id.startsWith('user.') && !['user.agents', 'user.expertise'].includes(id)) return 'communication';
+  if (['quality.error-detail', 'quality.log-output', 'quality.documentation'].includes(id)) return 'practices';
+  return id.split('.')[0];
+};
+const belongs = (step, group) => step.groups === null ? !['user', 'communication', 'idea', 'arch'].includes(group) : step.groups.includes(group);
 function renderWizard(focus = false) {
   const formView = presentation === 'settings' && phase === 'edit';
   root.classList?.toggle('settings-form', formView);
@@ -91,7 +97,7 @@ function renderWizard(focus = false) {
     const li = element('li');
     const button = element('button', undefined, { type: 'button' });
     if (i === stepIndex) button.setAttribute('aria-current', 'step');
-    const shown = [...controls.values()].filter((c) => !c.node.hidden && !isInline(c.q) && belongs(s, c.q.id.split('.')[0]));
+    const shown = [...controls.values()].filter((c) => !c.node.hidden && !isInline(c.q) && belongs(s, sectionOf(c.q)));
     const reviewed = shown.filter((c) => Object.hasOwn(state.answers, c.q.id)).length;
     const complete = i === LAST ? phase === 'done' : visitedSteps.has(i) && (!shown.length || reviewed === shown.length);
     button.append(element('span', complete ? '✓' : String(ordinal).padStart(2, '0'), { class: 'step-number', 'aria-hidden': 'true' }));
@@ -121,9 +127,9 @@ function advance() {
   const modules = selectedModules();
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
   for (const q of visibleQuestions(catalog.questions, state.answers, state.mode, modules)) {
-    if (!isInline(q) && !(q.id === 'arch.hosting-control' && controls.get(q.id)?.node.hidden) && belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
+    if (!isInline(q) && !(q.id === 'arch.hosting-control' && controls.get(q.id)?.node.hidden) && belongs(steps[stepIndex], sectionOf(q))) state.answers[q.id] = answers[q.id];
   }
-  state.proposed = (state.proposed ?? []).filter((id) => !belongs(steps[stepIndex], id.split('.')[0]));
+  state.proposed = (state.proposed ?? []).filter((id) => !belongs(steps[stepIndex], sectionOf(id)));
   visitedSteps.add(stepIndex);
   stepIndex++;
   update(); renderWizard(true);
@@ -182,9 +188,9 @@ async function refreshPrompts() {
   }
 }
 function buildQuestions() {
-  const title = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
+  const title = { user: 'About you', communication: 'Communication style', practices: 'Code practices', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
   for (const q of catalog.questions) {
-    const sectionId = q.id.split('.')[0];
+    const sectionId = sectionOf(q);
     if (!sections.has(sectionId)) {
       const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}`, class: 'settings-group' });
       section.append(element('h2', title[sectionId] ?? sectionId, { id: `title-${sectionId}` }));
@@ -199,7 +205,10 @@ function buildQuestions() {
     node.append(element(grouped ? 'legend' : 'label', label, grouped ? {} : { for: id }));
     let input;
     const inputs = [];
-    if (q.type === 'multi' || q.type === 'choice' || q.type === 'boolean') {
+    if (q.id === 'arch.docker') {
+      input = element('input', undefined, { id, name: q.id, type: 'checkbox', role: 'switch', class: 'module-switch', 'aria-label': label });
+      node.append(input); inputs.push(input);
+    } else if (q.type === 'multi' || q.type === 'choice' || q.type === 'boolean') {
       const choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices;
       const field = choiceField({ name: q.id, id, choices, value: q.default, label, multi: q.type === 'multi', onChange: () => {} });
       node.append(field.node); inputs.push(...field.inputs);
@@ -227,9 +236,9 @@ function buildQuestions() {
     if (q.id === 'user.agents') { capability = element('div'); node.append(capability); }
     // Creating the repository is asked right next to "Use GitHub for the repo?": same context.
     if (q.id === 'tasks.use-github') { gitHolder = element('div', undefined, { class: 'git-holder' }); node.append(gitHolder); }
-    inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : 'click', () => {
+    inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : i.type === 'checkbox' ? 'change' : 'click', () => {
       if (q.type === 'multi') state.answers[q.id] = inputs.filter((x) => x.getAttribute('aria-pressed') === 'true' && !x.disabled).map((x) => x.value);
-      else if (q.type === 'boolean') state.answers[q.id] = i.value === 'true';
+      else if (q.type === 'boolean') state.answers[q.id] = i.type === 'checkbox' ? i.checked : i.value === 'true';
       else if (q.type === 'number') state.answers[q.id] = i.value === '' ? q.default : Number(i.value);
       else state.answers[q.id] = i.value;
       state.proposed = (state.proposed ?? []).filter((id) => id !== q.id);
@@ -240,7 +249,17 @@ function buildQuestions() {
     controls.set(q.id, { q, node, label: node.firstChild, plainLabel: label, inputs, hint, capability, gitHolder });
   }
 
-  const personal = sections.get('user')?.node;
+  const personal = sections.get('communication')?.node;
+  if (personal) {
+    const holder = element('div', undefined, { class: 'module-grid communication-card-holder' });
+    personal.append(holder);
+  }
+  const practices = sections.get('practices')?.node;
+  if (practices) {
+    const grid = element('div', undefined, { class: 'module-grid practice-grid' });
+    grid.append(...[...controls.values()].filter((c) => sectionOf(c.q) === 'practices').map((c) => c.node));
+    practices.append(grid);
+  }
   // Choose the kit profile first; optional planning constraints follow it.
   sections.get('arch')?.node.before($('stack'));
   if (personal) {
@@ -259,7 +278,7 @@ function renderQuestions() {
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(questionMode()) && asksIn(q, questionMode())), state.answers, state.mode);
 
   for (const [id, c] of controls) {
-    c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id) || id === 'arch.hosting-control' && presentation !== 'settings' && !Object.hasOwn(state.answers, id);
+    c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id) || ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit'].includes(id);
     for (const button of c.inputs.filter((i) => i.type === 'button' && i.value === 'no-preference' && id.startsWith('arch.'))) {
       button.hidden = (answers[id] ?? c.q.default) !== 'no-preference';
     }
@@ -269,7 +288,8 @@ function renderQuestions() {
     c.label.textContent = c.plainLabel;
     const value = answers[id] ?? c.q.default;
     for (const input of c.inputs) {
-      if (input.type === 'button') input.setAttribute('aria-pressed', String(c.q.type === 'multi' ? value.includes(input.value) : input.value === String(value)));
+      if (input.type === 'checkbox') input.checked = Boolean(value);
+      else if (input.type === 'button') input.setAttribute('aria-pressed', String(c.q.type === 'multi' ? value.includes(input.value) : input.value === String(value)));
       else if (document.activeElement !== input) input.value = String(value);
     }
     c.hint.hidden = !c.q.hint;
@@ -292,7 +312,7 @@ function renderQuestions() {
     }
   }
   for (const [id, s] of sections) {
-    const qs = [...controls.values()].filter((c) => c.q.id.split('.')[0] === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id) && !isInline(c.q) && !GROUP_INTRO.has(c.q.id));
+    const qs = [...controls.values()].filter((c) => sectionOf(c.q) === id && visible.has(c.q.id) && !CARD_QUESTIONS.has(c.q.id) && !isInline(c.q) && !GROUP_INTRO.has(c.q.id));
     s.applicable = qs.length > 0;
     s.node.hidden = !s.applicable;
   }
@@ -307,6 +327,20 @@ function renderStackStep() {
     onChange: (id, value) => { state.answers[id] = value; state.proposed = (state.proposed ?? []).filter((key) => key !== id); update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus({ preventScroll: true }); },
   });
   stackValid = result.valid;
+}
+function renderCommunication() {
+  const section = sections.get('communication');
+  if (!section) return;
+  const shown = presentation === 'settings' || depthOf(state.mode) !== 'quick';
+  section.applicable = shown;
+  const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
+  renderCommunicationCard(section.node.querySelector('.communication-card-holder'), {
+    modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
+    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onExplain: explain,
+    questionNodes: (name, on) => [...controls.values()].filter((c) => isPreference(c.q) && c.q.id !== 'user.expertise' && !c.node.hidden)
+      .map((c) => { c.inputs.forEach((input) => { input.disabled = sectionEditing(); }); return c.node; }),
+    onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $('module-communication')?.focus(); },
+  });
 }
 function setGitInit(on) {
   state.gitInit = on;
@@ -329,7 +363,8 @@ function renderModules() {
   if (github?.gitHolder) github.gitHolder.hidden = false;
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderModuleGroups($('modules'), {
-    modules: catalog.modules.filter((m) => presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions,
+    modules: catalog.modules.filter((m) => m.name !== 'communication' && (presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name))), selected: selectedModules(), answers, questions: catalog.questions, compact,
+    onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); renderCommunication(); scopeIds(); $('compact-modules')?.focus(); },
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(), onExplain: explain,
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
@@ -344,7 +379,7 @@ function renderModules() {
   });
 }
 // Where a review item is configured: the step and the control to focus.
-const stepFor = (q) => q.id.startsWith('arch.') ? STACK : isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, q.id.split('.')[0]));
+const stepFor = (q) => q.id.startsWith('arch.') ? STACK : isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, sectionOf(q)));
 function setDepth(mode) {
   state.mode = mode;
   root.querySelectorAll('button[name=mode]').forEach((input) => { input.setAttribute('aria-pressed', String(input.value === depthOf(mode))); });
@@ -358,6 +393,7 @@ function jump(target) {
   let step, focusId;
   if (target.stack) { step = STACK; focusId = 'stack-title'; }
   else if (target.plan) { step = steps.findIndex((st) => st.groups?.includes('idea')); focusId = 'plan-card'; }
+  else if (target.module === 'communication') { if (depthOf(state.mode) === 'quick') setDepth('basic'); step = 1; focusId = 'module-communication'; }
   else if (target.module) { if (depthOf(state.mode) === 'quick') setDepth('pro'); step = WORKFLOW; focusId = `module-${target.module}`; }
   else {
     const c = controls.get(target.question);
@@ -402,7 +438,7 @@ function update() {
   // Do not leave a stale preview or diff (possibly including an earlier value) on screen.
   $('summary').textContent = 'Updating preview…';
   $('diff-panel').hidden = true; $('diff-output').textContent = '';
-  renderQuestions(); renderStackStep(); renderModules(); renderWizard(); scopeIds();
+  renderQuestions(); renderStackStep(); renderCommunication(); renderModules(); renderWizard(); scopeIds();
   // Cards are rebuilt on every change; keep the keyboard where it was.
   if (activeId && document.activeElement?.id !== activeId) $(activeId)?.focus({ preventScroll: true });
   clearTimeout(timer);

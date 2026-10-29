@@ -310,7 +310,7 @@ Describe this area's responsibility.
 
 ## modules
 
-Describe this area's responsibility.
+Composable setup features and their templates, agent instructions, hooks and tests. Core supplies the shared engineering baseline; review supplies the read-only quality, logic, UI/UX, feature and security reviewers.
 
 <!-- yaw:map:begin area-modules -->
 - Paths: `modules/**`
