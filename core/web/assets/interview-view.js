@@ -56,7 +56,7 @@ const belongs = (step, group) => step.groups === null ? !['user', 'idea', 'arch'
 const skipped = (index) => depthOf(state.mode) === 'quick' && (steps[index].groups?.includes('user') || index === WORKFLOW);
 function renderWizard(focus = false) {
   const formView = presentation === 'settings' && phase === 'edit';
-  root.classList.toggle('settings-form', formView);
+  root.classList?.toggle('settings-form', formView);
   if (formView && !settingsPreview) {
     settingsPreview = element('details', undefined, { class: 'settings-preview' });
     settingsPreview.append(element('summary', 'Preview changes'));
