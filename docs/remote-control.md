@@ -1,5 +1,7 @@
 # YAW Remote
 
+For Host/Client roles, workspace provisioning and native Claude Remote Control, use [LAN server mode](server-mode.md). This page describes the pre-role SDK controller retained for compatibility.
+
 Remote Control is **off by default**. Enable it on each participating machine in `yaw web` → **Global → Settings → Features**, then save. Enabling permits the feature; start the service separately with `yaw remote serve`. Its browser interface is available through an SSH tunnel, or commands through a paired private Telegram chat. Managed agents work in registered checkouts on the server. Closing the browser leaves them running; stopping the service stops its workers.
 
 While disabled, the command is hidden from normal CLI help, service startup and hub-client operations are refused, and provider adapters are not loaded by ordinary CLI commands. No remote service, worker or Telegram polling starts automatically. Turning the setting off shuts down a running controller and its workers. Its metadata and configuration remain available for a later opt-in. Previously migrated hub datasets remain paused rather than silently reverting to folder/GitHub authority.

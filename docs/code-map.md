@@ -203,7 +203,7 @@ Describe this area's responsibility.
 
 ## core
 
-CLI commands, setup rendering, shared libraries and browser applications. `remote` contains the private hub, shared execution supervisor, isolated provider workers and Telegram transport; it keeps execution metadata separate from session analytics.
+CLI commands, setup rendering, shared libraries and browser applications. `remote` contains opt-in LAN host/client services, portable sync, managed project provisioning, native Claude process monitoring and host-only Telegram interviews. The earlier SDK supervisor remains a compatibility path. Execution metadata stays separate from session analytics.
 
 <!-- yaw:map:begin area-core -->
 - Paths: `core/**`

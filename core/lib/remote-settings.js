@@ -22,6 +22,7 @@ function validate(input) {
 }
 export function saveRemoteSettings(env, input, { root, confirmWorkspace = false, migrate = false } = {}) {
   validate(input);
+  if (typeof confirmWorkspace !== 'boolean' || typeof migrate !== 'boolean') throw new Error('Workspace and migration confirmations must be true or false');
   const previous = remoteSettings(env);
   if (input.enabled && input.role === 'host') {
     const authority = readUserData(env, 'hub-sync.json');
@@ -33,6 +34,6 @@ export function saveRemoteSettings(env, input, { root, confirmWorkspace = false,
     if (!root || !confirmWorkspace || input.workspaceRoot !== join(realpathSync(root), 'workspaces')) throw new Error('Confirm that workspaces in the current folder will be the host workspace folder');
   }
   const settings = { ...input };
-  if (settings.enabled && settings.role === 'host') writeUserData(env, 'hub-sync.json', { version: 1, hostMode: true, scopes: ['settings', 'presets', 'statistics'] });
+  if (settings.enabled && settings.role === 'host') writeUserData(env, 'hub-sync.json', { ...readUserData(env, 'hub-sync.json'), version: 1, hostMode: true, scopes: ['settings', 'presets', 'statistics'] });
   writeUserData(env, REMOTE_SETTINGS_FILE, settings); return settings;
 }
