@@ -33,7 +33,7 @@ async function refresh() {
   $('sync-status').textContent = `${s.sync.status}${s.sync.revision ? ` · revision ${s.sync.revision}` : ''}`;
   $('sync-conflicts').hidden = s.sync.status !== 'conflict';
 }
-$('new-project').addEventListener('submit', async (e) => { e.preventDefault(); try { const s = await request('/api/interviews', { slug: $('slug').value, command: 'init-local' }); history.replaceState(null, '', `#interview=${s.id}`); await openInterview(s.id); } catch (e) { report(e); } });
+$('new-project').addEventListener('submit', async (e) => { e.preventDefault(); try { const s = await request('/api/interviews', { slug: $('slug').value, command: 'init-local', skipVerify: new URLSearchParams(location.hash.slice(1)).get('skip-verify') === '1' }); history.replaceState(null, '', `#interview=${s.id}`); await openInterview(s.id); } catch (e) { report(e); } });
 $('refresh').addEventListener('click', () => refresh().catch(report));
 $('logout').addEventListener('click', () => request('/api/logout', {}).then(() => location.reload()).catch(report));
 $('telegram-pair').addEventListener('click', async () => { try { const value = await request('/api/telegram-pair', {}); const a = node('a', 'Open Telegram to pair'); a.href = value.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; $('telegram-link').replaceChildren(a); } catch (e) { report(e); } });

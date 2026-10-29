@@ -10,7 +10,7 @@ export async function hostedWeb({ io, command, local, id, skipVerify = false }) 
   const request = (path, input) => hostRequest({ env: io.env, path, input, local });
   if (local) {
     // Host interviews use the already-running host interface, never a temporary local init form.
-    const link = await request('/api/local-open', {}); await openLink(`${link.url}${id ? `#interview=${id}` : ''}`, io); return 0;
+    const link = await request('/api/local-open', {}); await openLink(`${link.url}${id ? `#interview=${id}` : skipVerify ? '#skip-verify=1' : ''}`, io); return 0;
   }
   let finish, result = 0;
   const done = new Promise((resolve) => { finish = resolve; });

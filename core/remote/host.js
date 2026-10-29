@@ -16,7 +16,7 @@ import { allowedHosts, lanInterfaces, privateAddress } from './lan.js';
 
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const asset = (name, type) => [`/${name}`, [type, readFileSync(new URL(`../web/assets/${name}`, import.meta.url))]];
-export const HOST_ASSETS = new Map([...FORM_ASSETS, asset('host.js', 'text/javascript'), asset('host-interview.js', 'text/javascript'), asset('host.css', 'text/css')]);
+export const HOST_ASSETS = new Map([...FORM_ASSETS, ['/login.js', ['text/javascript', Buffer.from("location.replace('/' + location.hash);\n")]], asset('host.js', 'text/javascript'), asset('host-interview.js', 'text/javascript'), asset('host.css', 'text/css')]);
 export const hostPage = (csrf) => readFileSync(new URL('../web/assets/host.html', import.meta.url), 'utf8').replace('YAW_CSRF', csrf);
 async function jsonBody(req, max = 256 * 1024) {
   requireValue(String(req.headers['content-type']).split(';')[0].trim() === 'application/json', 'Expected JSON', 415);
