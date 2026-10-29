@@ -45,7 +45,7 @@ export async function connectClient({ env, kitRoot, migrate = false, fetchFn = l
   const status = await hostRequest({ env, path: '/api/pair/status', fetchFn });
   if (status.status !== 'approved') {
     if (status.status === 'expired') { delete cfg.request; writeUserData(env, 'server-client.json', cfg); }
-    return status;
+    return { ...status, verification: digest(cfg.token).slice(0, 12) };
   }
   configureHubClient({ env, url: address, serverMode: true, migrate: cfg.migrate || migrate });
   const result = await syncHub({ env, kitRoot, fetchFn });

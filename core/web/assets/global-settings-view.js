@@ -107,7 +107,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       } catch (e) { status.textContent = e.message; }
     }, 'primary'), status);
     if (settings.enabled && settings.role) {
-      const refresh = async () => { const state = await api('server-status', {}); status.textContent = state.connection ? `${state.connection.status}${state.connection.message ? ` · ${state.connection.message}` : ''}` : state.address ?? 'Running'; };
+      const refresh = async () => { const state = await api('server-status', {}); status.textContent = state.connection ? `${state.connection.status}${state.connection.verification ? ` · pairing ${state.connection.verification}` : ''}${state.connection.message ? ` · ${state.connection.message}` : ''}` : state.address ?? 'Running'; };
       card.append(button('Refresh status', () => refresh().catch((e) => { status.textContent = e.message; })));
       if (settings.role === 'host') card.append(button('Open host', async () => { try { const value = await api('server-open', {}); window.open(value.url, '_blank', 'noopener,noreferrer'); } catch (e) { status.textContent = e.message; } }));
       refresh().catch((e) => { status.textContent = e.message; });

@@ -13,6 +13,8 @@ export class HostedProjects {
     Object.assign(this, { root: safeDirectory(root), kitRoot, env, store, agents, verify }); this.interviews = new Map(); this.applying = false;
   }
   create({ slug, command = 'init-local', skipVerify = false, handoff = null }, owner) {
+    requireValue(!this.closed, 'Host is stopping', 503);
+    requireValue(handoff === null, 'Use the interview handoff action after creating a session');
     requireValue(projectSlug(slug), 'Provide a short slug using lower-case letters, digits and single hyphens');
     requireValue(['init-local', 'init-remote', 'telegram'].includes(command), 'Unknown hosted interview mode');
     requireValue(typeof skipVerify === 'boolean', 'skipVerify must be true or false');
@@ -24,6 +26,7 @@ export class HostedProjects {
   }
   expire() { for (const [id, value] of this.interviews) if (value.expires < Date.now() && value.status !== 'applying') { rmSync(value.scratch, { recursive: true, force: true }); this.interviews.delete(id); } }
   get(id, owner) {
+    requireValue(!this.closed, 'Host is stopping', 503);
     this.expire(); const interview = this.interviews.get(id);
     requireValue(interview && interview.owner === owner, 'Unknown interview', 404); return interview;
   }
@@ -40,7 +43,7 @@ export class HostedProjects {
     const i = this.get(id, owner), { model } = this.model(i);
     const catalog = model.bootstrap();
     catalog.questions = catalog.questions.map((q) => q.id === 'user.agents' ? { ...q, choices: [{ value: 'claude', label: 'Claude Code' }], default: ['claude'], hint: 'One native agent on the host.' } : q);
-    return { ...catalog, handoff: i.handoff, hosted: { id, slug: i.slug, command: i.command, workspaceRoot: this.root }, skipVerify: i.skipVerify };
+    return { ...catalog, hasDraft: Boolean(i.draft), handoff: i.draft ?? i.handoff, hosted: { id, slug: i.slug, command: i.command, workspaceRoot: this.root }, skipVerify: i.skipVerify };
   }
   async action(id, owner, name, input) {
     const i = this.get(id, owner);
@@ -48,6 +51,7 @@ export class HostedProjects {
     requireValue(input && typeof input === 'object' && !Array.isArray(input), 'Expected interview input');
     if (name === 'handoff') { this.model(i).model.normalize(input, { allowIncomplete: true }); i.handoff = structuredClone(input); return { saved: true }; }
     if (name === 'prefill') {
+      if (input.kind === 'draft') { requireValue(i.draft, 'No draft in this host session'); return structuredClone(i.draft); }
       const result = this.model(i).model.prefill(input.kind, input.name);
       result.answers['user.agents'] = ['claude']; return result;
     }
@@ -78,8 +82,9 @@ export class HostedProjects {
       const project = { id: randomUUID(), path: root, slug: i.slug, language: prepared.doc.answers['arch.language'], state: 'initializing', interview: id, command: i.command };
       this.store.state.projects.push(project); this.store.save();
       let outcome = null;
-      const writer = createFormApi({ root, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify });
+      let writer;
       try {
+        writer = createFormApi({ root, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify });
         const confirmed = writer.prepareApply(input);
         await writer.apply(confirmed, (event) => { if (event.type === 'done') outcome = event; });
         project.state = outcome?.ok ? 'initialized' : 'verification-failed'; this.store.save();
@@ -93,10 +98,11 @@ export class HostedProjects {
       } catch {
         project.state = 'initialization-failed'; i.status = 'failed'; this.store.save();
         throw new FormError('Initialization failed; partial files remain on the host. Inspect the project before retrying.', 500);
-      } finally { writer.close(); this.applying = false; }
+      } finally { writer?.close(); this.applying = false; }
     } finally { api.close(); }
   }
   async close() {
+    this.closed = true;
     // An accepted init is allowed to settle before releasing the service lock.
     while (this.applying) await new Promise((resolve) => setTimeout(resolve, 50));
     for (const i of this.interviews.values()) rmSync(i.scratch, { recursive: true, force: true });

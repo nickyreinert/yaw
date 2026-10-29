@@ -53,7 +53,7 @@ export class NativeAgents extends EventEmitter {
     const data = (chunk) => {
       worker.buffer = (worker.buffer + String(chunk)).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '').slice(-16384);
       const link = /https:\/\/claude\.ai\/code\/([A-Za-z0-9_-]{8,160})(?=[\s?])/.exec(worker.buffer);
-      if (link && !session.url) { session.url = link[0]; delete session.startup; this.save(session, 'ready'); }
+      if (link && !session.url) { session.url = link[0]; delete session.startup; this.save(session, 'ready'); this.emit('notification', { session: session.id, text: `${session.slug}: Claude Remote Control ready\n${session.url}` }); }
       if (!session.url && !session.startup) {
         const kind = /Trust [^\r\n]{1,4096}\?\s*\[y\/N\]/i.test(worker.buffer) ? 'workspace' : /Enable Remote Control\?\s*\(y\/n\)/i.test(worker.buffer) ? 'remote-control' : null;
         if (kind) { session.startup = kind; this.save(session, 'confirmation-required'); }
@@ -61,8 +61,9 @@ export class NativeAgents extends EventEmitter {
       if (!session.url && /(?:not logged in|requires a claude.ai subscription|Workspace not trusted|authentication failed|unknown option)/i.test(worker.buffer)) this.save(session, 'setup-required');
     };
     child.stdout.on('data', data); child.stderr.on('data', data);
-    child.once('error', () => { this.workers.delete(session.id); this.save(session, 'launch-failed'); });
-    child.once('close', (code) => { this.workers.delete(session.id); delete session.startup; this.save(session, worker.stopped ? 'stopped' : code === 0 ? 'completed' : 'failed'); });
+    const failed = () => { if (!worker.notified.has('process-failed')) { worker.notified.add('process-failed'); this.emit('notification', { session: session.id, text: `${session.slug}: Claude process failed. Check the host.` }); } };
+    child.once('error', () => { this.workers.delete(session.id); this.save(session, 'launch-failed'); failed(); });
+    child.once('close', (code) => { this.workers.delete(session.id); delete session.startup; this.save(session, worker.stopped ? 'stopped' : code === 0 ? 'completed' : 'failed'); if (!worker.stopped && code !== 0) failed(); });
     return { ...session };
   }
   confirm(id) {

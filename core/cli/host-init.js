@@ -22,7 +22,7 @@ export async function hostInit({ values, positionals, io, local = false }) {
   await startServerBackground({ env: io.env, kitRoot: io.kitRoot, cwd: io.cwd });
   if (!local) {
     const connection = await connectClient({ env: io.env, kitRoot: io.kitRoot });
-    if (connection.status !== 'connected') throw new UsageError('Approve this client in the host Web UI, then retry');
+    if (connection.status !== 'connected') throw new UsageError(connection.status === 'conflict' ? 'Resolve shared-data conflicts with yaw remote sync --resolve local|remote, then retry' : `Approve this client in the host Web UI${connection.verification ? ` (pairing ${connection.verification})` : ''}, then retry`);
   }
   const request = (path, input) => hostRequest({ env: io.env, path, input, local });
   let slug = values.slug;

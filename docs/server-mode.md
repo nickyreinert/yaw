@@ -12,7 +12,7 @@ The host needs Node 22.13+, Linux or macOS, and a current Claude Code CLI suppor
 
 ## Client
 
-Enable Server mode, choose Client and enter the host address, for example `http://192.168.1.10:4318`. That is the only client configuration field. A background client requests pairing; approve **sync + init** in the host interface. Its scoped device credential is stored privately on the client. Revoke it on the host to stop further sync and initialization requests. Existing data-only pairings retain data-only access.
+Enable Server mode, choose Client and enter the host address, for example `http://192.168.1.10:4318`. That is the only client configuration field. A background client requests pairing; compare the displayed pairing fingerprint on both machines, then approve **sync + init** in the host interface. Its scoped device credential is stored privately on the client. Revoke it on the host to stop further sync and initialization requests. Existing data-only pairings retain data-only access.
 
 Both host and clients sync portable personal preferences, setup/module defaults, presets and saved session statistics every 30 seconds. Explicit Refresh status on the client also checks the connection. Statistics retain device provenance and existing deduplication; raw conversations, repositories, local paths, service configuration and credentials are excluded. This does not automatically scan native history. `yaw web` remains the local dashboard for inspecting collected and synced statistics.
 

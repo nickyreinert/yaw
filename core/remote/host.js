@@ -127,7 +127,7 @@ export async function startHostServer({ env = process.env, kitRoot, port, signal
       }
       requireValue(owner, 'Owner access required', 403);
       if (req.method === 'GET' && url.pathname === '/api/state') return send(200, { root, address, csrf: login?.csrf ?? '', projects: store.state.projects, sessions: agents.list(),
-        devices: hub.devices(), pending: [...pending.values()].filter((p) => p.expires > now).map(({ id, name, expires }) => ({ id, name, expires })), sync: syncState,
+        devices: hub.devices(), pending: [...pending.values()].filter((p) => p.expires > now).map(({ id, name, expires, hash }) => ({ id, name, expires, verification: hash.slice(0, 12) })), sync: syncState,
         telegram: { configured: Boolean(telegram), paired: Boolean(store.state.telegram), status: telegram?.health ?? 'disabled' } });
       requireValue(req.method === 'POST', 'Method not allowed', 405);
       const input = await jsonBody(req);

@@ -26,7 +26,7 @@ async function refresh() {
     if (['starting', 'ready', 'busy', 'idle', 'input-required', 'confirmation-required', 'setup-required'].includes(s.state)) controls.push(button('Stop', async () => { await request('/api/native-stop', { session: s.id }); await refresh(); }));
     return row(`${s.slug} · ${s.state}`, ...controls);
   });
-  rows('pending', s.pending, (p) => row(p.name, button('Approve sync + init', async () => { await request('/api/pair/approve', { id: p.id }); await refresh(); })));
+  rows('pending', s.pending, (p) => row(`${p.name} · ${p.verification}`, button('Approve sync + init', async () => { await request('/api/pair/approve', { id: p.id }); await refresh(); })));
   rows('devices', s.devices, (d) => row(`${d.name}${d.revoked ? ' · revoked' : ''}`, ...(d.revoked ? [] : [button('Revoke', async () => { await request('/api/revoke', { id: d.id }); await refresh(); })])));
   $('telegram-status').textContent = s.telegram.configured ? `${s.telegram.status} · ${s.telegram.paired ? 'paired' : 'unpaired'}` : 'Bot credential required on host';
   $('telegram-pair').disabled = !s.telegram.configured; $('telegram-revoke').disabled = !s.telegram.paired;
