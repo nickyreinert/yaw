@@ -110,8 +110,8 @@ test('explicit question editing asks beyond the saved Quick depth without changi
 });
 
 test('selected architecture constraints are editable at saved Quick depth in terminal and browser', async () => {
-  for (const [id, value] of [['arch.framework', 'Keep React'], ['arch.hosting-control', 'no-preference']]) {
-    const root = await makeProject({ modules: ['core'] });
+  for (const [id, value, profile] of [['arch.framework', 'Keep React', 'node-cli'], ['arch.hosting-control', 'no-preference', 'node-ts-vercel']]) {
+    const root = await makeProject({ modules: ['core'], profile });
     const model = modelFor(root, [id]);
     const question = model.bootstrap().questions.find((q) => q.id === id);
     assert.equal(asksIn(question, 'quick'), true);

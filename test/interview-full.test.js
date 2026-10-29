@@ -42,7 +42,7 @@ async function init(replies) {
 }
 
 const IDEA = { 'Describe the idea': 'A small tool.', 'What language do you want': 'javascript', 'Where will it run': 'local' };
-const CONSTRAINTS = { 'arch.hosting-control': 'undecided', 'arch.libraries': 'undecided', 'arch.services': 'undecided', 'arch.cost': 'undecided' };
+const CONSTRAINTS = { 'arch.libraries': 'undecided', 'arch.services': 'undecided' };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],
@@ -143,14 +143,15 @@ test('agents: each of Claude, Codex and Copilot is selectable alone and together
   }
 });
 
-test('agents: only Gemini is shown as unavailable, and the interview finishes with a valid agent', async () => {
-  const r = await init({ depth: 'basic', ...IDEA, 'Which coding agents': ['gemini', 'codex'] });
+test('agents: Gemini is selectable in Quick without an obsolete phase gate', async () => {
+  const r = await init({ depth: 'quick', ...IDEA, 'Which coding agents': 'gemini' });
   assert.equal(r.code, 0, r.err);
-  assert.deepEqual(r.doc.answers['user.agents'], ['codex']);
+  assert.deepEqual(r.doc.answers['user.agents'], ['gemini']);
+  assert.equal(readFileSync(join(r.cwd, 'GEMINI.md'), 'utf8'), '@AGENTS.md\n');
   const shown = r.prompter.shown.join('');
-  assert.match(shown, /\) Gemini CLI .*\(phase 3, not available yet\)/);
+  assert.match(shown, /\) Gemini CLI/);
   for (const agent of ['Antigravity CLI', 'Pi', 'Hermes']) assert.doesNotMatch(shown, new RegExp(`\\) ${agent} `));
-  assert.match(shown, /"Gemini CLI \(enterprise \/ API key\)" is not available yet/);
+  assert.doesNotMatch(shown, /phase 3|not available yet/);
 });
 
 test('expertise: a layperson is still asked the Q and S questions', async () => {

@@ -16,7 +16,7 @@ test('profile: questions are personal keys only; preview and apply are hash-chec
   assert.ok(ids.includes('user.language') && ids.includes('user.agents'));
   assert.ok(ids.every((id) => id.startsWith('user.')), 'no project questions');
   assert.deepEqual(d.questions.find((q) => q.id === 'user.language').assumedIn, ['quick']);
-  assert.deepEqual(d.questions.find((q) => q.id === 'user.agents').assumedIn, ['quick']);
+  assert.deepEqual(d.questions.find((q) => q.id === 'user.agents').assumedIn, []);
   assert.deepEqual(d.questions.find((q) => q.id === 'user.comfort').assumedIn, ['quick', 'basic']);
   const input = { answers: { 'user.language': 'de' }, expected: d.hash };
   const preview = profilePreview({ kitRoot: KIT_ROOT, env, input });
