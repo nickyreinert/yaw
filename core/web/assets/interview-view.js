@@ -450,7 +450,11 @@ function finish({ ok, message }, kickoff) {
   const names = (state.answers['user.agents'] ?? []).map((a) => catalog.agents[a]?.name).filter(Boolean).join(' or ') || 'your coding agent';
   const list = $('next-list'); list.replaceChildren();
   if (!ok) list.append(bullet('Fix the problem in the log, then run ', code('just setup && just check'), '.'));
-  list.append(
+  if (catalog.hosted) list.append(
+    bullet('Open the Claude connection link in the host interface.'),
+    bullet('Resolve native startup confirmations on the host.'),
+    bullet('The host keeps running when this page closes.'));
+  else list.append(
     bullet(`Start ${names} in this folder; it reads AGENTS.md.`),
     bullet(code('yaw web'), ': start the workspace again.'),
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
@@ -507,7 +511,8 @@ async function apply() {
 function applyFacts() {
   const written = lastPreview.files.filter((f) => ['create', 'update', 'write', 'missing', 'delete'].includes(f.action)).length;
   const kept = lastPreview.files.filter((f) => f.action === 'kept').length;
-  const facts = [`Writes ${written} file${written === 1 ? '' : 's'} in this folder${kept ? `; ${kept} kept as they are` : ''}`];
+  const facts = [`Writes ${written} file${written === 1 ? '' : 's'} ${catalog.hosted ? `on the host: ${lastPreview.destination}` : 'in this folder'}${kept ? `; ${kept} kept as they are` : ''}`];
+  if (catalog.hosted) facts.push('Launches one Claude Code process with native Remote Control');
   if (catalog.personalDefaultsNotice && depthOf(state.mode) !== 'quick') facts.push('Confirmed personal answers will establish your defaults for future projects');
   if (catalog.skipVerify) facts.push('Skips the check (--skip-verify)');
   else if (!catalog.editing) facts.push('Then runs just setup and just check');

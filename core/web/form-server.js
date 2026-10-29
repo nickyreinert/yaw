@@ -41,6 +41,7 @@ const assets = new Map([
   ['/global-settings-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-settings-view.js', import.meta.url))]],
   ['/yaw-shark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-shark.svg', import.meta.url))]],
 ]);
+export const FORM_ASSETS = assets;
 
 async function readJson(req) {
   if (String(req.headers['content-type'] ?? '').split(';')[0].trim() !== 'application/json') {

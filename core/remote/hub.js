@@ -3,7 +3,7 @@ import { validateVault } from '../lib/data-sync.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
 import { digest, identifier, requireValue } from './store.js';
 
-export function createHub({ store, env, kitRoot }) {
+export function createHub({ store, env, kitRoot, rollingReceipts = false }) {
   let data = readUserData(env, 'remote-hub.json') ?? { schema: 1, revision: 0, records: {}, devices: {}, receipts: {} };
   requireValue(data.schema === 1, 'Unsupported hub schema');
   const commit = (next) => {
@@ -32,10 +32,11 @@ export function createHub({ store, env, kitRoot }) {
       const key = digest(`${device.id}:${input.commandId}`), fingerprint = digest(JSON.stringify(input));
       if (data.receipts[key]) { requireValue(data.receipts[key] === fingerprint, 'Command ID reused', 409); return { ...view(), deviceId: device.id, duplicate: true }; }
       requireValue(input.revision === data.revision, 'Revision conflict; fetch the hub and merge again', 409);
-      requireValue(Object.keys(data.receipts).length < 20000, 'Hub receipt limit reached', 409);
+      requireValue(rollingReceipts || Object.keys(data.receipts).length < 20000, 'Hub receipt limit reached', 409);
+      const receipts = rollingReceipts && Object.keys(data.receipts).length >= 10000 ? Object.fromEntries(Object.entries(data.receipts).slice(-5000)) : data.receipts;
       const validated = validateVault({ version: 1, records: input.records, devices: { [device.id]: input.device } }, kitRoot);
       // Missing records mean unchanged, explicit null values are deletion markers.
-      commit({ ...data, revision: data.revision + 1, records: { ...data.records, ...validated.records }, devices: { ...data.devices, ...validated.devices }, receipts: { ...data.receipts, [key]: fingerprint } });
+      commit({ ...data, revision: data.revision + 1, records: { ...data.records, ...validated.records }, devices: { ...data.devices, ...validated.devices }, receipts: { ...receipts, [key]: fingerprint } });
       return { ...view(), deviceId: device.id };
     },
   };

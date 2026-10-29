@@ -9,6 +9,7 @@ import { parse, stringify } from './yaml.js';
 import { schemas } from '../render/kit.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 import { remoteSettings } from './remote-settings.js';
+import { setupDefaults } from './setup-defaults.js';
 
 const hash = (v) => createHash('sha256').update(v).digest('hex');
 const canonical = (v) => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x);
@@ -84,8 +85,12 @@ export function configureSync({ env, target, github, name, scopes = ['settings',
 }
 
 function portable(key, value, kitRoot) {
-  if (key !== 'settings/profile' && !/^presets\/[a-z0-9][a-z0-9-]*$/.test(key) && !KNOWLEDGE_KEY(key)) throw new Error('Unknown portable record');
+  if (key !== 'settings/profile' && key !== 'settings/setup-defaults' && !/^presets\/[a-z0-9][a-z0-9-]*$/.test(key) && !KNOWLEDGE_KEY(key)) throw new Error('Unknown portable record');
   if (value === null) return null;
+  if (key === 'settings/setup-defaults') {
+    const checked = setupDefaults({ kitRoot }, value);
+    return { version: 1, modules: checked.modules, answers: checked.answers };
+  }
   if (key.startsWith('knowledge/')) {
     if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((k) => k !== 'text') || typeof value.text !== 'string' || !value.text.trim() ||
       value.text.includes('\0') || Buffer.byteLength(value.text) > MAX_RECORD) throw new Error('Invalid knowledge record');
@@ -321,13 +326,20 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
   }
 }
 
-export function portableSnapshot({ env, kitRoot, scopes, name }) {
-  return { records: localRecords(env, scopes, kitRoot), device: { name: device(env, name).name, updated: new Date().toISOString(),
+export function portableSnapshot({ env, kitRoot, scopes, name, serverMode = false }) {
+  const records = localRecords(env, scopes, kitRoot);
+  if (serverMode && scopes.includes('settings')) records['settings/setup-defaults'] = portable('settings/setup-defaults', readUserData(env, 'setup-defaults.json'), kitRoot);
+  return { records, device: { name: device(env, name).name, updated: new Date().toISOString(),
     rows: scopes.includes('statistics') ? statistics(env) : [], ...(scopes.includes('tasks') ? { tasks: cleanTasks(readUserData(env, 'session-analysis.json')?.tasks, kitRoot) } : {}) } };
 }
 export const portableScope = scopeOf;
 export function applyPortableRecords({ env, records }) {
     for (const [key, value] of Object.entries(records)) {
+      if (key === 'settings/setup-defaults') {
+        if (value !== null) writeUserData(env, 'setup-defaults.json', value);
+        else { const file = join(userDataDir(env), 'setup-defaults.json'); safe(file); try { unlinkSync(file); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
+        continue;
+      }
       const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : key.startsWith('knowledge/') ? join(...key.split('/')) : `${key}.yaml`);
       if (value === null) {
         const previous = read(path);

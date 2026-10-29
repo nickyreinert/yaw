@@ -69,25 +69,51 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   async function loadFeatures() {
     const data = await get('global/features'), root = $('gs-features'), settings = data.remoteControl;
     const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.checked = settings.enabled;
-    const label = el('label', ' Enable Remote Control'); label.prepend(enabled);
-    const details = el('section'); details.hidden = !settings.enabled;
-    const portLabel = el('label', 'Controller port'), port = document.createElement('input'); port.type = 'number'; port.min = '1024'; port.max = '65535'; port.value = settings.port; portLabel.append(port);
-    const link = el('a', 'Open Remote Control'); link.href = `http://127.0.0.1:${settings.port}`; link.target = '_blank'; link.rel = 'noopener noreferrer';
-    details.append(el('p', 'Manage coding agents and a shared data hub through a private browser or Telegram. Start the controller separately on its host; enabling this setting does not launch it.'),
-      portLabel, el('p', `Start on this host: yaw remote serve --port ${settings.port}`, 'small'), link,
-      el('p', 'Remote hosts use an SSH tunnel with the same local port. Owner and provider credentials are entered privately on the host; managed workers require Linux and bubblewrap.', 'small muted'));
+    const label = el('label', ' Server mode'); label.prepend(enabled);
+    const role = document.createElement('select'); role.setAttribute('aria-label', 'Server role');
+    for (const [value, text] of [['', 'Choose role'], ['client', 'Client'], ['host', 'Host']]) { const o = el('option', text); o.value = value; role.append(o); }
+    role.value = settings.role ?? '';
+    const details = el('section'), client = el('section'), host = el('section');
+    const addressLabel = el('label', 'Server address'), address = document.createElement('input'); address.type = 'text'; address.placeholder = 'http://192.168.1.10:4318'; address.value = settings.address ?? ''; addressLabel.append(address); client.append(addressLabel);
+    const portLabel = el('label', 'Port'), port = document.createElement('input'); port.type = 'number'; port.min = '1024'; port.max = '65535'; port.value = settings.port; portLabel.append(port);
+    const bindLabel = el('label', 'LAN interface'), bind = document.createElement('select');
+    for (const ip of data.interfaces) { const o = el('option', ip); o.value = ip; bind.append(o); } bind.value = settings.bindAddress ?? data.defaultInterface; bindLabel.append(bind);
+    const workspaceRoot = settings.workspaceRoot ?? `${data.root.replace(/\/$/, '')}/workspaces`;
+    host.append(el('p', workspaceRoot, 'small'), bindLabel, portLabel);
     const status = el('p', '', 'small'); status.setAttribute('role', 'status');
-    enabled.addEventListener('change', () => { details.hidden = !enabled.checked; status.textContent = enabled.checked === settings.enabled ? '' : 'Unsaved changes.'; });
-    const card = el('article', null, 'card');
-    card.append(el('h2', 'Optional features'), el('p', 'Features are off until you enable them on this machine.'), label,
-      el('p', 'When disabled, Remote Control is hidden from normal CLI help and its service and hub client cannot run. Disabling stops a running controller and its managed workers.', 'small muted'));
-    if (data.hubMigrated) card.append(el('p', 'Previously migrated hub datasets stay paused when disabled. Folder sync does not resume writing those datasets automatically.', 'small muted'));
-    card.append(details, button('Save features', async () => {
+    const update = () => { details.hidden = !enabled.checked; client.hidden = role.value !== 'client'; host.hidden = role.value !== 'host'; };
+    enabled.addEventListener('change', update); role.addEventListener('change', update); update();
+    details.append(role, client, host);
+    const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), label, details);
+    card.append(button('Save features', async () => {
       try {
-        const saved = await api('remote-settings', { enabled: enabled.checked, port: Number(port.value) });
-        await loadFeatures(); $('gs-features').append(el('p', saved.enabled ? 'Remote Control enabled. Start or restart the controller separately to use the saved port.' : 'Remote Control disabled. Any running controller is shutting down.', 'small'));
+        const input = { enabled: enabled.checked, port: Number(port.value) };
+        const migration = enabled.checked && data.folderSync && !data.hubMigrated;
+        if (migration) {
+          if (!window.confirm('Move settings, presets and statistics from folder/GitHub sync to this server? Sync and back up the old vault first. Current local records will be transferred.')) return;
+          input.migrate = true;
+        }
+        if (role.value) input.role = role.value;
+        if (role.value === 'client') input.address = address.value;
+        if (role.value === 'host') {
+          input.bindAddress = bind.value; input.workspaceRoot = workspaceRoot;
+          if (settings.role !== 'host' || settings.workspaceRoot !== workspaceRoot) {
+            if (!window.confirm(`${workspaceRoot} will be your workspace folder from now on. Enable Host mode?`)) return;
+            input.confirmWorkspace = true;
+          }
+        }
+        if (input.enabled && !input.role) throw new Error('Choose Host or Client');
+        await api('remote-settings', input); await loadFeatures();
       } catch (e) { status.textContent = e.message; }
-    }, 'primary'), status); root.replaceChildren(card);
+    }, 'primary'), status);
+    if (settings.enabled && settings.role) {
+      const refresh = async () => { const state = await api('server-status', {}); status.textContent = state.connection ? `${state.connection.status}${state.connection.message ? ` · ${state.connection.message}` : ''}` : state.address ?? 'Running'; };
+      card.append(button('Refresh status', () => refresh().catch((e) => { status.textContent = e.message; })));
+      if (settings.role === 'host') card.append(button('Open host', async () => { try { const value = await api('server-open', {}); window.open(value.url, '_blank', 'noopener,noreferrer'); } catch (e) { status.textContent = e.message; } }));
+      refresh().catch((e) => { status.textContent = e.message; });
+    }
+    if (data.hubMigrated && !settings.enabled) card.append(el('p', 'Hub sync paused.', 'small'));
+    root.replaceChildren(card);
   }
 
   async function loadReview() {

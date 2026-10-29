@@ -1,0 +1,13 @@
+body { display: block; margin: 0; }
+.host-main { max-width: 1200px; padding: 28px; margin: auto; }
+.host-heading { display: flex; align-items: center; gap: 12px; }
+.host-heading h1 { margin-right: auto; }
+.host-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 16px; margin-top: 20px; }
+.host-main .card { margin-bottom: 16px; }
+.host-main form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.host-main label { display: grid; gap: 6px; }
+.host-row { border-top: 1px solid var(--line,#5555); padding: 12px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.host-row span { flex: 1; overflow-wrap: anywhere; }
+.host-main .interview-shared { position: relative; }
+#host-interview { margin: 28px 0; }
+#interview-context { font-size: 1rem; overflow-wrap: anywhere; }

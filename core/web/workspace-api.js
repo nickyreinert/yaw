@@ -19,6 +19,7 @@ import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
 import { createImproveRunner, improveSettings, saveImproveSettings, planningAgents } from './improve-agents.js';
 import { previewPlanning, applyPlanning } from './planning.js';
+import { lanInterfaces, defaultInterface } from '../lib/lan-address.js';
 import { remoteSettings, saveRemoteSettings } from '../lib/remote-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
@@ -27,7 +28,7 @@ import { improveHistory, savedImprovement, saveImprovement, importImprovement, d
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
-  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings'];
+  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -60,7 +61,9 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     actions: WORKSPACE_ACTIONS,
     close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
-      '/api/global/features': () => ({ remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')) }),
+      '/api/global/features': () => {
+        return { remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf() };
+      },
       '/api/improve/history': () => improveHistory({ env }),
       '/api/improve/settings': () => improveSettings(env),
       '/api/improve/job': () => reviewer.read(),
@@ -132,9 +135,31 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       if (name === 'setup-defaults-save') {
         try { return saveSetupDefaults({ env, kitRoot }, input); } catch (e) { throw new FormError(e.message); }
       }
+      if (['server-status', 'server-open'].includes(name)) {
+        try {
+          const { backgroundControl } = await import('../remote/background.js');
+          if (name === 'server-status') return await backgroundControl(env, remoteSettings(env).role === 'client' ? 'refresh' : 'status') ?? { connection: { status: 'stopped' } };
+          const { hostRequest } = await import('../remote/server-client.js');
+          return await hostRequest({ env, local: true, path: '/api/local-open', input: {} });
+        } catch (e) { throw new FormError(e.message); }
+      }
       if (name === 'remote-settings') {
-        const { workspace, ...settings } = input;
-        try { return saveRemoteSettings(env, settings); } catch (e) { throw new FormError(e.message); }
+        const { workspace, confirmWorkspace, migrate, ...settings } = input;
+        try {
+          const root = rootOf(workspace);
+          if (settings.role) {
+            const { lanOrigin, lanInterfaces } = await import('../remote/lan.js');
+            if (settings.role === 'client') settings.address = lanOrigin(settings.address);
+            if (settings.role === 'host' && !lanInterfaces().includes(settings.bindAddress)) throw new Error('Choose a current LAN interface');
+          }
+          const saved = saveRemoteSettings(env, settings, { root, confirmWorkspace, migrate });
+          if (saved.enabled && saved.role) {
+            if (saved.role === 'client') { const { configureServerClient } = await import('../remote/server-client.js'); configureServerClient({ env, migrate }); }
+            const { startServerBackground } = await import('../remote/background.js');
+            await startServerBackground({ env, kitRoot, cwd: root });
+          }
+          return saved;
+        } catch (e) { throw new FormError(e.message); }
       }
       if (['improve-settings', 'improve-agent-start', 'improve-agent-clear'].includes(name)) {
         try {

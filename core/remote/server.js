@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, watchFile, unwatchFile } from 'node:fs';
 import { join } from 'node:path';
 import { userDataDir } from '../lib/user-store.js';
-import { REMOTE_SETTINGS_FILE, requireRemoteEnabled } from '../lib/remote-settings.js';
+import { REMOTE_SETTINGS_FILE, requireRemoteEnabled, remoteSettings } from '../lib/remote-settings.js';
 import { remoteStore, requireValue, RemoteError, digest } from './store.js';
 import { Supervisor } from './supervisor.js';
 import { executionAdapters } from './adapters.js';
@@ -28,7 +28,8 @@ export async function startRemoteServer({ env = process.env, kitRoot, port = 0, 
   const hub = createHub({ store, env, kitRoot });
   const logins = new Map(); let loginTimes = [], closing;
   const settingsFile = join(userDataDir(env), REMOTE_SETTINGS_FILE);
-  const settingsChanged = () => { try { requireRemoteEnabled(env); } catch { close().catch(() => { process.exitCode = 1; }); } };
+  const initialRole = remoteSettings(env).role;
+  const settingsChanged = () => { try { requireRemoteEnabled(env); if (remoteSettings(env).role !== initialRole) throw new Error(); } catch { close().catch(() => { process.exitCode = 1; }); } };
   const assets = new Map([
     ['/', ['text/html', readFileSync(new URL('../web/assets/remote.html', import.meta.url))]],
     ['/remote.js', ['text/javascript', readFileSync(new URL('../web/assets/remote.js', import.meta.url))]],

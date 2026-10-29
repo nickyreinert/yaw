@@ -13,14 +13,27 @@ export async function remote({ values, positionals, io }) {
     io.stdout.write(`${JSON.stringify({ client: cfg, revision: sync?.revision ?? null, lastSync: sync?.lastSync ?? null, conflicts: sync?.conflicts ?? [] }, null, 2)}\n`); return 0;
   }
   if (verb === 'sync') {
+    if (remoteSettings(io.env).role === 'host') {
+      if (values.hub) throw new UsageError('Host mode owns its hub; change authority through an explicit migration');
+      const { hostRequest } = await import('../remote/server-client.js');
+      const result = await hostRequest({ env: io.env, local: true, path: '/api/sync', input: { resolve: values.resolve } });
+      io.stdout.write(`${JSON.stringify(result, null, 2)}\n`); return result.status === 'conflict' ? 1 : 0;
+    }
     const { configureHubClient, syncHub } = await import('../remote/client.js');
-    const result = values.hub ? configureHubClient({ env: io.env, url: values.hub, tokenEnv: values['token-env'], scopes: values.scopes?.split(','), migrate: values.migrate })
+    const result = values.hub ? configureHubClient({ env: io.env, url: values.hub, tokenEnv: values['token-env'], scopes: values.scopes?.split(','), migrate: values.migrate, serverMode: remoteSettings(io.env).role === 'client' })
       : await syncHub({ env: io.env, kitRoot: io.kitRoot, resolution: values.resolve });
     io.stdout.write(`${JSON.stringify(result, null, 2)}\n`); return result.conflicts?.length ? 1 : 0;
   }
   if (verb !== 'serve') throw new UsageError('Use remote serve, sync or status');
+  if (remoteSettings(io.env).role === 'client') throw new UsageError('Client mode does not serve projects; choose Host on the host machine');
   const port = Number(values.port ?? remoteSettings(io.env).port);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new UsageError('Use a port from 1024 to 65535');
+  if (remoteSettings(io.env).role === 'host') {
+    const { startHostServer } = await import('../remote/host.js');
+    const service = await startHostServer({ env: io.env, kitRoot: io.kitRoot, port });
+    io.stdout.write(`YAW Host: ${service.address}\nCtrl+C stops the host.\n`);
+    await new Promise((resolve) => service.server.once('close', resolve)); return 0;
+  }
   const { startRemoteServer } = await import('../remote/server.js');
   const service = await startRemoteServer({ env: io.env, kitRoot: io.kitRoot, port });
   io.stdout.write(`YAW Remote: ${service.url}\nSign in with the owner credential entered in the service environment. Use an SSH tunnel with the same local port. Ctrl+C stops managed workers; browser disconnects do not.\n`);

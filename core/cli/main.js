@@ -30,6 +30,8 @@ const yes = { yes: { type: 'boolean', short: 'y' } };
 
 // The phase-1 command list (ADR-0019). Help and hook are dispatched separately.
 export const COMMANDS = [
+  { name: 'host', optional: true, args: '[--foreground | --stop]', summary: 'open the persistent LAN host and its workspace projects', options: { foreground: { type: 'boolean' }, stop: { type: 'boolean' } }, run: async (args) => (await import('./host.js')).host(args) },
+  ...['init-remote', 'init-local'].map((name) => ({ name, optional: true, args: '[--slug <slug>] [--web | --answers <file> [--yes]] [--skip-verify]', summary: name === 'init-remote' ? 'interview on this client; initialize and launch one agent on its host' : 'initialize in the host workspace from any folder on the host', options: { slug: { type: 'string' }, web: { type: 'boolean' }, answers: { type: 'string' }, 'skip-verify': { type: 'boolean' }, ...yes }, run: async (args) => (await import('./host-init.js')).hostInit({ ...args, local: name === 'init-local' }) })),
   { name: 'remote', optional: true, args: 'serve [--port 4318] | sync [--hub http://127.0.0.1:4318 --token-env YAW_HUB_TOKEN --scopes settings,presets,statistics --migrate] [--resolve local|remote] | status', summary: 'private data hub and agent-independent browser/Telegram controller (Linux workers)', options: { port: { type: 'string' }, hub: { type: 'string' }, 'token-env': { type: 'string' }, scopes: { type: 'string' }, migrate: { type: 'boolean' }, resolve: { type: 'string' } }, run: async (args) => (await import('./remote.js')).remote(args) },
   { name: 'init', args: '[--web | --answers <file> [--yes]] [--sync <folder|owner/repo>] [--skip-verify] [--force]', summary: 'set up YAW in this folder: interview or local browser form, confirm, write, verify', options: { web: { type: 'boolean' }, answers: { type: 'string' }, sync: { type: 'string' }, 'skip-verify': { type: 'boolean' }, force: { type: 'boolean' }, ...yes }, run: init },
   { name: 'defaults', args: '[--offer]', summary: 'review and save personal defaults for future projects', options: { offer: { type: 'boolean' } }, run: defaults },
@@ -63,9 +65,9 @@ export const COMMANDS = [
 ];
 
 export const HELP_GROUPS = [
-  { title: 'Project setup and maintenance', names: ['init', 'defaults', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
+  { title: 'Project setup and maintenance', names: ['init', 'init-remote', 'init-local', 'defaults', 'edit', 'apply', 'update', 'presets', 'status', 'add', 'remove', 'agents'] },
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'review', 'sessions'] },
-  { title: 'Monitoring and collaboration', names: ['web', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
+  { title: 'Monitoring and collaboration', names: ['web', 'host', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
   { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
 ];
@@ -78,7 +80,7 @@ export function usage(env = process.env) {
     '',
     ...HELP_GROUPS.flatMap(({ title, names }) => [
       `${title}:`,
-      ...names.filter((name) => name !== 'remote' || remoteEnabled).map((name) => {
+      ...names.filter((name) => !COMMANDS.find((c) => c.name === name)?.optional || remoteEnabled).map((name) => {
         const c = COMMANDS.find((c) => c.name === name);
         return `  ${c.name.padEnd(15)} ${c.summary}`;
       }),

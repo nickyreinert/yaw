@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="yaw-csrf" content="YAW_CSRF"><title>YAW Host</title><link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/yaw-theme.css"><link rel="stylesheet" href="/host.css"><script type="module" src="/host.js"></script></head>
+<body><main class="host-main"><header class="host-heading"><h1>YAW Host</h1><button id="refresh">Refresh</button><button id="logout">Sign out</button></header><p id="host-root" class="muted"></p><p id="notice" role="status"></p>
+<section class="card"><h2>New project</h2><form id="new-project"><label>Project slug<input id="slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="64" required autocomplete="off"></label><button class="primary">Start interview</button></form></section>
+<section id="host-interview" hidden><h2 id="interview-context"></h2><div id="interview"></div></section>
+<div class="host-grid"><section class="card"><h2>Projects</h2><div id="projects"></div></section><section class="card"><h2>Claude sessions</h2><div id="sessions"></div></section>
+<section class="card"><h2>Pairing requests</h2><div id="pending"></div><h2>Devices</h2><div id="devices"></div></section><section class="card"><h2>Telegram</h2><p id="telegram-status"></p><button id="telegram-pair">Pair chat</button><button id="telegram-revoke">Revoke chat</button><div id="telegram-link"></div><h2>Sync</h2><p id="sync-status"></p><div id="sync-conflicts" hidden><button id="sync-local">Keep host changes</button><button id="sync-remote">Keep hub changes</button></div></section></div>
+</main></body></html>

@@ -75,7 +75,7 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
 }
 
 // Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | 'previous' | WEB
-async function chooseMode({ prompter }) {
+export async function chooseMode({ prompter }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Setup depth')}\n`);
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - agents, purpose, language, runtime and GitHub\n`);
