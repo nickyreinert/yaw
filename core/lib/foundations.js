@@ -1,3 +1,4 @@
+import { architectureApplies } from '../interview/policy.js';
 // Two scopes: versioned kit practices and project-owned, reviewed Markdown sources.
 // The index contains references and review hashes, never a second copy of project rules.
 import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync } from 'node:fs';
@@ -23,8 +24,8 @@ export const CONSTRAINT_FIELDS = [
 export function constraintFacts(answers = {}) {
   return [
     ...(answers['arch.framework'] ? [`- Required framework / existing stack: ${answers['arch.framework']}`] : []),
-    ...CONSTRAINT_FIELDS.map(([key, label]) => `- ${label}: ${answers[key] === 'no-preference' ? 'no preference (recommend a suitable option with rationale)' : answers[key] || 'undecided (ask before choosing)'}`),
-    ...(answers['arch.cost-limit'] ? [`- Budget cap: ${answers['arch.cost-limit']}`] : []),
+    ...CONSTRAINT_FIELDS.filter(([key]) => architectureApplies(key, answers)).map(([key, label]) => `- ${label}: ${answers[key] === 'no-preference' ? 'no preference (recommend a suitable option with rationale)' : answers[key] || 'undecided (ask before choosing)'}`),
+    ...(architectureApplies('arch.cost-limit', answers) && answers['arch.cost-limit'] ? [`- Budget cap: ${answers['arch.cost-limit']}`] : []),
   ];
 }
 export const PRACTICES = `YAW generic practices (version ${PRACTICES_VERSION}):
@@ -166,7 +167,7 @@ export function foundationContext({ root, kitRoot } = {}) {
   if (savedAnswers !== null) {
     const answers = parseAnswers(savedAnswers).answers;
     for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework']) {
-      if (answers[key] !== undefined) result.constraints[key] = answers[key];
+      if (answers[key] !== undefined && architectureApplies(key, answers)) result.constraints[key] = answers[key];
     }
     if (secretValueRule(rulesFor(kitRoot), Object.values(result.constraints))) throw new FoundationError('Unsafe setup constraints; nothing was included.');
   }

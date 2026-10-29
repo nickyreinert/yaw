@@ -1,5 +1,5 @@
 // Pure browser state helpers; also tested without a DOM.
-import { asksIn, isPersonal, isPreference } from '../../interview/policy.js';
+import { asksIn, isPersonal, isPreference, questionApplies } from '../../interview/policy.js';
 import { selectedByPolicy } from '../../interview/depth.js';
 export { asksIn };
 export const choiceValue = (c) => typeof c === 'object' ? c.value : c;
@@ -41,7 +41,7 @@ export function matches(when, answers) {
 export function effectiveAnswers(questions, given, mode) {
   const answers = {};
   for (const asked of [true, false]) for (const q of questions) {
-    if (asksIn(q, mode) !== asked || !matches(q.when, answers)) continue;
+    if (asksIn(q, mode) !== asked || !questionApplies(q, answers)) continue;
     const use = Object.hasOwn(given, q.id);
     answers[q.id] = use ? given[q.id] : q.default;
   }
@@ -50,7 +50,7 @@ export function effectiveAnswers(questions, given, mode) {
 export function visibleQuestions(questions, given, mode, modules) {
   const selected = questions.filter((q) => modules.includes(q.owner) || isPreference(q) && asksIn(q, mode) || ['pro', 'all'].includes(mode) && asksIn(q, mode));
   const answers = effectiveAnswers(selected, given, mode);
-  return selected.filter((q) => !q.editHidden && asksIn(q, mode) && matches(q.when, answers));
+  return selected.filter((q) => !q.editHidden && asksIn(q, mode) && questionApplies(q, answers));
 }
 export function defaultModules(definitions, questions, given, mode) {
   const a = effectiveAnswers(questions, given, mode);

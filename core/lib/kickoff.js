@@ -1,3 +1,4 @@
+import { architectureApplies } from '../interview/policy.js';
 // Kickoff guidance (#173): a planning prompt built from the interview answers, and a parser for the plan the
 // user pastes back. The plan format is the one the prompt asks for; the parser accepts small deviations.
 
@@ -20,7 +21,7 @@ export function planningFacts(answers = {}) {
   const defaults = { 'idea.text': '', 'arch.language': '', 'arch.runs-on': '', 'arch.framework': '',
     'idea.team': 'solo', 'tasks.use-github': false, 'tasks.mode': 'local', 'arch.cost-limit': '',
     ...Object.fromEntries(CONSTRAINT_FIELDS.map(([key]) => [key, 'undecided'])) };
-  return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, answers[key] ?? fallback]));
+  return Object.fromEntries(Object.entries(defaults).filter(([key]) => architectureApplies(key, answers)).map(([key, fallback]) => [key, answers[key] ?? fallback]));
 }
 export function kickoffPrompt({ answers = {}, summary = '', tasksMode = 'local', hasTasks = true, stack = null, previousPlan = '', projectContext = '' } = {}) {
   const idea = String(answers['idea.text'] ?? '').trim() || '(describe the idea here)';

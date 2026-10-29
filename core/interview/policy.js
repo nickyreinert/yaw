@@ -7,3 +7,26 @@ export const asksIn = (q, mode) => q.reviewSelected || isPersonal(q) && q.review
 export const resolved = (q, value) => !q.required || (typeof value === 'string' && value.trim().length > 0);
 export const missingAnswers = (questions, answers) => questions.filter((q) => !resolved(q, answers[q.id])).map((q) => q.id);
 export const sourceOf = (q, used) => used ? 'answered' : q.defaultSource ?? 'documented default';
+
+// Deployment context, independent of language. Every offered language supports external dependencies.
+export const HOSTED_RUNTIMES = ['self-hosted', 'serverless', 'edge', 'static'];
+export function runtimeContext(answers = {}) {
+  const hosting = HOSTED_RUNTIMES.includes(answers['arch.runs-on']);
+  const paidComponents = hosting || ['commercial-allowed', 'no-preference'].includes(answers['arch.libraries'])
+    || ['approved-only', 'allowed', 'no-preference'].includes(answers['arch.services']);
+  return { hosting, paidComponents };
+}
+export function architectureApplies(id, answers = {}) {
+  const context = runtimeContext(answers);
+  if (id === 'arch.hosting-control') return context.hosting;
+  if (id === 'arch.cost') return context.paidComponents;
+  if (id === 'arch.cost-limit') return context.paidComponents && answers['arch.cost'] === 'capped';
+  return true;
+}
+export function questionApplies(q, answers = {}) {
+  return architectureApplies(q.id, answers) && Object.entries(q.when ?? {}).every(([id, wanted]) => {
+    const accepted = Array.isArray(wanted) ? wanted : [wanted];
+    return Array.isArray(answers[id]) ? answers[id].some((v) => accepted.includes(v)) : accepted.includes(answers[id]);
+  });
+}
+export const applicableArchitectureAnswers = (answers = {}) => Object.fromEntries(Object.entries(answers).filter(([id]) => architectureApplies(id, answers)));

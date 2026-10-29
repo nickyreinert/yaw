@@ -27,7 +27,7 @@ function save(f, answers = PERSONAL) {
 test('project architecture constraints reach terminal, browser, kickoff and agent context independently of personal settings', async () => {
   const f = fixture();
   save(f);
-  const chosen = { ...BASE, 'arch.hosting-control': 'on-premises', 'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month; no overage' };
+  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.hosting-control': 'on-premises', 'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month; no overage' };
   const result = await cli(f, prompts(chosen, 'pro'));
   assert.equal(result.code, 0, result.err);
   const answers = readAnswers(f.root).answers;
@@ -47,10 +47,11 @@ test('project architecture constraints reach terminal, browser, kickoff and agen
 test('unknown project constraints remain explicit and mockups include layout before visual polish', () => {
   const model = createFormModel(fixture());
   const normalized = model.normalize({ mode: 'quick', answers: BASE });
-  for (const id of ['arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost']) assert.equal(normalized.doc.answers[id], 'undecided');
+  for (const id of ['arch.libraries', 'arch.services']) assert.equal(normalized.doc.answers[id], 'undecided');
+  for (const id of ['arch.hosting-control', 'arch.cost']) assert.equal(Object.hasOwn(normalized.doc.answers, id), false);
   assert.equal(Object.hasOwn(normalized.doc.answers, 'arch.cost-limit'), false);
   const prompt = kickoffPrompt({ answers: BASE });
-  assert.match(prompt, /Cost policy: undecided \(ask before choosing\)/);
+  assert.doesNotMatch(prompt, /Cost policy:/);
   assert.match(prompt, /wireframe, screen mockup or clickable prototype/);
   assert.match(prompt, /Mockups cover layout as well as colours/);
   assert.match(prompt, /Review structure and the main flow before polishing colour/);
@@ -60,7 +61,7 @@ test('unknown project constraints remain explicit and mockups include layout bef
 test('no preference invites recommendations and explicit Pro answers survive a switch to Quick', () => {
   const model = createFormModel(fixture());
   const ids = ['arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost'];
-  const answers = { ...BASE, 'arch.framework': 'Keep Django', ...Object.fromEntries(ids.map((id) => [id, 'no-preference'])) };
+  const answers = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.framework': 'Keep Django', ...Object.fromEntries(ids.map((id) => [id, 'no-preference'])) };
   for (const mode of ['pro', 'basic', 'quick']) {
     const normalized = model.normalize({ mode, answers });
     for (const id of ids) assert.equal(normalized.doc.answers[id], 'no-preference');
@@ -227,4 +228,23 @@ test('init no longer offers a separate personal onboarding menu', async () => {
   assert.doesNotMatch(p.shown.join(''), /u\) Review|Review and save personal settings/);
   assert.match(r.out, /No personal defaults set/);
   assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), false);
+});
+
+test('runtime context hides irrelevant hosting/cost answers and preserves valid Kotlin dependency choices', () => {
+  const model = createFormModel(fixture());
+  for (const language of ['kotlin', 'swift', 'javascript']) {
+    const input = { ...BASE, 'arch.language': language, 'arch.runs-on': 'app-store', 'arch.hosting-control': 'managed',
+      'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'USD 50/month' };
+    const normalized = model.normalize({ mode: 'pro', answers: input });
+    for (const id of ['arch.hosting-control', 'arch.cost', 'arch.cost-limit']) assert.equal(Object.hasOwn(normalized.doc.answers, id), false, `${language}: ${id}`);
+    assert.equal(normalized.doc.answers['arch.libraries'], 'open-source');
+    const visible = visibleQuestions(model.bootstrap().questions, input, 'pro', normalized.modules).map((q) => q.id);
+    assert.ok(visible.includes('arch.libraries'));
+    assert.ok(!visible.includes('arch.hosting-control') && !visible.includes('arch.cost'));
+    const prompt = kickoffPrompt({ answers: input });
+    assert.doesNotMatch(prompt, /Hosting control: managed|Cost policy: capped|Budget cap: USD 50/);
+    const paid = model.normalize({ mode: 'pro', answers: { ...input, 'arch.libraries': 'commercial-allowed' } });
+    assert.equal(paid.doc.answers['arch.cost'], 'capped'); assert.equal(paid.doc.answers['arch.cost-limit'], input['arch.cost-limit']);
+    assert.equal(Object.hasOwn(paid.doc.answers, 'arch.hosting-control'), false);
+  }
 });

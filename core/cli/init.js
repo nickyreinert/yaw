@@ -14,8 +14,8 @@ import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js'
 import { loadSetupDefaults } from '../lib/setup-defaults.js';
 import { depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
-import { runInterview, whenMatches } from '../interview/engine.js';
-import { missingAnswers, isPersonal, isPreference } from '../interview/policy.js';
+import { runInterview } from '../interview/engine.js';
+import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -130,7 +130,7 @@ function summaryAnswers(questions, given, defaulted) {
   const out = {};
   const effective = Object.fromEntries(questions.map((q) => [q.id, q.default]));
   Object.assign(effective, given);
-  const hidden = new Set(questions.filter((q) => !whenMatches(q.when, effective)).map((q) => q.id));
+  const hidden = new Set(questions.filter((q) => !questionApplies(q, effective)).map((q) => q.id));
   for (const q of questions) {
     if (hidden.has(q.id)) continue;
     if (Object.hasOwn(given, q.id)) out[q.id] = given[q.id];

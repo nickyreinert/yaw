@@ -1,3 +1,4 @@
+import { runtimeContext } from './policy.js';
 // Derived facts (ADR-0017 §3) and the rule that matches a facts condition.
 // Used for module selection (appliesTo, default); the stack itself is picked from arch.language and arch.runs-on.
 
@@ -10,7 +11,7 @@ export function deriveFacts(answers = {}) {
   const runsOn = answers['arch.runs-on'];
   if (typeof runsOn === 'string' && runsOn !== 'auto') {
     facts.runsOn = runsOn;
-    facts.hosted = runsOn !== 'local';
+    facts.hosted = runtimeContext(answers).hosting;
   }
   if (typeof answers['idea.audience'] === 'string') facts.public = answers['idea.audience'] === 'public';
   if (typeof answers['idea.team'] === 'string') facts.team = ['team', 'external-reviewers'].includes(answers['idea.team']);

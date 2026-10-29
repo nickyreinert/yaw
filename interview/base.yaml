@@ -131,8 +131,8 @@ questions:
     ref: "3.8"
     mode: F
     type: choice
-    label: Which libraries are allowed?
-    hint: Installed code, not hosted services. Guides build-versus-reuse choices.
+    label: Which dependencies may be added?
+    hint: Project code · Libraries and packages
     choices:
       - { value: standard-only, label: "Built-in only" }
       - { value: open-source, label: "Open source" }
@@ -157,8 +157,8 @@ questions:
     ref: "3.10"
     mode: F
     type: choice
-    label: What can the architecture cost?
-    hint: Hosting, libraries, APIs and subscriptions. Purchases still need approval.
+    label: Budget for hosting or paid components?
+    hint: Hosting, libraries and services · Approval required
     choices:
       - { value: free-only, label: "Free components only" }
       - { value: capped, label: "Within a budget" }

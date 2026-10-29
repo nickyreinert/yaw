@@ -1,8 +1,8 @@
 // Read-only collection/preview shared by the HTTP actions. No project writes here.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { whenMatches, parseReply, validAnswer } from '../interview/engine.js';
-import { asksIn as asksQuestion, isPersonal, isPreference, missingAnswers, sourceOf } from '../interview/policy.js';
+import { parseReply, validAnswer } from '../interview/engine.js';
+import { asksIn as asksQuestion, isPersonal, isPreference, missingAnswers, sourceOf, questionApplies, applicableArchitectureAnswers } from '../interview/policy.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
@@ -115,7 +115,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       const sources = {};
       for (const asked of [true, false]) for (const q of qs) {
         if (edit && !editable(q)) continue;
-        if (asksQuestion(q, input.mode) !== asked || !whenMatches(q.when, { ...given, ...answers })) continue;
+        if (asksQuestion(q, input.mode) !== asked || !questionApplies(q, { ...given, ...answers })) continue;
         const use = Object.hasOwn(given, q.id);
         answers[q.id] = use ? given[q.id] : q.default;
         if (!use) defaulted.push(q.id);
@@ -123,7 +123,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
           ? 'saved project setting' : isPersonal(q) && JSON.stringify(answers[q.id]) === JSON.stringify(q.default)
             ? sourceOf(q, false) : sourceOf(q, use);
       }
-      return { answers: edit ? answers : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted, sources };
+      return { answers: edit ? applicableArchitectureAnswers(answers) : Object.fromEntries(qs.filter((q) => Object.hasOwn(answers, q.id)).map((q) => [q.id, answers[q.id]])), defaulted, sources };
     };
     const all = normalizeFor(questions);
     const facts = deriveFacts(all.answers);
@@ -142,7 +142,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const { answers, defaulted, sources } = normalizeFor(answerQuestions);
     assertSafe(answers, kitRoot);
     const stack = stackProfile(profiles, answers);
-    const missing = missingAnswers(selected.filter((q) => whenMatches(q.when, answers) && (!edit || editable(q))), answers);
+    const missing = missingAnswers(selected.filter((q) => questionApplies(q, answers) && (!edit || editable(q))), answers);
     const unresolved = [...new Set([...missing, ...proposed])];
     for (const id of unresolved) sources[id] = missing.includes(id) ? 'unanswered' : 'proposed — needs confirmation';
     if (!stack.profile && !missing.some((id) => id.startsWith('arch.'))) throw new FormError(`Choose another stack: ${stack.reason}`);
@@ -179,7 +179,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     if (result.unresolved.length) return {
       mode: result.doc.mode, profile: result.profile, modules: result.modules, answers: result.doc.answers,
       defaulted: result.defaulted, sources: result.sources, unresolved: result.unresolved,
-      visible: result.selected.filter((q) => asksQuestion(q, result.doc.mode) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id),
+      visible: result.selected.filter((q) => asksQuestion(q, result.doc.mode) && questionApplies(q, result.doc.answers) && editable(q)).map((q) => q.id),
       files: [], secrets: { names: [], existingFile: false }, footprint: { bytes: 0, baseCopies: 0, note: 'Complete essential project answers to see the file plan.' },
       ...(diff ? { diff: 'Complete essential project answers before inspecting the file diff.' } : {}),
     };
@@ -204,7 +204,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     files.push({ path: MANIFEST, module: 'core', bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
-    const visible = result.selected.filter((q) => (sections.length || asksQuestion(q, result.doc.mode)) && whenMatches(q.when, result.doc.answers) && editable(q)).map((q) => q.id);
+    const visible = result.selected.filter((q) => (sections.length || asksQuestion(q, result.doc.mode)) && questionApplies(q, result.doc.answers) && editable(q)).map((q) => q.id);
     const output = {
       mode: result.doc.mode, profile: result.profile,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, sources: result.sources, unresolved: [], visible, files,

@@ -11,7 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PLAIN } from '../cli/style.js';
-import { asksIn as asksQuestion, isPersonal, resolved, sourceOf } from './policy.js';
+import { asksIn as asksQuestion, isPersonal, resolved, sourceOf, questionApplies } from './policy.js';
 import { depthOf } from './depth.js';
 
 export const MAX_BATCH = 6;
@@ -199,7 +199,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     const batch = batches[b];
     prompter.show(`\n${style.bold(batch.title)} ${style.dim(`(${b + 1}/${batches.length})`)}\n`);
     for (const q of batch.questions) {
-      if (!whenMatches(q.when, seen())) continue;
+      if (!questionApplies(q, seen())) continue;
       const expertise = expertiseOf(seen());
       if (depthOf(mode) !== 'pro' && expertise === 'layperson' && q.mode === 'F') {
         answers[q.id] = q.default;
@@ -247,7 +247,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
   }
   // Questions this mode does not ask take their default and are listed as such.
   for (const q of questions) {
-    if (askedIds.has(q.id) || !whenMatches(q.when, seen())) continue;
+    if (askedIds.has(q.id) || !questionApplies(q, seen())) continue;
     answers[q.id] = q.default;
     sources[q.id] = sourceOf(q, false);
     defaulted.push(q.id);

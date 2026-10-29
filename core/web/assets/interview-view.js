@@ -1,5 +1,5 @@
 import { choiceValue, choiceLabel, available, asksIn, matches, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
-import { isPreference } from '../../interview/policy.js';
+import { isPreference, questionApplies } from '../../interview/policy.js';
 
 import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
@@ -320,7 +320,7 @@ function renderModules() {
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {
       const everything = effectiveAnswers(catalog.questions, state.answers, state.mode);
-      return [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && (on ? !c.node.hidden : asksIn(c.q, questionMode()) && matches(c.q.when, everything)))
+      return [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && (on ? !c.node.hidden : asksIn(c.q, questionMode()) && questionApplies(c.q, everything)))
         .map((c) => { c.node.hidden = false; c.inputs.forEach((i) => { i.disabled = !on || sectionEditing() || i.dataset.unavailable === '1'; }); return c.node; });
     },
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
