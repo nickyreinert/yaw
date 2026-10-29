@@ -6,11 +6,13 @@ import { createFormApi } from '../web/init.js';
 import { createFormModel, FormError } from '../web/form-model.js';
 import { verifyProject } from '../cli/init.js';
 import { safeDirectory, requireValue } from './store.js';
+import { executionEnvironment } from './native-agent.js';
 
 export const projectSlug = (slug) => typeof slug === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length <= 64;
 export class HostedProjects {
   constructor({ root, kitRoot, env, store, agents, verify = verifyProject }) {
-    Object.assign(this, { root: safeDirectory(root), kitRoot, env, store, agents, verify }); this.interviews = new Map(); this.applying = false;
+    Object.assign(this, { root: safeDirectory(root), kitRoot, env, store, agents }); this.interviews = new Map(); this.applying = false;
+    this.verify = (options) => verify({ ...options, io: { ...options.io, env: { ...executionEnvironment(env), YAW_KIT: kitRoot } } });
   }
   create({ slug, command = 'init-local', skipVerify = false, handoff = null }, owner) {
     requireValue(!this.closed, 'Host is stopping', 503);

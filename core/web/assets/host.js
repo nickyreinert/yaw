@@ -18,12 +18,14 @@ async function openInterview(id) {
 }
 async function refresh() {
   const s = await request('/api/state'); $('host-root').textContent = s.root;
+  const setupCommand = `cd '${s.root.replaceAll("'", "'\\''")}'\nclaude`;
+  if ($('claude-setup-command').textContent !== setupCommand) $('claude-setup-command').textContent = setupCommand;
   rows('projects', s.projects, (p) => row(`${p.slug ?? p.id} · ${p.language ?? ''} · ${p.state ?? 'registered'}`));
   rows('sessions', s.sessions, (s) => {
     const controls = [];
     if (s.url) { const a = node('a', 'Open Claude'); a.href = s.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; controls.push(a); }
     if (s.startup) controls.push(button(s.startup === 'workspace' ? 'Trust workspace' : 'Enable Claude Remote Control', async () => { await request('/api/native-confirm', { session: s.id }); await refresh(); }));
-    if (['starting', 'ready', 'busy', 'idle', 'input-required', 'confirmation-required', 'setup-required'].includes(s.state)) controls.push(button('Stop', async () => { await request('/api/native-stop', { session: s.id }); await refresh(); }));
+    if (s.running) controls.push(button('Stop', async () => { await request('/api/native-stop', { session: s.id }); await refresh(); }));
     return row(`${s.slug} · ${s.state}`, ...controls);
   });
   rows('pending', s.pending, (p) => row(`${p.name} · ${p.verification}`, button('Approve sync + init', async () => { await request('/api/pair/approve', { id: p.id }); await refresh(); })));

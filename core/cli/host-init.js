@@ -12,6 +12,7 @@ import { UsageError } from './commands.js';
 import { hostedWeb } from '../web/hosted-init.js';
 import { chooseInitModules } from './init-modules.js';
 import { selectedByPolicy } from '../interview/depth.js';
+import { orderSetupQuestions } from '../interview/policy.js';
 
 export async function hostInit({ values, positionals, io, local = false }) {
   requireRemoteEnabled(io.env);
@@ -56,7 +57,7 @@ export async function hostInit({ values, positionals, io, local = false }) {
       const preset = await request(`/api/interviews/${session.id}/prefill`, { kind: 'preset', name });
       selected = preset.mode; defaults = preset.answers;
     }
-    const result = await runInterview({ questions: catalog.questions, mode: selected, defaults, prompter: io.prompter, kitRoot: io.kitRoot, allowWeb: true });
+    const result = await runInterview({ questions: orderSetupQuestions(catalog.questions), mode: selected, defaults, prompter: io.prompter, kitRoot: io.kitRoot, allowWeb: true });
     input = { mode: selected, answers: result.answers, gitInit: true };
     if (result.web) return browser(input);
     const stack = await confirmStack({ prompter: io.prompter, profiles: catalog.profiles, questions: catalog.questions, answers: result.answers });

@@ -5,6 +5,7 @@ import { remoteSettings } from '../lib/remote-settings.js';
 import { digest, requireValue } from './store.js';
 import { chooseInitModules } from '../cli/init-modules.js';
 import { selectedByPolicy } from '../interview/depth.js';
+import { orderSetupQuestions } from '../interview/policy.js';
 
 // This questionnaire exists only inside a running Host service. Ordinary init has no Telegram route.
 export class HostTelegram extends TelegramController {
@@ -63,7 +64,7 @@ export class HostTelegram extends TelegramController {
     });
     try {
       this.send(`Host interview: ${slug}\n${mode}`);
-      const result = await runInterview({ questions: catalog.questions, mode, kitRoot: this.kitRoot, prompter: { interactive: true, show: (text) => { output += text; }, ask } });
+      const result = await runInterview({ questions: orderSetupQuestions(catalog.questions), mode, kitRoot: this.kitRoot, prompter: { interactive: true, show: (text) => { output += text; }, ask } });
       const input = { mode, answers: result.answers, gitInit: true };
       if (mode === 'all') {
         const selection = await chooseInitModules({ prompter: { show: (text) => { output += text; }, ask }, definitions: catalog.modules, defaults: catalog.modules.filter((m) => m.savedDefault).map((m) => m.name), answers: input.answers });

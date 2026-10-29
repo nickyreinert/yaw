@@ -10,6 +10,17 @@ Open `yaw web` in the folder that will hold your workspaces. Select Host, choose
 
 The host needs Node 22.13+, Linux or macOS, and a current Claude Code CLI supporting `remote-control --spawn=session`. A native terminal uses `/usr/bin/script` on Linux, or Python 3's standard-library PTY support on macOS; no Python packages are required. Sign into Claude on the host using `claude` and `/login`. Native Remote Control requires an eligible subscription; an API key is not a substitute. `YAW_CLAUDE_BIN` can select a trusted host-installed executable. No SDK package is installed by this workflow.
 
+Before creating hosted projects, prepare Claude interactively **on the host, as the same OS account and with the same home directory that runs YAW**:
+
+```sh
+cd /absolute/path/to/workspaces
+claude
+```
+
+Accept the workspace trust dialog and use `/login` if needed. Then run `/remote-control`, accept its one-time consent, and verify that a connection link appears. Use `/exit` afterward; this parent-folder session is only a setup check, not a coding task. The host interface also shows these setup steps.
+
+Trusting this parent covers ordinary subdirectories, but **separate Git repositories beneath it need their own trust**, and project allow rules or additional directories can also require explicit project trust. Most hosted projects initialize their own repository, so parent setup does not guarantee prompt-free launches. YAW keeps its native startup confirmation fallback and never edits Claude's trust records. See [Claude's trust scope](https://code.claude.com/docs/en/permissions#project-allow-rules-and-workspace-trust) and [Remote Control setup](https://code.claude.com/docs/en/remote-control#start-a-remote-control-session).
+
 ## Client
 
 Enable Server mode, choose Client and enter the host address, for example `http://192.168.1.10:4318`. That is the only client configuration field. A background client requests pairing; compare the displayed pairing fingerprint on both machines, then approve **sync + init** in the host interface. Its scoped device credential is stored privately on the client. Revoke it on the host to stop further sync and initialization requests. Existing data-only pairings retain data-only access.
@@ -43,7 +54,7 @@ After confirmation, files go to `workspaces/<programming-language>/<slug>/`, for
 
 Hosted projects select exactly one agent: Claude Code in this version. Successful setup/checks, or explicit skip, launch one native Claude Remote Control process in that project. The host allows two concurrent native processes and one initialization at a time. It shows process state and the native Claude connection link. No initial coding prompt is sent: use Claude's own web/mobile interface for prompts and tool approvals.
 
-Native workspace trust and Remote Control startup confirmations remain explicit in the host interface. A running process is not reported ready until its connection URL appears. Installation, login or unsupported CLI failures require attention on the host. YAW does not import or control arbitrary pre-existing CLI processes. Service restart marks previous sessions unknown and does not replay coding work or automatically relaunch them.
+Prepare the host account as described above before the first launch. Any remaining project-specific workspace trust or Remote Control startup confirmation remains explicit in the host interface. A running process is not reported ready until its connection URL appears. Installation, login or unsupported CLI failures require attention on the host. YAW does not import or control arbitrary pre-existing CLI processes. Service restart marks previous sessions unknown and does not replay coding work or automatically relaunch them.
 
 ## Telegram, only on the host
 

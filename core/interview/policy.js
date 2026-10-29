@@ -2,6 +2,10 @@
 import { asksAtDepth } from './depth.js';
 export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.register', 'user.examples', 'user.explain'];
 export const isPreference = (q) => PERSONAL_PREFERENCES.includes(typeof q === 'string' ? q : q.id);
+export function orderSetupQuestions(questions) {
+  const rank = (q) => q.id.startsWith('user.') && (isPreference(q) || q.id === 'user.agents') ? 0 : q.id.startsWith('idea.') ? 1 : q.id.startsWith('arch.') ? 2 : 3;
+  return [...questions].sort((a, b) => rank(a) - rank(b));
+}
 export const isPersonal = (q) => q.scope === 'user' && q.id !== 'user.agents';
 export const asksIn = (q, mode) => q.reviewSelected || isPersonal(q) && q.reviewPersonal ? true : isPreference(q) && mode === 'basic' ? true : asksAtDepth(q, mode);
 export const resolved = (q, value) => !q.required || (typeof value === 'string' && value.trim().length > 0);

@@ -116,7 +116,8 @@ test('paired LAN devices have scoped interview access, revocation, and no host c
 });
 
 test('host refuses symlinked language folders and preserves failed verification without launching', async () => {
-  const f = await setup({ verify: async () => false });
+  const f = await setup({ verify: async ({ io }) => { assert.equal(io.env.YAW_REMOTE_OWNER_TOKEN, undefined); return false; } });
+  f.env.YAW_REMOTE_OWNER_TOKEN = 'fixture-controller-credential';
   try {
     const outside = realpathSync(tmp()); symlinkSync(outside, join(f.settings.workspaceRoot, 'javascript'));
     const s = (await f.request('/api/interviews', { slug: 'no-escape' })).body;
@@ -154,6 +155,32 @@ test('Telegram questionnaires refuse disabled and client environments', async ()
   saveRemoteSettings(env, { enabled: true, port: 4318, role: 'client', address: 'http://127.0.0.1:4318' });
   assert.deepEqual(await bot.handle({ update_id: 2 }), { refused: true });
   await bot.close();
+});
+
+test('paired Telegram runs the hosted questionnaire and requires final confirmation before launch', { timeout: 10000 }, async () => {
+  const f = await setup(), messages = [];
+  const bot = new HostTelegram({ env: f.env, kitRoot: KIT_ROOT, store: f.service.store, projects: f.service.projects, agents: f.service.agents, token: 'fixture' });
+  bot.send = (text) => messages.push(text);
+  f.service.store.state.telegram = { userId: '12', chatId: '12' }; f.service.store.save();
+  let sequence = 1;
+  const reply = (text) => bot.handle({ update_id: sequence++, message: { text, from: { id: 12 }, chat: { id: 12, type: 'private' } } });
+  const waitForQuestion = async (previous) => {
+    for (let n = 0; n < 200 && !(bot.active?.resolve && messages.length > previous); n++) await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(bot.active?.resolve, messages.at(-1));
+  };
+  try {
+    await reply('/init telegram-check');
+    for (const [label, answer] of [[/coding agents/, 'claude'], [/Describe the idea/, 'A disposable Telegram project for local notes.'], [/language/, 'python'], [/run/, 'local'], [/GitHub/, 'no']]) {
+      assert.match(messages.at(-1), label);
+      const previous = messages.length; await reply(answer); await waitForQuestion(previous);
+    }
+    assert.match(messages.at(-1), /Create .*telegram-check/);
+    assert.equal(f.spawned.plans.length, 0);
+    await reply('yes');
+    for (let n = 0; n < 200 && bot.active; n++) await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.equal(bot.active, null); assert.equal(f.spawned.plans.length, 1);
+    assert.equal(existsSync(join(f.settings.workspaceRoot, 'python/telegram-check/.yaw/manifest.json')), true);
+  } finally { await bot.close(); await f.close(); }
 });
 
 test('client pairing syncs defaults, presets and statistics both ways through the LAN hub', async () => {

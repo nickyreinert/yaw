@@ -10,13 +10,16 @@ import { digest, requireValue } from './store.js';
 
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 const EVENTS = ['UserPromptSubmit', 'Stop', 'StopFailure', 'Notification', 'TaskCompleted', 'SessionEnd'];
+export function executionEnvironment(env) {
+  return Object.fromEntries(['PATH', 'HOME', 'YAW_HOME', 'LANG', 'LC_ALL', 'TERM', 'COLORTERM', 'TMPDIR', 'USER', 'LOGNAME', 'SHELL', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'].filter((key) => env[key]).map((key) => [key, env[key]]));
+}
 export function nativePlan({ root, slug, env, session, token, address, kitRoot, os = platform() }) {
   requireValue(['linux', 'darwin'].includes(os), 'Native hosting currently requires Linux or macOS');
   const executable = env.YAW_CLAUDE_BIN || 'claude';
   requireValue(!/[\r\n\0]/.test(executable), 'Invalid host Claude executable');
   const nativeArgs = ['remote-control', '--spawn=session', '--name', slug, '--permission-mode', 'default'];
   const command = [executable, ...nativeArgs].map(quote).join(' ');
-  const childEnv = Object.fromEntries(['PATH', 'HOME', 'LANG', 'LC_ALL', 'TERM', 'COLORTERM', 'TMPDIR', 'USER', 'LOGNAME', 'SHELL', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'].filter((k) => env[k]).map((k) => [k, env[k]]));
+  const childEnv = executionEnvironment(env);
   Object.assign(childEnv, { TERM: childEnv.TERM || 'xterm-256color', YAW_NATIVE_SESSION: session, YAW_NATIVE_TOKEN: token, YAW_NATIVE_ADDRESS: address });
   // A separate local settings file preserves generated, managed project hooks.
   requireValue(!existsSync(join(root, '.claude/settings.local.json')), 'Existing local Claude settings require review before managed launch');
@@ -37,7 +40,7 @@ export class NativeAgents extends EventEmitter {
     const executable = (name) => paths(name).some((path) => { try { accessSync(path, constants.X_OK); return statSync(path).isFile(); } catch { return false; } });
     return executable(binary) && executable(platform() === 'darwin' ? 'python3' : '/usr/bin/script');
   }
-  list() { return this.store.state.sessions.filter((s) => s.native === true).map((s) => ({ ...s })); }
+  list() { return this.store.state.sessions.filter((s) => s.native === true).map((s) => ({ ...s, running: this.workers.has(s.id) })); }
   save(session, state) { session.state = state; session.updated = new Date().toISOString(); this.store.save(); this.emit('status', { ...session }); }
   start(project) {
     requireValue(this.available(), 'Install Claude Code and the host PTY tool (Python 3 on macOS, script on Linux) before launch');
