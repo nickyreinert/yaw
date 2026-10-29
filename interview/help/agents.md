@@ -1,3 +1,2 @@
-- Every selected agent gets the files it reads: all read AGENTS.md, Claude Code also CLAUDE.md
-- Pick the agents you use now; change later in .yaw/answers.yaml
-- Supported: Claude Code, Codex, Copilot (Gemini is shown, not selectable yet)
+- AGENTS.md: shared project rules. CLAUDE.md / GEMINI.md: agent imports.
+- Select Claude Code, Codex, Copilot or Gemini CLI; multiple choices allowed.

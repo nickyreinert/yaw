@@ -84,7 +84,7 @@ test('edit CLI reviews a question with saved defaults and cancellation writes no
   assert.equal(await main(['edit', 'idea.text', '--skip-verify'], io), 0, io.stderr.text());
   assert.equal(readAnswers(root).answers['idea.text'], 'Updated idea.');
   assert.deepEqual(readAnswers(root).answers['user.agents'], ['claude', 'codex', 'copilot']);
-  assert.equal(io.prompter.asked.filter((q) => q.includes('(? help, skip)')).length, 1);
+  assert.equal(io.prompter.asked.filter((q) => q.endsWith('] > ')).length, 1);
 });
 
 test('edit without selectors reruns the interview and lists sections without prompting', async () => {
@@ -104,7 +104,7 @@ test('explicit question editing asks beyond the saved Quick depth without changi
   const p = interview();
   const io = ioFor(root, p);
   assert.equal(await main(['edit', question.id, '--skip-verify'], io), 0, io.stderr.text());
-  assert.equal(p.asked.filter((q) => q.includes('(? help, skip)')).length, 1);
+  assert.equal(p.asked.filter((q) => q.endsWith('] > ')).length, 1);
   assert.equal(readAnswers(root).mode, 'quick');
   assert.deepEqual(requireManifest(root).modules.core.enabled, true);
 });

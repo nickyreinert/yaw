@@ -1,4 +1,3 @@
-- A few sentences: what it does, for whom, what it must not do
-- Goes into AGENTS.md as one line, so agents know the purpose
-- Example: "A command-line tool that renames photos by their EXIF date."
-- Leave it empty if you do not know yet
+- Describe what it does, who uses it and key constraints.
+- Saved as the project purpose in AGENTS.md. Required before Apply.
+- Example: a command-line tool that renames photos by EXIF date.

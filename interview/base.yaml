@@ -61,7 +61,7 @@ questions:
     mode: Q
     type: choice
     label: Solo or team?
-    hint: Shared team rules; with GitHub enabled, Full also requires issues and PRs (doc 14). Git can use a remote in another local folder instead.
+    hint: Solo or shared project rules. GitHub remains optional.
     choices: [solo, team, external-reviewers]
     default: solo
   - id: tasks.use-github
@@ -112,14 +112,14 @@ questions:
     mode: F
     type: text
     label: Existing framework to keep? (optional)
-    hint: Only for an existing requirement, such as keeping Django. Leave blank for a new project; language and runtime choose the kit profile.
+    hint: Existing project requirement, e.g. Django. Otherwise leave blank.
     default: ""
   - id: arch.hosting-control
     ref: "3.7"
     mode: F
     type: choice
     label: Who manages hosting?
-    hint: Guides the architecture plan; separate from where the code runs.
+    hint: Hosting ownership for the project plan.
     choices:
       - { value: on-premises, label: "On premises" }
       - { value: self-hosted, label: "Self-managed" }
@@ -145,7 +145,7 @@ questions:
     mode: F
     type: choice
     label: Can the app use external services?
-    hint: Hosted auth, databases or APIs. Guides data flows in the plan.
+    hint: Hosted auth, databases or APIs.
     choices:
       - { value: none, label: "No external services" }
       - { value: approved-only, label: "Approved services only" }

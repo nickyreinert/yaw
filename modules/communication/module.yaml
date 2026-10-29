@@ -41,7 +41,7 @@ questions:
     mode: S
     type: choice
     label: Should the agent use examples and analogies?
-    hint: "This adds an instruction: Always asks for a plain-language example with each explanation; Never avoids examples unless asked; Only when useful lets the agent decide."
+    hint: "Examples and analogies in agent explanations."
     choices:
       - { value: when-helpful, label: Only when useful }
       - { value: always, label: Always }

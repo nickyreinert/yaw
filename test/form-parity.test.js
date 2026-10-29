@@ -67,7 +67,7 @@ async function viaCli({ mode, answers }) {
     if (/guidance to kick off/.test(question)) return 'n';
     const line = [...p.shown].reverse().join('').split('\n').find((l) => /^ {2}\d+\/\d+ /.test(l));
     const q = line && BY_LABEL.get(line.replace(/^ {2}\d+\/\d+ /, ''));
-    if (!q || !/\(\? help, skip\) > $/.test(question)) throw new Error(`unexpected prompt: ${question}`);
+    if (!q || !/\] > $/.test(question)) throw new Error(`unexpected prompt: ${question}`);
     return Object.hasOwn(answers, q.id) ? reply(answers[q.id]) : '';
   };
   const stderr = capture();

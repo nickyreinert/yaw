@@ -131,15 +131,17 @@ function helpText(q, kitRoot) {
   return parts.length > 0 ? parts.join('\n\n') : 'No further help for this question. Enter takes the default, skip lists it as "default".';
 }
 
+const indent = (text) => String(text).split('\n').map((line) => line ? `      ${line}` : '').join('\n');
+
 const isDefault = (q, value) => (Array.isArray(q.default) ? q.default.includes(value) : q.default === value);
 
 // style: plain text unless the prompter colours its terminal (#163); the default choice is green.
 function render(q, number, total, expertise, style) {
   const lines = [`  ${style.dim(`${number}/${total}`)} ${style.bold(q.label)}`];
   // Expert: hints are collapsed behind "?" (doc 02 section 4).
-  if (q.hint && expertise !== 'expert') lines.push(`      ${style.dim(q.hint)}`);
+  if (q.hint && expertise !== 'expert') lines.push(indent(style.dim(q.hint)));
   // A runtime status (e.g. the GitHub check, #166) is always shown.
-  if (q.status) lines.push(`      ${style.yellow(q.status)}`);
+  if (q.status) lines.push(indent(style.yellow(q.status)));
   if (q.choices) {
     q.choices.forEach((c, i) => {
       const label = typeof c === 'object' && c.label ? c.label : choiceValue(c);
@@ -193,7 +195,7 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
     for (const q of questions) if (Object.hasOwn(answers, q.id)) out[q.id] = answers[q.id];
     return out;
   };
-  const options = '? help, skip';
+  const options = `? help, skip${allowWeb ? ', w switch to browser' : ''}`;
   const style = prompter.style ?? PLAIN;
   for (let b = 0; b < batches.length; b++) {
     const batch = batches[b];
@@ -209,22 +211,22 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
       }
       number++;
       prompter.show(`${render(q, number, total, expertise, style)}\n`);
-      if (allowWeb) prompter.show(`      ${style.cyan('w)')} Continue in the browser\n`);
       // Up and down move through the available choices, starting from the default (#163).
       const values = (q.choices ?? []).filter(available).map(choiceValue);
       if (allowWeb) values.push('w');
       const keys = { choices: values, start: values.findIndex((v) => isDefault(q, v)) };
-      if (expertise === 'layperson' && q.help) prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
+      if (expertise === 'layperson' && q.help) prompter.show(`${indent(helpText(q, kitRoot))}\n`);
       for (;;) {
-        const reply = await prompter.ask(`      [${style.green(formatDefault(q))}] ${style.dim(`(${options})`)} > `, keys);
+        prompter.show(`      ${style.dim(`(${options})`)}\n`);
+        const reply = await prompter.ask(`      [${style.green(formatDefault(q))}] > `, keys);
         if (allowWeb && ['w', 'web'].includes(reply.trim().toLowerCase())) return { answers: ordered(), defaulted, sources, web: true };
         if (["don't know", 'dont know', 'unsure', 'you choose', 'auto'].includes(reply.trim().toLowerCase()) && q.required) {
-          prompter.show(`\n${helpText(q, kitRoot)}\nChoose a project answer, or use w for browser planning guidance. No project choice will be guessed.\n`);
+          prompter.show(`${indent(helpText(q, kitRoot))}\n      Choose a project answer; ? for help${allowWeb ? ', w for browser' : ''}.\n`);
           continue;
         }
         const r = parseReply(q, reply);
         if (r.help) {
-          prompter.show(`\n${helpText(q, kitRoot)}\n\n`);
+          prompter.show(`${indent(helpText(q, kitRoot))}\n`);
         } else if (r.error) {
           prompter.show(`      ${r.error}\n`);
         } else if (r.skip) {

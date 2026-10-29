@@ -1,5 +1,3 @@
-- Changes how much background the agent gives and which questions are asked
-- Layperson: more explanation, fewer advanced questions
-- Intermediate: balanced
-- Expert: skips basic explanations
-- It does not change security rules or what the agent can access
+- Controls explanation detail: layperson, intermediate or expert.
+- All asks every applicable question at every experience level.
+- Tool permissions stay unchanged.

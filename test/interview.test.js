@@ -75,7 +75,7 @@ test('runInterview: Enter, skip, ?, wrong replies; skipped and unasked questions
   // "skip" and the question this mode does not ask are defaults; Enter on team.approvals is an answer
   assert.deepEqual(r.defaulted, ['idea.size']);
   const shown = prompter.shown.join('');
-  assert.match(shown, /Every selected agent gets the files it reads/, '? shows interview/help/agents.md');
+  assert.match(shown, /AGENTS.md: shared project rules/, '? shows interview/help/agents.md');
   assert.match(shown, /"wat" is not one of: solo, team/);
   assert.match(shown, /About you \(1\/4\)/);
 });
@@ -144,4 +144,27 @@ test('stack catalogue has unique pairs and browser selection agrees with CLI for
     const cli = stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': host }).profile;
     assert.equal(browserProfileFor(profiles, language, host)?.name ?? null, cli, `${language} on ${host}`);
   }
+});
+
+test('CLI controls sit immediately above every input, including help and validation retries', async () => {
+  const prompter = scripted(['?', 'invalid', 'w']);
+  const ask = prompter.ask;
+  prompter.ask = async (prompt, keys) => {
+    assert.equal(prompter.shown.at(-1), '      (? help, skip, w switch to browser)\n');
+    assert.equal(prompt, '      [solo] > ');
+    return ask(prompt, keys);
+  };
+  const result = await runInterview({
+    questions: [q({ hint: 'First detail\nSecond detail', status: 'First status\nSecond status', help: 'stack' })],
+    mode: 'pro', known: { 'user.expertise': 'layperson' }, prompter, kitRoot: KIT_ROOT, allowWeb: true,
+  });
+  assert.equal(result.web, true);
+  const shown = prompter.shown.join('');
+  for (const line of ['First detail', 'Second detail', 'First status', 'Second status', '- Language and runtime']) {
+    assert.ok(shown.includes(`      ${line}`), line);
+  }
+  assert.doesNotMatch(shown, /Continue in the browser|Tailored stack/);
+  const terminal = scripted(['']);
+  await runInterview({ questions: [q()], mode: 'pro', prompter: terminal });
+  assert.equal(terminal.shown.at(-1), '      (? help, skip)\n');
 });

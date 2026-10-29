@@ -1,5 +1,2 @@
-- How the agent handles uncertainty in ordinary work
-- It does not override tool permissions, security rules or your approval for restricted actions
-- Ask often: frequent check-ins
-- Ask on risky or ambiguous steps: a balance
-- Act and report: when the request is clear
+- Sets when the agent asks before acting.
+- Tool permissions and required approvals still apply.

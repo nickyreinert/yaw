@@ -53,17 +53,18 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
     const language = next['arch.language'];
     const hit = profileForStack(profiles, language, next['arch.runs-on']);
     if (hit) {
-      prompter.show(`\n${s.bold('Stack')}: ${s.green(hit.title)} (${hit.name}; ${hit.stack.basic ? 'basic: the standard tools of the language' : 'tailored'})\n`);
-      if (hit.stack.notes?.[next['arch.runs-on']]) prompter.show(`  ${hit.stack.notes[next['arch.runs-on']]}\n`);
+      prompter.show(`\n  ${s.bold('Stack')}: ${s.green(hit.title)} (${hit.name})\n`);
+      prompter.show(`      ${hit.summary}\n`);
+      if (hit.stack.notes?.[next['arch.runs-on']]) prompter.show(`      ${hit.stack.notes[next['arch.runs-on']]}\n`);
       const tools = (hit.requires ?? []).filter((r) => !r.startsWith('just'));
-      if (tools.length) prompter.show(`  Needs on your computer: ${tools.join(', ')}. yaw doctor tells you what is missing.\n`);
+      if (tools.length) prompter.show(`      Requires: ${tools.join(', ')} · yaw doctor\n`);
       return { profile: hit.name, answers: next };
     }
     const hosts = hostsFor(profiles, language, (hostQ?.choices ?? []).map((c) => c.value ?? c));
     if (hosts.length === 0) throw new ProjectError(`no stack for ${language} in this kit`);
     prompter.show(`\nNo YAW profile for ${choiceLabel(langQ, language)} on ${next['arch.runs-on']}. ${s.bold('Where will it run?')}\n`);
     hosts.forEach((h, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${choiceLabel(hostQ, h)} - ${profileForStack(profiles, language, h).title}\n`));
-    prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
+    prompter.show(`  ${s.dim('(w switch to browser)')}\n`);
     const reply = (await prompter.ask('  Runs on > ', { choices: [...hosts, 'w'], start: 0 })).trim();
     if (['w', WEB].includes(reply.toLowerCase())) return WEB;
     const pick = hosts.find((h, i) => h === reply || String(i + 1) === reply);
@@ -76,12 +77,12 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
 async function chooseMode({ prompter }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Setup depth')}\n`);
-  prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
-  prompter.show(`  ${s.cyan('2)')} basic - essentials plus personal preferences, GitHub and review gates\n`);
+  prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - agents, purpose, language, runtime and GitHub\n`);
+  prompter.show(`  ${s.cyan('2)')} basic - Quick plus personal preferences and review gates\n`);
   prompter.show(`  ${s.cyan('3)')} all - every applicable question and optional tool\n`);
-  prompter.show(`  ${s.cyan('p)')} Load a previous setup - clone saved answers, then review them\n`);
-  prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
+  prompter.show(`  ${s.cyan('p)')} Load a previous setup\n`);
   for (;;) {
+    prompter.show(`  ${s.dim('(w switch to browser)')}\n`);
     const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'basic', 'all', 'p', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'basic') return 'basic';
@@ -102,8 +103,9 @@ async function choosePrevious(io) {
   const s = io.prompter.style ?? PLAIN;
   io.prompter.show(`\n${s.bold('Previous setups')} (newest names first)\n`);
   presets.forEach((p, i) => io.prompter.show(`  ${s.cyan(`${i + 1})`)} ${i === 0 ? s.green(s.bold(p.name)) : p.name}\n`));
-  io.prompter.show(`  ${s.cyan('b)')} Back to setup depth\n  ${s.cyan('w)')} Continue in the browser\n`);
+  io.prompter.show(`  ${s.cyan('b)')} Back to setup depth\n`);
   for (;;) {
+    io.prompter.show(`  ${s.dim('(w switch to browser)')}\n`);
     const reply = (await io.prompter.ask(`  Previous setup [${s.green(presets[0].name)}] > `, { choices: [...presets.map((p) => p.name), 'b', 'w'], start: 0 })).trim();
     if (['w', WEB].includes(reply.toLowerCase())) return WEB;
     if (['b', 'back'].includes(reply.toLowerCase())) return null;
@@ -251,11 +253,11 @@ export async function init({ values, positionals, io }) {
     }
     answersDoc = parseAnswers(fileText.toString('utf8'), values.answers);
   } else {
-    io.stdout.write('yaw init: a few questions (Enter takes the default, ? explains, skip lists it as "default", w continues in the browser). Nothing is written until you confirm.\n');
+    io.stdout.write('yaw init: Enter keeps the default. Review files before applying.\n');
     let mode;
     const preferences = loadPreferences({ env: io.env, kitRoot });
     if (!preferences.hasDefaults && !preferences.warning) {
-      const notice = 'No personal defaults set. Quick uses factory defaults. In Basic or All, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific. You can continue now, or run yaw defaults separately.';
+      const notice = 'No personal defaults set. Quick uses factory defaults. Basic/All saves your first confirmed personal preferences after Apply. Project choices stay separate. Edit defaults: yaw defaults.';
       io.stdout.write(`\n${(io.prompter.style ?? PLAIN).yellow(notice)}\n`);
     }
     const setupPolicy = loadSetupDefaults({ env: io.env, kitRoot });

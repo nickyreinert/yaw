@@ -71,7 +71,7 @@ test('init: a saved Full setup keeps its mode and can be declined without any wr
   };
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, env, prompter });
   assert.equal(r.code, 1, r.err);
-  assert.match(prompter.shown.join(''), /\(full\)\. Saved answers/);
+  assert.match(prompter.shown.join(''), /\(All\)\. Saved answers/);
   assert.match(r.out, /cancelled; nothing was written/);
   assert.deepEqual(readdirSync(dir), []);
 });
@@ -139,7 +139,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
-  assert.match(r.out, /profile: node-cli \(tailored stack for javascript on local\)/);
+  assert.match(r.out, /profile: node-cli \(javascript on local\)/);
   assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(documented default\)$/m);
   assert.match(r.out, /user\.language +de +\(documented default\)/);
   assert.match(r.out, /verification skipped/);
@@ -179,7 +179,7 @@ test('interview: an uncovered combination offers available YAW profiles (by numb
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No YAW profile for HTML, CSS & JavaScript on wordpress/);
   assert.match(prompter.shown.join(''), /choose one of: local, self-hosted, serverless, edge, static/);
-  assert.match(r.out, /profile: static-site \(tailored stack for html on local\)/);
+  assert.match(r.out, /profile: static-site \(html on local\)/);
   assert.match(prompter.shown.join(''), /Preview public\/ on your computer/);
   assert.ok(existsSync(join(dir, 'public')));
 });
@@ -232,7 +232,7 @@ test('answers without a proposal: the stack picks the profile and it is written 
   const text = 'mode: quick\nanswers:\n  user.agents: [codex]\n  idea.text: A tiny tool.\n  arch.language: python\n  arch.runs-on: local\n';
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /profile: python-cli \(tailored stack for python on local\)/);
+  assert.match(r.out, /profile: python-cli \(python on local\)/);
   assert.match(r.out, /user\.language +de +\(documented default\)/, 'questions missing from the file are listed as default');
   const doc = parseDocument(readFileSync(join(r.cwd, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(doc.proposal.profiles, ['python-cli']);
@@ -391,9 +391,9 @@ test('interview: "web" at a question continues in the browser form with the answ
   process.emit('SIGINT');
   await running;
   assert.match(asked[0], /Setup depth \[quick\] > $/);
-  assert.match(asked[1], /\(\? help, skip\) > $/);
-  assert.match(prompter.shown.join(''), / {2}w\) Continue in the browser\n/);
-  assert.match(prompter.shown.join(''), / {6}w\) Continue in the browser\n/);
+  assert.match(asked[1], /\] > $/);
+  assert.match(prompter.shown.join(''), / {2}\(w switch to browser\)\n/);
+  assert.match(prompter.shown.join(''), / {6}\(\? help, skip, w switch to browser\)\n/);
   assert.deepEqual(boot.handoff.answers['user.agents'], ['codex']);
   assert.equal(boot.handoff.answers['user.expertise'], undefined, 'handoff occurs before that question is answered');
   assert.ok(!Object.hasOwn(boot.handoff.answers, 'arch.language'));
