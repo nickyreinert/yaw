@@ -34,6 +34,7 @@ test('Settings URLs keep interview as a feature and preserve deep-link parameter
 test('Quick asks only project essentials and architecture; Basic adds GitHub/reviews; Pro asks all applicable questions', () => {
   const questions = collectQuestions(KIT_ROOT, ['core', 'tasks', 'review', 'communication', 'team']);
   assert.deepEqual(DEPTHS.map((d) => d.value), ['quick', 'basic', 'pro']);
+  assert.deepEqual(DEPTHS.map((d) => d.label), ['Quick', 'Basic', 'All']);
   const ids = (mode) => questions.filter((q) => asksIn(q, mode)).map((q) => q.id);
   assert.deepEqual(ids('quick'), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on']);
   for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {

@@ -2,7 +2,7 @@
 
 **Status: work packages 1–4 implemented.** This resolves both items in [KICK-OFF.md](../KICK-OFF.md). Docs [02](02-setup-flow.md) and [03](03-interview.md) describe the current interview. Guided kickoff adds reviewed foundations; installing the deterministic baseline alone creates none.
 
-Decision records: **Accepted** [ADR-0079](../.decisions/ADR-0079.md) supersedes ADR-0074 for personal-default onboarding and the Quick/Basic/Pro preference policy; **Accepted** [ADR-0075](../.decisions/ADR-0075.md) supersedes ADR-0073 for foundations and the two scopes of agent guidance.
+Decision records: **Accepted** [ADR-0079](../.decisions/ADR-0079.md) supersedes ADR-0074 for personal-default onboarding and the Quick/Basic/All preference policy; **Accepted** [ADR-0075](../.decisions/ADR-0075.md) supersedes ADR-0073 for foundations and the two scopes of agent guidance.
 
 ## 1. Quick asks about this project
 
@@ -11,11 +11,11 @@ Quick reduces repeated preference questions and the depth of planning. It must s
 | Information | Quick behavior |
 |---|---|
 | Experience, chat language, answer style, explanation depth, autonomy | Reuse saved personal settings, otherwise documented defaults; show their source in the summary. Offer an optional settings edit without making it part of the interview. |
-| Supported coding agents | Basic and Pro confirm the agents for this repository; Quick reuses an existing choice or the factory selection. This is a project choice even though its current answer key is `user.agents`. |
+| Supported coding agents | Basic and All confirm the agents for this repository; Quick reuses an existing choice or the factory selection. This is a project choice even though its current answer key is `user.agents`. |
 | Purpose, intended users and main task | Ask for a short description. Extract facts already supplied and ask only for missing essentials. |
 | Architecture/runtime and language/stack | Ask about requirements and constraints, or offer a reasoned proposal to confirm. Never silently copy these from personal preferences or a previous project. |
 | Data, human interaction and important constraints | Establish whether the project stores or changes meaningful data, how it is used, and any constraint that changes the proposal. A short follow-up is enough when the idea supplies most of this. |
-| Team, task storage and enabled modules | Basic and Pro ask project choices needed for the selected setup; Quick reuses defaults. Keep conditional questions conditional. |
+| Team, task storage and enabled modules | Basic and All ask project choices needed for the selected setup; Quick reuses defaults. Keep conditional questions conditional. |
 | Detailed capacity estimates, schema evolution, secondary flows and alternatives | Defer to Full or later work unless they affect an essential choice now. |
 
 “I don't know” is a valid reply to a project question. An agent should offer the simplest fitting option, explain the relevant trade-off and ask for confirmation. With no agent, the deterministic lane can explain supported choices and collect a selection, or save an incomplete draft for later guidance. It must not invent an architecture from a generic JavaScript/local default.
@@ -24,11 +24,11 @@ The review identifies answered, reused, defaulted and proposed values; the termi
 
 ### Personal onboarding and precedence
 
-The first question on a fresh interactive installation offers personal-default setup. `yaw defaults` and Global Settings → Defaults review them later. Init has no `u` onboarding entry. If defaults are absent, a coloured notice explains that Quick uses factory values while first confirmed Basic/Pro personal answers establish defaults after Apply. Only experience, chat language, autonomy and answer style are included. Agents, architecture and optional tools remain separate. CI/unattended installs and update reruns do not prompt.
+The first question on a fresh interactive installation offers personal-default setup. `yaw defaults` and Global Settings → Defaults review them later. Init has no `u` onboarding entry. If defaults are absent, a coloured notice explains that Quick uses factory values while first confirmed Basic/All personal answers establish defaults after Apply. Only experience, chat language, autonomy and answer style are included. Agents, architecture and optional tools remain separate. CI/unattended installs and update reruns do not prompt.
 
 For personal values, use an explicit project override first, then the saved user profile, then the documented default. When editing an existing project, keep its saved values unless the user changes them. Changing a global preference affects future setups and does not rewrite existing repositories.
 
-Reading an existing profile never grants permission to replace it. First-default seeding follows the init notice and confirmed Basic/Pro answers; explicit global preference changes and project preset saving remain separate actions. No new background profile writes or consent to external model use are implied. The exact onboarding command and answer metadata belong in the implementation design.
+Reading an existing profile never grants permission to replace it. First-default seeding follows the init notice and confirmed Basic/All answers; explicit global preference changes and project preset saving remain separate actions. No new background profile writes or consent to external model use are implied. The exact onboarding command and answer metadata belong in the implementation design.
 
 **Implemented:** both lanes reuse personal settings and leave missing essentials unresolved; the browser can save an incomplete draft. Invalid/unreadable profiles give a generic warning and remain untouched. Terminal Enter confirms a supplied project default; browser step review or an explicit review action confirms imported/planning choices. Answer provenance is transient review data. Explicit `yaw edit user` and browser section editing can change project overrides without changing depth or global settings.
 
@@ -115,4 +115,4 @@ The subsequent mockup/layout and project architecture-constraint additions are r
 
 ### Updated depth policy
 
-Quick asks essential project and architecture choices and reuses saved settings. Basic adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. Pro / all asks every applicable implemented question. Optional tools start off when never selected; Global Settings can save explicit tool defaults. Initial setup and Settings → Interview reuse one wizard/controller, including foundation review and Apply. Legacy depths and existing project module selections remain readable.
+Quick asks essential project and architecture choices and reuses saved settings. Basic adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. All asks every applicable implemented question. Optional tools start off when never selected; Global Settings can save explicit tool defaults. Initial setup and Settings → Interview reuse one wizard/controller, including foundation review and Apply. Legacy depths and existing project module selections remain readable.

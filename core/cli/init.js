@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { stringify } from '../lib/yaml.js';
 import { envFileExists, envNames, writeEnvSecrets } from '../lib/env-secrets.js';
 import { loadSetupDefaults } from '../lib/setup-defaults.js';
-import { depthOf } from '../interview/depth.js';
+import { DEPTHS, depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
 import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
@@ -78,18 +78,18 @@ async function chooseMode({ prompter }) {
   prompter.show(`\n${s.bold('Setup depth')}\n`);
   prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - prototype or MVP: the essential baseline, short interview with defaults\n`);
   prompter.show(`  ${s.cyan('2)')} basic - essentials plus personal preferences, GitHub and review gates\n`);
-  prompter.show(`  ${s.cyan('3)')} pro / all - every applicable question and optional tool\n`);
+  prompter.show(`  ${s.cyan('3)')} all - every applicable question and optional tool\n`);
   prompter.show(`  ${s.cyan('p)')} Load a previous setup - clone saved answers, then review them\n`);
   prompter.show(`  ${s.cyan('w)')} Continue in the browser\n`);
   for (;;) {
-    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'basic', 'pro', 'p', 'w'], start: 0 })).trim().toLowerCase();
+    const reply = (await prompter.ask(`  Setup depth [${s.green('quick')}] > `, { choices: ['quick', 'basic', 'all', 'p', 'w'], start: 0 })).trim().toLowerCase();
     if (reply === '' || reply === '1' || reply === 'quick') return 'quick';
     if (reply === '2' || reply === 'basic') return 'basic';
     if (['3', 'pro', 'all'].includes(reply)) return 'pro';
     if (['full', 'standard'].includes(reply)) return reply;
     if (reply === 'p') return 'previous';
     if (['w', WEB].includes(reply)) return WEB;
-    prompter.show('  choose quick, basic, pro/all, p to load a previous setup, or w to continue in the browser\n');
+    prompter.show('  choose quick, basic, all, p to load a previous setup, or w to continue in the browser\n');
   }
 }
 
@@ -113,7 +113,7 @@ async function choosePrevious(io) {
       continue;
     }
     const saved = createFormModel({ root: io.cwd, kitRoot: io.kitRoot, env: io.env }).prefill('preset', preset.name);
-    io.prompter.show(`\nLoaded ${preset.name} (${saved.mode}). Saved answers are defaults; Enter keeps them.\nReview the previous project's idea and other answers before confirming. No files or secrets are copied.\n`);
+    io.prompter.show(`\nLoaded ${preset.name} (${DEPTHS.find((d) => d.value === depthOf(saved.mode))?.label ?? saved.mode}). Saved answers are defaults; Enter keeps them.\nReview the previous project's idea and other answers before confirming. No files or secrets are copied.\n`);
     return saved;
   }
 }
@@ -144,7 +144,7 @@ function summaryAnswers(questions, given, defaulted) {
 }
 
 function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModules, answers, defaulted, sources = {}, desired }) {
-  out.write(`\nSummary (${mode} setup)\n`);
+  out.write(`\nSummary (${DEPTHS.find((d) => d.value === depthOf(mode))?.label ?? mode} setup)\n`);
   out.write(`  profile: ${profile} (${how})\n`);
   out.write(`  modules: ${modules.join(', ')}\n`);
   for (const m of skippedModules) out.write(`  note: module "${m}" is not in this kit yet; skipped\n`);
@@ -255,7 +255,7 @@ export async function init({ values, positionals, io }) {
     let mode;
     const preferences = loadPreferences({ env: io.env, kitRoot });
     if (!preferences.hasDefaults && !preferences.warning) {
-      const notice = 'No personal defaults set. Quick uses factory defaults. In Basic or Pro, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific. You can continue now, or run yaw defaults separately.';
+      const notice = 'No personal defaults set. Quick uses factory defaults. In Basic or All, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific. You can continue now, or run yaw defaults separately.';
       io.stdout.write(`\n${(io.prompter.style ?? PLAIN).yellow(notice)}\n`);
     }
     const setupPolicy = loadSetupDefaults({ env: io.env, kitRoot });

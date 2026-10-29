@@ -286,7 +286,7 @@ export function userDataDir(env) {
   return dir;
 }
 
-// First confirmed Basic/Pro answers establish personal defaults, never project facts or tool choices.
+// First confirmed Basic/All answers establish personal defaults, never project facts or tool choices.
 // Exclusive linking publishes a complete private file without replacing concurrently saved defaults.
 export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed = [] }) {
   if (!['basic', 'pro'].includes(depthOf(mode))) return { saved: false };

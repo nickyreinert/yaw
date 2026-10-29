@@ -2,7 +2,7 @@
 export const DEPTHS = [
   { value: 'quick', label: 'Quick', description: 'Agents, purpose, stack and GitHub. Saved defaults for the rest.' },
   { value: 'basic', label: 'Basic', description: 'Quick plus personal preferences, collaboration and review gates.' },
-  { value: 'pro', label: 'Pro / all', description: 'Every applicable question and optional tool.' },
+  { value: 'pro', label: 'All', description: 'Every applicable question and optional tool.' },
 ];
 export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[mode] ?? mode);
 export const validDepth = (mode) => ['quick', 'basic', 'pro'].includes(depthOf(mode));

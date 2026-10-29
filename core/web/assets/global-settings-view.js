@@ -272,7 +272,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     box.append(actions, out); root.append(box, setupDefaultsCard(), presetsCard());
   }
   function setupDefaultsCard() {
-    const box = el('section', null, 'card'); box.append(el('h2', 'Optional tools for new projects'), el('p', 'Undecided tools start off. Quick reuses these defaults; Basic and Pro let you review them. Existing projects keep their selections.', 'small muted'));
+    const box = el('section', null, 'card'); box.append(el('h2', 'Optional tools for new projects'), el('p', 'Undecided tools start off. Quick reuses these defaults; Basic and All let you review them. Existing projects keep their selections.', 'small muted'));
     if (setupPolicy.warning) box.append(el('p', setupPolicy.warning, 'warn'));
     const selected = new Set(setupPolicy.modules), values = { ...setupPolicy.answers };
     const groups = el('div', null, 'tool-default-groups');

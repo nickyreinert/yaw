@@ -92,7 +92,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       throw new FormError('Expected a setup object with mode, answers and optional modules');
     }
     if (input.gitInit !== undefined && typeof input.gitInit !== 'boolean') throw new FormError('gitInit must be true or false');
-    if (!validDepth(input.mode)) throw new FormError('Choose Quick, Basic or Pro');
+    if (!validDepth(input.mode)) throw new FormError('Choose Quick, Basic or All');
     const proposed = input.proposed ?? [];
     if (!Array.isArray(proposed) || proposed.some((id) => !byId.get(id)?.required)) throw new FormError('Invalid proposed project answers');
     let given = input.answers ?? {};
@@ -282,7 +282,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       agents: loadCapabilities(kitRoot).agents,
       presets: listPresets(env).map(({ name }) => ({ name })),
       hasUserProfile: preferences.hasDefaults === true,
-      personalDefaultsNotice: !edit && !preferences.hasDefaults && !preferences.warning ? 'No personal defaults set. Quick uses factory defaults. In Basic or Pro, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific.' : null,
+      personalDefaultsNotice: !edit && !preferences.hasDefaults && !preferences.warning ? 'No personal defaults set. Quick uses factory defaults. In Basic or All, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific.' : null,
       personalWarning: [preferences.warning, setupPolicy.warning].filter(Boolean).join(' ') || null,
       hasDraft: existsSync(join(root, '.yaw/draft.yaml')),
       ...(edit ? { editing: true, sections, initial, sectionNames } : {}),

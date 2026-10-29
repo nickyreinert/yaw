@@ -80,7 +80,7 @@ function renderWizard(focus = false) {
   const visible = visibleQuestions(catalog.questions, state.answers, state.mode, selectedModules());
   const ids = new Set(visible.map((q) => q.id));
   const extra = visibleQuestions(catalog.questions, state.answers, 'pro', selectedModules()).filter((q) => !ids.has(q.id)).length;
-  $('depth-coverage').textContent = `${DEPTHS.find((d) => d.value === depthOf(state.mode))?.description ?? ''} ${visible.length} questions at this depth${extra ? ` · ${extra} more in Pro` : ''}.`;
+  $('depth-coverage').textContent = `${DEPTHS.find((d) => d.value === depthOf(state.mode))?.description ?? ''} ${visible.length} questions at this depth${extra ? ` · ${extra} more in All` : ''}.`;
   for (const [group, section] of sections) section.node.hidden = !section.applicable || !belongs(step, group);
   $('sections').replaceChildren();
   let ordinal = 0;

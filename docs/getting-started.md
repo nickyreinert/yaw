@@ -59,7 +59,7 @@ From the root of a new project:
 yaw init
 ```
 
-Answer the interview, review the proposed files and confirm to apply them. YAW asks which language you want to use and where the project will run (your computer, your own server, serverless, edge, static hosting, WordPress, or desktop/mobile). Pairs YAW knows well get a tailored stack; other valid pairs get a basic stack for the language; impossible pairs (for example Rust inside WordPress) cannot be continued. YAW does not install the language; `yaw doctor` tells you what is missing. Choose **Quick**, **Basic** or **Pro / all** interview depth first. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
+Answer the interview, review the proposed files and confirm to apply them. YAW asks which language you want to use and where the project will run (your computer, your own server, serverless, edge, static hosting, WordPress, or desktop/mobile). Pairs YAW knows well get a tailored stack; other valid pairs get a basic stack for the language; impossible pairs (for example Rust inside WordPress) cannot be continued. YAW does not install the language; `yaw doctor` tells you what is missing. Choose **Quick**, **Basic** or **All** interview depth first. It normally runs `just setup` and `just check` after applying; use `yaw init --skip-verify` to skip that step explicitly.
 
 Run `yaw init` inside the project folder. YAW refuses your home folder and the file-system root, and asks before writing into a non-empty folder that is not yet a Git repository or YAW project (for example a folder that holds several projects); `--force` overrides both checks.
 
@@ -76,13 +76,13 @@ To plan the work, `yaw kickoff` prints a versioned prompt to draft and review ar
 
 The optional planning prompt includes links to external AI chats alongside Copy prompt. You can also use your coding agent or a local model. Opening a link sends no prompt; paste it yourself, then review the proposed foundations and plan before importing them.
 
-## Quick, Basic and Pro
+## Quick, Basic and All
 
 **Quick** asks purpose, language and runtime. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
 
-**Basic** adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. **Pro / all** asks every applicable implemented question and exposes every optional module. Pro asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
+**Basic** adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. **All** asks every applicable implemented question and exposes every optional module. All asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
 
-Personal defaults concern experience level, chat language, autonomy and answer style. Quick uses saved values or factory defaults; Basic and Pro offer them for project-specific overrides. When none exist, init shows a notice outside its menu: the first confirmed Basic/Pro personal answers become defaults after Apply. Existing defaults remain unchanged by later project overrides; edit them explicitly with `yaw defaults` or Global Settings.
+Personal defaults concern experience level, chat language, autonomy and answer style. Quick uses saved values or factory defaults; Basic and All offer them for project-specific overrides. When none exist, init shows a notice outside its menu: the first confirmed Basic/All personal answers become defaults after Apply. Existing defaults remain unchanged by later project overrides; edit them explicitly with `yaw defaults` or Global Settings.
 
 Save future-project tool defaults under Global Settings → Defaults. They are separate from personal preferences. Existing project modules remain selected; legacy `full` and `standard` answer files stay readable with their legacy module policy. Confirmed explicit module proposals continue to work unchanged.
 
