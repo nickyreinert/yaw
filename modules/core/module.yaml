@@ -14,7 +14,7 @@ depends: []
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:
-  templates: [AGENTS.md, CLAUDE.md, .gitignore, justfile]
+  templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile]
 agentsMd: |
   - Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
   - Run `just check` before you report a task as done; `just --list` shows all recipes.
@@ -23,5 +23,6 @@ agents:
   claude:  { support: native, via: "CLAUDE.md imports AGENTS.md" }
   codex:   { support: native, via: AGENTS.md }
   copilot: { support: native, via: AGENTS.md }
+  gemini:  { support: native, via: "GEMINI.md imports AGENTS.md" }
 tokenCost: low
 lastVerified: 2026-10-20

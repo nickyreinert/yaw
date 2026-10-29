@@ -37,6 +37,7 @@ function nonDefaults(overrides = {}) {
 const BASE = { 'idea.text': 'A small tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
 const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
+  { name: 'Quick, Gemini and GitHub', mode: 'quick', answers: { ...BASE, 'user.agents': ['gemini'], 'tasks.use-github': true } },
   ...['local', 'self-hosted', 'serverless', 'edge', 'static'].map((host) => ({ name: `Quick browser frontend on ${host}`, mode: 'quick', answers: { ...BASE, 'arch.language': 'html', 'arch.runs-on': host } })),
   { name: 'Pro, self-managed with open-source libraries and a paid cap', mode: 'pro', answers: { ...BASE, 'arch.hosting-control': 'self-hosted', 'arch.libraries': 'open-source', 'arch.services': 'approved-only', 'arch.cost': 'capped', 'arch.cost-limit': 'EUR 20 per month, no overage' } },
   { name: 'Full solo, defaults', mode: 'full', answers: BASE },

@@ -13,7 +13,7 @@ questions:
       - { value: claude, label: Claude Code }
       - { value: codex, label: Codex }
       - { value: copilot, label: Copilot }
-      - { value: gemini, label: Gemini CLI (enterprise / API key), phase: 3 }
+      - { value: gemini, label: Gemini CLI }
     default: [claude]
   - id: user.expertise
     ref: "0.1"

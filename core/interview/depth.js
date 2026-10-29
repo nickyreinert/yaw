@@ -1,7 +1,7 @@
 // Shared terminal/browser contract. Old file values remain readable.
 export const DEPTHS = [
-  { value: 'quick', label: 'Quick', description: 'Purpose, language and runtime. Saved or factory defaults for the rest.' },
-  { value: 'basic', label: 'Basic', description: 'Quick plus personal preferences, GitHub, collaboration and review gates.' },
+  { value: 'quick', label: 'Quick', description: 'Agents, purpose, stack and GitHub. Saved defaults for the rest.' },
+  { value: 'basic', label: 'Basic', description: 'Quick plus personal preferences, collaboration and review gates.' },
   { value: 'pro', label: 'Pro / all', description: 'Every applicable question and optional tool.' },
 ];
 export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[mode] ?? mode);
@@ -11,7 +11,7 @@ export function asksAtDepth(q, mode) {
   const depth = depthOf(mode);
   if (!q.id.includes('.')) return depth === 'pro' || q.mode === 'Q' || depth === 'basic' && q.mode === 'S';
   if (depth === 'pro') return true;
-  if (q.required || ['idea.text', 'arch.language', 'arch.runs-on'].includes(q.id)) return true;
+  if (q.required || ['user.agents', 'idea.text', 'arch.language', 'arch.runs-on', 'tasks.use-github'].includes(q.id)) return true;
   return depth === 'basic' && BASIC_QUESTIONS.has(q.id);
 }
 export function defaultQuestion(q) {

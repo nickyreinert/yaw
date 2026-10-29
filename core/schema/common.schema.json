@@ -10,8 +10,8 @@
       "pattern": "^[a-z][a-z0-9-]*$"
     },
     "agentId": {
-      "description": "Agents that can be selected in phase 1 (BD8).",
-      "enum": ["claude", "codex", "copilot"]
+      "description": "Supported setup agents.",
+      "enum": ["claude", "codex", "copilot", "gemini"]
     },
     "agentSelection": {
       "type": "array",

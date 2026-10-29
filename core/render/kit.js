@@ -296,7 +296,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     proposal: answersDoc.proposal ?? null,
     agents: flat['user.agents'] ?? [],
     // #170: per-agent flags, so templates can ignore an agent's machine-local files.
-    agent: Object.fromEntries(['claude', 'codex', 'copilot'].map((name) => [name, (flat['user.agents'] ?? []).includes(name)])),
+    agent: Object.fromEntries(['claude', 'codex', 'copilot', 'gemini'].map((name) => [name, (flat['user.agents'] ?? []).includes(name)])),
     profiles,
     // ADR-0041: several profiles are namespaced; the frame of the justfile defines the uniform verbs.
     composed: profiles.length > 1,

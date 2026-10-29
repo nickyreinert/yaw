@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', 'Rename photos by EXIF date.', 'javascript', 'local'];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'n', 'javascript', 'local'];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
@@ -57,7 +57,7 @@ test('init: p loads a saved setup as editable defaults, asks before writing and 
   assert.equal(readFileSync(file, 'utf8'), source);
   assert.match(prompter.shown.join(''), /p\) Load a previous setup/);
   assert.match(prompter.shown.join(''), /Saved answers are defaults/);
-  assert.ok(!prompter.shown.join('').includes('Which coding agents'));
+  assert.ok(prompter.shown.join('').includes('Which coding agents'));
 });
 
 test('init: a saved Full setup keeps its mode and can be declined without any writes', async () => {
@@ -174,7 +174,7 @@ test('interview: declining writes nothing and exits 1', async () => {
 
 test('interview: an uncovered combination offers available YAW profiles (by number)', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted(['', 'A static site.', 'html', 'wordpress', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
+  const prompter = scripted(['', '', 'A static site.', 'n', 'html', 'wordpress', '', '', '', '', '', 'nope', '1', 'y', '', '', 'n']);
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.match(prompter.shown.join(''), /No YAW profile for HTML, CSS & JavaScript on wordpress/);

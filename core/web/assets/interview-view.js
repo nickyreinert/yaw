@@ -53,7 +53,6 @@ let plan = null, planInfo = null, planCard;
 let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
 const belongs = (step, group) => step.groups === null ? !['user', 'idea', 'arch', 'quality'].includes(group) : step.groups.includes(group);
-const skipped = (index) => depthOf(state.mode) === 'quick' && (steps[index].groups?.includes('user') || index === WORKFLOW);
 function renderWizard(focus = false) {
   const formView = presentation === 'settings' && phase === 'edit';
   root.classList?.toggle('settings-form', formView);
@@ -86,7 +85,6 @@ function renderWizard(focus = false) {
   $('sections').replaceChildren();
   let ordinal = 0;
   steps.forEach((s, i) => {
-    if (skipped(i)) return;
     ordinal++;
     const li = element('li');
     const button = element('button', undefined, { type: 'button' });
@@ -125,7 +123,7 @@ function advance() {
   }
   state.proposed = (state.proposed ?? []).filter((id) => !belongs(steps[stepIndex], id.split('.')[0]));
   visitedSteps.add(stepIndex);
-  do { stepIndex++; } while (stepIndex < REVIEW && skipped(stepIndex));
+  stepIndex++;
   update(); renderWizard(true);
 }
 
@@ -246,14 +244,16 @@ function buildQuestions() {
   // Choose the kit profile first; optional planning constraints follow it.
   sections.get('arch')?.node.before($('stack'));
   if (personal) {
-    personal.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
+    const personalExtras = element('div', undefined, { class: 'personal-default-controls' });
+    personalExtras.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
     const global = element('button', 'Edit personal defaults for future projects', { type: 'button', class: 'link' });
-    global.addEventListener('click', () => showView('global-settings')); personal.append(global);
+    global.addEventListener('click', () => showView('global-settings')); personalExtras.append(global); personal.append(personalExtras);
   }
 
 }
 
 function renderQuestions() {
+  root.querySelectorAll('.personal-default-controls').forEach((node) => { node.hidden = presentation !== 'settings' && depthOf(state.mode) === 'quick'; });
   const modules = selectedModules();
   const visible = new Set(visibleQuestions(catalog.questions, state.answers, questionMode(), modules).map((q) => q.id));
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(questionMode()) && asksIn(q, questionMode())), state.answers, state.mode);
@@ -311,6 +311,19 @@ function setGitInit(on) {
   update();
 }
 function renderModules() {
+  const quickWorkflow = presentation !== 'settings' && depthOf(state.mode) === 'quick';
+  $('module-title').textContent = quickWorkflow ? 'Repository' : 'What YAW adds to your project';
+  if (quickWorkflow) {
+    const github = controls.get('tasks.use-github');
+    if (github) {
+      github.node.hidden = false;
+      if (github.gitHolder) github.gitHolder.hidden = true;
+      $('modules').replaceChildren(github.node);
+    }
+    return;
+  }
+  const github = controls.get('tasks.use-github');
+  if (github?.gitHolder) github.gitHolder.hidden = false;
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderModuleGroups($('modules'), {
     modules: catalog.modules.filter((m) => presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions, compact,
@@ -338,10 +351,7 @@ const stepFor = (q) => q.id.startsWith('arch.') ? STACK : isInline(q) || CARD_QU
 function setDepth(mode) {
   state.mode = mode;
   root.querySelectorAll('input[name=mode]').forEach((input) => { input.checked = input.value === depthOf(mode); });
-  const wasSkipped = skipped(stepIndex);
-  while (skipped(stepIndex) && stepIndex < REVIEW) stepIndex++;
   update();
-  if (wasSkipped) renderWizard(true);
 }
 function jump(target) {
   if (presentation === 'settings') {
@@ -351,10 +361,10 @@ function jump(target) {
   let step, focusId;
   if (target.stack) { step = STACK; focusId = 'stack-title'; }
   else if (target.plan) { step = steps.findIndex((st) => st.groups?.includes('idea')); focusId = 'plan-card'; }
-  else if (target.module) { step = WORKFLOW; focusId = `module-${target.module}`; }
+  else if (target.module) { if (depthOf(state.mode) === 'quick') setDepth('pro'); step = WORKFLOW; focusId = `module-${target.module}`; }
   else {
     const c = controls.get(target.question);
-    if (!asksIn(c.q, state.mode) || skipped(stepFor(c.q))) setDepth(asksIn(c.q, 'basic') ? 'basic' : 'pro');
+    if (!asksIn(c.q, state.mode)) setDepth(asksIn(c.q, 'basic') ? 'basic' : 'pro');
     step = stepFor(c.q); focusId = c.inputs[0]?.id;
   }
   stepIndex = step; reviewReturn = true; renderWizard();
@@ -560,7 +570,7 @@ async function start() {
   $('diff').hidden = !catalog.editing;
   buildQuestions();
   buildPlan();
-  $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { do { stepIndex--; } while (stepIndex > 0 && skipped(stepIndex)); renderWizard(true); } });
+  $('previous-step').addEventListener('click', () => { if (stepIndex > 0) { stepIndex--; renderWizard(true); } });
   $('back-to-review').addEventListener('click', () => { stepIndex = REVIEW; renderWizard(true); });
   $('next-step-button').addEventListener('click', advance);
   $('setup').addEventListener('submit', (e) => e.preventDefault());
@@ -622,7 +632,6 @@ return {
       const node = section === 'stack' ? $('stack') : section === 'workflow' ? $('module-section') : sections.get(section === 'user' ? 'user' : 'idea')?.node;
       node?.scrollIntoView({ block: 'start' }); return;
     }
-    if (skipped(index)) setDepth(section === 'user' ? 'basic' : 'pro');
     stepIndex = index; renderWizard(true);
   },
 };

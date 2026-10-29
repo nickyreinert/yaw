@@ -102,7 +102,7 @@ test('web model: schema catalogue, local help, ownership and phase-3 choices', (
   const f = fixture(), m = createFormModel(f), c = m.bootstrap();
   assert.equal(c.questions[0].id, 'user.agents');
   assert.deepEqual(c.questions[0].choices.map((x) => x.value), ['claude', 'codex', 'copilot', 'gemini']);
-  assert.ok(c.questions[0].choices.find((x) => x.value === 'gemini').phase > 1);
+  assert.ok(!c.questions[0].choices.find((x) => x.value === 'gemini').phase);
   assert.match(c.questions[0].helpText, /agent/i);
   assert.match(c.questions.find((q) => q.id === 'user.expertise').helpText, /does not change security rules/i);
   assert.match(c.questions.find((q) => q.id === 'user.autonomy').helpText, /does not override tool permissions/i);
@@ -267,7 +267,7 @@ test('web API: bounded JSON, explicit errors, CSRF and unavailable choices', asy
     req.write('a'.repeat(MAX_JSON_BYTES)); req.end('"}}');
   });
   assert.equal(chunked.status, 413); assert.match(chunked.data, /exceeds/);
-  for (const answers of [{ 'user.agents': ['gemini'] }, { 'user.agents': [] }, { 'user.expertise': 'wizard' }, { 'unknown.answer': 'oops' }, { 'idea.text': 3 }]) {
+  for (const answers of [{ 'user.agents': ['unsupported'] }, { 'user.agents': [] }, { 'user.expertise': 'wizard' }, { 'unknown.answer': 'oops' }, { 'idea.text': 3 }]) {
     assert.equal((await f.post('preview', setup({ answers }))).status, 400, JSON.stringify(answers));
   }
   assert.deepEqual(readTree(f.root), {});

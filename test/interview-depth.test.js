@@ -35,7 +35,7 @@ test('Quick asks only project essentials and architecture; Basic adds GitHub/rev
   const questions = collectQuestions(KIT_ROOT, ['core', 'tasks', 'review', 'communication', 'team']);
   assert.deepEqual(DEPTHS.map((d) => d.value), ['quick', 'basic', 'pro']);
   const ids = (mode) => questions.filter((q) => asksIn(q, mode)).map((q) => q.id);
-  assert.deepEqual(ids('quick'), ['idea.text', 'arch.language', 'arch.runs-on']);
+  assert.deepEqual(ids('quick'), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on']);
   for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {
     assert.ok(!ids('basic').includes(id), `${id} belongs to Pro`);
     assert.ok(ids('pro').includes(id));

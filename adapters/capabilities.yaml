@@ -48,3 +48,18 @@ agents:
       notification: { support: partial, via: notification, note: CLI only }
       subagents: { support: partial, via: custom agents (.agent.md) }
       telemetry: { support: fallback, via: hook events to the YAW receiver }
+
+  gemini:
+    name: Gemini CLI
+    phase: 1
+    note: "Rules and shared skills are configured. YAW hooks are not registered; use project commands for checks and recall."
+    capabilities:
+      rulesFile: { support: native, via: "GEMINI.md imports AGENTS.md" }
+      skills: { support: native, via: .agents/skills/ }
+      hooks: { support: none, note: "No YAW hook registration" }
+      promptContext: { support: fallback, via: "just decisions recall" }
+      sessionStartContext: { support: fallback, via: "yaw kickoff context and AGENTS.md" }
+      userMessage: { support: none, note: "No YAW hook registration" }
+      blockTool: { support: fallback, via: "AGENTS.md rules; no runtime guard" }
+      stopCheck: { support: fallback, via: "just check" }
+      notification: { support: none, note: "No YAW hook registration" }

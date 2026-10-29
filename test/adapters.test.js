@@ -171,3 +171,15 @@ test('Codex trust note in yaw init and yaw doctor; doctor checks that the shim f
   const claudeOnly = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), answersText({ agents: ['claude'] })), '--yes', '--skip-verify'], { cwd: tmp('yaw-proj-') });
   assert.doesNotMatch(claudeOnly.out, /Codex runs/);
 });
+
+test('Gemini setup writes its AGENTS.md import and shared skills, with no unimplemented hook registration', async () => {
+  const root = await makeProject({ agents: ['gemini'], modules: ['core', 'github'] });
+  assert.equal(readFileSync(join(root, 'GEMINI.md'), 'utf8'), '@AGENTS.md\n');
+  assert.ok(existsSync(join(root, '.agents/skills/issue-create/SKILL.md')));
+  for (const path of ['CLAUDE.md', '.claude', '.codex', '.gemini/settings.json']) assert.equal(existsSync(join(root, path)), false, path);
+  assert.deepEqual(readManifest(root).agents, ['gemini']);
+  assert.equal((await yaw(['sync', '--check'], { cwd: root })).code, 0);
+  const compatibility = await yaw(['agents'], { cwd: root });
+  assert.equal(compatibility.code, 0); assert.match(compatibility.out, /Gemini CLI/);
+  assert.match(compatibility.out, /YAW hooks are not registered/);
+});

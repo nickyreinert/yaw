@@ -31,6 +31,7 @@ export function isAdapterPath(path) {
 export function pathWanted(path, agents) {
   if (path === CLAUDE_SETTINGS) return agents.includes('claude') || agents.includes('copilot');
   // Codex and Copilot read AGENTS.md directly; CLAUDE.md only imports it for Claude Code (#169).
+  if (path === 'GEMINI.md') return agents.includes('gemini');
   if (path === 'CLAUDE.md') return agents.includes('claude');
   if (path.startsWith('.claude/')) return agents.includes('claude');
   if (path.startsWith('.codex/')) return agents.includes('codex');

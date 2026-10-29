@@ -12,7 +12,7 @@ import { schemas } from '../core/render/kit.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
-const INTERVIEW = ['', 'Rename photos by EXIF date.', 'javascript', 'local'];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'n', 'javascript', 'local'];
 const CANARY = 'ghp_CANARY0123456789abcdefghijklmnopqrst';
 const mode = (p) => statSync(p).mode & 0o777;
 
@@ -233,7 +233,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   // end to end: the canary typed into the interview is not saved, not printed
   const home = tmp('yaw-home-');
   const interview = [...INTERVIEW];
-  interview[1] = `Deploy with ${CANARY}`;
+  interview[2] = `Deploy with ${CANARY}`;
   const prompter = scripted([...interview, 'y', 'y', '']);
   const r = await yaw(['init', '--skip-verify'], { home, prompter });
   assert.equal(r.code, 0, r.err);

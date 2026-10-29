@@ -10,7 +10,7 @@ import { readManifest } from '../render/manifest.js';
 import { enabledModules } from '../render/project.js';
 import { UsageError } from './commands.js';
 
-const PHASE1 = ['claude', 'codex', 'copilot'];
+const SETUP_AGENTS = ['claude', 'codex', 'copilot', 'gemini'];
 
 // Capability that stands in for an item when neither the item nor its module names the agent.
 const HOOK_CAPABILITY = { guard: 'blockTool', comfort: 'userMessage', evaluation: 'hooks' };
@@ -34,6 +34,7 @@ function cell({ caps, def, item, kind, agent }) {
   const own = item && typeof item === 'object' ? item.agents?.[agent] : undefined;
   if (own) return own;
   if (def.agents?.[agent]) return def.agents[agent];
+  if (!item && agent === 'gemini' && def.agentsMd) return { support: 'fallback', via: 'AGENTS.md and project commands' };
   const fromCaps = item ? caps.agents[agent]?.capabilities?.[capabilityOf(kind, item)] : undefined;
   return fromCaps ?? { support: 'none', note: 'not declared' };
 }
@@ -83,11 +84,11 @@ export async function agents({ positionals, io }) {
   const modules = manifest
     ? enabledModules(manifest).filter((m) => hasModule(io.kitRoot, m))
     : (existsSync(dir) ? readdirSync(dir).filter((n) => hasModule(io.kitRoot, n)).sort() : []);
-  const selected = manifest ? manifest.agents : PHASE1;
+  const selected = manifest ? manifest.agents : SETUP_AGENTS;
   const m = matrix({ kitRoot: io.kitRoot, modules, agents: selected });
   io.stdout.write(manifest
     ? `yaw agents: ${modules.length} enabled module${modules.length === 1 ? '' : 's'}, agents ${selected.join(', ')}\n\n`
-    : 'yaw agents: no project here; every module of the kit, phase-1 agents\n\n');
+    : 'yaw agents: no project here; every module of the kit, supported setup agents\n\n');
   io.stdout.write(renderMatrix(m));
   return 0;
 }
