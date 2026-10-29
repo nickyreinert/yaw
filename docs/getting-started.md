@@ -80,7 +80,7 @@ The optional planning prompt includes links to external AI chats alongside Copy 
 
 **Quick** asks purpose, language and runtime. Personal settings and optional tools reuse saved defaults; optional tools start off if never chosen. A new Quick setup installs core instructions and project commands for the selected profile.
 
-**Basic** adds personal preferences, repository agents, collaboration, GitHub on/off and review gates. **All** asks every applicable implemented question and exposes every optional module. All asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
+**Basic** adds personal preferences, collaboration and review gates. **All** asks every applicable implemented question and exposes every optional module. All asks advanced questions for all expertise levels. Neither depth enables every tool by itself.
 
 Personal defaults concern experience level, chat language, autonomy and answer style. Quick uses saved values or factory defaults; Basic and All offer them for project-specific overrides. When none exist, init shows a notice outside its menu: the first confirmed Basic/All personal answers become defaults after Apply. Existing defaults remain unchanged by later project overrides; edit them explicitly with `yaw defaults` or Global Settings.
 

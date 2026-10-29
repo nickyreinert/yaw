@@ -2,7 +2,7 @@
 
 The Quick/personal boundary in [doc 15 §1](15-project-foundations.md#1-quick-asks-about-this-project) is implemented in the terminal and browser. The catalogue also contains future questions; availability still follows implemented module definitions.
 
-Legend: Q/S/F annotations describe the catalogue's original question groups. The shared depth policy now governs visibility: **Quick** asks purpose, language and runtime, **Basic** adds repository agents, collaboration, GitHub and review gates, and **Pro / all** asks every applicable implemented question. Saved personal/tool defaults are reused; optional tools are off when never chosen. Pro does not suppress advanced questions for laypeople. Future catalogue entries remain unavailable until implemented. Essential purpose/language/runtime start unresolved; uncertainty calls for help or a proposal to confirm.
+Legend: Q/S/F annotations describe the catalogue's original question groups. The shared depth policy now governs visibility: **Quick** asks agents, purpose, language, runtime and GitHub, **Basic** adds personal preferences, collaboration and review gates, and **All** asks every applicable implemented question. Saved personal/tool defaults are reused; optional tools are off when never chosen. All does not suppress advanced questions for laypeople. Future catalogue entries remain unavailable until implemented. Essential purpose/language/runtime start unresolved; uncertainty calls for help or a proposal to confirm.
 
 Rules for the interviewer (CLI, form, or agent):
 
@@ -13,7 +13,7 @@ Rules for the interviewer (CLI, form, or agent):
 
 ## 0. Personal settings and repository agents
 
-Personal defaults cover experience, chat language, autonomy, answer length, tone, examples and explanation style. A fresh interactive installation offers to enter them; `yaw defaults` and Global Settings → Defaults edit them later. Init has no separate personal-settings menu. Quick reuses saved or factory values without asking; Basic and Pro offer those values for project-specific overrides. When no defaults exist, a notice explains that first confirmed Basic/Pro personal answers establish defaults after Apply. Existing global values are never automatically replaced by a project override. Presets, agent selections, architecture, GitHub and optional tools are separate; legacy profile fields remain readable.
+Personal defaults cover experience, chat language, autonomy, answer length, tone, examples and explanation style. A fresh interactive installation offers to enter them; `yaw defaults` and Global Settings → Defaults edit them later. Init has no separate personal-settings menu. Quick reuses saved or factory values without asking; Basic and All offer those values for project-specific overrides. When no defaults exist, a notice explains that first confirmed Basic/All personal answers establish defaults after Apply. Existing global values are never automatically replaced by a project override. Presets, agent selections, architecture, GitHub and optional tools are separate; legacy profile fields remain readable.
 
 | # | Question | Options (default **bold**) | Mode | → |
 |---|---|---|---|---|
