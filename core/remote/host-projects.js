@@ -21,7 +21,10 @@ export class HostedProjects {
     this.expire(); requireValue(this.interviews.size < 100, 'Interview limit reached', 429);
     const id = randomUUID();
     const scratch = mkdtempSync(join(tmpdir(), 'yaw-host-interview-'));
-    const interview = { id, slug, command, owner, skipVerify, handoff, scratch, expires: Date.now() + 30 * 60000, status: 'editing' };
+    let model;
+    try { model = createFormModel({ root: scratch, kitRoot: this.kitRoot, env: this.env }); }
+    catch (e) { rmSync(scratch, { recursive: true, force: true }); throw e; }
+    const interview = { id, slug, command, owner, skipVerify, handoff, scratch, model, expires: Date.now() + 30 * 60000, status: 'editing' };
     this.interviews.set(id, interview); return { id, slug, command };
   }
   expire() { for (const [id, value] of this.interviews) if (value.expires < Date.now() && value.status !== 'applying') { rmSync(value.scratch, { recursive: true, force: true }); this.interviews.delete(id); } }
@@ -33,9 +36,9 @@ export class HostedProjects {
   model(interview, input) {
     const language = input?.answers?.['arch.language'];
     const base = interview.scratch;
-    const model = createFormModel({ root: base, kitRoot: this.kitRoot, env: this.env });
+    const model = interview.model;
     const choices = model.bootstrap().questions.find((q) => q.id === 'arch.language').choices.map((c) => c.value ?? c);
-    requireValue(language === undefined || (choices.includes(language) && /^[a-z0-9-]+$/.test(language)), 'Choose a supported programming language');
+    requireValue(language === undefined || language === '' || (choices.includes(language) && /^[a-z0-9-]+$/.test(language)), 'Choose a supported programming language');
     const root = language ? join(this.root, language, interview.slug) : base;
     return { root, model };
   }
@@ -61,7 +64,7 @@ export class HostedProjects {
     input = { ...input, ...(['preview', 'diff', 'apply', 'draft', 'preset'].includes(name) ? { answers: { ...input.answers, 'user.agents': ['claude'] } } : {}) };
     const { root, model } = this.model(i, input);
     if (name === 'draft') { model.normalize(input, { allowIncomplete: true }); i.draft = structuredClone(input); return { message: 'Draft kept in this host session for 30 minutes.' }; }
-    const api = createFormApi({ root: i.scratch, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify });
+    const api = createFormApi({ root: i.scratch, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify, model: i.model });
     try {
       if (name !== 'apply') {
         requireValue(['preview', 'diff', 'preset', 'kickoff-prompt', 'kickoff-reply'].includes(name), 'Unknown interview action', 404);
@@ -80,11 +83,12 @@ export class HostedProjects {
       try { mkdirSync(root, { mode: 0o700 }); } catch (e) { if (e.code === 'EEXIST') throw new FormError('Project folder already exists; choose another slug', 409); throw e; }
       this.applying = true; i.status = 'applying';
       const project = { id: randomUUID(), path: root, slug: i.slug, language: prepared.doc.answers['arch.language'], state: 'initializing', interview: id, command: i.command };
-      this.store.state.projects.push(project); this.store.save();
       let outcome = null;
       let writer;
       try {
-        writer = createFormApi({ root, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify });
+        this.store.state.projects.push(project); this.store.save();
+        // The target is a new empty folder; retain the interview's original defaults while writing there.
+        writer = createFormApi({ root, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify, model: i.model });
         const confirmed = writer.prepareApply(input);
         await writer.apply(confirmed, (event) => { if (event.type === 'done') outcome = event; });
         project.state = outcome?.ok ? 'initialized' : 'verification-failed'; this.store.save();

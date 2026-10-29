@@ -27,8 +27,8 @@ import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js
 export const DRAFT = '.yaw/draft.yaml';
 
 // handoff: answers given so far in the terminal (#162), shown prefilled; never written before apply.
-export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null, edit = false, sections = [] }) {
-  const model = createFormModel({ root, kitRoot, env, edit, sections });
+export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null, edit = false, sections = [], model: suppliedModel }) {
+  const model = suppliedModel ?? createFormModel({ root, kitRoot, env, edit, sections });
   const workspace = createWorkspaceApi({ root, kitRoot, env });
   // The values the planning chat may recommend, in the interview's own words.
   let lists;

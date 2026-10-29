@@ -61,8 +61,8 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     actions: WORKSPACE_ACTIONS,
     close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); resume(); },
     get: {
-      '/api/global/features': () => {
-        return { remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf() };
+      '/api/global/features': (params) => {
+        return { remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf(params?.get('workspace')) };
       },
       '/api/improve/history': () => improveHistory({ env }),
       '/api/improve/settings': () => improveSettings(env),

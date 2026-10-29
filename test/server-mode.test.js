@@ -65,6 +65,10 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     const catalog = (await f.request(route + '/bootstrap')).body;
     assert.equal(catalog.hosted.command, 'init-local');
     assert.equal(catalog.questions.find((q) => q.id === 'user.agents').choices.length, 1);
+    const languageDefault = catalog.questions.find((q) => q.id === 'user.language').default;
+    writeUserProfile(f.env, stringify({ answers: { 'user.language': 'de' } }));
+    await f.request(route + '/draft', input);
+    assert.deepEqual((await f.request(route + '/prefill', { kind: 'draft' })).body.answers, input.answers);
     const preview = await f.request(route + '/preview', input); assert.equal(preview.status, 200);
     assert.equal(preview.body.destination, join(f.settings.workspaceRoot, 'javascript', 'sample'));
     assert.equal(existsSync(preview.body.destination), false);
@@ -72,6 +76,8 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     assert.equal((await f.request(route + '/apply', { ...input, secrets: { API_KEY: 'not-a-real-secret' } })).status, 400);
     const result = await f.request(route + '/apply', input); assert.equal(result.status, 200); assert.equal(result.body.ok, true);
     assert.equal(existsSync(join(preview.body.destination, '.yaw/manifest.json')), true);
+    const saved = readFileSync(join(preview.body.destination, '.yaw/answers.yaml'), 'utf8');
+    assert.match(saved, new RegExp(`user.language: ${languageDefault}`));
     assert.equal(f.spawned.plans.length, 1); assert.ok(['python3', '/usr/bin/script'].includes(f.spawned.plans[0].command));
     assert.match(f.spawned.plans[0].args.join(' '), /remote-control.*--spawn=session/);
     assert.equal(f.spawned.plans[0].options.env.YAW_REMOTE_TELEGRAM_TOKEN, undefined);
