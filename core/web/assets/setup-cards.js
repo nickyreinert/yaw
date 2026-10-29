@@ -53,6 +53,26 @@ const shortLabel = (label) => label.split(/ [—(–-] |: /)[0];
 
 // Small, decorative line drawings. The adjacent text always names the choice.
 const ICONS = {
+  'lang-python': 'M12 3H8a4 4 0 0 0-4 4v4h8v2H7a4 4 0 0 0-4 4v1M12 21h4a4 4 0 0 0 4-4v-4h-8v-2h5a4 4 0 0 0 4-4V6M8 7h.01M16 17h.01',
+  'lang-typescript': 'M3 3h18v18H3zM6 9h6m-3 0v9m9-8c-4-3-6 2-2 3 5 1 2 6-2 3',
+  'lang-php': 'M2 12c0-10 20-10 20 0s-20 10-20 0Zm4-2v6m0-6h2c3 0 3 4 0 4H6m5-6v6m0-4h2v4m3-4v6m0-6h2c3 0 3 4 0 4h-2',
+  'lang-kotlin': 'M3 3h18L12 12l9 9H3V3Zm0 18L21 3M3 3l9 9',
+  'lang-html': 'm8 5-6 7 6 7m8-14 6 7-6 7m-3-15-2 16',
+  'lang-go': 'M2 8h5M1 12h5m-4 4h5m8-8h-3c-5 0-5 8 0 8h3v-4h-3m8-4c-4 0-4 8 0 8s4-8 0-8Z',
+  'lang-rust': 'm12 2 2 3 4-1 1 4 3 2-2 3 1 4-4 1-2 3-3-2-4 1-1-4-3-2 2-3-1-4 4-1ZM9 16V8h4c4 0 4 5 0 5H9m4 0 3 3',
+  'lang-swift': 'M4 4c5 6 8 8 12 9L7 3c7 4 12 9 12 13l2 5-6-2c-5 2-10-1-12-5 4 3 7 3 9 1C8 12 5 8 4 4Z',
+  'lang-java': 'M6 11h11v5c0 6-11 6-11 0Zm11 1h2c4 0 3 5-2 5M4 22h16M11 2c-5 3 5 3 0 7m5-7c-5 3 4 3-1 7',
+  edit: 'm15 4 5 5M4 20l5-1L21 7l-5-5L4 14Zm0 0 1-6 5 5',
+  file: 'M5 2h9l5 5v15H5zM14 2v6h5M8 12h8m-8 4h8',
+  book: 'M3 4h6c2 0 3 1 3 2 0-1 1-2 3-2h6v16h-6c-2 0-3 1-3 2 0-1-1-2-3-2H3Zm9 2v16',
+  branch: 'M6 7v10m0-7h6a6 6 0 0 0 6-6M9 4a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9 20a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-19v6h-6',
+  memory: 'M3 6c0-5 18-5 18 0s-18 5-18 0Zm0 0v12c0 5 18 5 18 0V6M3 12c0 5 18 5 18 0',
+  bell: 'M8 19h8m-11-3h14c-3-3-2-4-2-8a5 5 0 0 0-10 0c0 4 1 5-2 8Zm5 4a2 2 0 0 0 4 0',
+  list: 'm3 5 2 2 3-4m3 2h10M3 12h5m3 0h10M3 19h5m3 0h10',
+  users: 'M10 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM1 21v-3c0-6 11-6 11 0v3m3-17c7-3 9 8 2 9m-1 3c5-1 7 1 7 5',
+  map: 'm2 5 7-3 6 3 7-3v17l-7 3-6-3-7 3Zm7-3v17m6-14v17',
+  message: 'M3 3h18v14H9l-6 5ZM7 7h10M7 12h7',
+  ruler: 'm3 17 14-14 5 5L8 22Zm3-3 3 3m1-7 3 3m1-7 3 3',
   building: 'M4 21V5h16v16M8 21v-5h8v5M8 8h1m6 0h1M8 12h1m6 0h1M2 21h20',
   server: 'M4 3h16v7H4zM4 14h16v7H4zM7 6h1m3 0h6M7 17h1m3 0h6',
   cloud: 'M6 18a4 4 0 0 1-1-8 7 7 0 0 1 13-1 4.5 4.5 0 0 1 0 9Z',
@@ -80,6 +100,15 @@ export function decisionIcon(kind) {
   path.setAttribute('d', ICONS[kind] ?? ICONS.question); svg.append(path);
   return svg;
 }
+const LANGUAGE_ICONS = { python: 'python', javascript: 'typescript', php: 'php', kotlin: 'kotlin', html: 'html', go: 'go', rust: 'rust', swift: 'swift', java: 'java' };
+export function languageIcon(language) {
+  const icon = decisionIcon(`lang-${LANGUAGE_ICONS[language] ?? 'html'}`);
+  icon.classList.add('language-icon'); return icon;
+}
+export function moduleIcon(name) {
+  return decisionIcon(({ core: 'book', standards: 'ruler', security: 'shield', devenv: 'terminal', github: 'branch', 'git-hooks': 'branch', ci: 'shuffle', 'code-map': 'map', decisions: 'book', communication: 'message', tasks: 'list', review: 'shield', comfort: 'bell', sessions: 'chart', team: 'users', backup: 'memory' })[name] ?? 'box');
+}
+const GROUP_ICONS = { github: 'branch', basics: 'box', memory: 'memory', quality: 'shield', comfort: 'bell' };
 const ARCH_DECISIONS = {
   'arch.hosting-control': { 'on-premises': 'building', 'self-hosted': 'server', managed: 'cloud' },
   'arch.libraries': { 'standard-only': 'box', 'open-source': 'open', 'commercial-allowed': 'briefcase' },
@@ -157,8 +186,8 @@ export function renderStack(root, ctx) {
 
   const langRow = el('div', { class: 'chips', role: 'group', 'aria-label': langQ.label });
   for (const l of langs) {
-    langRow.append(el('button', { type: 'button', class: 'chip', 'aria-pressed': String(l.value === lang), disabled: ctx.disabled,
-      text: langName(l.value), title: l.label, onclick: () => ctx.onChange('arch.language', l.value) }));
+    langRow.append(el('button', { type: 'button', class: 'chip language-chip', 'aria-pressed': String(l.value === lang), disabled: ctx.disabled,
+      title: l.label, onclick: () => ctx.onChange('arch.language', l.value) }, languageIcon(l.value), el('span', { text: langName(l.value) })));
   }
   const hostGrid = el('div', { class: 'hosts', role: 'group', 'aria-label': hostQ.label });
   for (const h of hosts) {
@@ -223,7 +252,7 @@ export function renderModuleGroups(root, ctx) {
     if (!mods.length && !intro.length) continue;
     const grid = el('div', { class: 'module-grid' });
     for (const m of mods) grid.append(moduleCard(m, ctx, selected, hasGit));
-    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { text: title }), el('p', { class: 'small muted lead', text: lead }),
+    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })), el('p', { class: 'small muted lead', text: lead }),
       ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []), grid));
   }
   root.replaceChildren(bar, groups);
@@ -246,7 +275,7 @@ function moduleCard(m, ctx, selected, hasGit) {
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
   const questions = ctx.questionNodes?.(m.name, on) ?? [];
   const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' || questions.length ? ' wide' : ''}` },
-    el('label', { class: 'module-head' }, input, el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
+    el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));
 

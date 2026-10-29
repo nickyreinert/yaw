@@ -188,3 +188,8 @@ dialog p, .intro, .interview-status, .activity-day { color: var(--muted); }
 svg.chart text { fill: var(--muted); }
 meter::-webkit-meter-bar { background: var(--wash); }
 meter::-webkit-meter-optimum-value { background: var(--accent); }
+
+.language-chip { display: inline-flex; align-items: center; gap: 6px; }
+.language-chip .language-icon { width: 16px; height: 16px; flex: 0 0 16px; color: currentColor; }
+.module-group-title { display: flex; align-items: center; gap: 8px; }
+.module-head .decision-icon { width: 20px; height: 20px; flex: 0 0 20px; }
