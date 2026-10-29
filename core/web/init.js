@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { setupPrompt } from '../lib/setup-prompts.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,6 +31,8 @@ export const DRAFT = '.yaw/draft.yaml';
 export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, stderr, handoff = null, edit = false, sections = [], model: suppliedModel }) {
   const model = suppliedModel ?? createFormModel({ root, kitRoot, env, edit, sections });
   const workspace = createWorkspaceApi({ root, kitRoot, env });
+  let agentState = null, agentRevision = 0;
+  const setupState = () => ({ revision: agentRevision, setup: structuredClone(agentState ?? handoff ?? model.bootstrap().initial ?? { mode: 'quick', answers: {}, modules: null }) });
   // The values the planning chat may recommend, in the interview's own words.
   let lists;
   const stackLists = () => {
@@ -76,14 +79,15 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     }
   }
   return {
-    actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply'],
+    actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply', 'setup-prompts', 'setup-update'],
     close: () => workspace.close(),
     get: {
       ...workspace.get,
+      '/api/setup': setupState,
       '/api/dashboard': (params) => dashboardData({ root, kitRoot, env, params }),
       '/api/knowledge': (params) => knowledgeData({ root, kitRoot, env, params }),
     },
-    bootstrap: () => ({ ...model.bootstrap(), skipVerify, handoff }),
+    bootstrap: () => ({ ...model.bootstrap(), skipVerify, handoff: agentState ?? handoff }),
     prepareApply(input) {
       ensureNew();
       if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new FormError('Expected a setup object');
@@ -112,6 +116,22 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     },
     async action(name, input) {
       if (WORKSPACE_ACTIONS.includes(name)) return workspace.action(name, input);
+      if (name === 'setup-update') {
+        ensureNew();
+        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some((key) => !['revision', 'setup'].includes(key))) throw new FormError('Expected revision and setup');
+        if (input.revision !== agentRevision) throw new FormError('Setup changed; read /api/setup and review again', 409);
+        model.normalize(input.setup, { allowIncomplete: true });
+        // Keep explicit answers only: defaults are not user confirmation.
+        const { mode, answers = {}, modules = null, gitInit = false, proposed = [] } = input.setup;
+        agentState = structuredClone({ mode, answers, modules, gitInit, proposed }); agentRevision++;
+        return setupState();
+      }
+      if (name === 'setup-prompts') {
+        const prepared = model.normalize(input, { allowIncomplete: true });
+        const catalog = model.bootstrap();
+        const context = { answers: prepared.doc.answers, modules: prepared.modules, questions: catalog.questions, definitions: catalog.modules };
+        return { interview: setupPrompt({ ...context, kind: 'interview' }), kickoff: prepared.unresolved.length ? '' : setupPrompt({ ...context, kind: 'kickoff' }), kickoffStatus: prepared.unresolved.length ? 'Complete essential project answers before copying the final prompt.' : '' };
+      }
       if (name === 'prefill') {
         if (!input || typeof input !== 'object' || Array.isArray(input) ||
           Object.keys(input).some((k) => !['kind', 'name'].includes(k))) throw new FormError('Invalid prefill request');
@@ -236,7 +256,7 @@ export function openBrowser(target, env) {
   });
 }
 
-export async function initWeb({ io, skipVerify, verify, handoff, edit = false, sections = [] }) {
+export async function initWeb({ io, skipVerify, verify, handoff, edit = false, sections = [], headless = false }) {
   const api = createFormApi({ root: io.cwd, kitRoot: io.kitRoot, env: io.env, verify, skipVerify, stderr: io.stderr, handoff, edit, sections });
   let finish;
   const done = new Promise((r) => { finish = r; });
@@ -253,6 +273,10 @@ export async function initWeb({ io, skipVerify, verify, handoff, edit = false, s
   let launcher;
   const server = await startFormServer({ api, onClose: () => { launcher?.remove(); finish(exitCode); } });
   io.stdout.write(`YAW ${edit ? 'edit' : 'setup'} (local only). Open this one-time link:\n${server.url}\nNothing is written until Save draft, Save as preset, or Apply. Ctrl+C stops the server.\n`);
+  if (headless) {
+    io.stdout.write('Agent API: authenticate with the link above, then GET /api/bootstrap and /api/setup. POST /api/setup-update to configure; POST /api/preview to review, then POST /api/apply to write. See docs/setup-api.md.\n');
+    return done;
+  }
   let opened;
   try {
     if (io.openBrowser) opened = await io.openBrowser(server.url, io.env);

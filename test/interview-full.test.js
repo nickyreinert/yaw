@@ -109,7 +109,7 @@ test('Full solo without GitHub: github and ci are off and the answer is recorded
 });
 
 test('Full team: team questions and GitHub choice appear, task mode is forced to issues', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Tell the agent the active issue': 'n' });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Who works on this project': 'team', 'Tell the agent the active issue': 'n' });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.doc.answers, {
     ...Object.fromEntries(Object.entries(SOLO_FULL).filter(([k]) => k !== 'tasks.mode')),
@@ -121,7 +121,7 @@ test('Full team: team questions and GitHub choice appear, task mode is forced to
 });
 
 test('teams can select a local Git remote without GitHub and without hidden questions in the summary', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Use GitHub for the repo': 'n' });
+  const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Who works on this project': 'team', 'Use GitHub for the repo': 'n' });
   assert.equal(r.code, 0, r.err);
   assert.equal(r.doc.answers['tasks.use-github'], false);
   for (const name of ['github', 'ci', 'team']) assert.ok(!r.doc.proposal.modules.includes(name));
@@ -129,7 +129,7 @@ test('teams can select a local Git remote without GitHub and without hidden ques
 });
 
 test('Basic team: the choice is recorded without optional team tooling', async () => {
-  const r = await init({ depth: 'basic', ...IDEA, 'Solo or team': 'team' });
+  const r = await init({ depth: 'basic', ...IDEA, 'Who works on this project': 'team' });
   assert.equal(r.doc.answers['idea.team'], 'team');
   assert.ok(!('team.session-context' in r.doc.answers));
   assert.deepEqual(r.doc.proposal.modules, QUICK_MODULES);
@@ -180,7 +180,7 @@ test('yaw add team on a solo project fits the budget without committing personal
 test('expertise: each level is recorded; the level changes how the interview is shown', async () => {
   const runs = {};
   for (const level of ['layperson', 'intermediate', 'expert']) {
-    runs[level] = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Solo or team': 'team', 'Your experience with software': level });
+    runs[level] = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y', 'Who works on this project': 'team', 'Your experience with software': level });
     assert.equal(runs[level].code, 0, runs[level].err);
     assert.equal(runs[level].doc.answers['user.expertise'], level);
   }
@@ -193,8 +193,8 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
-  assert.match(shown('intermediate'), /Solo or shared project rules/);
-  assert.doesNotMatch(shown('expert'), /Solo or shared project rules/);
+  assert.match(shown('intermediate'), /Shared rules for collaborators/);
+  assert.doesNotMatch(shown('expert'), /Shared rules for collaborators/);
   // the summary lists the layperson default
   assert.doesNotMatch(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);

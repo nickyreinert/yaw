@@ -60,9 +60,12 @@ questions:
     ref: "1.5"
     mode: Q
     type: choice
-    label: Solo or team?
-    hint: Solo or shared project rules. GitHub remains optional.
-    choices: [solo, team, external-reviewers]
+    label: Who works on this project?
+    hint: Shared rules for collaborators. GitHub remains optional.
+    choices:
+      - { value: solo, label: Solo }
+      - { value: team, label: Team }
+      - { value: external-reviewers, label: External reviewers }
     default: solo
   - id: tasks.use-github
     ref: "10.2"
@@ -111,7 +114,7 @@ questions:
     ref: "3.12"
     mode: F
     type: text
-    label: Existing framework to keep? (optional)
+    label: Required framework (optional)
     hint: Existing project requirement, e.g. Django. Otherwise leave blank.
     default: ""
   - id: arch.hosting-control
@@ -131,8 +134,8 @@ questions:
     ref: "3.8"
     mode: F
     type: choice
-    label: Which dependencies may be added?
-    hint: Project code · Libraries and packages
+    label: Libraries
+    hint: Allowed packages.
     choices:
       - { value: standard-only, label: "Built-in only" }
       - { value: open-source, label: "Open source" }
@@ -144,7 +147,7 @@ questions:
     ref: "3.9"
     mode: F
     type: choice
-    label: Can the app use external services?
+    label: External services
     hint: Hosted auth, databases or APIs.
     choices:
       - { value: none, label: "No external services" }
@@ -157,8 +160,8 @@ questions:
     ref: "3.10"
     mode: F
     type: choice
-    label: Budget for hosting or paid components?
-    hint: Hosting, libraries and services · Approval required
+    label: Budget
+    hint: Hosting and paid components.
     choices:
       - { value: free-only, label: "Free components only" }
       - { value: capped, label: "Within a budget" }

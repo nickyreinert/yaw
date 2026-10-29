@@ -8,6 +8,7 @@ import { hashContent, readProjectFile } from '../render/files.js';
 import { enabledModules, readAnswers, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 import { task } from './tasks.js';
+import { setupPrompt } from '../lib/setup-prompts.js';
 
 // The guide lines and the planning prompt for a project; the terminal and the web UI show the same text.
 export function kickoffParts({ root, manifest }) {
@@ -26,6 +27,7 @@ export function kickoffParts({ root, manifest }) {
   }
   return {
     plan,
+    localPrompt: setupPrompt({ kind: 'kickoff', answers: doc.answers, modules }),
     guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
     prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks'), previousPlan, projectContext: context.documents.length ? contextText(context) : '' }),
   };

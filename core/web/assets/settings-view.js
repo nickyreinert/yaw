@@ -141,12 +141,8 @@ export function source(text) {
 
 // The kickoff guide and the planning prompt, shared by Settings → Kickoff and the last setup step.
 export function kickoffCard(data, ctx = {}) {
-  const planning = createPlanCard({ id: ctx.id ?? 'project-planning', project: true, progress: data.plan,
-    agents: data.agents, offline: !ctx.request, request: ctx.request, getPrompt: async () => data.prompt,
-    async onUse(reply, text) {
-      const result = await (await ctx.request('planning-apply', { text, expected: reply.expected, reviewed: true })).json();
-      const next = kickoffCard(result, ctx); next.append(el('p', result.message, 'small muted')); planning.node.replaceWith(next);
-    } });
+  const planning = createPlanCard({ id: ctx.id ?? 'project-planning', prompt: data.localPrompt ?? data.prompt,
+    instruction: 'Copy into your local coding agent to generate the project documents.' });
   return planning.node;
 }
 

@@ -20,8 +20,6 @@ export const INLINE_OWNERS = new Set(['comfort', 'team', 'tasks']);
 // Questions that open a group instead of sitting in a card: "Use GitHub for the repo?" leads the Git & GitHub group.
 export const GROUP_INTRO = new Map([['tasks.use-github', 'github']]);
 export const isInline = (q) => INLINE_OWNERS.has(q.owner) && !GROUP_INTRO.has(q.id);
-// Radio buttons up to this many choices; a dropdown only beyond it.
-export const RADIO_MAX = 5;
 const HOST_EXTRA = {
   'self-hosted': 'Dockerfile and compose.yaml when the stack ships them',
   serverless: 'the deploy configuration is up to you',
@@ -115,34 +113,35 @@ export function profileFor(profiles, language, runsOn) {
   return profileForStack(profiles, language, runsOn);
 }
 
-// One-of-few choices as radio buttons (a dropdown only beyond RADIO_MAX).
-// field: { name, id, choices: [{ value, label, disabled? }], value, disabled, describedBy, label, onChange(value) } -> { node, inputs }
+// Finite choices share native toggle buttons and visible, monochrome icons.
 const pretty = (v) => { const t = String(v).replaceAll('-', ' '); return t[0].toUpperCase() + t.slice(1); };
 export function radioChoices(choices) {
   return choices.map((c) => typeof c === 'object'
     ? { value: String(c.value), label: c.label ?? pretty(c.value), disabled: c.phase > 1 || c.disabled === true }
     : { value: String(c), label: pretty(c), disabled: false });
 }
-export function choiceField({ name, id, choices, value, disabled = false, describedBy, label, onChange }) {
+export function choiceIcon(name, value) {
+  if (ARCH_DECISIONS[name]) return ARCH_DECISIONS[name][value] ?? 'question';
+  return ({ true: 'shield', false: 'unplug', solo: 'terminal', team: 'users', 'external-reviewers': 'users',
+    claude: 'terminal', codex: 'terminal', copilot: 'terminal', gemini: 'terminal',
+    layperson: 'book', intermediate: 'ruler', expert: 'building', off: 'unplug', request: 'message',
+    suggest: 'bell', push: 'branch', warn: 'bell', block: 'shield', local: 'file', github: 'branch', both: 'list',
+    'ask-often': 'message', 'ask-risky': 'shield', 'act-and-report': 'bolt', short: 'list', medium: 'file', long: 'book' })[value]
+    ?? (name.startsWith('user.') ? 'message' : 'box');
+}
+export function choiceField({ name, id, choices, value, disabled = false, describedBy, label, onChange, multi = false }) {
   const list = radioChoices(choices);
-  if (ARCH_DECISIONS[name]) {
-    const inputs = list.map((c) => el('input', { type: 'radio', name, id: `${id}-${c.value}`, value: c.value, checked: c.value === String(value), disabled: disabled || c.disabled,
-      'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
-    const node = el('div', { class: 'decision-options', role: 'radiogroup', 'aria-label': label },
-      ...list.map((c, i) => el('label', { class: 'decision-option' }, inputs[i], decisionIcon(c.value === 'no-preference' ? 'shuffle' : ARCH_DECISIONS[name][c.value]), el('span', { text: c.label }))));
-    return { node, inputs };
-  }
-  if (list.length > RADIO_MAX) {
-    const select = el('select', { id, name, 'aria-label': label, 'aria-describedby': describedBy, disabled, onchange: (e) => onChange(e.target.value) },
-      ...list.map((c) => el('option', { value: c.value, disabled: c.disabled, text: c.label })));
-    select.value = String(value);
-    return { node: select, inputs: [select] };
-  }
-  const longest = Math.max(...list.map((c) => c.label.length));
-  const inputs = list.map((c) => el('input', { type: 'radio', name, value: c.value, id: `${id}-${c.value}`, checked: c.value === String(value),
-    disabled: disabled || c.disabled, 'data-unavailable': c.disabled ? '1' : null, 'aria-describedby': describedBy, onchange: (e) => { if (e.target.checked) onChange(c.value); } }));
-  const node = el('div', { class: `radios${list.length > 3 || longest > 26 ? ' stacked' : ''}`, role: 'radiogroup', 'aria-label': label },
-    ...list.map((c, i) => el('label', {}, inputs[i], ` ${c.label}${c.disabled ? ' (not available yet)' : ''}`)));
+  const selected = (v) => multi ? [].concat(value ?? []).map(String).includes(v) : v === String(value);
+  const inputs = list.map((c) => el('button', { type: 'button', name, id: `${id}-${c.value}`, value: c.value,
+    class: 'decision-option', 'aria-pressed': String(selected(c.value)), disabled: disabled || c.disabled,
+    'data-unavailable': c.disabled ? '1' : null, 'aria-describedby': describedBy },
+    decisionIcon(choiceIcon(name, c.value)), el('span', { text: c.label })));
+  const node = el('div', { class: 'decision-options', role: 'group', 'aria-label': label }, ...inputs);
+  inputs.forEach((button) => button.addEventListener('click', () => {
+    if (multi) button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+    else inputs.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+    onChange(multi ? inputs.filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.value) : button.value);
+  }));
   return { node, inputs };
 }
 
@@ -180,7 +179,7 @@ export function renderStack(root, ctx) {
 
   const langRow = el('div', { class: 'chips', role: 'group', 'aria-label': langQ.label });
   for (const l of langs) {
-    langRow.append(el('button', { type: 'button', class: 'chip language-chip', 'aria-pressed': String(l.value === lang), disabled: ctx.disabled,
+    langRow.append(el('button', { type: 'button', class: 'chip language-chip decision-option', 'aria-pressed': String(l.value === lang), disabled: ctx.disabled,
       title: l.label, onclick: () => ctx.onChange('arch.language', l.value) }, languageIcon(l.value), el('span', { text: langName(l.value) })));
   }
   const hostGrid = el('div', { class: 'hosts', role: 'group', 'aria-label': hostQ.label });
@@ -188,7 +187,7 @@ export function renderStack(root, ctx) {
     const f = fit(lang, h.value);
     const p = profileFor(ctx.profiles, lang, h.value);
     const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : 'No YAW profile yet';
-    hostGrid.append(el('button', { type: 'button', class: 'host', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
+    hostGrid.append(el('button', { type: 'button', class: 'host decision-option', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
     decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone' })[h.value]),
     el('strong', { text: hostName(h.value) }),
@@ -196,6 +195,10 @@ export function renderStack(root, ctx) {
     el('span', { class: `fit ${f === 'tailored' ? 'yes' : f === 'basic' ? 'basic' : 'no'}`, text })));
   }
 
+  const explainLanguage = () => ctx.onExplain?.(langQ.label, [el('p', { text: langQ.helpText ?? 'Sets the project language and available checks.' })]);
+  const explainHost = () => ctx.onExplain?.(hostQ.label, [el('p', { text: hostQ.helpText ?? 'Sets the runtime, deployment configuration and applicable project constraints.' })]);
+  langRow.addEventListener('focusin', explainLanguage); langRow.addEventListener('mouseenter', explainLanguage);
+  hostGrid.addEventListener('focusin', explainHost); hostGrid.addEventListener('mouseenter', explainHost);
   const profile = profileFor(ctx.profiles, lang, host);
   const result = el('div', { class: `stack-result${profile ? (profile.stack.basic ? ' basic' : '') : ' invalid'}`, role: 'status' });
   const needs = (p) => el('li', { text: `Needs ${p.requires?.length ? p.requires.join(', ') : 'nothing extra'} on your computer (yaw doctor checks)` });
@@ -228,18 +231,12 @@ export function renderStack(root, ctx) {
 
 // ---------------------------------------------------------------- module cards
 
-// ctx: { modules (catalog), selected: string[], answers, questions, compact, gitRepo, gitInit, usesGitHub,
-//   readOnly, onToggle(name, on), onAnswer(id, value), onGitInit(on), onCompact(on), onPreset(kind) }
+// ctx: { modules (catalog), selected: string[], answers, questions, gitRepo, gitInit, usesGitHub,
+//   readOnly, onToggle(name, on), onAnswer(id, value), onExplain(title, content) }
 export function renderModuleGroups(root, ctx) {
   const selected = new Set(ctx.selected);
   const hasGit = ctx.gitRepo || ctx.gitInit;
-  const bar = el('div', { class: 'module-bar' },
-    el('div', { class: 'presets', role: 'group', 'aria-label': 'Preset' },
-      el('button', { type: 'button', disabled: ctx.readOnly, title: 'Use saved optional tool defaults; otherwise keep optional tools off.', onclick: () => ctx.onPreset('quick'), text: 'Quick' }),
-      el('button', { type: 'button', disabled: ctx.readOnly, title: 'Every module that fits your answers, including commit checks and review agents.', onclick: () => ctx.onPreset('full'), text: 'Everything that fits' })),
-    el('label', { class: 'small', title: 'Compact hides the examples and costs, for users who already know the modules.' },
-      el('input', { type: 'checkbox', checked: ctx.compact, onchange: (e) => ctx.onCompact(e.target.checked) }), ' Compact view'));
-  const groups = el('div', { class: `module-groups${ctx.compact ? ' compact' : ''}` });
+  const groups = el('div', { class: 'module-groups' });
   for (const [id, title, lead] of GROUPS) {
     const mods = ctx.modules.filter((m) => (m.group ?? 'basics') === id);
     const intro = ctx.groupNodes?.(id) ?? [];
@@ -249,16 +246,9 @@ export function renderModuleGroups(root, ctx) {
     groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })), el('p', { class: 'small muted lead', text: lead }),
       ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []), grid));
   }
-  root.replaceChildren(bar, groups);
+  root.replaceChildren(groups);
 }
 
-// Cards that show their "?" panel (kept across redraws).
-const expanded = new Set();
-
-// Every card reads the same way: switch and title, one short line, its options, warnings, then the "?" with
-// everything else (description, example, cost, notes for the agent, dependencies). A card never changes size when
-// it is switched: its options are always there, greyed out while the module is off. Compact view drops the short
-// line and the "?"; the same text shows as a tooltip on hover or focus.
 function moduleCard(m, ctx, selected, hasGit) {
   const on = selected.has(m.name);
   const required = m.name === 'core';
@@ -268,7 +258,7 @@ function moduleCard(m, ctx, selected, hasGit) {
   const input = el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
   const questions = ctx.questionNodes?.(m.name, on) ?? [];
-  const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' || questions.length ? ' wide' : ''}` },
+  const card = el('article', { class: `module-card${on ? ' on' : ''}${m.name === 'review' ? ' wide' : ''}` },
     el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));
@@ -281,22 +271,12 @@ function moduleCard(m, ctx, selected, hasGit) {
     ...(m.depends?.length && !required ? [el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` })] : []),
   ];
 
-  if (ctx.compact) card.append(el('div', { class: 'card-tip', role: 'tooltip' }, ...more()));
-  else card.append(el('p', { class: 'what', text: m.short ?? m.what ?? m.description }));
+  card.append(el('p', { class: 'what', text: m.short ?? m.what ?? m.description }));
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (m.name === 'review') card.append(reviewerGrid(ctx, on, hasGit));
   for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
-  if (!ctx.compact) {
-    const open = expanded.has(m.name);
-    const panel = el('div', { class: 'card-more', id: `more-${m.name}`, hidden: !open }, ...more());
-    const help = el('button', { type: 'button', class: 'help-button', 'aria-expanded': String(open), 'aria-controls': `more-${m.name}`, 'aria-label': `More about ${m.title ?? m.name}`, text: '?',
-      onclick: () => {
-        const now = panel.hidden;
-        panel.hidden = !now; help.setAttribute('aria-expanded', String(now));
-        if (now) expanded.add(m.name); else expanded.delete(m.name);
-      } });
-    card.append(el('div', { class: 'card-foot' }, help), panel);
-  }
+  const explain = () => ctx.onExplain?.(m.title ?? m.name, more());
+  card.addEventListener('focusin', (e) => { if (!e.target.closest('.question')) explain(); }); card.addEventListener('mouseenter', explain);
   return card;
 }
 
@@ -312,9 +292,9 @@ function reviewerGrid(ctx, on, hasGit) {
   const gated = REVIEWERS.some(([k]) => trig(k) === 'push');
   if (!hasGit) return el('div', {}, grid, el('div', { class: 'gate muted' }, el('small', { text: 'The push gate needs a git repository.' })));
   const gate = ctx.answers['quality.review-gate'] ?? 'warn';
-  const radio = (value, label, tip) => el('label', { title: tip }, el('input', { type: 'radio', name: 'review-gate', value, checked: gate === value, disabled: !on || !gated || ctx.readOnly,
-    onchange: () => ctx.onAnswer('quality.review-gate', value) }), ` ${label}`);
-  return el('div', {}, grid, el('div', { class: `gate${gated ? '' : ' muted'}` }, el('b', { text: 'Push gate' }),
-    radio('warn', 'Warn', 'Show findings and ask before pushing'), radio('block', 'Block', 'Stop the push until findings are fixed'),
+  const field = choiceField({ name: 'review-gate', id: 'review-gate', label: 'Push gate', value: gate,
+    disabled: !on || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
+    onChange: (value) => ctx.onAnswer('quality.review-gate', value) });
+  return el('div', {}, grid, el('div', { class: `gate${gated ? '' : ' muted'}` }, el('b', { text: 'Push gate' }), field.node,
     ...(gated ? [] : [el('small', { text: 'Set a reviewer to "Required before push" to use it.' })])));
 }

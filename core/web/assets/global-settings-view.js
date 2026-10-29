@@ -3,7 +3,7 @@
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
-import { GROUPS, RADIO_MAX, choiceField } from './setup-cards.js';
+import { GROUPS, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
 import { depthLabel } from '../../interview/depth.js';
 import { CHATS } from './chat-services.js';
@@ -341,9 +341,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     box.append(actions); return box;
   }
   function question(q) {
-    const multi = q.type === 'multi', radios = q.type === 'boolean' || (q.type === 'choice' && (q.choices ?? []).length <= RADIO_MAX);
+    const multi = q.type === 'multi', radios = q.type === 'boolean' || q.type === 'choice';
     const wrap = el(multi || radios ? 'fieldset' : 'label', null, 'interview-question');
-    const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(code(q.id)); head.lastChild.className = 'small muted'; head.append(...depthBadges(q.assumedIn ?? [])); wrap.append(head);
+    const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(...depthBadges(q.assumedIn ?? [])); wrap.append(head);
     const value = answers[q.id] ?? q.default;
     const set = (v) => { answers[q.id] = v; changed(); };
     if (multi) {
@@ -361,7 +361,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     } else if (q.type === 'number') {
       const i = el('input'); i.type = 'number'; i.step = 'any'; i.value = String(value ?? ''); i.addEventListener('input', () => set(i.value === '' ? q.default : Number(i.value))); wrap.append(i);
     } else {
-      const t = el('textarea'); t.maxLength = 8192; t.rows = 1; t.value = String(value ?? ''); t.addEventListener('input', () => set(t.value)); wrap.append(t);
+      const t = el(q.id === 'user.language' ? 'input' : 'textarea'); t.maxLength = 8192; if (q.id === 'user.language') t.type = 'text'; else t.rows = 1; t.value = String(value ?? ''); t.addEventListener('input', () => set(t.value)); wrap.append(t);
     }
     if (q.hint) wrap.append(el('span', q.hint, 'small muted'));
     return wrap;

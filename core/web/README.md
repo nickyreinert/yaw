@@ -5,7 +5,7 @@
 | Area | Data / controls |
 | --- | --- |
 | Overview | Current workspace: shared overview cards (projects, sessions, agents, tokens, elapsed, reported cost, open tasks), configuration, recent tasks/sessions and activity |
-| Setup | Six revisitable steps, expertise-specific help, live file plan, diff, draft/preset save, explicit Apply |
+| Setup | Six revisitable steps, button choices, persistent setting help, live file plan, diff, draft/preset save, explicit Apply |
 | Global overview | Folder drill-down from the shared project root; totals; charts split by agent/model/folder/project; device filter for session metrics |
 | Analytics | Workspace (locked to the project) and Global; shared multi-select column browser: Device → Folders → Projects → Programming language → Agent → Model; dates and chart split below; usage and message-insight cards; stackable charts; filter/sort/page tables; Refresh, Auto and Classify in the filter bar (Global reads all workspaces, Workspace only the open one); state in the URL |
 | Learn | Classified project/session browsing, filtered classification, highlighted dialogue and browser/CLI review; temporary evidence |
@@ -76,11 +76,13 @@ Writes are CSRF-protected actions that carry the SHA-256 of the content they sta
 - `review-prompt-save` / `review-prompt-remove` (ADR-0056) write or delete a review prompt: `scope: project` is `.yaw/review/<kind>.md` in the workspace, `scope: global` the blueprint `~/.yaw/review/<kind>.md` (0600). GET `/api/review-prompts?workspace=` and `/api/global/review-prompts` return every layer per kind. The store (`modules/review/lib/prompts.js`) refuses symbolic links, empty text, more than 32 KiB and secret-rule matches.
 - `interview-preview` renders the `yaw edit` plan and diff (capped at 256 KiB) without writing; `interview-apply` applies it through `editProject` with the keep strategy. Only one apply runs at a time.
 
-## Connected project planning
+## Setup prompts and agent API
 
-Setup, completion and Settings → Kickoff share `plan-card.js` and `planning-handoff.js`. A complete reviewed reply supplies the idea/stack, foundations and build plan once. A saved partial plan or changed project context produces a continuation prompt containing existing work. Foundation review records a hash of relevant setup facts; personal preferences are excluded. Standalone setup still stops after Apply; completion offers manual handoff and directs live drafting/import to the workspace.
+Your project includes an optional copy-only interview prompt containing the current idea and supported settings. An external chat can ask focused questions and recommend Architecture and Workflow values for manual entry. Review shows one automatically regenerated final kickoff prompt for a local coding agent to write Architecture, Data Model and UI/UX directly in the target project. Setup, completion and Settings use copy-only cards; there is no reply input or refresh action. Prompt generation uses validated effective answers and clears stale text while updating. Chat links carry no project data.
 
-`planning-agents/start/job/clear` use a separate restricted runner from Learn, with explicit provider confirmation and 100,000-character prompt/output bounds. `planning-preview/apply` validate the exact reply, foundation sources, plan, manifest, answers and task ledger before explicit import. Existing foundation content is never replaced. Browser links carry no prompts. No model output is automatically treated as reviewed ground truth.
+Interview choices use native buttons with `aria-pressed` and hand-drawn `currentColor` icons. A persistent right column shows help for the focused or hovered setting; narrow layouts place it above the choices. Personal language uses a text input and labels remain stable at every expertise level. Legacy architecture values remain readable; fresh interviews omit redundant no-preference choices and defer hosting ownership to document planning.
+
+`yaw init --api` starts the authenticated local REST service without a browser. Agents discover the same question/module catalogue, replace validated in-memory setup state with revision checks, preview files, then explicitly apply the reviewed setup. Opening/reloading the wizard picks up API state. See [the API contract](../../docs/setup-api.md). Existing CLI plan-import commands remain available separately.
 
 ## YAW visual identity
 

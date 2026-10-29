@@ -1,7 +1,7 @@
-import { choiceValue, choiceLabel, available, asksIn, matches, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
+import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
 import { isPreference, questionApplies } from '../../interview/policy.js';
 
-import { CARD_QUESTIONS, GROUP_INTRO, RADIO_MAX, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
+import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
 import { renderReview } from './review-step.js';
 import { DEPTHS, depthOf } from '../../interview/depth.js';
@@ -12,7 +12,6 @@ const questionMode = () => presentation === 'settings' ? 'pro' : state.mode;
 const prefix = options.prefix ?? '';
 const localId = (id) => prefix && !id.startsWith(prefix) ? prefix + id : id;
 const $ = (id) => root.querySelector('#' + CSS.escape(localId(id)));
-const kickoffCard = options.kickoffCard;
 const showView = (view, replace) => options.navigate?.(view, replace);
 const setInterviewDone = (done) => options.onDone?.(done);
 function scopeIds() {
@@ -32,7 +31,7 @@ for (const button of root.querySelectorAll('.focus-toggle')) {
 }
 const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
 let catalog, state = { mode: 'quick', answers: {}, modules: null };
-let stackValid = true, compact = localStorage.getItem('yaw.setup.compact') === '1';
+let stackValid = true;
 let revision = 0, timer, busy = false, lastPreview;
 const controls = new Map(), sections = new Map();
 const actionIds = ['draft', 'preset', 'diff', 'apply'];
@@ -40,15 +39,16 @@ const steps = [
   { title: 'Starting point', hint: 'Choose your starting depth', ids: ['setup-depth', 'start'], groups: [] },
   { title: 'About you', hint: 'Agents, preferences & guidance', ids: [], groups: ['user'] },
   { title: 'Your project', hint: 'The idea and who it’s for', ids: [], groups: ['idea'] },
-  { title: 'Stack & standards', hint: 'How the project is built', ids: ['stack'], groups: ['arch', 'quality'] },
+  { title: 'Architecture', hint: 'Language, runtime and constraints', ids: ['stack'], groups: ['arch', 'quality'] },
   { title: 'Your workflow', hint: 'Modules, tasks & collaboration', ids: ['module-section'], groups: null },
   { title: 'Review & apply', hint: 'Inspect what will be written', ids: ['confirm'], groups: [] },
   { title: 'Finished', hint: 'What happened and what to do next', ids: ['finished'], groups: [] },
 ];
 const LAST = steps.length - 1, REVIEW = LAST - 1, WORKFLOW = steps.findIndex((s) => s.groups === null), STACK = steps.findIndex((s) => s.ids.includes('stack'));
-let stepIndex = 0;
-// The answer of the planning chat (step 3): sent with Apply only, never with previews or drafts.
-let plan = null, planInfo = null, planCard;
+let stepIndex = 0, helpStep = null;
+// Two copy-only prompts share the current validated setup.
+let planCard, finalCard;
+let promptRevision = 0;
 // edit: answering; applying: the log streams; done: the server has stopped.
 let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
@@ -64,6 +64,8 @@ function renderWizard(focus = false) {
     settingsPreview.replaceWith($('summary')); settingsPreview = null;
   }
   if (planCard) planCard.node.hidden = formView;
+  if (finalCard) finalCard.node.hidden = formView;
+  if (!formView && helpStep !== stepIndex) { helpStep = stepIndex; explain(stepIndex === 0 ? 'Interview depth' : steps[stepIndex].title, [element('p', steps[stepIndex].hint)]); }
   if (formView) {
     $('setup').hidden = false; $('finished').hidden = true; $('start').hidden = true;
     for (const id of ['stack', 'module-section', 'confirm']) { $(id).hidden = false; $(id).classList.add('settings-group'); }
@@ -119,7 +121,7 @@ function advance() {
   const modules = selectedModules();
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
   for (const q of visibleQuestions(catalog.questions, state.answers, state.mode, modules)) {
-    if (!isInline(q) && belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
+    if (!isInline(q) && !(q.id === 'arch.hosting-control' && controls.get(q.id)?.node.hidden) && belongs(steps[stepIndex], q.id.split('.')[0])) state.answers[q.id] = answers[q.id];
   }
   state.proposed = (state.proposed ?? []).filter((id) => !belongs(steps[stepIndex], id.split('.')[0]));
   visitedSteps.add(stepIndex);
@@ -140,7 +142,7 @@ function error(message) {
 function status(message) { $('status').textContent = message; }
 function actions(enabled) {
   actionIds.forEach((id) => { $(id).disabled = !enabled || busy || (id !== 'draft' && Boolean(lastPreview?.unresolved?.length)); });
-  root.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = busy || sectionEditing(); });
+  root.querySelectorAll('button[name=mode]').forEach((input) => { input.disabled = busy || sectionEditing(); });
 }
 async function request(action, input = state) {
   if (options.request) return options.request(action, input);
@@ -154,24 +156,30 @@ async function request(action, input = state) {
   return response;
 }
 const selectedModules = () => state.modules ?? defaultModules(catalog.modules, catalog.questions, state.answers, state.mode);
-const shownValue = (v) => Array.isArray(v) ? v.join(', ') : String(v ?? '');
 
+function explain(title, content) {
+  $('setting-help-title').textContent = title;
+  $('setting-help-content').replaceChildren(...content);
+}
 function buildPlan() {
-  planCard = createPlanCard({
-    request,
-    getAnswers: () => state.answers,
-    onUse(reply, text) {
-      plan = text; planInfo = reply;
-      if (reply.idea) state.answers['idea.text'] = reply.idea;
-      if (reply.language) state.answers['arch.language'] = reply.language;
-      if (reply.runsOn) state.answers['arch.runs-on'] = reply.runsOn;
-      state.proposed = ['idea.text', 'arch.language', 'arch.runs-on'].filter((id) => Object.hasOwn(state.answers, id));
-      planInfo.basis = structuredClone(state.answers);
-      planCard.setInfo(reply); update();
-    },
-    onRemove() { plan = null; planInfo = null; update(); },
-  });
+  planCard = createPlanCard({ title: 'Setup interview (optional)', label: 'Setup interview prompt', chat: true,
+    instruction: 'Copy into any AI chat. Enter its recommendations in Architecture and Your Workflow.' });
+  finalCard = createPlanCard({ id: 'final-prompt', title: 'Final kickoff prompt',
+    instruction: 'Copy into your local coding agent to generate Architecture, Data Model and UI/UX.' });
   sections.get('idea')?.node.append(planCard.node);
+  $('confirm').append(finalCard.node);
+}
+async function refreshPrompts() {
+  const current = ++promptRevision;
+  planCard?.setPrompt('', 'Updating prompt…'); finalCard?.setPrompt('', 'Updating prompt…');
+  try {
+    const result = await (await request('setup-prompts', state)).json();
+    if (current !== promptRevision) return;
+    planCard?.setPrompt(result.interview); finalCard?.setPrompt(result.kickoff, result.kickoffStatus);
+  } catch (e) {
+    if (current !== promptRevision) return;
+    planCard?.setPrompt('', e.message); finalCard?.setPrompt('', e.message);
+  }
 }
 function buildQuestions() {
   const title = { user: 'About you', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
@@ -184,27 +192,19 @@ function buildQuestions() {
       sections.set(sectionId, { node: section });
     }
     const id = `q-${q.id.replaceAll('.', '-')}`;
-    const radios = (q.type === 'choice' && q.choices.length <= RADIO_MAX) || q.type === 'boolean';
+    const radios = q.type === 'choice' || q.type === 'boolean';
     const grouped = q.type === 'multi' || radios;
     const node = element(grouped ? 'fieldset' : 'div', undefined, { class: 'question', id: `wrap-${id}` });
     const label = q.label.replace(' (comma-separated)', '');
     node.append(element(grouped ? 'legend' : 'label', label, grouped ? {} : { for: id }));
     let input;
     const inputs = [];
-    if (q.type === 'multi') {
-      for (const c of q.choices) {
-        const value = choiceValue(c);
-        input = element('input', undefined, { type: 'checkbox', value, name: q.id, id: `${id}-${value}` });
-        input.disabled = !available(c); if (!available(c)) input.dataset.unavailable = '1';
-        const l = element('label'); l.append(input, document.createTextNode(`${choiceLabel(c)}${available(c) ? '' : ' — phase 3, not available yet'}`));
-        node.append(l); inputs.push(input);
-      }
-    } else if (q.type === 'choice' || q.type === 'boolean') {
+    if (q.type === 'multi' || q.type === 'choice' || q.type === 'boolean') {
       const choices = q.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : q.choices;
-      const field = choiceField({ name: q.id, id, choices, value: String(q.default), label, onChange: () => {} });
+      const field = choiceField({ name: q.id, id, choices, value: q.default, label, multi: q.type === 'multi', onChange: () => {} });
       node.append(field.node); inputs.push(...field.inputs);
     } else {
-      const shortText = ['arch.framework', 'arch.cost-limit'].includes(q.id);
+      const shortText = ['user.language', 'arch.framework', 'arch.cost-limit'].includes(q.id);
       input = element(q.type === 'text' && !shortText ? 'textarea' : 'input', undefined, { id, name: q.id });
       if (q.type === 'text') {
         input.maxLength = 8192;
@@ -221,14 +221,14 @@ function buildQuestions() {
     if (q.status) node.append(element('p', q.status, { class: 'hint status', id: `${id}-status` }));
     const describedBy = [q.hint ? `${id}-hint` : '', q.status ? `${id}-status` : ''].filter(Boolean).join(' ');
     if (describedBy) inputs.forEach((i) => i.setAttribute('aria-describedby', describedBy));
-    const why = q.helpText ? element('details') : null;
-    if (why) { why.append(element('summary', 'Why this matters'), element('div', q.helpText, { class: 'help' })); node.append(why); }
+    const showHelp = () => explain(label, [element('p', q.helpText || q.hint || `Sets ${label.replace(/\?$/, '').toLowerCase()}.`)]);
+    node.addEventListener('focusin', showHelp); node.addEventListener('mouseenter', showHelp);
     let capability, gitHolder;
     if (q.id === 'user.agents') { capability = element('div'); node.append(capability); }
     // Creating the repository is asked right next to "Use GitHub for the repo?": same context.
     if (q.id === 'tasks.use-github') { gitHolder = element('div', undefined, { class: 'git-holder' }); node.append(gitHolder); }
-    inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : 'change', () => {
-      if (q.type === 'multi') state.answers[q.id] = inputs.filter((x) => x.checked && !x.disabled).map((x) => x.value);
+    inputs.forEach((i) => i.addEventListener(q.type === 'text' || q.type === 'number' ? 'input' : 'click', () => {
+      if (q.type === 'multi') state.answers[q.id] = inputs.filter((x) => x.getAttribute('aria-pressed') === 'true' && !x.disabled).map((x) => x.value);
       else if (q.type === 'boolean') state.answers[q.id] = i.value === 'true';
       else if (q.type === 'number') state.answers[q.id] = i.value === '' ? q.default : Number(i.value);
       else state.answers[q.id] = i.value;
@@ -246,8 +246,8 @@ function buildQuestions() {
   if (personal) {
     const personalExtras = element('div', undefined, { class: 'personal-default-controls' });
     personalExtras.append(element('p', catalog.personalWarning ?? 'Quick uses your saved personal settings, or the documented defaults. You can review them separately.', { class: 'hint' }));
-    const global = element('button', 'Edit personal defaults for future projects', { type: 'button', class: 'link' });
-    global.addEventListener('click', () => showView('global-settings')); personalExtras.append(global); personal.append(personalExtras);
+    const global = element('a', undefined, { href: '#global-settings/interview', target: '_blank', rel: 'noopener noreferrer', class: 'button' });
+    global.append(decisionIcon('users'), element('span', 'Add personal defaults for future projects')); personalExtras.append(global); personal.append(personalExtras);
   }
 
 }
@@ -257,20 +257,22 @@ function renderQuestions() {
   const modules = selectedModules();
   const visible = new Set(visibleQuestions(catalog.questions, state.answers, questionMode(), modules).map((q) => q.id));
   const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(questionMode()) && asksIn(q, questionMode())), state.answers, state.mode);
-  const expertise = answers['user.expertise'] ?? 'intermediate';
+
   for (const [id, c] of controls) {
-    c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id);
+    c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id) || id === 'arch.hosting-control' && presentation !== 'settings' && !Object.hasOwn(state.answers, id);
+    for (const button of c.inputs.filter((i) => i.type === 'button' && i.value === 'no-preference' && id.startsWith('arch.'))) {
+      button.hidden = (answers[id] ?? c.q.default) !== 'no-preference';
+    }
     if (c.gitHolder) {
       c.gitHolder.replaceChildren(gitInitControl({ gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onGitInit: setGitInit }));
     }
-    c.label.textContent = expertise === 'expert' ? `${c.q.id} — ${c.plainLabel}` : c.plainLabel;
+    c.label.textContent = c.plainLabel;
     const value = answers[id] ?? c.q.default;
     for (const input of c.inputs) {
-      if (c.q.type === 'multi') input.checked = value.includes(input.value);
-      else if (input.type === 'radio') input.checked = input.value === String(value);
+      if (input.type === 'button') input.setAttribute('aria-pressed', String(c.q.type === 'multi' ? value.includes(input.value) : input.value === String(value)));
       else if (document.activeElement !== input) input.value = String(value);
     }
-    c.hint.hidden = !c.q.hint || expertise === 'expert' && id !== 'user.examples';
+    c.hint.hidden = !c.q.hint;
     if (c.capability) {
       c.capability.replaceChildren();
       for (const agent of value) {
@@ -282,7 +284,7 @@ function renderQuestions() {
           if (support.support !== 'native') notes.push(`${feature}: ${support.support}. ${support.note ?? support.via ?? ''}`);
         }
         if (notes.length) {
-          const note = element('details'); note.append(element('summary', `${detail.name} support`));
+          const note = element('div', undefined, { class: 'agent-support' }); note.append(element('strong', `${detail.name} support`));
           for (const text of notes) note.append(element('p', text));
           c.capability.append(note);
         }
@@ -301,6 +303,7 @@ function renderStackStep() {
   const result = renderStack($('stack-cards'), {
     profiles: catalog.profiles, questions: catalog.questions, answers,
     disabled: sectionEditing() && !catalog.sections.some((s) => s === 'arch' || s.startsWith('arch.')),
+    onExplain: explain,
     onChange: (id, value) => { state.answers[id] = value; state.proposed = (state.proposed ?? []).filter((key) => key !== id); update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus({ preventScroll: true }); },
   });
   stackValid = result.valid;
@@ -326,9 +329,9 @@ function renderModules() {
   if (github?.gitHolder) github.gitHolder.hidden = false;
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderModuleGroups($('modules'), {
-    modules: catalog.modules.filter((m) => presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions, compact,
+    modules: catalog.modules.filter((m) => presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions,
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
-    readOnly: sectionEditing(),
+    readOnly: sectionEditing(), onExplain: explain,
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {
@@ -338,19 +341,13 @@ function renderModules() {
     },
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
     onAnswer: (id, value) => { state.answers[id] = value; update(); },
-    onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); },
-    onPreset: (kind) => {
-      let next = defaultModules(catalog.modules, catalog.questions, state.answers, kind);
-      if (!catalog.gitRepo && state.gitInit === false) next = toggleModules(catalog.modules, next, 'git-hooks', false);
-      state.modules = next; update();
-    },
   });
 }
 // Where a review item is configured: the step and the control to focus.
 const stepFor = (q) => q.id.startsWith('arch.') ? STACK : isInline(q) || CARD_QUESTIONS.has(q.id) ? WORKFLOW : steps.findIndex((st) => belongs(st, q.id.split('.')[0]));
 function setDepth(mode) {
   state.mode = mode;
-  root.querySelectorAll('input[name=mode]').forEach((input) => { input.checked = input.value === depthOf(mode); });
+  root.querySelectorAll('button[name=mode]').forEach((input) => { input.setAttribute('aria-pressed', String(input.value === depthOf(mode))); });
   update();
 }
 function jump(target) {
@@ -372,7 +369,7 @@ function jump(target) {
   if (node) { if (node.tabIndex < 0) node.tabIndex = -1; node.focus(); node.scrollIntoView({ block: 'center', behavior: 'instant' }); }
 }
 function summary(preview) {
-  renderReview($('summary'), { preview, modules: catalog.modules, questions: catalog.questions, jump, plan: planInfo,
+  renderReview($('summary'), { preview, modules: catalog.modules, questions: catalog.questions, jump,
     confirmProposal: () => { state.proposed = []; update(); } });
 }
 function applySecretFields() {
@@ -399,7 +396,8 @@ function applySecretFields() {
 function update() {
   const activeId = document.activeElement?.id;
   revision++;
-  lastPreview = null;
+  lastPreview = null; promptRevision++;
+  planCard?.setPrompt('', 'Updating prompt…'); finalCard?.setPrompt('', 'Updating prompt…');
   error(''); actions(false);
   // Do not leave a stale preview or diff (possibly including an earlier value) on screen.
   $('summary').textContent = 'Updating preview…';
@@ -410,6 +408,7 @@ function update() {
   clearTimeout(timer);
   const current = revision;
   timer = setTimeout(async () => {
+    refreshPrompts();
     try {
       const body = await (await request('preview')).json();
       if (current !== revision) return;
@@ -441,7 +440,8 @@ async function perform(name, input = state) {
 const code = (text) => element('code', text);
 const bullet = (...parts) => { const li = element('li'); li.append(...parts.map((p) => typeof p === 'string' ? document.createTextNode(p) : p)); return li; };
 // The last step: outcome, then what the user can do now. The server has stopped by then.
-function finish({ ok, message }, kickoff) {
+function finish({ ok, message }, prompt) {
+  if (prompt) { promptRevision++; finalCard.setPrompt(prompt); }
   phase = 'done';
   setInterviewDone(true);
   $('finished-status').textContent = message;
@@ -460,7 +460,7 @@ function finish({ ok, message }, kickoff) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet(options.persistent ? 'The workspace remains open.' : 'This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
-  $('kickoff-box').replaceChildren(...(kickoff ? [kickoffCard(kickoff, { request: options.persistent ? request : undefined })] : []));
+  $('kickoff-box').replaceChildren(finalCard.node);
   status(message);
   renderWizard(true);
 }
@@ -476,7 +476,7 @@ async function apply() {
   for (const input of $('secret-fields').querySelectorAll('input[type=password]')) input.value = '';
   let outcome = null, started = false, failure = '', kickoff = null;
   try {
-    const response = await request('apply', { ...state, ...(plan ? { plan, planBasis: planInfo?.basis, foundationsReviewed: planInfo?.foundationsReviewed === true, foundationReview: planInfo?.foundationReview } : {}), secrets: secretValues });
+    const response = await request('apply', { ...state, secrets: secretValues });
     started = true;
     const reader = response.body.getReader(), decoder = new TextDecoder();
     let buffer = '';
@@ -485,7 +485,7 @@ async function apply() {
       const event = JSON.parse(line);
       if (event.type === 'log') $('log').textContent += event.text;
       if (event.type === 'error') failure = event.message;
-      if (event.type === 'kickoff') kickoff = event;
+      if (event.type === 'kickoff') kickoff = event.localPrompt;
       if (event.type === 'done') outcome = event;
     };
     for (;;) {
@@ -521,10 +521,10 @@ function applyFacts() {
 }
 function loadState(next) {
   const { profile: _ignored, ...rest } = next;
-  state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: !catalog.gitRepo };
+  state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: rest.gitInit ?? !catalog.gitRepo };
   visitedSteps.clear();
-  plan = null; planInfo = null; planCard?.setInfo(null);
-  root.querySelectorAll('input[name=mode]').forEach((i) => { i.checked = i.value === depthOf(state.mode); });
+
+  root.querySelectorAll('button[name=mode]').forEach((i) => { i.setAttribute('aria-pressed', String(i.value === depthOf(state.mode))); });
   update();
 }
 // Where the answers start from: a dropdown of the presets that exist; nothing is shown when there are none.
@@ -544,15 +544,16 @@ async function start() {
   catalog = body;
   state.gitInit = !catalog.gitRepo;
   if (catalog.personalDefaultsNotice) {
-    const notice = element('p', catalog.personalDefaultsNotice, { class: 'personal-defaults-notice', role: 'status' });
-    $('setup').before(notice);
+    const notice = element('p', 'No personal defaults. Basic and All save confirmed preferences after Apply.', { class: 'personal-defaults-notice', role: 'status' });
+    $('setup').closest('.interview-columns').before(notice);
   }
   const depthCards = $('setup-depth').querySelector('.depth-options');
   depthCards.replaceChildren(...DEPTHS.map((depth) => {
-    const label = element('label', undefined, { class: 'depth-card', title: depth.description });
-    const input = element('input', undefined, { type: 'radio', name: 'mode', value: depth.value });
-    input.checked = depth.value === depthOf(state.mode);
-    label.append(input, decisionIcon(({ quick: 'bolt', basic: 'shield', pro: 'box' })[depth.value]), element('strong', depth.label)); return label;
+    const button = element('button', undefined, { type: 'button', name: 'mode', value: depth.value, class: 'decision-option', title: depth.description,
+      'aria-pressed': String(depth.value === depthOf(state.mode)) });
+    const showHelp = () => explain('Interview depth', [element('p', depth.description)]);
+    button.addEventListener('focus', showHelp); button.addEventListener('mouseenter', showHelp);
+    button.append(decisionIcon(({ quick: 'bolt', basic: 'shield', pro: 'box' })[depth.value]), element('strong', depth.label)); return button;
   }));
   if (catalog.editing) {
     if (!options.persistent) document.title = 'YAW edit setup';
@@ -562,7 +563,7 @@ async function start() {
       const selected = (q) => catalog.sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
       catalog.questions = catalog.questions.map((q) => selected(q) ? q : { ...q, editHidden: true });
       prefillLocked = true; $('load').disabled = true;
-      root.querySelectorAll('input[name=mode]').forEach((input) => { input.disabled = true; });
+      root.querySelectorAll('button[name=mode]').forEach((input) => { input.disabled = true; });
     }
     catalog.questions = catalog.questions.map((q) => Object.hasOwn(catalog.initial.answers, q.id) ? { ...q, default: catalog.initial.answers[q.id] } : q);
   }
@@ -579,7 +580,7 @@ async function start() {
   $('back-to-review').addEventListener('click', () => { stepIndex = REVIEW; renderWizard(true); });
   $('next-step-button').addEventListener('click', advance);
   $('setup').addEventListener('submit', (e) => e.preventDefault());
-  root.querySelectorAll('input[name=mode]').forEach((input) => input.addEventListener('change', () => {
+  root.querySelectorAll('button[name=mode]').forEach((input) => input.addEventListener('click', () => {
     setDepth(input.value);
   }));
   $('load').addEventListener('click', async () => {
@@ -625,7 +626,7 @@ async function start() {
 }
 await start();
 return {
-  destroy() { clearTimeout(timer); revision++; root.replaceChildren(); }, state: () => state,
+  destroy() { clearTimeout(timer); revision++; promptRevision++; root.replaceChildren(); }, state: () => state,
   setPresentation(mode) {
     if (!['settings', 'interview'].includes(mode) || presentation === mode) return;
     presentation = mode; update();

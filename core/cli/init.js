@@ -225,11 +225,12 @@ export async function init({ values, positionals, io }) {
   const root = io.cwd;
   const kitRoot = io.kitRoot;
   if (values.sync) syncShortcut({ spec: values.sync, io });
-  if (values.web) {
-    if (values.answers || values.yes) throw new UsageError('--web cannot be combined with --answers or --yes; confirm in the browser');
+  if (values.api && values.web) throw new UsageError('--api cannot be combined with --web');
+  if (values.web || values.api) {
+    if (values.answers || values.yes) throw new UsageError('--web/--api cannot be combined with --answers or --yes; review and apply through the setup interface');
     if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
     if (!(await guardFolder({ root, io, force: values.force }))) return cancelled(io);
-    return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject });
+    return initWeb({ io, skipVerify: values['skip-verify'], verify: verifyProject, headless: values.api === true });
   }
   const fromFile = Boolean(values.answers);
   if (!fromFile && !io.prompter.interactive) throw new UsageError('no terminal for the interview: run yaw init --answers <file> --yes');

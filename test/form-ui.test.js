@@ -51,7 +51,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.match(app, /setInterviewDone\(true\)/);
   assert.match(css, /body\.interview-done \.focus-toggle \{ display: none/);
   assert.ok(!html.includes('id="log-panel"'));
-  // Radio buttons up to five choices; the git question sits next to "Use GitHub"; module questions live in their card.
+  // Finite choices use buttons; the git question and module options retain their context.
   // Header project switcher with search and plus; folder browser; one focus switch everywhere; kickoff in the UI.
   const dash = readFileSync(join(KIT_ROOT, 'core/web/assets/dashboard.html'), 'utf8');
   for (const page of [html, dash]) {
@@ -61,12 +61,16 @@ test('interview UI: concise setup, focus switch and final module review', () => 
     assert.match(page, /data-tab="kickoff"/);
     assert.match(page, /class="page-actions"/);
   }
-  assert.match(app, /event\.type === 'kickoff'|type === 'kickoff'/);
-  assert.match(cards, /RADIO_MAX = 5/);
+  assert.match(app, /finalCard\.node/);
+  assert.match(cards, /'aria-pressed'/);
+  assert.ok(!cards.includes("type: 'radio'"));
   assert.ok(!html.includes('save-consent') && !html.includes('I explicitly agree'));
   assert.ok(!html.includes('Choose a preset'));
-  assert.match(cards, /help-button/);
-  assert.match(cards, /card-tip/);
+  assert.match(cards, /onExplain/);
+  assert.match(html, /class="setting-help"/);
+  assert.ok(!cards.includes('Everything that fits'));
+  const handoff = readFileSync(join(KIT_ROOT, 'core/web/assets/planning-handoff.js'), 'utf8');
+  assert.ok(!handoff.includes('Refresh from project answers') && !handoff.includes("text: 'Reply'"));
   assert.match(cards, /GROUP_INTRO = new Map\(\[\['tasks\.use-github', 'github'\]\]\)/);
   assert.ok(!cards.includes("el('select', { id, disabled"));
   assert.equal(app.split("element('select'").length - 1, 1, 'the only dropdown is the preset list');
