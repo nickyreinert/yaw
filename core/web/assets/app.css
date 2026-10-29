@@ -790,3 +790,15 @@ a.button.primary { background: var(--accent); color: #fff; }
 @media (max-width: 700px) {
   .workspace-filter .workspace-facets, .workspace-filter .analytics-dates { flex-basis: 100%; }
 }
+
+/* Settings uses the shared controls as a grouped form; the wizard is opt-in. */
+.settings-presentation { display: flex; gap: 8px; margin: 0 0 20px; }
+.settings-presentation [aria-pressed=true] { background: var(--ink); color: var(--sun); border-color: var(--ink); }
+.settings-form .wizard-layout { display: block; }
+.settings-form .wizard-nav, .settings-form .interview-depth-bar, .settings-form .wizard-footer { display: none; }
+.settings-form .interview-form { padding: 0; border: 0; background: transparent; }
+.settings-form .interview-form .settings-group { padding: 22px; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 14px 4px 14px 4px; background: var(--paper); }
+.settings-form .interview-form :is(h2, h3, legend, input, textarea) { scroll-margin-top: 24px; }
+.settings-preview { margin: 14px 0; }
+.settings-preview > summary { font-weight: 600; }
+.settings-preview[open] > summary { margin-bottom: 16px; }

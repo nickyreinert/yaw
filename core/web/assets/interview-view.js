@@ -7,6 +7,8 @@ import { renderReview } from './review-step.js';
 import { DEPTHS, depthOf } from '../../interview/depth.js';
 
 export async function mountInterview(root, options = {}) {
+let presentation = options.presentation ?? 'interview', settingsPreview = null;
+const questionMode = () => presentation === 'settings' ? 'pro' : state.mode;
 const prefix = options.prefix ?? '';
 const localId = (id) => prefix && !id.startsWith(prefix) ? prefix + id : id;
 const $ = (id) => root.querySelector('#' + CSS.escape(localId(id)));
@@ -53,6 +55,23 @@ const visitedSteps = new Set();
 const belongs = (step, group) => step.groups === null ? !['user', 'idea', 'arch', 'quality'].includes(group) : step.groups.includes(group);
 const skipped = (index) => depthOf(state.mode) === 'quick' && (steps[index].groups?.includes('user') || index === WORKFLOW);
 function renderWizard(focus = false) {
+  const formView = presentation === 'settings' && phase === 'edit';
+  root.classList.toggle('settings-form', formView);
+  if (formView && !settingsPreview) {
+    settingsPreview = element('details', undefined, { class: 'settings-preview' });
+    settingsPreview.append(element('summary', 'Preview changes'));
+    $('summary').before(settingsPreview); settingsPreview.append($('summary'));
+  } else if (!formView && settingsPreview) {
+    settingsPreview.replaceWith($('summary')); settingsPreview = null;
+  }
+  if (planCard) planCard.node.hidden = formView;
+  if (formView) {
+    $('setup').hidden = false; $('finished').hidden = true; $('start').hidden = true;
+    for (const id of ['stack', 'module-section', 'confirm']) { $(id).hidden = false; $(id).classList.add('settings-group'); }
+    for (const section of sections.values()) section.node.hidden = !section.applicable;
+    $('back-to-review').hidden = true;
+    return;
+  }
   const step = steps[stepIndex];
   const finished = step.ids.includes('finished');
   $('setup').hidden = finished; $('finished').hidden = !finished;
@@ -161,7 +180,7 @@ function buildQuestions() {
   for (const q of catalog.questions) {
     const sectionId = q.id.split('.')[0];
     if (!sections.has(sectionId)) {
-      const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}` });
+      const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}`, class: 'settings-group' });
       section.append(element('h2', title[sectionId] ?? sectionId, { id: `title-${sectionId}` }));
       $('questions').append(section);
       sections.set(sectionId, { node: section });
@@ -236,8 +255,8 @@ function buildQuestions() {
 
 function renderQuestions() {
   const modules = selectedModules();
-  const visible = new Set(visibleQuestions(catalog.questions, state.answers, state.mode, modules).map((q) => q.id));
-  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(state.mode) && asksIn(q, state.mode)), state.answers, state.mode);
+  const visible = new Set(visibleQuestions(catalog.questions, state.answers, questionMode(), modules).map((q) => q.id));
+  const answers = effectiveAnswers(catalog.questions.filter((q) => modules.includes(q.owner) || isPreference(q) || ['pro', 'all'].includes(questionMode()) && asksIn(q, questionMode())), state.answers, state.mode);
   const expertise = answers['user.expertise'] ?? 'intermediate';
   for (const [id, c] of controls) {
     c.node.hidden = !visible.has(id) || CARD_QUESTIONS.has(id);
@@ -294,14 +313,14 @@ function setGitInit(on) {
 function renderModules() {
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderModuleGroups($('modules'), {
-    modules: catalog.modules.filter((m) => depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions, compact,
+    modules: catalog.modules.filter((m) => presentation === 'settings' || depthOf(state.mode) === 'pro' || selectedModules().includes(m.name) || depthOf(state.mode) === 'basic' && ['review', 'github', 'tasks'].includes(m.name)), selected: selectedModules(), answers, questions: catalog.questions, compact,
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(),
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {
       const everything = effectiveAnswers(catalog.questions, state.answers, state.mode);
-      return [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && (on ? !c.node.hidden : asksIn(c.q, state.mode) && matches(c.q.when, everything)))
+      return [...controls.values()].filter((c) => c.q.owner === name && isInline(c.q) && (on ? !c.node.hidden : asksIn(c.q, questionMode()) && matches(c.q.when, everything)))
         .map((c) => { c.node.hidden = false; c.inputs.forEach((i) => { i.disabled = !on || sectionEditing() || i.dataset.unavailable === '1'; }); return c.node; });
     },
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $(`module-${name}`)?.focus(); },
@@ -325,6 +344,10 @@ function setDepth(mode) {
   if (wasSkipped) renderWizard(true);
 }
 function jump(target) {
+  if (presentation === 'settings') {
+    const id = target.question ? controls.get(target.question)?.inputs[0]?.id : target.stack ? 'stack-title' : target.plan ? 'plan-card' : `module-${target.module}`;
+    const node = id && $(id); node?.scrollIntoView({ block: 'center' }); node?.focus({ preventScroll: true }); return;
+  }
   let step, focusId;
   if (target.stack) { step = STACK; focusId = 'stack-title'; }
   else if (target.plan) { step = steps.findIndex((st) => st.groups?.includes('idea')); focusId = 'plan-card'; }
@@ -588,9 +611,17 @@ async function start() {
 await start();
 return {
   destroy() { clearTimeout(timer); revision++; root.replaceChildren(); }, state: () => state,
+  setPresentation(mode) {
+    if (!['settings', 'interview'].includes(mode) || presentation === mode) return;
+    presentation = mode; update();
+  },
   showSection(section) {
     const index = ({ start: 0, user: 1, idea: 2, stack: STACK, workflow: WORKFLOW })[section];
     if (index === undefined || phase !== 'edit') return;
+    if (presentation === 'settings') {
+      const node = section === 'stack' ? $('stack') : section === 'workflow' ? $('module-section') : sections.get(section === 'user' ? 'user' : 'idea')?.node;
+      node?.scrollIntoView({ block: 'start' }); return;
+    }
     if (skipped(index)) setDepth(section === 'user' ? 'basic' : 'pro');
     stepIndex = index; renderWizard(true);
   },

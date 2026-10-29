@@ -10,7 +10,7 @@ import { createFormModel } from '../core/web/form-model.js';
 import { interviewShell } from '../core/web/interview-shell.js';
 import { interviewApply, interviewData, interviewPreview } from '../core/web/settings.js';
 import { saveSetupDefaults } from '../core/lib/setup-defaults.js';
-import { settingsRoute, visibleQuestions } from '../core/web/assets/ui-state.js';
+import { settingsRoute, settingsPresentation, visibleQuestions } from '../core/web/assets/ui-state.js';
 import { main } from '../core/cli/main.js';
 import { readAnswers } from '../core/render/project.js';
 import { KIT_ROOT, tmp, capture, scripted } from './helpers/fixtures.js';
@@ -19,6 +19,12 @@ const f = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: { HOME: tmp(), PATH: pro
 
 test('Settings URLs keep interview as a feature and preserve deep-link parameters', () => {
   assert.equal(settingsRoute('settings'), 'settings');
+  assert.equal(settingsRoute('settings', 'interview'), 'settings?interview');
+  assert.equal(settingsRoute('settings', 'project', 'interview&section=stack'), 'settings?section=stack');
+  assert.equal(settingsPresentation(undefined), 'settings');
+  assert.equal(settingsPresentation('project'), 'settings');
+  assert.equal(settingsPresentation(undefined, new URLSearchParams('interview')), 'interview');
+  assert.equal(settingsPresentation('interview'), 'interview');
   assert.equal(settingsRoute('global-settings', 'interview'), 'global-settings');
   assert.equal(settingsRoute('settings', 'interview', 'interview&section=stack'), 'settings?interview&section=stack');
   assert.equal(settingsRoute('global-settings', 'files', 'file=presets%2Fdemo.yaml'), 'global-settings/files?file=presets%2Fdemo.yaml');

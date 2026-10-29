@@ -10,10 +10,18 @@ export const choiceLabel = (c) => {
   return c.label.toLowerCase().startsWith(String(c.value).toLowerCase()) ? c.label : `${c.value} — ${c.label}`;
 };
 export const available = (c) => !(typeof c === 'object' && c.phase > 1);
-// Interview is the default Settings feature, never a path segment.
-export function settingsRoute(page, tab = 'interview', query = '') {
-  return `${page}${tab && tab !== 'interview' ? `/${tab}` : ''}${query ? `?${query}` : ''}`;
+// Interview is opt-in within workspace Settings, never a path segment.
+export function settingsRoute(page, tab, query = '') {
+  const params = new URLSearchParams(query);
+  if (page === 'settings') {
+    if (tab === 'interview') params.set('interview', '');
+    else params.delete('interview');
+  }
+  const suffix = params.toString().replace(/(^|&)interview=(?=&|$)/, '$1interview');
+  return `${page}${tab && !['interview', 'project'].includes(tab) ? `/${tab}` : ''}${suffix ? `?${suffix}` : ''}`;
 }
+export const settingsPresentation = (tab, params = new URLSearchParams()) =>
+  tab === 'interview' || params.has('interview') ? 'interview' : 'settings';
 export function installDialogCancellation(dialog) {
   const cancel = (event) => {
     event.preventDefault();

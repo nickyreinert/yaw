@@ -627,7 +627,7 @@ test('settings UI: one Sync tab, Project/Defaults tabs, page and sidebar search 
     const page = readFileSync(join(dir, name), 'utf8');
     assert.equal(page.match(/data-tab="sync"/g).length, 1, `${name}: one Sync tab`);
     assert.match(page, /id="gs-sync"/);
-    assert.match(page, /data-tab="interview">Project</);
+    assert.match(page, /data-tab="project">Project</);
     assert.match(page, /data-tab="interview">Defaults</);
     for (const id of ['side-search', 'side-results', 'side-nav', 'settings-search', 'gs-search', 'global-settings-view']) assert.match(page, new RegExp(`id="${id}"`), `${name}: ${id}`);
   }

@@ -1,3 +1,4 @@
+import { settingsPresentation } from './ui-state.js';
 import { mountInterview } from './interview-view.js';
 // Settings (Project | Files | Review prompts | Kickoff) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
@@ -152,9 +153,9 @@ export function kickoffCard(data, ctx = {}) {
 // ------------------------------------------------------------------------------- settings view
 
 export function createSettings({ api, get, report, refresh, go, openSetup }) {
-  let tab = 'interview', files = null, open = new Set(), selected = null, interview = null, interviewStarted = false;
+  let tab = 'project', files = null, open = new Set(), selected = null, interview = null, interviewStarted = false;
   let mountedInterview = null;
-  let pendingSection = null;
+  let pendingSection = null, presentationControls = null;
   const drawer = $('settings-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -162,22 +163,30 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
 
   function show(name, params) {
     const section = params?.get('section');
-    if (PANES.some(([id]) => id === section)) {
-      pendingSection = section;
-      if (mountedInterview) { mountedInterview.showSection(section); pendingSection = null; }
-    }
-    tab = ['interview', 'files', 'review', 'kickoff'].includes(name) ? name : 'interview';
-    document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
-    for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== tab;
+    tab = ['files', 'review', 'kickoff'].includes(name) ? name : settingsPresentation(name, params) === 'interview' ? 'interview' : 'project';
+    const pane = tab === 'project' ? 'interview' : tab;
+    document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === (tab === 'interview' ? 'project' : tab))));
+    for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== pane;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();
-    if (tab === 'interview' && !interview && !interviewStarted) { interviewStarted = true; loadInterview().catch(report); }
+    if (['project', 'interview'].includes(tab)) {
+      if (PANES.some(([id]) => id === section)) pendingSection = section;
+      if (mountedInterview) presentInterview();
+      else if (!interviewStarted) { interviewStarted = true; loadInterview().catch(report); }
+    }
     if (tab === 'kickoff') loadKickoff().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);
     if (tab === 'review') loadReview().catch(report);
     return tab;
   }
   function hide() { if (!drawer.hidden) closeDrawer(); }
-  function reset() { mountedInterview?.destroy(); mountedInterview = null; pendingSection = null; files = null; interview = null; interviewStarted = false; }
+  function reset() { mountedInterview?.destroy(); mountedInterview = null; pendingSection = null; presentationControls = null; files = null; interview = null; interviewStarted = false; }
+
+  function presentInterview() {
+    const mode = tab === 'interview' ? 'interview' : 'settings';
+    mountedInterview.setPresentation(mode);
+    presentationControls.querySelectorAll('[data-presentation]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.presentation === mode)));
+    if (pendingSection) { mountedInterview.showSection(pendingSection); pendingSection = null; }
+  }
 
   // Review prompts --------------------------------------------------------------------------------------
   async function loadReview() {
@@ -266,8 +275,16 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
       root.prepend(warning);
     }
     const json = (body) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
-    mountedInterview = await mountInterview(root, {
-      bootstrap: { ...opened, editing: !opened.fresh, sections: [], skipVerify: true }, prefix: 'project-interview-', persistent: true, kickoffCard,
+    const content = el('div'); content.append(...root.childNodes); root.append(content);
+    presentationControls = el('div', null, 'settings-presentation');
+    presentationControls.setAttribute('role', 'group'); presentationControls.setAttribute('aria-label', 'Project settings view');
+    for (const [mode, label] of [['settings', 'Settings'], ['interview', 'Interview']]) {
+      const pick = button(label, () => go(mode === 'interview' ? 'interview' : 'project'));
+      pick.dataset.presentation = mode; presentationControls.append(pick);
+    }
+    root.prepend(presentationControls);
+    mountedInterview = await mountInterview(content, {
+      bootstrap: { ...opened, editing: !opened.fresh, sections: [], skipVerify: true }, prefix: 'project-interview-', persistent: true, kickoffCard, presentation: tab === 'interview' ? 'interview' : 'settings',
       navigate: (view) => { if (view !== 'setup') location.hash = view; },
       request: async (action, payload) => {
         if (action.startsWith('planning-')) return json(await api(action, payload));
@@ -279,7 +296,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
         return json(await api('interview-action', { action, payload, expected: opened.hash, confirmFolder: opened.confirmFolder === true }));
       },
     });
-    if (pendingSection) { mountedInterview.showSection(pendingSection); pendingSection = null; }
+    presentInterview();
   }
   return { show, hide, reset };
 }

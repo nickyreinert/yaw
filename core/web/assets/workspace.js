@@ -355,7 +355,7 @@ export function startWorkspace() {
 // What the sidebar search looks through: the pages, the settings tabs and, once the setup data has loaded, every
 // question and module of the project and of your defaults.
 const SETTINGS_TABS = [
-  ['settings', 'interview', 'Project', 'answers interview stack language modules depth setup preview apply'],
+  ['settings', 'project', 'Project', 'answers interview stack language modules depth setup preview apply'],
   ['settings', 'files', 'Files', 'generated files agents.md claude.md justfile hooks manifest recipes'],
   ['settings', 'review', 'Review prompts', 'review agents quality logic ux feature prompt blueprint'],
   ['settings', 'kickoff', 'Kickoff', 'plan planning prompt first steps'],
