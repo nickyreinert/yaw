@@ -66,7 +66,7 @@ export class HostedProjects {
         return result;
       }
       requireValue(!this.applying, 'Another project is being initialized; retry after it finishes', 409);
-      requireValue(this.agents.available(), 'Install Claude Code and the script PTY utility on the host before initializing');
+      requireValue(this.agents.available(), 'Install Claude Code and the host PTY tool (Python 3 on macOS, script on Linux) before initializing');
       requireValue(this.agents.workers.size < this.agents.maxWorkers, 'Native worker limit reached; stop an idle process first', 409);
       const prepared = api.prepareApply(input);
       requireValue(!existsSync(root), 'Project folder already exists; choose another slug', 409);

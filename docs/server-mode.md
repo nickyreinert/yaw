@@ -8,7 +8,7 @@ Open `yaw web` in the folder that will hold your workspaces. Select Host, choose
 
 `yaw host` opens the existing host interface, starting it if needed. It has no idle timeout; closing browser tabs and completing interviews leave it running. `yaw host --stop` stops the service and its managed agent processes. `yaw host --foreground` runs it under the terminal or a service manager instead. Do not run foreground and background instances together. Disabling Server mode stops its daemon and pauses migrated data; it does not silently restore the previous sync authority.
 
-The host needs Node 22.13+, Linux or macOS, `/usr/bin/script` for a native terminal, and a current Claude Code CLI supporting `remote-control --spawn=session`. Sign into Claude on the host using `claude` and `/login`. Native Remote Control requires an eligible subscription; an API key is not a substitute. `YAW_CLAUDE_BIN` can select a trusted host-installed executable. No SDK package is installed by this workflow.
+The host needs Node 22.13+, Linux or macOS, and a current Claude Code CLI supporting `remote-control --spawn=session`. A native terminal uses `/usr/bin/script` on Linux, or Python 3's standard-library PTY support on macOS; no Python packages are required. Sign into Claude on the host using `claude` and `/login`. Native Remote Control requires an eligible subscription; an API key is not a substitute. `YAW_CLAUDE_BIN` can select a trusted host-installed executable. No SDK package is installed by this workflow.
 
 ## Client
 

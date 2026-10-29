@@ -72,7 +72,7 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     assert.equal((await f.request(route + '/apply', { ...input, secrets: { API_KEY: 'not-a-real-secret' } })).status, 400);
     const result = await f.request(route + '/apply', input); assert.equal(result.status, 200); assert.equal(result.body.ok, true);
     assert.equal(existsSync(join(preview.body.destination, '.yaw/manifest.json')), true);
-    assert.equal(f.spawned.plans.length, 1); assert.equal(f.spawned.plans[0].command, '/usr/bin/script');
+    assert.equal(f.spawned.plans.length, 1); assert.ok(['python3', '/usr/bin/script'].includes(f.spawned.plans[0].command));
     assert.match(f.spawned.plans[0].args.join(' '), /remote-control.*--spawn=session/);
     assert.equal(f.spawned.plans[0].options.env.YAW_REMOTE_TELEGRAM_TOKEN, undefined);
     assert.equal((await f.request(route + '/apply', input)).status, 409);
@@ -231,7 +231,7 @@ test('legacy data-only pairings cannot initialize projects; owner browser action
 test('native launcher uses a real PTY, waits for explicit startup trust and stops its process group', { timeout: 15000, skip: !existsSync('/usr/bin/script') }, async () => {
   const root = realpathSync(tmp('yaw-native-pty-')), executable = join(root, 'fixture-claude');
   writeFileSync(executable, '#!/bin/sh\nprintf "Trust this-project? [y/N]"\nread -r answer\n[ "$answer" = "y" ] || exit 1\nprintf "https://claude.ai/code/fixture_session_123\\n"\nread -r finish\n', { mode: 0o700 });
-  const store = { state: { sessions: [] }, save() {} }, env = { ...cleanEnv(realpathSync(tmp())), YAW_CLAUDE_BIN: executable };
+  const store = { state: { sessions: [] }, save() {} }, env = { ...cleanEnv(realpathSync(tmp())), PATH: process.env.PATH, YAW_CLAUDE_BIN: executable };
   const agents = new NativeAgents({ store, env, kitRoot: KIT_ROOT, address: 'http://127.0.0.1:4318' });
   try {
     const session = agents.start({ id: 'project', path: root, slug: 'pty-test' });
