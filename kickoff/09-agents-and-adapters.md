@@ -42,9 +42,9 @@
 
 Notes:
 
-- Gemini CLI stopped serving Google AI Pro/Ultra and free users on 2026-06-18 and was replaced by **Antigravity CLI**; it stays available for Gemini Code Assist Standard/Enterprise and paid API keys. The form therefore offers *Gemini CLI (enterprise / API key)* and *Antigravity CLI* as separate checkboxes. Phase 1 adapters: Claude, Codex, Copilot; Gemini CLI and Antigravity follow in phase 3.
+- Implemented setup adapters: Claude Code, Codex, Copilot and Gemini CLI. Gemini writes `GEMINI.md` importing `AGENTS.md` and uses `.agents/skills/`. YAW does not register Gemini hooks; checks and recall use project commands and rules. Antigravity, Pi and Hermes remain proposed adapters (ADR-0091).
 - **Multiple agents per project are supported**: the agent selection is multi-select; all selected adapters are generated from the same neutral sources and can be used side by side (e.g. Claude for design work, Codex for refactors, Gemini for reviews).
-- Hook schemas of Claude and Codex are nearly identical (same event names, `hookSpecificOutput`, exit code 2); Copilot and Hermes also accept Claude-style JSON. Gemini/Antigravity and Pi use different event models, so their adapters translate one neutral hook definition.
+- Hook schemas of Claude and Codex are nearly identical (same event names, `hookSpecificOutput`, exit code 2); Copilot and Hermes also accept Claude-style JSON. Gemini/Antigravity and Pi use different event models; the Gemini setup currently uses command fallbacks, with no YAW hook translation.
 - Skills: author once in `.agents/skills/`; Codex, Copilot, Gemini CLI, Antigravity CLI and Pi read it directly. Claude reads `.claude/skills/`, so the adapter generates (or symlinks) it. Hermes: install into its skills dir via `yaw sync`. Antigravity hooks ship as a generated YAW plugin (`agy plugin install <path>`).
 
 ## 3. Compatibility attribute (internal data model)
