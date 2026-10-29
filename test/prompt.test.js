@@ -69,7 +69,7 @@ test('NO_COLOR and a scripted prompter keep the plain output; typed replies stil
   prompter.close();
   assert.doesNotMatch(t.text(), /\u001b\[(1|2|3\d)m/);
   assert.match(t.text(), / {6}1\) a\n {6}2\) b\n/);
-  assert.doesNotMatch(t.text(), /w\) Continue in the browser/);
+  assert.doesNotMatch(t.text(), /w switch to browser/);
 });
 
 test('the browser entry is visible for every question type and accepts w or web', async () => {
@@ -87,7 +87,7 @@ test('the browser entry is visible for every question type and accepts w or web'
       if (type === 'choice' || type === 'multi') q.choices = ['a', 'b'];
       const result = await runInterview({ questions: [q], mode: 'quick', prompter, allowWeb: true });
       assert.deepEqual(result, { answers: {}, defaulted: [], sources: {}, web: true });
-      assert.match(shown, / {6}w\) Continue in the browser\n/);
+      assert.match(shown, / {6}\(\? help, skip, w switch to browser\)\n/);
       assert.doesNotMatch(shown, /3\) Continue in the browser/);
     }
   }
@@ -102,7 +102,7 @@ test('arrow keys can select the browser entry without changing the default', asy
     await new Promise((r) => setImmediate(r));
     t.input.write('\u001b[A\r');
     assert.deepEqual(await running, { answers: {}, defaulted: [], sources: {}, web: true });
-    assert.match(t.text(), /w\) Continue in the browser/);
+    assert.match(t.text(), /w switch to browser/);
   } finally {
     prompter.close();
   }

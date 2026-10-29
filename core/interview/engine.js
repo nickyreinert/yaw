@@ -231,14 +231,14 @@ export async function runInterview({ questions, mode, prompter, kitRoot, known =
         } else if (r.error) {
           prompter.show(`      ${r.error}\n`);
         } else if (r.skip) {
-          if (q.required) { prompter.show('      This project answer is required; choose a value, ? for help, or w for browser guidance.\n'); continue; }
+          if (q.required) { prompter.show(`      Required: choose a value; ? for help${allowWeb ? ', w for browser' : ''}.\n`); continue; }
           answers[q.id] = q.default;
           defaulted.push(q.id);
           sources[q.id] = sourceOf(q, false);
           break;
         } else {
           if (!resolved(q, r.value) || (q.required && !validAnswer(q, r.value))) {
-            prompter.show('      This project answer is required; choose a value, ? for help, or w for browser guidance.\n');
+            prompter.show(`      Required: choose a value; ? for help${allowWeb ? ', w for browser' : ''}.\n`);
             continue;
           }
           answers[q.id] = r.value;

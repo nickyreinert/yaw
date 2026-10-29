@@ -174,7 +174,7 @@ test('empty, skipped and uncertain essential answers need a real selection in th
   const p = scripted(['', 'skip', "don't know", BASE['idea.text'], '', 'skip', "don't know", 'python', '', 'local']);
   const result = await runInterview({ questions, mode: 'quick', kitRoot: KIT_ROOT, prompter: p });
   assert.deepEqual(result.answers, BASE);
-  assert.match(p.shown.join(''), /No project choice will be guessed/);
+  assert.match(p.shown.join(''), /Choose a project answer/);
   assert.deepEqual(result.defaulted, []);
 });
 
