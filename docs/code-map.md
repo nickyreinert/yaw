@@ -257,6 +257,7 @@ Describe this area's responsibility.
   - `examples/composed/`
   - `examples/node-cli/`
   - `examples/node-ts-vercel/`
+  - `examples/node-web/`
   - `examples/php-web/`
   - `examples/python-cli/`
   - `examples/python-vercel/`
@@ -358,6 +359,7 @@ Describe this area's responsibility.
   - `profiles/node-basic/`
   - `profiles/node-cli/`
   - `profiles/node-ts-vercel/`
+  - `profiles/node-web/`
   - `profiles/php-basic/`
   - `profiles/php-web/`
   - `profiles/python-basic/`

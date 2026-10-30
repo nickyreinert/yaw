@@ -101,7 +101,7 @@ test('dependabot keeps the pinned actions current', async () => {
 test('dependabot covers each profile dependency ecosystem and kit actions are SHA-pinned', async () => {
   const ecosystems = {
     'node-cli': [], 'python-cli': ['pip'], 'python-web': ['pip'], 'python-vercel': ['pip'], 'static-site': ['npm'],
-    'node-ts-vercel': ['npm'], 'cloudflare-workers': ['npm'], 'php-web': ['composer'],
+    'node-ts-vercel': ['npm'], 'node-web': ['npm'], 'cloudflare-workers': ['npm'], 'php-web': ['composer'],
     'wordpress-plugin': ['composer'], 'android-kotlin': ['gradle'],
   };
   for (const [profile, expected] of Object.entries(ecosystems)) {

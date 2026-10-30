@@ -1,0 +1,13 @@
+# profiles/node-web
+# Picked for JavaScript/TypeScript x your own server (ADR-0054, T-001).
+# Profile options (framework, db; doc 05 §2) come with the full interview; the scaffold is plain TypeScript on node:http without a database.
+name: node-web
+title: TypeScript web app on your own server
+dependencyEcosystems: [npm]
+summary: TypeScript web app on node:http for your own server; tsc, ESLint, Vitest, npm audit, Dockerfile.
+stack:
+  language: [javascript]
+  runsOn: [self-hosted]
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [node>=22.13, just]

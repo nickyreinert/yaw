@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'php-basic', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-basic', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -363,6 +363,42 @@ test('node-ts-vercel guards block every Vercel CLI form and the deploy recipe, n
   for (const cmd of ['vercel --version', 'vercel -v', 'vercel --help', 'npx vercel@65.0.0 --version', 'cat vercel.json', 'npx vitest run', 'just check', 'just test', 'npm test', 'npx tsc --noEmit', 'npx eslint .', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
 });
 
+test('node-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('node-web', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'fmt', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+const nodeWebSkip = (!haveJust && 'just is not installed') || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
+
+test('smoke node-web: yaw init, just setup && just check pass and build the app; bad code fails the gate (needs npm and network)', { skip: nodeWebSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('node-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'dist', 'server.js')), 'just check builds dist/server.js');
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'node-web');
+  const bad = join(cwd, 'src', 'bad.ts');
+  copyFileSync(join(fixtures, 'lint_error.ts'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
+  copyFileSync(join(fixtures, 'type_error.ts'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('node-web guards block image pushes, remote hosts and publishing, not local work', () => {
+  const guards = parse(readFileSync(dir('node-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'docker build --push -t me/app .', 'docker compose push', 'docker-compose push', 'DOCKER_HOST=ssh://me@host docker ps', 'docker -Hssh://me@host ps', 'docker -H ssh://me@host ps', 'docker --host=ssh://me@host ps', 'docker --context prod ps', 'ssh me@host', 'scp a me@host:/srv', 'sftp me@host', 'rsync -av dist/ me@host:/srv/app', 'rsync -av dist/ host:/srv/app', 'npm publish', 'pnpm publish', 'yarn publish']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['docker build -t app .', 'docker compose up', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'npx vitest run', 'npm run build', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -693,7 +729,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
-    ['javascript', 'local', 'node-cli'], ['javascript', 'serverless', 'node-ts-vercel'], ['javascript', 'edge', 'cloudflare-workers'],
+    ['javascript', 'local', 'node-cli'], ['javascript', 'serverless', 'node-ts-vercel'], ['javascript', 'self-hosted', 'node-web'], ['javascript', 'edge', 'cloudflare-workers'],
     ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);

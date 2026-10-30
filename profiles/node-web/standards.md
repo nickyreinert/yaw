@@ -1,0 +1,9 @@
+- TypeScript in strict mode; `just typecheck` (`tsc --noEmit`) must pass. No `any` without a comment saying why.
+- Request logic lives in `src/app.ts` as a pure `Request` to `Response` function; `src/server.ts` only adapts `node:http` to it.
+- Tests use Vitest, live in `tests/` as `*.spec.ts`, are deterministic and make no network calls beyond loopback.
+- Lint with ESLint (`just lint`); do not add a second linter or formatter without an ADR.
+- Dependencies are pinned exact versions; the scaffold has no runtime dependency, so add one only with a reason. Run `just audit` after changing them.
+- Validate all input at the boundary and answer with specific status codes; no empty `catch`.
+- Settings and secrets come from environment variables (the local env file is never committed); never hard-code or log them.
+- The server binds to 127.0.0.1 by default; the Dockerfile sets HOST for the container. Never expose it wider without the user.
+- `just build` compiles to `dist/`; building an image with the Dockerfile, pushing it, `ssh` to a host and deploys need the user's approval.
