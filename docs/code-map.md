@@ -255,6 +255,10 @@ Describe this area's responsibility.
   - `examples/android-kotlin/`
   - `examples/cloudflare-workers/`
   - `examples/composed/`
+  - `examples/node-app/`
+  - `examples/node-app-electron/`
+  - `examples/node-app-expo/`
+  - `examples/node-app-tauri/`
   - `examples/node-cli/`
   - `examples/node-ts-vercel/`
   - `examples/node-web/`
@@ -357,6 +361,7 @@ Describe this area's responsibility.
   - `profiles/go-basic/`
   - `profiles/java-basic/`
   - `profiles/kotlin-basic/`
+  - `profiles/node-app/`
   - `profiles/node-basic/`
   - `profiles/node-cli/`
   - `profiles/node-ts-vercel/`
