@@ -1,0 +1,14 @@
+# profiles/swift-web
+# Picked for Swift x self-hosted (ADR-0054, T-001): an HTTP service on your own server or container host.
+name: swift-web
+title: Swift web service
+dependencyEcosystems: [swift]
+summary: Swift HTTP service on Hummingbird; Swift Package Manager, swift format, XCTest, Dockerfile.
+stack:
+  language: [swift]
+  runsOn: [self-hosted]
+  notes:
+    self-hosted: The gate runs without Docker; building and pushing the image and reaching your server are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [swift>=6.1, just]

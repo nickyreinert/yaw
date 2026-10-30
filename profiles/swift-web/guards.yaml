@@ -1,0 +1,8 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: tag-push, pattern: "\\bgit\\s+push\\b.*(--tags|\\brefs/tags/|\\sv[0-9])", reason: Pushing a release tag needs your approval. }
+  - { id: docker-push, pattern: "\\b(docker|podman)(-compose)?\\b.*(\\bpush\\b|--push)", reason: Pushing an image to a registry needs your approval. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp|ftp|lftp)\\s+\\S|\\brsync\\b.*\\s[^\\s/.][^\\s/]*:\\S|\\bDOCKER_HOST=", reason: Reaching a remote host (production) needs your approval. }
+  - { id: remote-docker, pattern: "\\bdocker\\s+(-H|--host\\b|--context\\b)", reason: Running Docker against a remote host needs your approval. }
+  - { id: registry-publish, pattern: "\\bswift\\s+package-registry\\s+publish\\b|\\bpod\\s+trunk\\s+push\\b", reason: Publishing a package to a registry needs your approval. }

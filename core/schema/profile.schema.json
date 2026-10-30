@@ -89,7 +89,7 @@
     "dependencyEcosystems": {
       "description": "Dependabot ecosystems for dependencies in this profile's scaffold, including development/test dependencies; omit for dependency-free profiles.",
       "type": "array",
-      "items": { "enum": ["npm", "pip", "composer", "gradle"] },
+      "items": { "enum": ["npm", "pip", "composer", "gradle", "swift", "cargo"] },
       "uniqueItems": true
     }
   },

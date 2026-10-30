@@ -1,0 +1,10 @@
+- Swift 6.1+ and Swift Package Manager; Linux and macOS must both build (import Foundation only, no AppKit/UIKit).
+- Hummingbird is the only server dependency; pin every package with `exact:` and commit `Package.resolved`. Add packages only with a reason.
+- Routes live in `buildRouter()` (`Sources/AppCore`); `Sources/app/main.swift` stays a thin entry point that reads `HOST` and `PORT` and runs the application.
+- Tests use XCTest with `HummingbirdTesting` (`.router`, no sockets), are deterministic and make no network calls.
+- Format with `swift format` (`just fmt`; `just lint` only checks, strict); do not add a second formatter.
+- Handlers validate path, query and body input before use; return explicit status codes; never build shell commands or file paths from input.
+- Expose `GET /health` for the host's health check; log with `Logger`, never log secrets or request bodies.
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- The `Dockerfile` builds a static binary and runs as a non-root user; building it needs Docker, pushing it needs the user's approval.
+- Reaching remote hosts, pushing images, release tags and registry publishing need the user's approval.

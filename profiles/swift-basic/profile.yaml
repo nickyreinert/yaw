@@ -5,7 +5,7 @@ title: Basic Swift project
 summary: Swift project; Swift Package Manager, swift build, swift test, optional swift-format.
 stack:
   language: [swift]
-  runsOn: [self-hosted, app-store]
+  runsOn: [app-store]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

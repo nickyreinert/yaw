@@ -270,6 +270,7 @@ Describe this area's responsibility.
   - `examples/python-web/`
   - `examples/static-site/`
   - `examples/swift-cli/`
+  - `examples/swift-web/`
   - `examples/wordpress-plugin/`
 <!-- yaw:map:end area-examples -->
 
@@ -379,6 +380,7 @@ Describe this area's responsibility.
   - `profiles/static-site/`
   - `profiles/swift-basic/`
   - `profiles/swift-cli/`
+  - `profiles/swift-web/`
   - `profiles/wordpress-plugin/`
 <!-- yaw:map:end area-profiles -->
 
