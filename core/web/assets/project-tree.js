@@ -20,10 +20,12 @@ export function treeRows(files) {
 export function matchesTarget(file, target = {}) {
   const path = file.path;
   if (target.setup) return path.startsWith('.yaw/') || path === 'AGENTS.md';
-  if (target.workflow) return Boolean(file.module && file.module !== 'core' && !file.module.startsWith('profile:') || file.contributors?.some((name) => name !== 'core' && !name.startsWith('profile:')));
+  if (target.workflow) return path === 'AGENTS.md' || path === 'docs/engineering.md' || Boolean(file.module && file.module !== 'core' && !file.module.startsWith('profile:') || file.contributors?.some((name) => name !== 'core' && !name.startsWith('profile:')));
   if (target.module) return file.module === target.module || file.contributors?.includes(target.module);
   const id = target.question ?? '';
-  if (id === 'idea.text' || id.startsWith('user.')) return path === 'AGENTS.md' || /^(CLAUDE|GEMINI)\.md$|^\.(claude|codex|github|agents)\//.test(path);
+  if (id === 'idea.team') return path === 'AGENTS.md' || file.module === 'team' || file.contributors?.includes('team');
+  if (id === 'idea.text' || id === 'user.expertise') return path === 'AGENTS.md';
+  if (id.startsWith('user.')) return path === 'AGENTS.md' || /^(CLAUDE|GEMINI)\.md$|^\.(claude|codex|agents)\/|^\.github\/(agents|instructions)\/|^\.github\/copilot-instructions\.md$/.test(path);
   if (id === 'arch.wrapper') return ['justfile', 'Makefile', 'project.sh', 'docs/engineering.md'].includes(path);
   if (id.startsWith('arch.')) return file.module?.startsWith('profile:') || /^(just\/|docs\/engineering)|^(Dockerfile|compose\.yaml|Makefile|project\.sh)$/.test(path);
   if (id.startsWith('quality.review-')) return file.module === 'review' || path.includes('/review');
@@ -31,9 +33,77 @@ export function matchesTarget(file, target = {}) {
   return false;
 }
 
-export function createProjectTree(root) {
-  let files = [], changed = new Set(), previous = new Map(), target = {}, section = {}, openFolders = new Map();
-  const body = el('div', { class: 'project-tree-body', hidden: true });
+export function filePurpose(path) {
+  if (path === 'AGENTS.md') return 'Agent entry point';
+  if (['CLAUDE.md', 'GEMINI.md'].includes(path)) return 'Rules import';
+  if (['Makefile', 'project.sh'].includes(path)) return 'Command wrapper';
+  if (path === 'justfile' || path.endsWith('.just')) return 'Project commands';
+  if (path === '.gitignore') return 'Ignored files';
+  if (path === '.yaw/answers.yaml') return 'Project choices';
+  if (path === '.yaw/manifest.json') return 'Generated file index';
+  if (path === 'docs/engineering.md') return 'Coding rules';
+  if (path.endsWith('SKILL.md')) return 'Agent skill';
+  if (path.includes('/ISSUE_TEMPLATE/')) return 'Issue form';
+  if (path.endsWith('pull_request_template.md')) return 'PR template';
+  if (path.endsWith('hooks.json') || path.endsWith('settings.json')) return 'Agent configuration';
+  if (path.includes('docs/spec/')) return 'Project specification';
+  if (path.includes('docs/standards')) return 'Coding standards';
+  if (path.includes('docs/plan/')) return 'Project plan';
+  if (path.endsWith('README.md')) return 'Project overview';
+  if (path.endsWith('package.json')) return 'Dependencies and scripts';
+  if (path.startsWith('src/') || path.startsWith('public/')) return 'Starter code';
+  return 'Project file';
+}
+
+export function folderPurpose(path) {
+  const known = { '.yaw': 'YAW setup and records', '.claude': 'Claude instructions and configuration', '.codex': 'Codex configuration', '.agents': 'Shared agent skills', '.github': 'GitHub collaboration', '.github/workflows': 'Continuous integration', '.github/ISSUE_TEMPLATE': 'Issue forms', '.claude/agents': 'Review sub-agents', '.decisions': 'Decision journal', just: 'Project command recipes', docs: 'Project documentation', 'docs/spec': 'Project specifications', 'docs/plan': 'Project plans', src: 'Application source', public: 'Static assets', test: 'Automated tests', tests: 'Automated tests' };
+  return known[path] ?? 'Project files';
+}
+
+const ACTION = { create: 'new', update: 'changed', write: 'write', kept: 'kept', missing: 'restore', delete: 'remove' };
+export function filesForStep(files, section, target = {}) {
+  return files.filter((file) => matchesTarget(file, section) || matchesTarget(file, target));
+}
+
+// Both the final review and the console use the same folder hierarchy and purpose labels.
+export function fileTreeEntries(files, options = {}) {
+  const record = (node, search, children = [], key = null) => ({ node, search: search.toLocaleLowerCase(), children, key });
+  const render = (node) => {
+    if (!node.file) {
+      const children = [...node.children.values()].map(render), key = `folder/${node.path}`;
+      const purpose = folderPurpose(node.path), open = options.expanded?.get(node.path) ?? options.expandFolders ?? false;
+      const summary = el('summary', { class: 'review-summary' }, options.icons === false ? null : decisionIcon('folder'),
+        el('code', { class: 'review-branch-label', text: `${node.name}/` }), el('small', { class: 'review-count', text: purpose }));
+      const branch = el('details', { class: 'review-branch project-tree-folder', 'data-review-key': key, 'data-plan-folder': node.path }, summary,
+        el('div', { class: 'review-children' }, ...children.map((child) => child.node)));
+      branch.open = open;
+      summary.addEventListener('click', () => {
+        options.expanded?.set(node.path, !branch.open);
+        options.onExpand?.(key, !branch.open);
+        options.onFolder?.({ path: node.path, purpose, files: files.filter((file) => file.path.startsWith(`${node.path}/`)) });
+      });
+      return record(branch, `${node.path} ${purpose}`, children, key);
+    }
+    const file = node.file, purpose = filePurpose(file.path);
+    const note = `${purpose} · ${ACTION[file.action] ?? 'planned'}`;
+    const cls = ['review-file-row', options.onFile ? 'project-tree-file' : '', matchesTarget(file, options.section) ? 'in-section' : '', matchesTarget(file, options.target) ? 'is-focused' : '', options.changed?.has(file.path) ? 'is-changed' : ''].filter(Boolean).join(' ');
+    const row = el(options.onFile ? 'button' : 'div', { class: cls, 'data-review-file': file.path, 'data-plan-file': file.path,
+      ...(options.onFile ? { type: 'button', 'aria-pressed': String(options.selected === file.path), 'aria-label': `Preview ${file.path}`, onclick: () => options.onFile(file) } : {}) },
+      options.icons === false ? null : decisionIcon('file'), el('code', { text: node.name }), el('small', { class: 'muted', text: note }));
+    return { ...record(row, `${file.path} ${note}`), file };
+  };
+  return treeRows(files).map(render);
+}
+
+export function createProjectTree(root, { readFile } = {}) {
+  let files = [], changed = new Set(), previous = new Map(), target = {}, section = {}, selected = null, requestRevision = 0;
+  const expanded = new Map();
+  let renderedFiles = [];
+  const tree = el('div', { class: 'review-tree project-tree-items', 'aria-label': 'Planned project files' });
+  const previewTitle = el('h3', { text: 'File content' });
+  const preview = el('pre', { class: 'project-file-content', text: 'Select a file to preview its content.' });
+  const previewPane = el('aside', { class: 'project-file-preview', 'aria-label': 'File content preview' }, previewTitle, preview);
+  const body = el('div', { class: 'project-tree-body', hidden: true }, tree, previewPane);
   const count = el('span', { class: 'small muted', text: 'Plan updating…', role: 'status' });
   const toggle = el('button', { type: 'button', class: 'tree-toggle', 'aria-expanded': 'false', 'aria-label': 'Expand project structure' }, decisionIcon('chevron'));
   toggle.addEventListener('click', () => {
@@ -41,33 +111,52 @@ export function createProjectTree(root) {
     toggle.setAttribute('aria-expanded', String(!body.hidden));
     toggle.setAttribute('aria-label', `${body.hidden ? 'Expand' : 'Collapse'} project structure`);
   });
-  root.replaceChildren(el('div', { class: 'section-heading' }, el('h2', { class: 'module-group-title' }, decisionIcon('folder'), el('span', { text: 'Project structure' })), count, toggle), body);
+  root.replaceChildren(el('div', { class: 'project-structure-heading' }, el('h2', { text: 'Project structure' }), count, toggle), body);
+  function markSelection() {
+    for (const row of renderedFiles) row.node.setAttribute('aria-pressed', String(row.file.path === selected));
+  }
+  function clearPreview() {
+    selected = null; requestRevision++; markSelection();
+    previewTitle.textContent = 'File content'; preview.textContent = 'Select a file to preview its content.';
+  }
+  async function selectFile(file) {
+    const current = ++requestRevision;
+    selected = file.path; previewTitle.textContent = file.path; preview.textContent = 'Loading…';
+    markSelection();
+    try {
+      const result = await readFile(file.path);
+      if (current !== requestRevision) return;
+      previewTitle.textContent = `${file.path} · ${result.source ?? 'Preview'}`;
+      preview.textContent = result.content ?? result.message;
+    } catch (error) { if (current === requestRevision) preview.textContent = error.message; }
+  }
   function draw() {
-    const render = (node) => {
-      if (!node.file) {
-        const children = [...node.children.values()];
-        const descendants = files.filter((file) => file.path.startsWith(`${node.path}/`));
-        const folderClass = descendants.some((file) => matchesTarget(file, target)) ? 'is-focused' : descendants.some((file) => matchesTarget(file, section)) ? 'in-section' : '';
-        const folder = el('details', { class: 'project-tree-folder', open: openFolders.get(node.path) !== false },
-          el('summary', { class: folderClass }, decisionIcon('folder'), el('code', { text: `${node.name}/` })), el('ul', {}, ...children.map(render)));
-        folder.addEventListener('toggle', () => openFolders.set(node.path, folder.open));
-        return el('li', {}, folder);
-      }
-      const file = node.file;
-      return el('li', { class: ['project-tree-file', matchesTarget(file, section) ? 'in-section' : '', matchesTarget(file, target) ? 'is-focused' : '', changed.has(file.path) ? 'is-changed' : '', file.action === 'delete' ? 'is-removed' : ''].filter(Boolean).join(' '), 'data-plan-file': file.path },
-        decisionIcon('file'), el('code', { text: node.name }), file.action === 'delete' ? el('small', { text: 'Remove' }) : changed.has(file.path) ? el('small', { text: 'Changed' }) : null);
-    };
-    body.replaceChildren(el('ul', { class: 'project-tree-list', 'aria-label': 'Planned project files' }, ...treeRows(files).map(render)));
+    const visible = filesForStep(files, section, target);
+    const entries = fileTreeEntries(visible, { expanded, expandFolders: true, icons: false, target, section, selected, changed, onFile: selectFile,
+      onFolder: (folder) => { clearPreview(); previewTitle.textContent = `${folder.path}/`; preview.textContent = `${folder.purpose}\n${folder.files.length} files`; } });
+    renderedFiles = [];
+    const collect = (entries) => { for (const entry of entries) { if (entry.file) renderedFiles.push(entry); collect(entry.children); } };
+    collect(entries);
+    tree.replaceChildren(...entries.map((entry) => entry.node));
+    if (!visible.length) tree.append(el('p', { class: 'small muted', text: 'No files affected by this step.' }));
+    count.textContent = `${visible.length} / ${files.length} files${root.dataset.provisional === 'true' ? ' · provisional' : ''}`;
   }
   return {
     update(next, { provisional = false } = {}) {
       files = next;
       const signatures = new Map(files.map((file) => [file.path, `${file.action}|${file.bytes}|${file.excerpt ?? ''}`]));
       changed = new Set([...signatures].filter(([path, signature]) => previous.size && previous.get(path) !== signature).map(([path]) => path));
-      previous = signatures;
-      count.textContent = `${files.length} files${provisional ? ' · provisional' : ''}`;
+      previous = signatures; root.dataset.provisional = String(provisional);
+      const file = selected && filesForStep(files, section, target).find((entry) => entry.path === selected);
+      if (file) selectFile(file); else clearPreview();
       draw();
     },
-    highlight(next = {}, current = section) { target = next; section = current; draw(); },
+    highlight(next = {}, current = section) {
+      if (JSON.stringify(current) !== JSON.stringify(section)) { expanded.clear(); clearPreview(); }
+      target = next; section = current;
+      if (selected && !filesForStep(files, section, target).some((file) => file.path === selected)) clearPreview();
+      draw();
+    },
+    destroy() { requestRevision++; },
   };
 }

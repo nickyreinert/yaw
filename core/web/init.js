@@ -79,7 +79,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
     }
   }
   return {
-    actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply', 'setup-prompts', 'setup-update'],
+    actions: [...WORKSPACE_ACTIONS, 'kickoff-prompt', 'kickoff-reply', 'setup-prompts', 'setup-update', 'file-preview'],
     close: () => workspace.close(),
     get: {
       ...workspace.get,
@@ -155,6 +155,7 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
           foundationReview: foundations?.entries.map(({ path, expected }) => ({ path, expected })) ?? [],
           tasks: reply.tasks.length, phases: [...new Set(reply.tasks.map((t) => t.phase))].length, titles: reply.tasks.slice(0, 6).map((t) => t.title) };
       }
+      if (name === 'file-preview') return model.filePreview(input?.setup, input?.path);
       if (name === 'preview' || name === 'diff') return model.preview(input, name === 'diff');
       ensureNew();
       const prepared = model.normalize(input, { allowIncomplete: name === 'draft' });
