@@ -1,0 +1,10 @@
+- Stable Rust, edition 2021, `rust-version` explicit in `Cargo.toml`; `unsafe` is forbidden (`[lints.rust]`).
+- axum on tokio is the server stack; pin every direct crate exactly (`=1.2.3`), commit `Cargo.lock`, add crates only with a reason.
+- Routes live in `router()` (`src/lib.rs`); `src/main.rs` stays a thin entry point that reads `HOST` and `PORT` and serves the router.
+- Tests drive `router()` with `tower::ServiceExt::oneshot` (no sockets), are deterministic and make no network calls.
+- Handlers validate path, query and body input before use, return explicit status codes and never `unwrap` request data.
+- Format with `cargo fmt` (`just fmt`; `just lint` only checks) and keep `cargo clippy -- -D warnings` clean.
+- Expose `GET /health` for the host's health check; log without secrets or request bodies; shut down gracefully on SIGINT.
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- The `Dockerfile` builds with `--locked` and runs as a non-root user; building it needs Docker, pushing it needs the user's approval.
+- `cargo install`, publishing to crates.io, image pushes, release tags and reaching remote hosts need the user's approval.

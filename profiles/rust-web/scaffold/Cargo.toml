@@ -1,0 +1,23 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+name = "app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "app"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "=1.54.1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+
+[dev-dependencies]
+tower = { version = "=0.5.3", features = ["util"] }
+
+[lints.rust]
+unsafe_code = "forbid"

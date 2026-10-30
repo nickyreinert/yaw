@@ -269,6 +269,7 @@ Describe this area's responsibility.
   - `examples/python-vercel/`
   - `examples/python-web/`
   - `examples/rust-cli/`
+  - `examples/rust-web/`
   - `examples/static-site/`
   - `examples/swift-app/`
   - `examples/swift-cli/`
@@ -380,6 +381,7 @@ Describe this area's responsibility.
   - `profiles/python-web/`
   - `profiles/rust-basic/`
   - `profiles/rust-cli/`
+  - `profiles/rust-web/`
   - `profiles/static-site/`
   - `profiles/swift-app/`
   - `profiles/swift-cli/`

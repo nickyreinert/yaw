@@ -1,0 +1,14 @@
+# profiles/rust-web
+# Picked for Rust x self-hosted (ADR-0054, T-001): an HTTP service on your own server or container host.
+name: rust-web
+title: Rust web service
+dependencyEcosystems: [cargo]
+summary: Rust HTTP service on axum and tokio; Cargo, rustfmt, clippy, cargo test, Dockerfile.
+stack:
+  language: [rust]
+  runsOn: [self-hosted]
+  notes:
+    self-hosted: The gate runs without Docker; building and pushing the image and reaching your server are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [rustc>=1.80, cargo, just]

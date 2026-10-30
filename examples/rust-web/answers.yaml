@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile rust-web (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small web service that greets people.
+  idea.team: solo
+  arch.language: rust
+  arch.runs-on: self-hosted
+proposal:
+  status: confirmed
+  summary: rust-web - Rust web service; axum, Cargo, rustfmt, clippy, cargo test.
+  profiles: [rust-web]
+  modules: [core]
