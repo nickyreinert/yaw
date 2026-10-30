@@ -40,7 +40,7 @@ questions:
     help: autonomy
     choices:
       - { value: ask-often, label: Ask often }
-      - { value: ask-risky, label: Ask on risky or ambiguous steps }
+      - { value: ask-risky, label: Ask on risky steps }
       - { value: act-and-report, label: Act and report }
     default: ask-risky
     agents:

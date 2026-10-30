@@ -28,7 +28,7 @@ test('AGENTS.md is assembled from the core frame and agentsMd, well below the bu
   assert.match(md, /^- Stack: node-cli - Node CLI or tool/m);
   assert.match(md, /^- Chat in "en"; write code, comments, commit messages and docs in English\.$/m);
   assert.match(md, /^- Act, then report what you did and why\.$/m);
-  assert.match(md, /<!-- yaw:core -->\n- Start every task[^\n]*\n- Run `just check`[^\n]*\n- Never read, print or commit secrets[^\n]*\n<!-- \/yaw:core -->\n$/);
+  assert.match(md, /<!-- yaw:core -->\n- Start every task[^\n]*\n- Do not assume\. If a request is vague[^\n]*\n- Run `just check`[^\n]*\n- Never read, print or commit secrets[^\n]*\n<!-- \/yaw:core -->\n$/);
   const def = loadModule(KIT_ROOT, 'core');
   assert.ok(def.agentsMd.trimEnd().split('\n').length <= 5);
 });
@@ -36,7 +36,7 @@ test('AGENTS.md is assembled from the core frame and agentsMd, well below the bu
 test('questions the answers file does not hold take their defaults', async () => {
   const md = read(await init(), 'AGENTS.md');
   assert.match(md, /Chat in "de"/);
-  assert.match(md, /Ask before risky or ambiguous steps; otherwise act\./);
+  assert.match(md, /Ask before risky steps; otherwise act\./);
 });
 
 test('the idea is one safe line: no markers, no line breaks; empty idea leaves no Purpose line', async () => {

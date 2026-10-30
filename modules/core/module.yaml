@@ -18,6 +18,7 @@ outputs:
   templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile, docs/engineering.md, project.sh, Makefile]
 agentsMd: |
   - Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
+  - Do not assume. If a request is vague or has several reasonable readings, ask the user before acting.
   - Run `just check` before you report a task as done; `just --list` shows all recipes.
   - Never read, print or commit secrets (`.env*`, keys, tokens); ask the user to enter them.
 agents:

@@ -178,7 +178,7 @@ export function collectQuestions(kitRoot, modules, definitions) {
 
 const AUTONOMY = {
   'ask-often': 'Ask before every change that is not trivial.',
-  'ask-risky': 'Ask before risky or ambiguous steps; otherwise act.',
+  'ask-risky': 'Ask before risky steps; otherwise act.',
   'act-and-report': 'Act, then report what you did and why.',
 };
 
