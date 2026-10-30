@@ -71,7 +71,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.ok(!cards.includes('Everything that fits'));
   const handoff = readFileSync(join(KIT_ROOT, 'core/web/assets/planning-handoff.js'), 'utf8');
   assert.ok(!handoff.includes('Refresh from project answers') && !handoff.includes("text: 'Reply'"));
-  assert.match(cards, /GROUP_INTRO = new Map\(\[\['tasks\.use-github', 'github'\]\]\)/);
+  assert.match(cards, /GROUP_INTRO = new Map\(\[\['tasks\.use-github', 'github'\], \['quality\.unit-tests', 'basics'\]\]\)/);
   assert.ok(!cards.includes("el('select', { id, disabled"));
   assert.equal(app.split("element('select'").length - 1, 1, 'the only dropdown is the preset list');
   assert.match(app, /q\.id === 'tasks\.use-github'/);
@@ -166,6 +166,8 @@ test('web model: normalization and browser defaults match the CLI interview', as
 
 test('web state: toggles add dependencies, cascade removal and immediately hide questions', () => {
   const m = createFormModel(fixture()), c = m.bootstrap();
+  const repaired = toggleModules(c.modules, ['core', 'security'], 'security', true);
+  assert.ok(repaired.includes('standards'), 'repair dependencies of an already selected module');
   const enabled = toggleModules(c.modules, ['core'], 'team', true);
   for (const n of ['core', 'team', 'tasks', 'github', 'git-hooks']) assert.ok(enabled.includes(n));
   const questions = visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', enabled);
@@ -173,7 +175,7 @@ test('web state: toggles add dependencies, cascade removal and immediately hide 
   const removed = toggleModules(c.modules, enabled, 'github', false);
   assert.ok(!removed.includes('team') && !removed.includes('github'));
   assert.ok(!visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', removed).some((q) => q.owner === 'team'));
-  assert.throws(() => m.normalize(setup({ modules: ['core', 'team'] })), /depends on/);
+  assert.throws(() => m.normalize(setup({ modules: ['core', 'team'] })), /Enable .* to use/);
   const full = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team', 'tasks.use-github': true } }));
   const lay = m.preview(setup({ mode: 'full', answers: { 'idea.team': 'team', 'tasks.use-github': true, 'user.expertise': 'layperson' } }));
   assert.equal(full.visible.length, lay.visible.length);
@@ -335,7 +337,7 @@ test('web API: diff does not echo a secret already in a generated non-secret fil
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.match(body.diff, /Kept unchanged: AGENTS.md/);
-  assert.ok(!body.diff.includes(secret));
+  assert.ok(!JSON.stringify(body).includes(secret));
 });
 
 test('web API: diff and file plan match apply keeping conflicting existing outputs', async (t) => {

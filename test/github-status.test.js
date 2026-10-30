@@ -64,3 +64,10 @@ test('init without GitHub shows the check, hides the task-mode choice and says t
   assert.match(shown, /Task tracking: local \(TASKS\.md\), because GitHub is off for this project\./);
   assert.doesNotMatch(shown, /2\) github - GitHub only/);
 });
+
+test('settings GitHub hint does not start a network authentication probe', () => {
+  const status = githubStatus({ root: tmp('yaw-gh-local-'), env: { PATH: fakeGh(), GH_TOKEN: 'test-only' }, verifyAuth: false,
+    run: () => { throw new Error('settings must not start gh'); } });
+  assert.equal(status.authUnchecked, true);
+  assert.match(githubHint(status), /connection checked when used/);
+});

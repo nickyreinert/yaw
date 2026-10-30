@@ -48,3 +48,36 @@ test('explicit legacy architecture facts remain readable and new practice change
   assert.notDeepEqual(planningFacts(base), planningFacts({ ...base, 'arch.docker': true }));
   assert.notDeepEqual(planningFacts(base), planningFacts({ ...base, 'quality.documentation': 'detailed' }));
 });
+
+test('unit-test opt-in reaches generated rules, help and Quality review requirements', async () => {
+  const { buildPrompt } = await import('../modules/review/lib/cli.js');
+  for (const enabled of [false, true]) {
+    const f = fixture(), model = createFormModel(f);
+    const input = { mode: 'basic', modules: ['core'], answers: { ...base, 'quality.unit-tests': enabled } };
+    const prepared = model.normalize(input);
+    assert.equal(prepared.doc.answers['quality.unit-tests'], enabled);
+    const preview = model.preview(input, true);
+    const rules = preview.instructions.find((file) => file.path === 'docs/engineering.md');
+    assert.match(rules.content, enabled ? /Unit tests are required/ : /Unit tests are optional/);
+    assert.ok(preview.instructions.every((file) => !file.path.includes('.env')));
+    await initProject({ root: f.root, kitRoot: KIT_ROOT, answers: { doc: prepared.doc, text: prepared.text }, modules: prepared.modules });
+    const prompt = buildPrompt({ root: f.root, kind: 'quality', range: 'a..b', diff: '+behavior', env: f.env });
+    assert.match(prompt, enabled ? /missing, empty or failing suite is FINDINGS/ : /Do not require a unit-test suite/);
+    assert.notDeepEqual(planningFacts(base), planningFacts({ ...base, 'quality.unit-tests': true }));
+  }
+});
+
+test('Docker is normalized and rendered only for applicable runtime choices', () => {
+  const model = createFormModel(fixture());
+  for (const runsOn of ['local', 'self-hosted', 'serverless', 'edge', 'static', 'wordpress', 'app-store']) {
+    const answers = { ...base, 'arch.runs-on': runsOn, 'arch.docker': true };
+    const applicable = ['local', 'self-hosted', 'serverless'].includes(runsOn);
+    // Use HTML's basic profile for static hosting; JavaScript supports the other hosts.
+    if (runsOn === 'wordpress') answers['arch.language'] = 'php';
+    if (runsOn === 'static') answers['arch.language'] = 'html';
+    const result = model.normalize({ mode: 'basic', answers, modules: ['core'] });
+    assert.equal(Object.hasOwn(result.doc.answers, 'arch.docker'), applicable, runsOn);
+    const preview = model.preview({ mode: 'basic', answers, modules: ['core'] });
+    assert.equal(preview.instructions.find((file) => file.path === 'docs/engineering.md').content.includes('Docker is required'), applicable, runsOn);
+  }
+});

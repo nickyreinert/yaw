@@ -19,7 +19,7 @@ export const CARD_QUESTIONS = new Set(['arch.language', 'arch.runs-on', 'quality
 // Optional tool questions live inside module cards; personal communication preferences belong in About you.
 export const INLINE_OWNERS = new Set(['comfort', 'team', 'tasks']);
 // Questions that open a group instead of sitting in a card: "Use GitHub for the repo?" leads the Git & GitHub group.
-export const GROUP_INTRO = new Map([['tasks.use-github', 'github']]);
+export const GROUP_INTRO = new Map([['tasks.use-github', 'github'], ['quality.unit-tests', 'basics']]);
 export const isInline = (q) => INLINE_OWNERS.has(q.owner) && !GROUP_INTRO.has(q.id);
 const HOST_EXTRA = {
   'self-hosted': 'Dockerfile and compose.yaml when the stack ships them',
@@ -227,7 +227,7 @@ export function renderStack(root, ctx) {
   root.replaceChildren(
     el('h3', { class: 'stack-step', text: `1 · ${langQ.label}` }), langRow,
     el('h3', { class: 'stack-step', text: `2 · ${hostQ.label}` }), hostGrid,
-    result);
+    ...(ctx.dockerNode && !ctx.dockerNode.hidden ? [ctx.dockerNode] : []), result);
   return { valid: Boolean(profile), profile };
 }
 
@@ -250,11 +250,14 @@ export function renderModuleGroups(root, ctx) {
     if (!mods.length && !intro.length) continue;
     const grid = el('div', { class: 'module-grid' });
     for (const m of mods) {
-      grid.append(moduleCard(m, ctx, selected, hasGit));
+      if (m.name !== 'review') grid.append(moduleCard(m, ctx, selected, hasGit));
       if (m.name === 'review') grid.append(...reviewerCards(ctx, selected.has('review'), hasGit));
     }
-    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h3', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })), el('p', { class: 'small muted lead', text: lead }),
-      ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []), grid));
+    groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h2', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })),
+      ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []),
+      ...(mods.some((m) => m.name === 'review') ? [el('label', { class: 'review-toggle' }, el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: 'module-review', checked: selected.has('review'), disabled: ctx.readOnly, onchange: (event) => ctx.onToggle('review', event.target.checked) }), ' Review agents')] : []), el('p', { class: 'small muted lead', text: lead }), grid));
+    const after = ctx.afterGroup?.(id);
+    if (after) groups.append(after);
   }
   const compact = el('input', { id: 'compact-modules', type: 'checkbox', role: 'switch', class: 'module-switch', checked: ctx.compact, onchange: (event) => ctx.onCompact(event.target.checked) });
   root.replaceChildren(el('div', { class: 'module-bar' }, el('label', { class: 'compact-control' }, compact, ' Compact')), groups);
@@ -279,7 +282,7 @@ function moduleCard(m, ctx, selected, hasGit) {
     ...(m.example ? [el('p', { class: 'example small' }, el('span', { class: 'muted', text: `${m.example.when} ` }), m.example.run ? el('code', { text: m.example.run }) : null, el('span', { text: ` → ${m.example.then}` }))] : []),
     ...(m.cost ? [el('p', { class: 'cost small muted', text: m.cost })] : []),
     ...(m.rules?.length ? [el('p', { class: 'small', text: `Adds ${m.rules.length} note${m.rules.length === 1 ? '' : 's'} for the agent (AGENTS.md):` }), el('ul', {}, ...m.rules.map((r) => el('li', { text: r })))] : []),
-    ...(m.depends?.length && !required ? [el('p', { class: 'small muted deps', text: `Uses: ${m.depends.join(', ')}` })] : []),
+    ...(m.depends?.length && !required ? [el('p', { class: 'small muted deps', text: `Enabling this also enables: ${m.depends.map((name) => ctx.modules.find((module) => module.name === name)?.title ?? name).join(', ')}` })] : []),
   ];
 
   card.append(el('p', { class: 'what', text: m.short ?? m.what ?? m.description }));

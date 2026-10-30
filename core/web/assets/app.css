@@ -848,3 +848,7 @@ button.decision-option[aria-pressed="true"] { background: var(--yellow, #ffe178)
 .module-grid .module-card .decision-options { margin-top: auto; }
 .compact-control { display: inline-flex; align-items: center; gap: 8px; }
 .module-card .card-more { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.help-changes pre { max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .72rem; }
+.module-group-title { font-size: 1.1rem; }
+.review-toggle { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; }

@@ -32,23 +32,23 @@ function githubRemote(root) {
 }
 
 // -> { ready: boolean, reasons: [text] }
-export function githubStatus({ root, env = process.env, run = spawnSync }) {
+export function githubStatus({ root, env = process.env, run = spawnSync, verifyAuth = true }) {
   const reasons = [];
   const gh = onPath('gh', env);
   if (!gh) reasons.push('gh (GitHub CLI) is not installed (macOS: brew install gh)');
   else if (!ghConfigured(env) && !env.GH_TOKEN && !env.GITHUB_TOKEN) reasons.push('gh is not logged in (run gh auth login)');
-  else {
+  else if (verifyAuth) {
     const r = run(gh, ['auth', 'status', '--hostname', 'github.com'], { env, stdio: 'ignore', timeout: 5000 });
     if (r.error || r.status !== 0) reasons.push('gh is not logged in or GitHub is not reachable (run gh auth login)');
   }
   const remote = githubRemote(root);
   if (remote === false) reasons.push('this repository has no GitHub remote yet');
-  return { ready: reasons.length === 0, reasons };
+  return { ready: reasons.length === 0, reasons, ...(verifyAuth ? {} : { authUnchecked: true }) };
 }
 
 export function githubHint(status) {
   return status.ready
-    ? 'GitHub check: gh is installed and logged in.'
+    ? status.authUnchecked ? 'GitHub CLI configured; connection checked when used.' : 'GitHub check: gh is installed and logged in.'
     : `GitHub check: ${status.reasons.join('; ')}. Yes still works; the GitHub steps wait. No keeps tasks local.`;
 }
 

@@ -133,7 +133,17 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       !modules.includes('core') || modules.some((n) => !names.includes(n))) throw new FormError('Invalid module selection; core is required');
     modules = names.filter((n) => modules.includes(n));
     try { checkDependencies({ kitRoot, modules }); }
-    catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; }
+    catch (e) {
+      if (e instanceof ProjectError) {
+        const dependent = definitions.find((definition) => modules.includes(definition.name) && definition.depends?.some((name) => !modules.includes(name)));
+        if (dependent) {
+          const missing = dependent.depends.filter((name) => !modules.includes(name)).map((name) => definitions.find((definition) => definition.name === name)?.title ?? name);
+          throw new FormError(`Enable ${missing.join(', ')} to use ${dependent.title ?? dependent.name}. These modules provide its shared rules and checks.`);
+        }
+        throw new FormError(e.message);
+      }
+      throw e;
+    }
     const selected = questions.filter((q) => isPreference(q) || modules.includes(owner.get(q.id) ?? 'core') || asksQuestion(q, input.mode));
     const selectedIds = new Set(selected.map((q) => q.id));
     // GitHub owns its own opt-out. Keep that selection-driving answer even when it removes its owner.
@@ -208,6 +218,11 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const output = {
       mode: result.doc.mode, profile: result.profile,
       modules: result.modules, answers: result.doc.answers, defaulted: result.defaulted, sources: result.sources, unresolved: [], visible, files,
+      instructions: [...desired]
+        .filter(([path]) => path === 'AGENTS.md' || path === 'docs/engineering.md' || /^\.(claude|github)\/agents\/review-/.test(path))
+        .map(([path, d]) => ({ path, action: files.find((file) => file.path === path).action,
+          content: secretFindings({ answers: { 'idea.text': String(d.content) }, kitRoot }).length
+            ? '(Content omitted: possible secret.)' : String(d.content) })),
       secrets: secretCatalog(result, { desired }),
       footprint: {
         bytes: files.reduce((n, f) => n + (f.bytes ?? 0), 0),
@@ -271,7 +286,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
       modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
       gitRepo: existsSync(join(root, '.git')),
-      questions: withGitHubHint(questions, githubStatus({ root, env })).map((q) => {
+      questions: withGitHubHint(questions, githubStatus({ root, env, verifyAuth: false })).map((q) => {
         let help = '';
         if (q.help) {
           const file = join(kitRoot, 'interview', 'help', `${q.help}.md`);
@@ -302,8 +317,7 @@ export function excerpt(path, content) {
   return head.length > EXCERPT_CHARS || lines.length > EXCERPT_LINES ? `${head.slice(0, EXCERPT_CHARS).trimEnd()}\n…` : head;
 }
 // The rules a module adds to AGENTS.md (the "pre-prompt notes"), one short line each.
-const ruleLines = (text) => String(text ?? '').split('\n').map((l) => l.replace(/^\s*-\s*/, '').trim()).filter(Boolean)
-  .map((l) => l.length > 150 ? `${l.slice(0, 147)}…` : l);
+const ruleLines = (text) => String(text ?? '').split('\n').map((l) => l.replace(/^\s*-\s*/, '').trim()).filter(Boolean);
 
 // A valid unified diff with whole-file context, deliberately in memory (no scratch files).
 export function fullFileDiff(path, before, after) {

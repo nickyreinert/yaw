@@ -166,6 +166,26 @@ const selectedModules = () => state.modules ?? defaultModules(catalog.modules, c
 function explain(title, content) {
   $('setting-help-title').textContent = title;
   $('setting-help-content').replaceChildren(...content);
+  const changes = element('div', undefined, { class: 'help-changes' });
+  $('setting-help-content').append(changes);
+  renderHelpChanges();
+}
+function renderHelpChanges() {
+  let holder = $('setting-help-content').querySelector('.help-changes');
+  if (!holder) {
+    holder = element('div', undefined, { class: 'help-changes' });
+    $('setting-help-content').append(holder);
+    $('setting-help-title').textContent = 'Project settings';
+  }
+  holder.replaceChildren(element('h4', 'Generated instructions'));
+  for (const file of lastPreview?.instructions ?? []) {
+    holder.append(element('h4', `${file.path} · ${file.action}`), element('pre', file.content.split('\n').map((line, index) => `${index + 1}  ${line}`).join('\n'), { class: 'file-source' }));
+  }
+  if (!lastPreview?.instructions?.length) holder.append(element('p', lastPreview?.unresolved?.length ? 'Complete required project answers to see generated lines.' : 'Preview updating…'));
+  if (lastPreview?.diff) {
+    const details = element('details');
+    details.append(element('summary', 'All file changes'), element('pre', lastPreview.diff, { class: 'file-source' })); holder.append(details);
+  }
 }
 function buildPlan() {
   planCard = createPlanCard({ title: 'Setup interview (optional)', label: 'Setup interview prompt', chat: true,
@@ -188,12 +208,14 @@ async function refreshPrompts() {
   }
 }
 function buildQuestions() {
-  const title = { user: 'About you', communication: 'Communication style', practices: 'Code practices', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
+  const title = { user: 'About you', communication: 'Communication style', practices: 'Coding Practices', idea: 'The idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
   for (const q of catalog.questions) {
     const sectionId = sectionOf(q);
     if (!sections.has(sectionId)) {
       const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}`, class: 'settings-group' });
-      section.append(element('h2', title[sectionId] ?? sectionId, { id: `title-${sectionId}` }));
+      const heading = element('h2', undefined, { id: `title-${sectionId}`, class: 'module-group-title' });
+      heading.append(decisionIcon(sectionId === 'practices' ? 'ruler' : 'file'), element('span', title[sectionId] ?? sectionId));
+      section.append(heading);
       $('questions').append(section);
       sections.set(sectionId, { node: section });
     }
@@ -205,7 +227,7 @@ function buildQuestions() {
     node.append(element(grouped ? 'legend' : 'label', label, grouped ? {} : { for: id }));
     let input;
     const inputs = [];
-    if (q.id === 'arch.docker') {
+    if (['arch.docker', 'quality.unit-tests'].includes(q.id)) {
       input = element('input', undefined, { id, name: q.id, type: 'checkbox', role: 'switch', class: 'module-switch', 'aria-label': label });
       node.append(input); inputs.push(input);
     } else if (q.type === 'multi' || q.type === 'choice' || q.type === 'boolean') {
@@ -324,6 +346,7 @@ function renderStackStep() {
     profiles: catalog.profiles, questions: catalog.questions, answers,
     disabled: sectionEditing() && !catalog.sections.some((s) => s === 'arch' || s.startsWith('arch.')),
     onExplain: explain,
+    dockerNode: controls.get('arch.docker')?.node,
     onChange: (id, value) => { state.answers[id] = value; state.proposed = (state.proposed ?? []).filter((key) => key !== id); update(); $('stack-cards').querySelector(`[aria-pressed="true"]${id === 'arch.language' ? '.chip' : '.host'}`)?.focus({ preventScroll: true }); },
   });
   stackValid = result.valid;
@@ -349,7 +372,8 @@ function setGitInit(on) {
 }
 function renderModules() {
   const quickWorkflow = presentation !== 'settings' && depthOf(state.mode) === 'quick';
-  $('module-title').textContent = quickWorkflow ? 'Repository' : 'What YAW adds to your project';
+  $('module-title').replaceChildren(decisionIcon('users'), element('span', quickWorkflow ? 'Repository' : 'Collaboration'));
+  $('module-title').classList.add('module-group-title');
   if (quickWorkflow) {
     const github = controls.get('tasks.use-github');
     if (github) {
@@ -367,6 +391,7 @@ function renderModules() {
     onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); renderCommunication(); scopeIds(); $('compact-modules')?.focus(); },
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(), onExplain: explain,
+    afterGroup: (group) => group === 'basics' ? sections.get('practices')?.node : null,
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {
@@ -433,6 +458,7 @@ function update() {
   const activeId = document.activeElement?.id;
   revision++;
   lastPreview = null; promptRevision++;
+  renderHelpChanges();
   planCard?.setPrompt('', 'Updating prompt…'); finalCard?.setPrompt('', 'Updating prompt…');
   error(''); actions(false);
   // Do not leave a stale preview or diff (possibly including an earlier value) on screen.
@@ -446,9 +472,10 @@ function update() {
   timer = setTimeout(async () => {
     refreshPrompts();
     try {
-      const body = await (await request('preview')).json();
+      const body = await (await request('diff')).json();
       if (current !== revision) return;
       lastPreview = body; summary(body); actions(true);
+      renderHelpChanges();
       status(body.unresolved?.length ? `Still needed: ${body.unresolved.join(', ')}. You can save a draft.` : 'Preview updated.');
     } catch (e) {
       if (current !== revision) return;
@@ -558,6 +585,7 @@ function applyFacts() {
 function loadState(next) {
   const { profile: _ignored, ...rest } = next;
   state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: rest.gitInit ?? !catalog.gitRepo };
+  if (state.modules) for (const name of [...state.modules]) state.modules = toggleModules(catalog.modules, state.modules, name, true);
   visitedSteps.clear();
 
   root.querySelectorAll('button[name=mode]').forEach((i) => { i.setAttribute('aria-pressed', String(i.value === depthOf(state.mode))); });

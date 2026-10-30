@@ -80,8 +80,10 @@ export function defaultModules(definitions, questions, given, mode) {
 export function toggleModules(definitions, selected, name, enabled) {
   const defs = new Map(definitions.map((d) => [d.name, d]));
   const next = new Set(selected);
+  const visited = new Set();
   const add = (n) => {
-    if (next.has(n)) return;
+    if (visited.has(n)) return;
+    visited.add(n);
     next.add(n);
     for (const dep of defs.get(n).depends ?? []) add(dep);
   };

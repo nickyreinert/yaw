@@ -125,6 +125,12 @@ questions:
     label: Require Docker?
     hint: A requirement for the architecture plan; no containers are started here.
     default: false
+  - id: quality.unit-tests
+    mode: S
+    type: boolean
+    label: Unit Tests
+    hint: Require a non-empty unit-test suite in just check and Quality reviews.
+    default: false
   - id: quality.error-detail
     mode: S
     type: choice

@@ -8,7 +8,7 @@ export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[m
 export const depthLabel = (mode) => DEPTHS.find((depth) => depth.value === depthOf(mode))?.label ?? mode;
 export const validDepth = (mode) => ['quick', 'basic', 'pro'].includes(depthOf(mode));
 export const RETIRED_ARCHITECTURE = new Set(['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']);
-export const BASIC_QUESTIONS = new Set(['user.agents', 'idea.team', 'tasks.use-github', 'tasks.mode', 'quality.review-quality', 'quality.review-logic', 'quality.review-ux', 'quality.review-feature', 'quality.review-security', 'quality.review-gate', 'arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation']);
+export const BASIC_QUESTIONS = new Set(['user.agents', 'idea.team', 'tasks.use-github', 'tasks.mode', 'quality.review-quality', 'quality.review-logic', 'quality.review-ux', 'quality.review-feature', 'quality.review-security', 'quality.review-gate', 'arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.unit-tests']);
 export function asksAtDepth(q, mode) {
   const depth = depthOf(mode);
   if (RETIRED_ARCHITECTURE.has(q.id)) return false;

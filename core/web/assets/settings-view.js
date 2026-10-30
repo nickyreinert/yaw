@@ -167,7 +167,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     if (['project', 'interview'].includes(tab)) {
       if (PANES.some(([id]) => id === section)) pendingSection = section;
       if (mountedInterview) presentInterview();
-      else if (!interviewStarted) { interviewStarted = true; loadInterview().catch(report); }
+      else if (!interviewStarted) { interviewStarted = true; loadInterview().catch((error) => { interviewStarted = false; report(error); }); }
     }
     if (tab === 'kickoff') loadKickoff().catch(report);
     if (tab === 'files' && !files) loadFiles().catch(report);
@@ -256,11 +256,12 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
 
   // Interview -----------------------------------------------------------------------------------------
   async function loadInterview() {
-    const opened = await get('interview');
+    const root = $('settings-interview');
+    root.replaceChildren(el('p', 'Loading settings…', 'muted'));
+    const [opened, shell] = await Promise.all([get('interview'), fetch('/interview-shell.html').then((response) => response.text())]);
     interview = opened;
-    const root = $('settings-interview'); root.replaceChildren();
+    root.replaceChildren();
     if (!opened.available) { root.append(el('p', opened.message ?? 'Interview unavailable.')); return; }
-    const shell = await (await fetch('/interview-shell.html')).text();
     const parsed = new DOMParser().parseFromString(shell, 'text/html');
     root.append(...[...parsed.body.childNodes].map((node) => document.importNode(node, true)));
     if (opened.folder?.confirm) {

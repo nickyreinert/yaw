@@ -22,6 +22,7 @@ export function runtimeContext(answers = {}) {
 }
 export function architectureApplies(id, answers = {}) {
   const context = runtimeContext(answers);
+  if (id === 'arch.docker') return ['local', 'self-hosted', 'serverless'].includes(answers['arch.runs-on']);
   if (id === 'arch.hosting-control') return context.hosting;
   if (id === 'arch.cost') return context.paidComponents;
   if (id === 'arch.cost-limit') return context.paidComponents && answers['arch.cost'] === 'capped';

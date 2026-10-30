@@ -78,6 +78,13 @@ export function buildPrompt({ root, kind, range, diff, env = process.env }) {
     'Read and report only; never edit, stage, commit or push.',
     'End with exactly one line: `VERDICT: PASS` (nothing that should stop a push) or `VERDICT: FINDINGS`.',
   ];
+  if (kind === 'quality') {
+    let required = false;
+    try { required = readAnswers(root).answers?.['quality.unit-tests'] === true; } catch { /* optional by default */ }
+    parts.push(required
+      ? 'Unit tests are enabled. Inspect the project unit-test suite, including unchanged files. A missing, empty or failing suite is FINDINGS. Require meaningful behavior assertions and evidence of a passing run; do not infer a suite exists from the diff alone.'
+      : 'Unit tests are disabled. Do not require a unit-test suite or report an empty or missing suite as findings. Still review the correctness of existing tests.');
+  }
   if (kind === 'feature' && existsSync(join(root, 'TASKS.md'))) {
     parts.push(`TASKS.md:\n${readFileSync(join(root, 'TASKS.md'), 'utf8').slice(0, MAX_TASKS)}`);
   }
