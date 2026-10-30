@@ -5,7 +5,6 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseDocument, stringify } from '../lib/yaml.js';
 import { matchFacts } from '../interview/facts.js';
-import { migrateAnswers } from '../interview/legacy.js';
 import { selectedByPolicy } from '../interview/depth.js';
 import { formatError } from '../lib/schema.js';
 import { tasksMode } from '../lib/tasks.js';
@@ -27,7 +26,7 @@ export function parseAnswers(text, file = ANSWERS) {
   const { value, lines } = parseDocument(text, { file });
   const errors = schemas().validate('answers.schema.json', value, { lines });
   if (errors.length > 0) throw new ProjectError(errors.map((e) => formatError(e, file)).join('\n'));
-  return { ...value, answers: migrateAnswers(value.answers) };
+  return value;
 }
 
 export function readAnswers(root) {

@@ -7,7 +7,6 @@ import { readRegular, MAX_BYTES } from './knowledge.js';
 import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
-import { migrateAnswers } from '../interview/legacy.js';
 import { stackProfile } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
 import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
@@ -98,7 +97,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     if (!validDepth(input.mode)) throw new FormError('Choose Quick, Basic or All');
     const proposed = input.proposed ?? [];
     if (!Array.isArray(proposed) || proposed.some((id) => !byId.get(id)?.required)) throw new FormError('Invalid proposed project answers');
-    let given = migrateAnswers(input.answers ?? {});
+    let given = input.answers ?? {};
     validateGiven(given);
     if (edit) {
       if (sections.length && Object.entries(given).some(([id, value]) => !editable(byId.get(id)) &&
@@ -303,7 +302,6 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       }
       if (schemas().validate('preset.schema.json', doc).length) throw new FormError('Saved preset is invalid; it was not loaded');
     } else throw new FormError('Choose a saved profile or preset');
-    doc.answers = migrateAnswers(doc.answers);
     validateGiven(doc.answers);
     return { mode: doc.mode ?? 'quick', answers: doc.answers, modules: doc.proposal?.modules ?? null,
       ...(kind !== 'profile' ? { proposed: questions.filter((q) => q.required && Object.hasOwn(doc.answers, q.id)).map((q) => q.id) } : {}) };
