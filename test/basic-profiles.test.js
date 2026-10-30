@@ -12,7 +12,6 @@ const EXPECTED = {
   'kotlin-basic': { language: ['kotlin'], runsOn: ['local', 'self-hosted', 'serverless'] },
   'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['local', 'self-hosted', 'serverless', 'edge', 'app-store'] },
-  'swift-basic': { language: ['swift'], runsOn: ['app-store'] },
   'java-basic': { language: ['java'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
 };
 const SOURCE_FILES = {
@@ -21,7 +20,6 @@ const SOURCE_FILES = {
   'kotlin-basic': 'src/main/kotlin/com/example/app/Greeting.kt',
   'go-basic': 'greeting.go',
   'rust-basic': 'src/lib.rs',
-  'swift-basic': 'Sources/App/Greeting.swift',
   'java-basic': 'src/main/java/com/example/app/Greeting.java',
 };
 const VERBS = [

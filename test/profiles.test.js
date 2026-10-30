@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -609,6 +609,49 @@ test('swift-web guards block image pushes, remote hosts, release tags and regist
   for (const cmd of ['docker build -t app .', 'docker compose up', 'swift build', 'swift test', 'swift run app', 'swift package resolve', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
+test('swift-app: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('swift-app', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+test('swift-app keeps the SwiftUI views inside canImport(SwiftUI) and the logic UI-free', () => {
+  const ui = readFileSync(dir('swift-app', 'scaffold', 'Sources', 'app', 'MainApp.swift'), 'utf8');
+  assert.match(ui, /#if canImport\(SwiftUI\)/);
+  assert.match(ui, /#else/);
+  assert.doesNotMatch(readFileSync(dir('swift-app', 'scaffold', 'Sources', 'AppCore', 'Counter.swift'), 'utf8'), /SwiftUI|UIKit|AppKit/);
+  assert.match(readFileSync(dir('swift-app', 'scaffold', 'Package.swift'), 'utf8'), /\.macOS\(\.v14\)/);
+});
+
+test('smoke swift-app: yaw init, just setup && just check pass without Xcode or signing; the app builds; bad code fails the gate (needs swift 6)', { skip: swiftSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('swift-app', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  const build = run('just', ['build'], { cwd });
+  assert.equal(build.status, 0, build.stdout + build.stderr);
+  assert.ok(existsSync(join(cwd, '.build', 'release', 'app')));
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'swift-app');
+  const bad = join(cwd, 'Sources', 'AppCore', 'Bad.swift');
+  copyFileSync(join(fixtures, 'lint_error.swift'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+  copyFileSync(join(fixtures, 'type_error.swift'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('swift-app guards block store upload, notarization, signing changes, release tags and remote hosts, not local work', () => {
+  const guards = parse(readFileSync(dir('swift-app', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['git push --tags', 'git push origin v1.0.0', 'xcrun altool --upload-app -f App.ipa', 'xcrun notarytool submit App.zip --wait', 'xcrun stapler staple App.app', 'cd x && xcrun notarytool submit a.zip', 'xcodebuild -exportArchive -archivePath a.xcarchive -exportPath out', 'xcodebuild -scheme App -allowProvisioningUpdates build', 'fastlane beta', 'bundle exec fastlane release', 'security import cert.pfx -k login.keychain', 'security unlock-keychain login.keychain', 'security add-trusted-cert -d cert.cer', 'codesign --sign "Developer ID" App.app', 'codesign -f -s - App.app', 'swift package-registry publish me.app 1.0.0', 'ssh me@host', 'scp a me@host:/srv', 'rsync -av out/ me@host:/srv']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['swift build', 'swift test', 'swift run app', 'swift package resolve', 'xcodebuild -list', 'codesign --verify App.app', 'security find-identity -v', 'git push origin main', 'rsync -av a/ b/', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -939,7 +982,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['swift', 'self-hosted', 'swift-web'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

@@ -1,0 +1,13 @@
+# profiles/swift-app
+# Picked for Swift x app store (ADR-0054, T-001): a SwiftUI app as a Swift package, built without Xcode project or signing.
+name: swift-app
+title: SwiftUI app (Swift package)
+summary: SwiftUI app as a Swift package; Swift Package Manager, swift format, XCTest, no signing needed for the gate.
+stack:
+  language: [swift]
+  runsOn: [app-store]
+  notes:
+    app-store: The gate builds and tests the package without signing; the Xcode app target, signing, notarization and store submission are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [swift>=6.0, just]

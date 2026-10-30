@@ -269,6 +269,7 @@ Describe this area's responsibility.
   - `examples/python-vercel/`
   - `examples/python-web/`
   - `examples/static-site/`
+  - `examples/swift-app/`
   - `examples/swift-cli/`
   - `examples/swift-web/`
   - `examples/wordpress-plugin/`
@@ -378,7 +379,7 @@ Describe this area's responsibility.
   - `profiles/python-web/`
   - `profiles/rust-basic/`
   - `profiles/static-site/`
-  - `profiles/swift-basic/`
+  - `profiles/swift-app/`
   - `profiles/swift-cli/`
   - `profiles/swift-web/`
   - `profiles/wordpress-plugin/`

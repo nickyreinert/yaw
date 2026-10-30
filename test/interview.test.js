@@ -128,7 +128,7 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   for (const language of ['go', 'rust', 'java']) assert.equal(pick(language, 'local'), `${language}-basic`);
   assert.equal(pick('swift', 'local'), 'swift-cli');
   assert.equal(pick('swift', 'self-hosted'), 'swift-web');
-  assert.equal(pick('swift', 'app-store'), 'swift-basic');
+  assert.equal(pick('swift', 'app-store'), 'swift-app');
   for (const host of ['local', 'self-hosted', 'serverless', 'edge', 'static']) {
     assert.equal(pick('html', host), 'static-site', host);
     assert.ok(profiles.find((p) => p.name === 'static-site').stack.notes[host], host);

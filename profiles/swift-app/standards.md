@@ -1,0 +1,10 @@
+- Swift 6.0+ and Swift Package Manager (tools version 5.9); target macOS 14+, keep the package building on Linux too.
+- Put all app logic in `Sources/AppCore` with no UI framework import (Foundation only); the SwiftUI views stay thin in `Sources/app/MainApp.swift`, inside `#if canImport(SwiftUI)`.
+- Tests use XCTest in `Tests/AppCoreTests` for the logic, are deterministic, make no network calls and never touch the user's real files or Keychain.
+- Format with `swift format` (`just fmt`; `just lint` only checks, strict); do not add a second formatter.
+- Views are small and take their state from `AppCore` types; no business logic, networking or file access in a `View`.
+- Prefer the standard library and Apple frameworks; every third-party package needs a reason, an exact version and a committed `Package.resolved`.
+- `just dev` runs the bare executable for quick checks; the shippable app needs an Xcode app target that depends on `AppCore` (bundle id, icons, entitlements, sandbox).
+- Store privacy: declare data use in a privacy manifest, ask for the least entitlements, store secrets in the Keychain, never in the repository.
+- Signing certificates, provisioning profiles and App Store Connect credentials never enter the repository or the agent session.
+- Signing, notarizing, uploading to App Store Connect, release tags and registry publishing need the user's approval.

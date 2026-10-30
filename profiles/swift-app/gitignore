@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+*.xcodeproj
+xcuserdata/
+DerivedData/
+*.xcarchive
+*.ipa
+*.p12
+*.mobileprovision

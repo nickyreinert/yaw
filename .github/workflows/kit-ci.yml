@@ -50,11 +50,12 @@ jobs:
   profile:
     # Profile matrix (Y-6): yaw init (runs just setup and just check) on examples/<profile>/answers.yaml.
     name: profile ${{ matrix.profile }}
-    runs-on: ubuntu-latest
+    # swift-app builds SwiftUI, which needs macOS (ADR-0112); every other profile runs on Linux.
+    runs-on: ${{ matrix.profile == 'swift-app' && 'macos-latest' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        profile: [static-site, python-web, python-vercel, node-ts-vercel, node-web, php-web, php-cli, php-serverless, php-serverless-bref, wordpress-plugin, cloudflare-workers, android-kotlin, node-app, node-app-electron, node-app-tauri, swift-cli, swift-web]
+        profile: [static-site, python-web, python-vercel, node-ts-vercel, node-web, php-web, php-cli, php-serverless, php-serverless-bref, wordpress-plugin, cloudflare-workers, android-kotlin, node-app, node-app-electron, node-app-tauri, swift-cli, swift-web, swift-app]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -90,8 +91,8 @@ jobs:
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
-      # swift-cli, swift-web (ADR-0110, ADR-0111): Swift 6.1 toolchain; the gate needs no Xcode, signing or secrets.
-      - if: startsWith(matrix.profile, 'swift-')
+      # swift-cli, swift-web (ADR-0110, ADR-0111); swift-app uses the Swift of the macOS runner.: Swift 6.1 toolchain; the gate needs no Xcode, signing or secrets.
+      - if: contains(fromJSON('["swift-cli", "swift-web"]'), matrix.profile)
         uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
         with:
           swift-version: '6.1'
