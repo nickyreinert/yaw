@@ -1,7 +1,7 @@
 // Test helpers: temp dirs, file trees, fixture kits and a scripted prompter.
 // Not a test file (npm test only runs *.test.js).
 
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -9,8 +9,22 @@ import { KIT_ROOT } from '../../core/render/kit.js';
 
 export { KIT_ROOT };
 
+// Every temp dir made here is removed when the test process exits (also after failures).
+const made = new Set();
+process.on('exit', () => {
+  for (const dir of made) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch {
+      // read-only trees (e.g. a Go module cache): make writable, retry
+      spawnSync('chmod', ['-R', 'u+w', dir]);
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* leave it */ }
+    }
+  }
+});
+
 export function tmp(prefix = 'yaw-test-') {
-  return mkdtempSync(join(tmpdir(), prefix));
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  made.add(dir);
+  return dir;
 }
 
 export function writeTree(root, files) {

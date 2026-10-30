@@ -4,6 +4,11 @@
 
 ## Backlog
 
+- T-005 Tests must not leak yaw-* temp dirs
+  model: sonnet · effort: low
+  acceptance: Every temp dir a test creates is removed when the test process exits, also after failures and for smoke tests; test/helpers/fixtures.js `tmp` registers dirs and removes them on exit, other test files use it. Proof: yaw-* count in $TMPDIR is unchanged after running test files.
+  done: helper in place and verified (5 files, count unchanged). Dirs left by earlier runs are not cleaned.
+
 - T-004 Tell users which third-party tools a stack needs
   model: sonnet · effort: medium
   acceptance: Every arch stack requiring third-party tools (e.g. AWS CLI) tells the user while selecting it and at the end of setup, with copy-paste install commands per platform. Profiles declare them in an optional `tools` list (ADR-0116); proof: php-serverless (bref), rust-serverless (lambda), node-app (tauri). Add the remaining profiles' tools as they are tailored.

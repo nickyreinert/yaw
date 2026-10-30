@@ -1,16 +1,15 @@
 // Profile options select a scaffold variant (ADR-0105, T-003).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { asksAtDepth } from '../core/interview/depth.js';
 import { questionApplies } from '../core/interview/policy.js';
 import { collectQuestions, loadProfile, profileOptionValues, renderProfiles } from '../core/render/kit.js';
-import { KIT_ROOT } from './helpers/fixtures.js';
+import { KIT_ROOT, tmp } from './helpers/fixtures.js';
 
 function kit(profileYaml, variants = ['one', 'two']) {
-  const root = mkdtempSync(join(tmpdir(), 'yaw-options-'));
+  const root = tmp('yaw-options-');
   cpSync(join(KIT_ROOT, 'interview'), join(root, 'interview'), { recursive: true });
   const dir = join(root, 'profiles', 'demo');
   mkdirSync(join(dir, 'scaffold'), { recursive: true });
