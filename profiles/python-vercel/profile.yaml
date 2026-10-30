@@ -1,0 +1,12 @@
+# profiles/python-vercel
+# Picked for Python x serverless (ADR-0054, T-001): Vercel is the concrete target of "serverless".
+name: python-vercel
+title: Python app on Vercel
+dependencyEcosystems: [pip]
+summary: Python serverless functions for Vercel; uv venv, ruff, pyright, pytest, bandit, pip-audit.
+stack:
+  language: [python]
+  runsOn: [serverless]
+defaults:
+  modules: { devenv: true, ui-design: false, backup: false }
+requires: [just, uv]

@@ -7,7 +7,7 @@ import { listProfiles, loadProfile, renderProfiles } from '../core/render/kit.js
 import { KIT_ROOT } from './helpers/fixtures.js';
 
 const EXPECTED = {
-  'python-basic': { language: ['python'], runsOn: ['serverless', 'edge', 'app-store'] },
+  'python-basic': { language: ['python'], runsOn: ['edge', 'app-store'] },
   'node-basic': { language: ['javascript'], runsOn: ['self-hosted', 'static', 'app-store'] },
   'php-basic': { language: ['php'], runsOn: ['local', 'serverless'] },
   'kotlin-basic': { language: ['kotlin'], runsOn: ['local', 'self-hosted', 'serverless'] },

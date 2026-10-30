@@ -259,6 +259,7 @@ Describe this area's responsibility.
   - `examples/node-ts-vercel/`
   - `examples/php-web/`
   - `examples/python-cli/`
+  - `examples/python-vercel/`
   - `examples/python-web/`
   - `examples/static-site/`
   - `examples/wordpress-plugin/`
@@ -361,6 +362,7 @@ Describe this area's responsibility.
   - `profiles/php-web/`
   - `profiles/python-basic/`
   - `profiles/python-cli/`
+  - `profiles/python-vercel/`
   - `profiles/python-web/`
   - `profiles/rust-basic/`
   - `profiles/static-site/`

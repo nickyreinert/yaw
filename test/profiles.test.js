@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'php-basic', 'php-web', 'python-basic', 'python-cli', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'php-basic', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -270,6 +270,52 @@ test('python-web guards block publishing and remote forms, not local work', () =
     assert.ok(blocked(cmd), cmd);
   }
   for (const cmd of ['docker build -t app .', 'docker compose up', 'alembic upgrade head', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'uv run pytest']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('python-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('python-vercel', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'dev', 'build']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  // deploy refuses before it reaches the Vercel CLI (a PATH without npx proves nothing is run)
+  const only = tmp('yaw-bin-');
+  for (const t of ['sh', 'just']) symlinkSync(execFileSync('which', [t], { encoding: 'utf8' }).trim(), join(only, t));
+  for (const [args, extra] of [[[], {}], [['prod'], {}], [['preview'], { YAW_CONFIRM_PROD: 'yes' }], [['prod'], { YAW_CONFIRM_PROD: 'no' }], [['prod'], { YAW_CONFIRM_PROD: 'yes', CI: 'true' }]]) {
+    const r = run('just', ['deploy', ...args], { cwd, env: cleanEnv(tmp('yaw-home-'), { PATH: only, ...extra }) });
+    assert.notEqual(r.status, 0, `deploy ${args} ${JSON.stringify(extra)}`);
+    assert.match(r.stderr, /deploy: refused/);
+    assert.doesNotMatch(r.stdout + r.stderr, /vercel@/);
+  }
+});
+
+test('smoke python-vercel: yaw init, just setup && just check pass; bad code fails the gate (needs uv and network)', { skip: pythonSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('python-vercel', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /3 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'python-vercel');
+  const bad = join(cwd, 'api', '_bad.py');
+  copyFileSync(join(fixtures, 'lint_error.py'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused import fails just lint');
+  copyFileSync(join(fixtures, 'insecure.py'), bad);
+  const bandit = run('just', ['lint'], { cwd });
+  assert.notEqual(bandit.status, 0, 'shell=True fails bandit');
+  assert.match(bandit.stdout + bandit.stderr, /B602|shell=True/);
+  copyFileSync(join(fixtures, 'type_error.py'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('python-vercel guards block every Vercel CLI form, the deploy recipe and publishing, not local work', () => {
+  const guards = parse(readFileSync(dir('python-vercel', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['vercel', 'vercel --prod', 'vercel deploy', 'vercel --token abc deploy', 'vercel env add KEY', 'vercel pull', 'vercel link', 'vercel dev', 'vc --prod', 'npx vc deploy', 'VERCEL_TOKEN=abc vercel --prod', 'env -i vercel deploy', 'npx -y vercel@latest deploy', 'pnpm dlx vercel deploy', 'bunx vercel deploy', 'cd app && vercel --prod', 'true;vercel deploy', '(vercel deploy)', 'just deploy prod', 'YAW_CONFIRM_PROD=yes just deploy prod', 'twine upload dist/*', 'uv publish', 'ssh me@host']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['vercel --version', 'vercel --help', 'cat vercel.json', 'uv run pytest', 'uv run ruff check .', 'just check', 'just test', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
 });
 
 test('node-ts-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
@@ -648,7 +694,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['javascript', 'local', 'node-cli'], ['javascript', 'serverless', 'node-ts-vercel'], ['javascript', 'edge', 'cloudflare-workers'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['php', 'self-hosted', 'php-web'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

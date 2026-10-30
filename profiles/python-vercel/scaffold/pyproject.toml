@@ -1,0 +1,24 @@
+[project]
+name = "app"
+version = "0.0.0"
+description = ""
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.380", "pip-audit>=2.7", "bandit>=1.7"]
+
+[tool.pytest.ini_options]
+pythonpath = ["api"]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["api", "tests"]
+extraPaths = ["api"]
+
+[tool.ruff]
+line-length = 100
+src = ["api"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]

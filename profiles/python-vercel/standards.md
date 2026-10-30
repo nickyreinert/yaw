@@ -1,0 +1,9 @@
+- Python >= 3.11 with type hints on all public functions; `pyright` must pass (`just typecheck`).
+- Logic lives in plain functions in `api/_*.py` (underscore files are not routed); handlers in `api/*.py` stay thin and call them.
+- Manage the environment with `uv` (`uv add`, `uv sync`); never `pip install` into the system Python.
+- Format and lint with `ruff` (`just fmt`, `just lint`); `bandit` runs inside `just lint`; do not add a second formatter.
+- Tests use `pytest`, live in `tests/`, are deterministic and make no network calls beyond loopback.
+- Keep runtime dependencies few: each one grows the function bundle; run `just audit` (`pip-audit`) after changing them.
+- Settings and secrets come from environment variables (the local env file is never committed); never hard-code or log them.
+- `vercel.json` holds platform configuration only; changing routes, headers or env needs a reason in the PR.
+- Deploying (`vercel`, `just deploy`), env changes and promotions are remote: only the user runs them, never CI or the agent.
