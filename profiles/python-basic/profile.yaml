@@ -5,7 +5,7 @@ title: Basic Python project
 summary: Python project; uv, Ruff, Pyright, pytest.
 stack:
   language: [python]
-  runsOn: [edge, app-store]
+  runsOn: [edge]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

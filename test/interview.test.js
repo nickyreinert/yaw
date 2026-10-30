@@ -119,7 +119,8 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   assert.equal(pick('javascript', 'local'), 'node-cli');
   assert.equal(pick('javascript', 'static'), 'node-basic');
   assert.equal(pick('python', 'local'), 'python-cli');
-  assert.equal(pick('python', 'app-store'), 'python-basic');
+  assert.equal(pick('python', 'app-store'), null);
+  assert.match(stackProfile(profiles, { 'arch.language': 'python', 'arch.runs-on': 'app-store' }).reason, /no YAW profile for python on app-store/);
   assert.equal(pick('html', 'static'), 'static-site');
   assert.equal(pick('kotlin', 'app-store'), 'android-kotlin');
   assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-basic');
