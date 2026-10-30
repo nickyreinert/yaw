@@ -20,10 +20,7 @@ const SOURCE_FILES = {
   'rust-basic': 'src/lib.rs',
   'java-basic': 'src/main/java/com/example/app/Greeting.java',
 };
-const VERBS = [
-  'setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot',
-  'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy',
-];
+const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 
 function renderedTestFile(files) {
   return [...files.keys()].find((path) =>

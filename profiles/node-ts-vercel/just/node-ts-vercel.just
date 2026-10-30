@@ -27,30 +27,9 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for node-ts-vercel (Vercel builds on its side; 'tsc --noEmit' runs in just typecheck)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for node-ts-vercel (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for node-ts-vercel"
-
-preview-share:
-    @echo "preview-share: not applicable for node-ts-vercel (share only with your approval)"
-
 # Only shipped dependencies: everything in the scaffold is a dev tool (ADR-0036).
 audit:
     npm audit --omit=dev
-
-db-migrate:
-    @echo "db-migrate: not applicable for node-ts-vercel"
-
-db-reset:
-    @echo "db-reset: not applicable for node-ts-vercel"
-
-backup:
-    @echo "backup: not applicable for node-ts-vercel"
-
-restore:
-    @echo "restore: not applicable for node-ts-vercel"
 
 # Production deploy with the Vercel CLI, only on your machine: refuses in CI, without the argument `prod`, and without YAW_CONFIRM_PROD=yes.
 deploy env='':

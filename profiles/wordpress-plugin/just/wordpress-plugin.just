@@ -29,30 +29,6 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for wordpress-plugin (no build step; the ZIP release is made by you)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for wordpress-plugin (browser screenshots against wp-env need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for wordpress-plugin (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for wordpress-plugin (share only with your approval)"
-
 # Vulnerability scan of the locked dependencies (needs network).
 audit:
     composer audit --locked
-
-db-migrate:
-    @echo "db-migrate: not applicable for wordpress-plugin"
-
-db-reset:
-    @echo "db-reset: not applicable for wordpress-plugin (the wp-env database is disposable: npx @wordpress/env clean)"
-
-backup:
-    @echo "backup: not applicable for wordpress-plugin"
-
-restore:
-    @echo "restore: not applicable for wordpress-plugin"
-
-deploy env='':
-    @echo "deploy: not applicable for wordpress-plugin (a release to the WordPress.org SVN or a host is yours to run; the agent never does)"

@@ -30,30 +30,6 @@ check: lint typecheck test audit sync-check
 build:
     docker build -t app .
 
-screenshot:
-    @echo "screenshot: not applicable yet for python-web (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for python-web (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for python-web (share only with your approval)"
-
 # Vulnerability scan of the installed dependencies (needs network).
 audit:
     uv run pip-audit
-
-db-migrate:
-    @echo "db-migrate: not applicable for python-web (the scaffold has no database; add alembic with an ADR)"
-
-db-reset:
-    @echo "db-reset: not applicable for python-web (the scaffold has no database)"
-
-backup:
-    @echo "backup: not applicable for python-web"
-
-restore:
-    @echo "restore: not applicable for python-web"
-
-deploy env='':
-    @echo "deploy: not applicable for python-web (deploying and pushing images are remote and need your approval; add the command with your host)"

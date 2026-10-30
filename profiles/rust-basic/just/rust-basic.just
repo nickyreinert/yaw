@@ -32,29 +32,5 @@ build:
     @command -v cargo >/dev/null 2>&1 || { echo "build: install Rust with rustup" >&2; exit 1; }
     cargo build
 
-screenshot:
-    @echo "screenshot: not applicable for rust-basic"
-
-preview:
-    @echo "preview: not applicable for rust-basic"
-
-preview-share:
-    @echo "preview-share: not applicable for rust-basic"
-
 audit:
     @echo "audit: not applicable for rust-basic (no third-party crates)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for rust-basic"
-
-db-reset:
-    @echo "db-reset: not applicable for rust-basic"
-
-backup:
-    @echo "backup: not applicable for rust-basic"
-
-restore:
-    @echo "restore: not applicable for rust-basic"
-
-deploy env='':
-    @echo "deploy: not applicable for rust-basic (deployment needs your approval)"

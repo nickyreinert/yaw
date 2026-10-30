@@ -27,30 +27,6 @@ check: lint typecheck test build audit sync-check
 build:
     npm run build
 
-screenshot:
-    @echo "screenshot: not applicable yet for node-app"
-
-preview:
-    @echo "preview: not applicable for node-app"
-
-preview-share:
-    @echo "preview-share: not applicable for node-app (share only with your approval)"
-
 # Shipped dependencies only.
 audit:
     npm run audit
-
-db-migrate:
-    @echo "db-migrate: not applicable for node-app"
-
-db-reset:
-    @echo "db-reset: not applicable for node-app"
-
-backup:
-    @echo "backup: not applicable for node-app"
-
-restore:
-    @echo "restore: not applicable for node-app"
-
-deploy:
-    @echo "deploy: not applicable for node-app (signing and store uploads are run by you, outside YAW)"

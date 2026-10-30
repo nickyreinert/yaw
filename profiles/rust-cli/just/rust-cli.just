@@ -31,29 +31,5 @@ check: lint typecheck test sync-check
 build:
     cargo build --release
 
-screenshot:
-    @echo "screenshot: not applicable for rust-cli"
-
-preview:
-    @echo "preview: not applicable for rust-cli (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for rust-cli"
-
 audit:
     @echo "audit: not applicable for rust-cli (no third-party crates; add cargo-audit with your approval once there are)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for rust-cli"
-
-db-reset:
-    @echo "db-reset: not applicable for rust-cli"
-
-backup:
-    @echo "backup: not applicable for rust-cli"
-
-restore:
-    @echo "restore: not applicable for rust-cli"
-
-deploy env='':
-    @echo "deploy: not applicable for rust-cli (a local tool; installing or copying it elsewhere needs your approval)"

@@ -28,30 +28,6 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for php-web (no build step; a container image comes with the compose setup)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for php-web (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for php-web (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for php-web (share only with your approval)"
-
 # Vulnerability scan of the locked dependencies (needs network).
 audit:
     composer audit --locked
-
-db-migrate:
-    @echo "db-migrate: not applicable for php-web (the scaffold has no database; 'artisan migrate --pretend' comes with Laravel)"
-
-db-reset:
-    @echo "db-reset: not applicable for php-web (the scaffold has no database)"
-
-backup:
-    @echo "backup: not applicable for php-web"
-
-restore:
-    @echo "restore: not applicable for php-web"
-
-deploy env='':
-    @echo "deploy: not applicable for php-web (rsync/SFTP to a host and migrations are remote and need your approval; add the command with your host)"

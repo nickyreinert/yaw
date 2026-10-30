@@ -32,29 +32,5 @@ check: lint typecheck test sync-check
 build:
     @echo "build: not applicable for python-basic (no build step)"
 
-screenshot:
-    @echo "screenshot: not applicable for python-basic"
-
-preview:
-    @echo "preview: not applicable for python-basic"
-
-preview-share:
-    @echo "preview-share: not applicable for python-basic"
-
 audit:
     @echo "audit: not applicable for python-basic (no dependency audit tool is included)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for python-basic"
-
-db-reset:
-    @echo "db-reset: not applicable for python-basic"
-
-backup:
-    @echo "backup: not applicable for python-basic"
-
-restore:
-    @echo "restore: not applicable for python-basic"
-
-deploy env='':
-    @echo "deploy: not applicable for python-basic (deployment needs your approval)"

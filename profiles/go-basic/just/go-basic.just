@@ -30,29 +30,5 @@ build:
     @command -v go >/dev/null 2>&1 || { echo "build: install Go 1.22 or newer" >&2; exit 1; }
     go build ./...
 
-screenshot:
-    @echo "screenshot: not applicable for go-basic"
-
-preview:
-    @echo "preview: not applicable for go-basic"
-
-preview-share:
-    @echo "preview-share: not applicable for go-basic"
-
 audit:
     @echo "audit: not applicable for go-basic (no third-party modules)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for go-basic"
-
-db-reset:
-    @echo "db-reset: not applicable for go-basic"
-
-backup:
-    @echo "backup: not applicable for go-basic"
-
-restore:
-    @echo "restore: not applicable for go-basic"
-
-deploy env='':
-    @echo "deploy: not applicable for go-basic (deployment needs your approval)"

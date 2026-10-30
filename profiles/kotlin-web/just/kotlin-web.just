@@ -37,29 +37,5 @@ build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
     ./gradlew build installDist
 
-screenshot:
-    @echo "screenshot: not applicable for kotlin-web"
-
-preview:
-    @echo "preview: not applicable for kotlin-web"
-
-preview-share:
-    @echo "preview-share: not applicable for kotlin-web"
-
 audit:
     @echo "audit: not applicable for kotlin-web (Dependabot can monitor Gradle dependencies)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for kotlin-web"
-
-db-reset:
-    @echo "db-reset: not applicable for kotlin-web"
-
-backup:
-    @echo "backup: not applicable for kotlin-web"
-
-restore:
-    @echo "restore: not applicable for kotlin-web"
-
-deploy env='':
-    @echo "deploy: not applicable for kotlin-web (building and pushing the image and reaching your server need your approval)"

@@ -25,29 +25,5 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for node-basic (no build step)"
 
-screenshot:
-    @echo "screenshot: not applicable for node-basic"
-
-preview:
-    @echo "preview: not applicable for node-basic"
-
-preview-share:
-    @echo "preview-share: not applicable for node-basic"
-
 audit:
     @echo "audit: no dependencies, nothing to audit"
-
-db-migrate:
-    @echo "db-migrate: not applicable for node-basic"
-
-db-reset:
-    @echo "db-reset: not applicable for node-basic"
-
-backup:
-    @echo "backup: not applicable for node-basic"
-
-restore:
-    @echo "restore: not applicable for node-basic"
-
-deploy env='':
-    @echo "deploy: not applicable for node-basic (releases need your approval)"
