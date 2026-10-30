@@ -5,7 +5,7 @@ title: Basic Rust project
 summary: Rust project; Cargo, rustfmt, clippy, cargo test.
 stack:
   language: [rust]
-  runsOn: [serverless, edge, app-store]
+  runsOn: [edge, app-store]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

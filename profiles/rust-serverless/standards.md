@@ -1,0 +1,10 @@
+- Stable Rust, edition 2021, `rust-version` explicit in `Cargo.toml`; `unsafe` is forbidden (`[lints.rust]`).
+- Pin every direct crate exactly (`=1.2.3`), commit `Cargo.lock`, add crates only with a reason; keep the dependency set small (cold start and image size).
+- Logic lives in the library: `greeting` plus `router()` (container, axum) or `handler()` (Lambda, `lambda_http`); `src/main.rs` stays a thin entry point.
+- Container: reads `HOST` and `PORT` (the platform sets `PORT`), serves `GET /health`, shuts down gracefully, runs as non-root; the `Dockerfile` builds with `--locked`.
+- Lambda: the handler is a plain async function from `Request` to `Response`; keep state out of globals and initialise clients in `main`, not per request.
+- Tests call `router()` (tower `oneshot`) or `handler()` directly: deterministic, no sockets, no network, no cloud account.
+- Format with `cargo fmt` (`just fmt`; `just lint` only checks) and keep `cargo clippy -- -D warnings` clean.
+- Validate path, query and body input before use; return explicit status codes; never log secrets or request bodies.
+- Settings and secrets come from environment variables or the platform's secret store; never hard-code or commit them.
+- Building images, `cargo lambda deploy`, `aws`/`sam`/`gcloud`, registry pushes, `cargo install`, publishing and release tags need the user's approval.

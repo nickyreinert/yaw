@@ -1,0 +1,14 @@
+# CI steps fragment: Rust toolchain and cargo-audit, then `just check` (same gate as local). No deploy, no cloud account, no cargo-lambda.
+# Actions are pinned by commit SHA (Y-5.5, ADR-0027); the comment names the version the SHA was verified for.
+steps:
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+  - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+    with:
+      toolchain: stable
+      components: rustfmt, clippy
+  - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+    with:
+      tool: cargo-audit
+  - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+  - run: just setup
+  - run: just check

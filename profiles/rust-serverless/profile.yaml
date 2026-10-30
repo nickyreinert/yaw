@@ -1,0 +1,23 @@
+# profiles/rust-serverless
+# Picked for Rust x serverless (ADR-0054); the hosting option picks the scaffold variant (ADR-0105, ADR-0115).
+name: rust-serverless
+title: Rust serverless app
+dependencyEcosystems: [cargo]
+summary: Rust app for serverless hosts, as a container or on AWS Lambda (cargo-lambda); Cargo, rustfmt, clippy, cargo test.
+stack:
+  language: [rust]
+  runsOn: [serverless]
+  notes:
+    serverless: The gate runs without Docker, AWS accounts or cargo-lambda; building images, deploying and cloud accounts are yours.
+options:
+  hosting:
+    label: "Serverless flavor: container (Cloud Run style) or AWS Lambda (cargo-lambda)"
+    hint: Container ships an axum service with a Dockerfile; Lambda ships a lambda_http handler built and deployed with cargo-lambda.
+    choices:
+      - { value: container, label: "Container (axum, Dockerfile, Cloud Run style)" }
+      - { value: lambda, label: "AWS Lambda (lambda_http, cargo-lambda)" }
+    default: container
+    scaffold: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [rustc>=1.84, cargo, just]

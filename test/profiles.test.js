@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -733,6 +733,61 @@ test('rust-web guards block crates.io changes, image pushes, remote hosts, tool 
   for (const cmd of ['cargo build --release --locked', 'cargo test', 'cargo run', 'cargo audit', 'cargo fetch', 'docker build -t app .', 'docker compose up', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
+// rust-serverless (ADR-0115): one smoke test per hosting variant (ADR-0105); none needs Docker, AWS accounts or cargo-lambda.
+const RUST_SERVERLESS_EXAMPLES = { container: 'rust-serverless', lambda: 'rust-serverless-lambda' };
+
+test('rust-serverless: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('rust-serverless', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+test('rust-serverless: the uniform verbs exist and the hosting option has the two variants, container by default, with exact crate pins', () => {
+  const just = readFileSync(dir('rust-serverless', 'just', 'rust-serverless.just'), 'utf8');
+  for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+  const profile = loadProfile(KIT_ROOT, 'rust-serverless');
+  assert.deepEqual(profile.options.hosting.choices.map((c) => c.value), ['container', 'lambda']);
+  assert.equal(profile.options.hosting.default, 'container');
+  assert.match(profile.options.hosting.label, /container.*Lambda/i);
+  assert.deepEqual(profile.dependencyEcosystems, ['cargo']);
+  for (const variant of ['container', 'lambda']) {
+    const toml = readFileSync(dir('rust-serverless', 'variants', variant, 'Cargo.toml'), 'utf8');
+    const versions = [...toml.matchAll(/^[a-z_]+ = \{ version = "([^"]+)"/gm)].map((m) => m[1]);
+    assert.ok(versions.length >= 2, variant);
+    for (const v of versions) assert.match(v, /^=\d+\.\d+\.\d+$/, variant);
+  }
+});
+
+for (const [variant, example] of Object.entries(RUST_SERVERLESS_EXAMPLES)) {
+  test(`smoke rust-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs cargo and network)`, { skip: rustSkip || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (cargo fetches crates)'), timeout: 900000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, 'src', 'greeting.rs')));
+    assert.equal(existsSync(join(cwd, 'Dockerfile')), variant === 'container');
+    assert.match(readFileSync(join(cwd, 'Cargo.toml'), 'utf8'), variant === 'lambda' ? /lambda_http/ : /axum/);
+    const fixtures = join(KIT_ROOT, 'test', 'profiles', 'rust-serverless');
+    const bad = join(cwd, 'tests', 'bad.rs');
+    copyFileSync(join(fixtures, 'lint_error.rs'), bad);
+    assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+    copyFileSync(join(fixtures, 'type_error.rs'), bad);
+    assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+  });
+}
+
+test('rust-serverless guards block registry pushes, cloud CLIs, cargo lambda deploy, remote hosts and publishing, not local work', () => {
+  const guards = parse(readFileSync(dir('rust-serverless', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['cargo publish', 'cargo --quiet publish', 'cargo install cargo-lambda', 'rustup target add aarch64-unknown-linux-gnu', 'cargo lambda deploy', 'cargo lambda deploy --iam-role x app', 'cargo lambda invoke app', 'cargo +stable lambda deploy', 'cd x && cargo lambda deploy', 'docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'podman push me/app', 'gcloud builds submit --tag gcr.io/p/app', 'gcloud run deploy app --source .', 'aws lambda update-function-code --function-name x', 'AWS_PROFILE=p aws sts get-caller-identity', 'sam deploy --guided', 'git push --tags', 'ssh me@host', 'scp a me@host:/srv', 'rsync -av out/ me@host:/srv', 'DOCKER_HOST=ssh://me@host docker ps', 'docker --context prod ps']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['cargo build --release --locked', 'cargo lambda build --release --arm64', 'cargo lambda watch', 'cargo test', 'cargo audit', 'cargo fetch', 'docker build -t app .', 'git push origin main', 'rsync -av a/ b/', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -1063,7 +1118,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['rust', 'self-hosted', 'rust-web'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
