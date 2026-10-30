@@ -1,0 +1,19 @@
+# AWS SAM template; the gate only parses it as YAML. Build and deploy with the SAM CLI yourself.
+# Set BrefLayerVersion to the current php-84 layer version for your region (https://runtimes.bref.sh).
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  BrefLayerVersion:
+    Type: String
+    Default: "1"
+Resources:
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.php
+      Runtime: provided.al2023
+      CodeUri: .
+      MemorySize: 512
+      Timeout: 10
+      Layers:
+        - Fn::Sub: "arn:aws:lambda:${AWS::Region}:534081306603:layer:php-84:${BrefLayerVersion}"

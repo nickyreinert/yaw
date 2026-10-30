@@ -1,3 +1,4 @@
 vendor/
+tests/
+.git/
 .phpunit.cache/
-.php-cs-fixer.cache

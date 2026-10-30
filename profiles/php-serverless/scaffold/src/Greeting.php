@@ -8,6 +8,8 @@ final class Greeting
 {
     public static function for(string $name): string
     {
-        return 'Hello, ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '!';
+        $name = trim($name);
+
+        return 'Hello, ' . ($name === '' ? 'world' : $name) . '!';
     }
 }

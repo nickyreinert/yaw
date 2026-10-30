@@ -1,3 +1,0 @@
-# Dangerous command patterns of this stack (doc 04 §3).
-guards:
-  - { id: composer-publish, pattern: "\\bcomposer\\s+publish\\b", reason: Publishing a PHP package needs your approval. }

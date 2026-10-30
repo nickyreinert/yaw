@@ -1,6 +1,0 @@
-- Use PHP >= 8.2, strict types, and typed function parameters and returns.
-- Keep application code in `src/` and PHPUnit tests in `tests/`.
-- Manage dependencies with Composer; do not edit `vendor/`.
-- Format with PHP-CS-Fixer; require PHPStan to pass.
-- Tests are deterministic and must not make network calls.
-- Escape output and use prepared statements for SQL.

@@ -1,0 +1,10 @@
+- PHP >= 8.2 with `declare(strict_types=1);` in every file and types on all parameters and returns; `phpstan` level 8 must pass (`just typecheck`).
+- Code in `src/` (namespace `App`), tests in `tests/` (namespace `Tests`); the entry point (`public/index.php` or `handler.php`) stays thin and calls into `src/`.
+- Handlers are stateless: no local files, sessions or in-memory state between requests; keep cold starts small.
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- Manage dependencies with Composer; commit `composer.lock`; never edit `vendor/`; run `just audit` after changing them.
+- Format with `php-cs-fixer` (`just fmt`; `just lint` only checks). Tests use PHPUnit, are deterministic and make no network or cloud calls.
+- Container: the app listens on `$PORT`, logs to stderr, runs as the image's non-root user, and ships no dev dependencies.
+- Bref: `handler.php` is the Lambda function; `template.yaml` (AWS SAM) is the infrastructure; keep it valid YAML (a test parses it).
+- Validate all request or event input; never `eval`, `unserialize` input, or build shell commands from input.
+- Registry pushes, cloud CLIs that deploy (`aws`, `sam`, `gcloud`), remote hosts and `composer global` need the user's approval.

@@ -1,0 +1,7 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: composer-global, pattern: "\\bcomposer\\b[^;&|)]*\\b(global|self-update|selfupdate)\\b", reason: Changing the machine-wide Composer setup needs your approval. }
+  - { id: registry-push, pattern: "\\b(docker|podman|buildah|nerdctl)(-compose)?\\b.*(\\bpush\\b|--push)|\\bgcloud\\b.*\\bbuilds\\s+submit\\b", reason: Pushing an image to a registry needs your approval. }
+  - { id: cloud-cli, pattern: "(^|[;&|(\\s])(aws|sam|gcloud)\\s+\\S", reason: Cloud CLIs deploy or change resources on your account; only you run them. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp|ftp|lftp)\\s+\\S|\\brsync\\b.*\\s[^\\s/.][^\\s/]*:\\S|\\bDOCKER_HOST=|\\bdocker\\s+(-H|--host\\b|--context\\b)", reason: Reaching a remote host needs your approval. }

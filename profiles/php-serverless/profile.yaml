@@ -1,0 +1,23 @@
+# profiles/php-serverless
+# Picked for PHP x serverless (ADR-0054); the hosting option picks the scaffold variant (ADR-0105, ADR-0107).
+name: php-serverless
+title: PHP serverless app
+dependencyEcosystems: [composer]
+summary: PHP app for serverless hosts, as a container or on AWS Lambda (Bref); Composer, PHPStan, PHP-CS-Fixer, PHPUnit, composer audit.
+stack:
+  language: [php]
+  runsOn: [serverless]
+  notes:
+    serverless: The gate runs without Docker, AWS credentials or the SAM CLI; building images, deploying and cloud accounts are yours.
+options:
+  hosting:
+    label: "Serverless flavor: container (Cloud Run style) or Bref (AWS Lambda)"
+    hint: Container ships a Dockerfile and front controller; Bref ships a Lambda handler and an AWS SAM template.
+    choices:
+      - { value: container, label: "Container (Dockerfile, Cloud Run style)" }
+      - { value: bref, label: "Bref (AWS Lambda, SAM template)" }
+    default: container
+    scaffold: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [php>=8.2, composer, just]
