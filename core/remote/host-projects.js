@@ -61,7 +61,7 @@ export class HostedProjects {
       result.answers['user.agents'] = ['claude']; return result;
     }
     requireValue(!input.secrets || (typeof input.secrets === 'object' && !Array.isArray(input.secrets) && !Object.keys(input.secrets).length), 'Enter project secrets privately on the host; hosted interviews do not transmit them');
-    const selected = input.answers?.['user.agents'];
+    const selected = (name === 'file-preview' ? input.setup?.answers : input.answers)?.['user.agents'];
     requireValue(selected === undefined || (Array.isArray(selected) && selected.length === 1 && selected[0] === 'claude'), 'Select exactly one supported host agent: Claude Code');
     input = { ...input, ...(['preview', 'diff', 'apply', 'draft', 'preset'].includes(name) ? { answers: { ...input.answers, 'user.agents': ['claude'] } } : {}) };
     const { root, model } = this.model(i, input);
@@ -69,7 +69,7 @@ export class HostedProjects {
     const api = createFormApi({ root: i.scratch, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify, model: i.model });
     try {
       if (name !== 'apply') {
-        requireValue(['preview', 'diff', 'preset', 'kickoff-prompt', 'kickoff-reply'].includes(name), 'Unknown interview action', 404);
+        requireValue(['preview', 'diff', 'preset', 'kickoff-prompt', 'kickoff-reply', 'file-preview'].includes(name), 'Unknown interview action', 404);
         const result = await api.action(name, input);
         if (['preview', 'diff'].includes(name)) { result.destination = input.answers?.['arch.language'] ? root : join(this.root, '<language>', i.slug); result.secrets = { names: [], existingFile: false }; }
         return result;

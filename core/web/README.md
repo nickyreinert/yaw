@@ -111,3 +111,6 @@ Core always generates `docs/engineering.md` and links it from AGENTS.md, includi
 | No emojis/examples and confirmation before calling work final | Personal communication choices and explicit review/apply boundaries govern these; they are not universal coding constraints. |
 
 Security references: https://asvs.owasp.org/; https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html; https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html.
+
+
+The interview console is docked above the fixed workspace footer and navigation across the available viewport width. Its scrollable split pane is capped at 240px / 28vh (180px / 24vh on small screens). Only paths affected by the current step or focused control appear; their folders start expanded. Files show their complete planned text, or preserved existing text, on demand in the console’s right pane. Previews are limited to 128 KiB, refuse symlinks, secret paths and detected secret values, and never write project files. Review & apply hides the console and reuses the same folder/purpose tree without content previews. Step navigation explicitly scrolls to the form start while focusing its heading. Experience and team choices explain their actual instruction changes in the context panel.

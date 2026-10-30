@@ -1,4 +1,4 @@
-import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation } from './ui-state.js';
+import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation, focusStepStart, interviewDetailText } from './ui-state.js';
 import { isPreference, questionApplies } from '../../interview/policy.js';
 
 import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderCommunicationCard, renderStack } from './setup-cards.js';
@@ -34,7 +34,14 @@ const csrf = document.querySelector('meta[name="yaw-csrf"]').content;
 let catalog, state = { mode: 'quick', answers: {}, modules: null };
 let stackValid = true, activeProfile = null, compact = localStorage.getItem('yaw.setup.compact') !== '0';
 let revision = 0, timer, busy = false, lastPreview, planReady = false;
-const projectTree = createProjectTree($('project-structure'));
+const projectTree = createProjectTree($('project-structure'), { readFile: async (path) => (await request('file-preview', { setup: state, path })).json() });
+const dock = $('interview-dock');
+function syncDockHeight() {
+  const height = Math.max(0, ...[...document.querySelectorAll('.interview-dock')].map((node) => node.getClientRects().length ? node.getBoundingClientRect().height : 0));
+  document.documentElement.style.setProperty('--interview-dock-height', `${height}px`);
+}
+const dockObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncDockHeight);
+dockObserver?.observe(dock);
 let helpTarget = {};
 const sectionTarget = () => [{ setup: true }, { question: 'user.agents' }, { question: 'idea.text' }, { question: 'arch.language' }, { workflow: true }, {}][stepIndex] ?? {};
 function highlightTree() { projectTree.highlight(helpTarget, sectionTarget()); }
@@ -74,7 +81,9 @@ function renderWizard(focus = false) {
   } else if (!formView && settingsPreview) {
     settingsPreview.replaceWith($('summary')); settingsPreview = null;
   }
-  $('project-structure').hidden = formView || phase !== 'edit';
+  dock.hidden = formView || phase !== 'edit';
+  $('project-structure').hidden = formView || phase !== 'edit' || stepIndex === REVIEW;
+  syncDockHeight();
   highlightTree();
   if (planCard) planCard.node.hidden = formView;
   if (finalCard) finalCard.node.hidden = formView;
@@ -116,8 +125,8 @@ function renderWizard(focus = false) {
   $('next-step-button').title = blocked ? 'Pick a language and hosting target with a YAW profile' : '';
   if (focus) {
     const visibleSection = [...sections.values()].find((s) => !s.node.hidden)?.node;
-    const heading = (step.ids[0] ? $(step.ids[0])?.querySelector('h2, legend') : null) ?? visibleSection?.querySelector('h2');
-    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+    const heading = (step.ids[0] ? $(step.ids[0])?.querySelector('h2:not(.sr-only), legend') : null) ?? visibleSection?.querySelector('h2');
+    focusStepStart(finished ? $('finished') : $('setup'), heading);
   }
 }
 function advance() {
@@ -193,6 +202,8 @@ function explain(title, content, target = {}) {
   highlightTree();
 }
 function questionHelp(q) {
+  const details = interviewDetailText(q.id);
+  if (details) return details.map(helpText);
   if (q.id.startsWith('user.')) return aboutHelp();
   if (q.id === 'idea.text') return [helpText('Describe what your app does, its target users and its constraints.'), helpText('Will be stored as a global entry in `AGENTS.md`.')];
   if (q.id === 'arch.wrapper') return [helpText('Tells the agent to add a wrapper script for common commands like installing, running and checking the project.'), helpText('Shell: `sh project.sh setup`. Just: `just setup`. Make: `make setup`. Off: no additional wrapper. YAW’s checks use `just check`.')];
@@ -743,7 +754,7 @@ async function start() {
 }
 await start();
 return {
-  destroy() { clearTimeout(timer); revision++; promptRevision++; prefillRevision++; root.replaceChildren(); }, state: () => state,
+  destroy() { dockObserver?.disconnect(); projectTree.destroy(); clearTimeout(timer); revision++; promptRevision++; prefillRevision++; root.replaceChildren(); syncDockHeight(); }, state: () => state,
   setPresentation(mode) {
     if (!['settings', 'interview'].includes(mode) || presentation === mode) return;
     presentation = mode; update();

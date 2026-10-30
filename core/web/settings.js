@@ -203,7 +203,7 @@ export async function interviewApply({ root, kitRoot, env, input }) {
 }
 
 export async function interviewAction({ root, kitRoot, env, input }) {
-  const allowed = ['kickoff-prompt', 'kickoff-reply', 'setup-prompts', 'prefill', 'draft', 'preset'];
+  const allowed = ['kickoff-prompt', 'kickoff-reply', 'setup-prompts', 'prefill', 'draft', 'preset', 'file-preview'];
   if (!allowed.includes(input.action)) throw new FormError('Unknown interview action');
   editModel({ root, kitRoot, env, expected: input.expected });
   if (input.action === 'draft' && !readManifest(root)) {

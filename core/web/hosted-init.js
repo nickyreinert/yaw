@@ -26,7 +26,7 @@ export async function hostedWeb({ io, command, local, id, skipVerify = false }) 
         if (name === 'hosted-start') { const s = await request('/api/interviews', { slug: input.slug, command, skipVerify }); allowed.add(s.id); return s; }
         if (!allowed.has(input.id)) throw new FormError('Unknown local interview', 404);
         if (name === 'hosted-bootstrap') return request(`/api/interviews/${input.id}/bootstrap`);
-        if (!['preview', 'diff', 'draft', 'preset', 'prefill', 'apply', 'kickoff-prompt', 'kickoff-reply'].includes(input.action)) throw new FormError('Unknown interview action', 404);
+        if (!['preview', 'diff', 'draft', 'preset', 'prefill', 'apply', 'kickoff-prompt', 'kickoff-reply', 'file-preview'].includes(input.action)) throw new FormError('Unknown interview action', 404);
         const value = await request(`/api/interviews/${input.id}/${input.action}`, input.input);
         if (input.action === 'apply') { result = value.ok ? 0 : 1; const timer = setTimeout(() => server.close(), 1500); timer.unref(); }
         return value;

@@ -101,3 +101,26 @@ export function toggleModules(definitions, selected, name, enabled) {
   }
   return definitions.map((d) => d.name).filter((n) => next.has(n));
 }
+
+// Focus belongs to the step heading; scrolling belongs to the start of the step, not the old button.
+export function focusStepStart(start, heading) {
+  if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  start?.scrollIntoView({ block: 'start', behavior: 'instant' });
+}
+
+export function interviewDetailText(id) {
+  return ({
+    'user.expertise': [
+      'Layperson: plain language, explained terms and step-by-step guidance.',
+      'Intermediate: concise explanations with context for less familiar decisions.',
+      'Expert: precise technical language; skip introductory explanations.',
+      'This changes the agent’s explanation style in `AGENTS.md`. Question coverage and tool permissions stay the same.',
+    ],
+    'idea.team': [
+      'Solo: project instructions include your personal communication and autonomy preferences.',
+      'Team: shared instructions use English for code and documentation; chat language and autonomy are agreed per contributor.',
+      'External reviewers: the same shared rules as Team, for occasional contributors and reviewers.',
+      'GitHub, task tracking and review gates remain separate choices. The optional Team rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
+    ],
+  })[id] ?? null;
+}

@@ -42,7 +42,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   // Review: bullet lists with a jump to where each item is configured and a file preview, no scroll area.
   assert.match(review, /review-tree/);
   assert.match(review, /module: name/);
-  assert.match(review, /review-file/);
+  assert.match(review, /fileTreeEntries/);
   assert.ok(!/#summary ul \{[^}]*overflow/.test(css));
   assert.match(css, /\.review-file pre \{ max-height: none; overflow: visible/);
   // Finished is the seventh step: log, what to do next, no focus switch, nothing to go back to.
@@ -638,4 +638,21 @@ test('settings UI: one Sync tab, Project/Defaults tabs, page and sidebar search 
     for (const id of ['side-search', 'side-results', 'side-nav', 'settings-search', 'gs-search', 'global-settings-view']) assert.match(page, new RegExp(`id="${id}"`), `${name}: ${id}`);
   }
   assert.ok(!readFileSync(join(dir, 'global-settings-view.js'), 'utf8').includes("button('Sync'"));
+});
+
+test('web API: console file previews return full text through authenticated, read-only actions', async (t) => {
+  const f = await serverFixture(t);
+  const before = readTree(f.root);
+  const response = await f.post('file-preview', { setup: setup(), path: 'just/node-cli.just' });
+  assert.equal(response.status, 200);
+  const file = await response.json();
+  assert.equal(file.source, 'Planned content');
+  assert.ok(file.content.split('\n').length > 30, 'full file, rather than the review excerpt');
+  assert.deepEqual(readTree(f.root), before);
+  const forbidden = await f.post('file-preview', { setup: setup(), path: 'AGENTS.md' }, { 'X-YAW-Token': 'invalid' });
+  assert.equal(forbidden.status, 403);
+  const outside = await f.post('file-preview', { setup: setup(), path: '../outside' });
+  assert.equal(outside.status, 404);
+  const protectedFile = await f.post('file-preview', { setup: setup(), path: '.env' });
+  assert.equal(protectedFile.status, 403);
 });

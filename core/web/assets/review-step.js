@@ -1,5 +1,8 @@
 // Shared, searchable review tree. All content is rendered as text; expansion is user-controlled.
-import { el, radioChoices, decisionIcon, moduleIcon, GROUPS } from './setup-cards.js';
+import { el, radioChoices, decisionIcon } from './setup-cards.js';
+
+import { fileTreeEntries } from './project-tree.js';
+export { filePurpose } from './project-tree.js';
 
 const SHORT = {
   'user.agents': 'Agents', 'user.expertise': 'Experience', 'user.language': 'Chat language', 'user.autonomy': 'Autonomy',
@@ -9,7 +12,6 @@ const SHORT = {
   'arch.library-strategy': 'Build or reuse', 'arch.docker': 'Docker support', 'arch.wrapper': 'Wrapper', 'quality.error-detail': 'User-facing errors', 'quality.log-output': 'Diagnostic logs', 'quality.documentation': 'Internal documentation',
   'arch.hosting-control': 'Hosting', 'arch.libraries': 'Dependencies', 'arch.services': 'Services', 'arch.cost': 'Budget policy', 'arch.cost-limit': 'Budget cap',
 };
-const ACTION = { create: 'new', update: 'changed', write: 'write', kept: 'kept', missing: 'restore', delete: 'remove' };
 const OPEN = new WeakMap();
 
 export function answerText(q, value) {
@@ -19,26 +21,6 @@ export function answerText(q, value) {
   if (q.type === 'choice') return label(value);
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
   return text.length > 90 ? `${text.slice(0, 87)}…` : text || '—';
-}
-
-export function filePurpose(path) {
-  if (path === 'AGENTS.md') return 'Agent entry point';
-  if (['CLAUDE.md', 'GEMINI.md'].includes(path)) return 'Rules import';
-  if (path === 'justfile' || path.endsWith('.just')) return 'Project commands';
-  if (path === '.gitignore') return 'Ignored files';
-  if (path === '.yaw/answers.yaml') return 'Project choices';
-  if (path === '.yaw/manifest.json') return 'Generated file index';
-  if (path.endsWith('SKILL.md')) return 'Agent skill';
-  if (path.includes('/ISSUE_TEMPLATE/')) return 'Issue form';
-  if (path.endsWith('pull_request_template.md')) return 'PR template';
-  if (path.endsWith('hooks.json') || path.endsWith('settings.json')) return 'Agent configuration';
-  if (path.includes('docs/spec/')) return 'Project specification';
-  if (path.includes('docs/standards')) return 'Coding standards';
-  if (path.includes('docs/plan/')) return 'Project plan';
-  if (path.endsWith('README.md')) return 'Project overview';
-  if (path.endsWith('package.json')) return 'Dependencies and scripts';
-  if (path.startsWith('src/') || path.startsWith('public/')) return 'Starter code';
-  return 'Project file';
 }
 
 const editButton = (what, onclick) => el('button', { type: 'button', class: 'review-edit', 'aria-label': `Edit ${what}`, title: `Edit ${what}`,
@@ -87,25 +69,16 @@ export function renderReview(root, ctx) {
   const entries = sections.map(([key, title, icon]) => branch(title, key,
     [...groups.get(key)].map(([name, rows]) => branch(name, `${key}/${name}`, rows, icon)), icon)).filter((entry) => entry.children.length);
 
-  const defs = new Map(ctx.modules.map((m) => [m.name, m])), owners = new Map();
-  for (const file of preview.files) add(owners, file.module ?? 'core', file);
-  for (const name of preview.modules) if (!owners.has(name)) owners.set(name, []);
-  const tools = new Map();
-  for (const [name, files] of owners) {
-    const module = defs.get(name), label = module?.title ?? name.replace(/^profile:/, '');
-    const children = files.map((file) => {
-      const note = `${filePurpose(file.path)} · ${ACTION[file.action] ?? file.action}`;
-      if (!file.excerpt) return record(el('div', { class: 'review-file-row', 'data-review-file': file.path }, decisionIcon('file'), el('code', { text: file.path }), el('small', { class: 'muted', text: note })), `${file.path} ${note}`);
-      const item = branch(file.path, `file/${file.path}`, [record(el('pre', { class: 'review-file', text: file.excerpt }), file.excerpt)], 'file', null, note);
-      item.node.setAttribute('data-review-file', file.path);
-      item.search += ` ${note.toLocaleLowerCase()}`;
-      return item;
-    });
-    const target = name === 'core' ? null : module ? { module: name } : { stack: true };
-    add(tools, module?.group ?? 'basics', branch(label, `module/${name}`, children, moduleIcon(name), target, `${files.length} files`));
-  }
-  const output = [...tools].map(([key, modules]) => branch(GROUPS.find(([id]) => id === key)?.[1] ?? key, `tools/${key}`, modules));
-  if (output.length) entries.push(branch('Tools & files', 'tools', output, 'file', null, `${preview.files.length} files`));
+  const moduleRows = preview.modules.filter((name) => name !== 'core').map((name) => {
+    const module = ctx.modules.find((entry) => entry.name === name);
+    return leaf(module?.title ?? name, 'Enabled', '', { module: name });
+  });
+  const output = fileTreeEntries(preview.files, { onExpand: (key, open) => {
+    if (state.query) return;
+    if (open) state.expanded.add(key); else state.expanded.delete(key);
+  } });
+  if (output.length) entries.push(branch('Project structure', 'tools', output, 'folder', null, `${preview.files.length} files`));
+  if (moduleRows.length) entries.push(branch('Enabled tools', 'modules', moduleRows, 'box'));
   if (defaults.size) entries.push(branch('Saved & default settings', 'defaults', [...defaults].map(([title, rows]) => branch(title, `defaults/${title}`, rows, 'book')), 'book'));
 
   const input = el('input', { type: 'search', maxlength: 100, placeholder: 'Search choices and files…', 'aria-label': 'Search review' }); input.value = state.query;

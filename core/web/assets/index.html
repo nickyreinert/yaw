@@ -57,11 +57,13 @@
       <section id="stack" aria-labelledby="stack-title"><h2 id="stack-title" class="sr-only">Architecture</h2><div id="stack-cards"></div></section>
       <section id="module-section" aria-labelledby="module-title"><div class="section-heading"><h2 id="module-title">Collaboration</h2><div id="module-tools"></div></div><div id="modules"></div></section>
       <section id="confirm" aria-labelledby="confirm-title"><h2 id="confirm-title">Review &amp; apply</h2><div id="summary" class="interview-summary" aria-live="polite"></div><p id="verify-note" class="small muted"></p><div class="actions"><div class="save-action"><button type="button" id="draft" disabled>Save draft</button><span class="small muted">Continue later</span></div><div class="save-action"><button type="button" id="preset" disabled>Save preset</button><span class="small muted">Save for future use</span></div><button type="button" id="diff" disabled hidden>Inspect file diff</button><button type="button" id="apply" class="primary" disabled>Apply</button></div></section>
-      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="back-to-review" hidden>Back to review</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
     </form><aside class="setting-help" aria-labelledby="setting-help-title"><h2 id="setting-help-title" class="module-group-title">Interview depth</h2><div id="setting-help-content"></div></aside></div>
-    <section id="project-structure" class="project-structure" hidden aria-label="Project structure"></section>
     <section id="diff-panel" hidden aria-labelledby="diff-title"><h2 id="diff-title" tabindex="-1">File diff</h2><pre id="diff-output"></pre></section><section id="finished" hidden aria-labelledby="finished-title"><h2 id="finished-title" tabindex="-1">Finished</h2><p id="finished-status" class="interview-finished-status" role="status"></p><div id="next-steps" hidden><h3>What you can do now</h3><ul id="next-list"></ul></div><div id="kickoff-box"></div><details id="log-details" open><summary>Apply log</summary><pre id="log" role="log" aria-live="polite"></pre></details></section>
   </div>
+  </div>
+  <div id="interview-dock" class="interview-dock">
+    <section id="project-structure" class="project-structure" hidden aria-label="Project structure"></section>
+      <div class="wizard-footer"><button type="button" id="previous-step">← Back</button><button type="button" id="back-to-review" hidden>Back to review</button><button type="button" id="next-step-button" class="primary">Continue →</button></div>
   </div>
 </section>
       <section data-view="global" class="view" hidden>

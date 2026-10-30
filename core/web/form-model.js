@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseReply, validAnswer } from '../interview/engine.js';
 import { asksIn as asksQuestion, isPersonal, isPreference, missingAnswers, sourceOf, questionApplies, applicableArchitectureAnswers } from '../interview/policy.js';
+import { readRegular, MAX_BYTES } from './knowledge.js';
+import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
@@ -250,6 +252,31 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return output;
   }
 
+  // Resolve only files in the current plan. Return full text on demand, never a truncated excerpt.
+  function filePreview(input, path) {
+    const result = normalize(input, { allowIncomplete: true });
+    const rules = loadRules({ kitRoot, profiles: result.doc.proposal?.profiles ?? [] });
+    if (typeof path !== 'string' || /(^|\/)\.env/.test(path) || secretRule(rules, path)) throw new FormError('File content is protected.', 403);
+    const provisional = result.unresolved.length > 0;
+    const rendered = provisional ? renderInit({ root, kitRoot, modules: result.modules, answersDoc: { ...result.doc,
+      answers: Object.fromEntries(Object.entries(result.doc.answers).filter(([id, value]) => !byId.get(id)?.required || value !== '')),
+      proposal: { profiles: result.profile ? [result.profile] : [] } } }) : render(result);
+    const { desired } = rendered;
+    const entry = manifest?.files.find((file) => file.path === path);
+    const generated = desired.get(path);
+    if (!generated && !entry && ![ANSWERS, MANIFEST].includes(path)) throw new FormError('File is not in the project plan.', 404);
+    let current = null;
+    try { if (existsSync(resolveInside(root, path))) current = readRegular(root, path); }
+    catch { throw new FormError('File is unavailable, too large or not a regular file.', 403); }
+    const kept = current !== null && (path === MANIFEST || !edit || generated?.managed === false || entry?.managed === false || !entry || hashContent(current) !== entry.hash);
+    const content = path === ANSWERS ? result.text : kept || !generated ? current : String(generated.content);
+    if (content === null) return { path, content: null, message: 'Generated when Apply writes the project.' };
+    if (Buffer.byteLength(content) > MAX_BYTES) return { path, content: null, message: 'File exceeds the 128 KiB preview limit.' };
+    if (content.includes('\0')) return { path, content: null, message: 'Binary file; no text preview.' };
+    if (secretFindings({ answers: { 'idea.text': content }, kitRoot }).length) throw new FormError('File content is protected.', 403);
+    return { path, content, source: path === ANSWERS || !kept && generated ? (provisional ? 'Provisional content' : 'Planned content') : 'Existing content' };
+  }
+
   function prefill(kind, name) {
     let doc;
     if (kind === 'profile') {
@@ -310,7 +337,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       ...(edit ? { editing: true, sections, initial, sectionNames } : {}),
     };
   }
-  return { bootstrap, normalize, preview, prefill, definitions, secretCatalog, initial, sectionNames, assertUnchanged };
+  return { bootstrap, normalize, preview, filePreview, prefill, definitions, secretCatalog, initial, sectionNames, assertUnchanged };
 }
 
 // First lines of a rendered file for the review step. Secret files and binary content are never shown.

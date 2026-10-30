@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createFormModel } from '../core/web/form-model.js';
@@ -88,4 +88,57 @@ test('project tree groups common folders and identifies files affected by curren
   assert.equal(matchesTarget(files[1], { module: 'code-map' }), true);
   assert.equal(matchesTarget(files[0], { question: 'quality.unit-tests' }), true);
   assert.equal(matchesTarget(files[1], { question: 'quality.unit-tests' }), false);
+});
+
+test('planned file preview returns complete generated text and preserves existing user content', async () => {
+  const f = fixture(), model = createFormModel(f);
+  const input = { mode: 'basic', answers: base, modules: ['core'] };
+  const planned = model.filePreview(input, 'just/node-cli.just');
+  assert.equal(planned.source, 'Planned content');
+  const prepared = model.normalize(input);
+  await initProject({ ...f, answers: { doc: prepared.doc, text: prepared.text }, modules: prepared.modules });
+  assert.equal(planned.content, readFileSync(join(f.root, 'just/node-cli.just'), 'utf8'));
+  const mine = Array.from({ length: 90 }, (_, index) => `Custom line ${index + 1}`).join('\n');
+  writeFileSync(join(f.root, 'AGENTS.md'), mine);
+  const existing = model.filePreview(input, 'AGENTS.md');
+  assert.equal(existing.source, 'Existing content');
+  assert.equal(existing.content, mine);
+  assert.throws(() => model.filePreview(input, '../outside'), /not in the project plan/);
+  assert.throws(() => model.filePreview(input, '.env.example'), /protected/);
+  writeFileSync(join(f.root, 'AGENTS.md'), 'ghp_' + 'c'.repeat(36));
+  assert.throws(() => model.filePreview(input, 'AGENTS.md'), /protected/);
+});
+
+test('step navigation focuses the heading then explicitly returns to the start of the form', async () => {
+  const { focusStepStart, interviewDetailText } = await import('../core/web/assets/ui-state.js');
+  const calls = [];
+  const heading = { focus: (options) => calls.push(['focus', options]) };
+  const form = { scrollIntoView: (options) => calls.push(['scroll', options]) };
+  focusStepStart(form, heading);
+  assert.equal(heading.tabIndex, -1);
+  assert.deepEqual(calls, [['focus', { preventScroll: true }], ['scroll', { block: 'start', behavior: 'instant' }]]);
+  const experience = interviewDetailText('user.expertise').join(' ');
+  for (const value of ['Layperson', 'Intermediate', 'Expert', 'permissions']) assert.ok(experience.includes(value));
+  const team = interviewDetailText('idea.team').join(' ');
+  for (const value of ['Solo', 'Team', 'External reviewers', 'separate choices']) assert.ok(team.includes(value));
+});
+
+
+test('console can preview provisional instructions before required project answers are complete', () => {
+  const model = createFormModel(fixture());
+  const preview = model.filePreview({ mode: 'quick', answers: {}, modules: ['core'] }, 'AGENTS.md');
+  assert.equal(preview.source, 'Provisional content');
+  assert.match(preview.content, /# AGENTS.md/);
+  assert.doesNotMatch(preview.content, /Purpose:/);
+});
+
+test('console refuses symlinks and bounds large existing file previews', () => {
+  const f = fixture(), model = createFormModel(f);
+  const input = { mode: 'quick', answers: base, modules: ['core'] };
+  const outside = join(tmp(), 'outside.md'); writeFileSync(outside, 'not part of the project');
+  symlinkSync(outside, join(f.root, 'AGENTS.md'));
+  assert.throws(() => model.filePreview(input, 'AGENTS.md'), /unavailable/);
+  unlinkSync(join(f.root, 'AGENTS.md'));
+  writeFileSync(join(f.root, 'AGENTS.md'), 'large '.repeat(25000));
+  assert.throws(() => model.filePreview(input, 'AGENTS.md'), /too large/);
 });

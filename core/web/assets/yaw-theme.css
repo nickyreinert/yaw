@@ -207,7 +207,7 @@ meter::-webkit-meter-optimum-value { background: var(--accent); }
 .review-branch-label { font-weight: 650; overflow-wrap: anywhere; min-width: 0; }
 .review-count { margin-left: auto; color: var(--muted); font-weight: 400; }
 .review-children { display: grid; gap: 8px; padding: 0 12px 12px 22px; }
-.review-children .review-branch { background: #f7faff; }
+.review-children .review-branch { background: var(--paper); }
 .review-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .review-value { display: grid; gap: 3px; min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: .82rem; }
 .review-edit { display: inline-flex; align-items: center; justify-content: center; padding: 6px; color: var(--accent); border: 1px solid var(--line); border-radius: 6px; flex: 0 0 auto; }
