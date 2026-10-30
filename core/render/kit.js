@@ -89,7 +89,47 @@ export function loadProfile(kitRoot, name) {
   const errors = schemas().validate('profile.schema.json', value, { lines });
   if (errors.length > 0) throw new KitError(errors.map((e) => formatError(e, file)).join('\n'));
   if (value.name !== name) throw new KitError(`${file}: name "${value.name}" does not match its folder "${name}"`);
+  const options = Object.entries(value.options ?? {});
+  for (const [option, def] of options) {
+    const values = def.choices.map(optionValue);
+    // The option becomes the question arch.<profile>-<option> (ADR-0105).
+    if (!/^[a-z][a-z0-9]*$/.test(option) || values.some((v) => typeof v !== 'string' || !/^[a-z][a-z0-9-]*$/.test(v))) {
+      throw new KitError(`${file}: options.${option} needs a lowercase name and lowercase text choices`);
+    }
+    if (new Set(values).size !== values.length) throw new KitError(`${file}: options.${option} lists a choice twice`);
+    if (!values.includes(def.default)) throw new KitError(`${file}: options.${option} default "${def.default}" is not one of its choices`);
+    if (def.scaffold) for (const v of values) {
+      if (!existsSync(join(profileDir(kitRoot, name), 'variants', v))) throw new KitError(`${file}: options.${option} choice "${v}" has no variants/${v}/ folder`);
+    }
+  }
+  if (options.filter(([, def]) => def.scaffold).length > 1) throw new KitError(`${file}: only one option can select the scaffold`);
   return value;
+}
+
+// Profile options (ADR-0105): one generated choice question per option, asked for the profile's pairs.
+const optionValue = (c) => (typeof c === 'object' ? c.value : c);
+export const optionQuestionId = (profile, option) => `arch.${profile}-${option}`;
+
+export function profileOptionQuestions(kitRoot) {
+  return listProfiles(kitRoot).flatMap((p) => Object.entries(p.options ?? {}).map(([option, def]) => ({
+    id: optionQuestionId(p.name, option),
+    mode: 'Q',
+    type: 'choice',
+    label: def.label ?? `${p.title}: ${option}`,
+    ...(def.hint ? { hint: def.hint } : {}),
+    choices: def.choices.map((c) => (typeof c === 'object' ? { ...c } : { value: c })),
+    default: def.default,
+    when: { 'arch.language': p.stack.language, 'arch.runs-on': p.stack.runsOn },
+    profileOption: p.name,
+  })));
+}
+
+// The chosen value of each option of a profile; a missing or unknown answer means the default. -> { option: value }
+export function profileOptionValues(profile, answers = {}) {
+  return Object.fromEntries(Object.entries(profile.options ?? {}).map(([option, def]) => {
+    const given = answers[optionQuestionId(profile.name, option)];
+    return [option, def.choices.map(optionValue).includes(given) ? given : def.default];
+  }));
 }
 
 export function listProfiles(kitRoot) {
@@ -111,6 +151,11 @@ export function loadBaseQuestions(kitRoot) {
 // Base questions plus the inline questions of the given modules; ids are unique across the kit (ADR-0017).
 export function collectQuestions(kitRoot, modules, definitions) {
   const all = [...loadBaseQuestions(kitRoot)];
+  const options = profileOptionQuestions(kitRoot);
+  if (options.length) {
+    const at = all.findIndex((q) => q.id === 'arch.runs-on');
+    all.splice(at === -1 ? all.length : at + 1, 0, ...options);
+  }
   for (const m of modules) all.push(...((definitions?.get(m) ?? loadModule(kitRoot, m)).questions ?? []));
   const seen = new Set();
   for (const q of all) {
@@ -289,7 +334,12 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     answers[group][name] = value;
   }
   const profiles = answersDoc.proposal?.profiles ?? [];
-  const stack = profiles.map((p) => (hasProfile(kitRoot, p) ? `${p} - ${loadProfile(kitRoot, p).summary}` : p)).join('; ');
+  const stack = profiles.map((p) => {
+    if (!hasProfile(kitRoot, p)) return p;
+    const profile = loadProfile(kitRoot, p);
+    const picked = Object.entries(profileOptionValues(profile, flat)).map(([k, v]) => `${k}: ${v}`).join(', ');
+    return `${p}${picked ? ` (${picked})` : ''} - ${profile.summary}`;
+  }).join('; ');
   return {
     kit: { version: kitVersion(kitRoot) },
     mode: answersDoc.mode,
@@ -401,7 +451,8 @@ function composedJust(name, text) {
 // standards.md, guards.yaml and ci/check.yml are read by the modules that need them (standards, security, ci).
 // Profiles missing from the kit are reported, not rendered.
 // -> { parts: [{ path, module, kind, content }], files: Map<path, { module, content, fragments, managed }>, missing }
-export function renderProfiles({ kitRoot, profiles, scaffold = null }) {
+// A profile option with scaffold: true adds profiles/<p>/variants/<choice>/ to the scaffold (ADR-0105); `answers` picks the choice.
+export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {} }) {
   const parts = [];
   const files = new Map();
   const missing = [];
@@ -421,13 +472,22 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null }) {
     const ignore = join(dir, 'gitignore');
     if (existsSync(ignore)) parts.push({ path: '.gitignore', module: name, kind: 'part', content: readFileSync(ignore) });
     if (scaffold) {
-      const rels = walk(join(dir, 'scaffold'));
+      const profile = loadProfile(kitRoot, name);
+      const picked = profileOptionValues(profile, answers);
+      const variant = Object.entries(profile.options ?? {}).find(([, def]) => def.scaffold);
+      const sources = [join(dir, 'scaffold'), ...(variant ? [join(dir, 'variants', picked[variant[0]])] : [])];
+      const fromDir = new Map();
+      for (const source of sources) for (const rel of walk(source)) {
+        if (fromDir.has(rel)) throw new KitError(`profiles/${name}: ${rel} is in both scaffold/ and the variant`);
+        fromDir.set(rel, source);
+      }
+      const rels = [...fromDir.keys()];
       const target = (rel) => (composed ? `${name}/${rel}` : rel);
       if (!rels.some((rel) => scaffold(target(rel)))) {
         for (const rel of rels) {
           checkRelPath(target(rel));
           if (files.has(target(rel))) throw new KitError(`profiles write ${target(rel)} twice`);
-          files.set(target(rel), { module: 'core', content: readFileSync(join(dir, 'scaffold', rel)), fragments: [], managed: false });
+          files.set(target(rel), { module: 'core', content: readFileSync(join(fromDir.get(rel), rel)), fragments: [], managed: false });
         }
       }
     }

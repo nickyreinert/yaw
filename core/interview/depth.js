@@ -13,7 +13,7 @@ export function asksAtDepth(q, mode) {
   const depth = depthOf(mode);
   if (RETIRED_ARCHITECTURE.has(q.id)) return false;
   if (!q.id.includes('.')) return depth === 'pro' || q.mode === 'Q' || depth === 'basic' && q.mode === 'S';
-  if (depth === 'pro') return true;
+  if (depth === 'pro' || q.profileOption) return true;
   if (q.required || ['user.agents', 'idea.text', 'arch.language', 'arch.runs-on', 'tasks.use-github'].includes(q.id)) return true;
   return depth === 'basic' && BASIC_QUESTIONS.has(q.id);
 }

@@ -59,6 +59,19 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
       if (hit.stack.notes?.[next['arch.runs-on']]) prompter.show(`      ${hit.stack.notes[next['arch.runs-on']]}\n`);
       const tools = (hit.requires ?? []).filter((r) => !r.startsWith('just'));
       if (tools.length) prompter.show(`      Requires: ${tools.join(', ')} · yaw doctor\n`);
+      // A profile option the interview did not ask (the pair changed here) is asked now (ADR-0105).
+      for (const q of questions.filter((x) => x.profileOption === hit.name && !Object.hasOwn(next, x.id))) {
+        const values = q.choices.map((c) => c.value);
+        prompter.show(`\n  ${s.bold(q.label)}\n`);
+        if (q.hint) prompter.show(`      ${s.dim(q.hint)}\n`);
+        q.choices.forEach((c, i) => prompter.show(`  ${s.cyan(`${i + 1})`)} ${c.value === q.default ? s.green(s.bold(c.label ?? c.value)) : c.label ?? c.value}\n`));
+        for (;;) {
+          const reply = (await prompter.ask(`  [${s.green(q.default)}] > `, { choices: values, start: values.indexOf(q.default) })).trim();
+          const pick = reply === '' ? q.default : values.find((v, i) => v === reply || String(i + 1) === reply);
+          if (pick) { next[q.id] = pick; break; }
+          prompter.show(`  choose one of: ${values.join(', ')}\n`);
+        }
+      }
       return { profile: hit.name, answers: next };
     }
     const hosts = hostsFor(profiles, language, (hostQ?.choices ?? []).map((c) => c.value ?? c));

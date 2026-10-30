@@ -208,7 +208,7 @@ export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   const profiles = answersDoc.proposal.profiles;
   const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules, definitions });
-  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null });
+  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null, answers: answersDoc.answers });
   const desired = renderModules({ kitRoot, modules, context, definitions, profileOutput, root });
   return { desired, definitions, missingProfiles: profileOutput.missing };
 }
