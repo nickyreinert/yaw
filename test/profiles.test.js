@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'swift-cli', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -529,6 +529,45 @@ test('php-serverless guards block registry pushes, cloud CLIs, remote hosts and 
   for (const cmd of ['composer install', 'composer require x/y', 'composer audit --locked', 'docker build -t app .', 'php -S 127.0.0.1:8080 -t public', 'vendor/bin/phpunit', 'vendor/bin/phpstan analyse', 'just check', 'rsync -av a/ b/']) assert.ok(!blocked(cmd), cmd);
 });
 
+const swiftSkip = (!haveJust && 'just is not installed') || (!hasTool('swift') && 'swift is not installed');
+
+test('swift-cli: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('swift-cli', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+test('smoke swift-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs swift 6)', { skip: swiftSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('swift-cli', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  const hello = run('swift', ['run', 'app', 'Ada'], { cwd });
+  assert.equal(hello.stdout, 'Hello, Ada!\n');
+  const tooMany = run('swift', ['run', 'app', 'a', 'b'], { cwd });
+  assert.equal(tooMany.status, 1);
+  assert.match(tooMany.stderr, /usage: app \[name\]/);
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'swift-cli');
+  const bad = join(cwd, 'Sources', 'AppCore', 'Bad.swift');
+  copyFileSync(join(fixtures, 'lint_error.swift'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+  copyFileSync(join(fixtures, 'type_error.swift'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('swift-cli guards block release tags, package registry publishing and remote hosts, not local work', () => {
+  const guards = parse(readFileSync(dir('swift-cli', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['git push --tags', 'git push origin v1.0.0', 'swift package-registry publish me.app 1.0.0', 'swift package-registry publish --url https://r.example me.app 1.0.0', 'cd x && swift package-registry publish a 1.0.0', 'pod trunk push App.podspec', 'ssh me@host', 'scp a me@host:/srv', 'sftp me@host', 'rsync -av out/ me@host:/srv', 'rsync -av out/ host:/srv']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['swift build', 'swift test', 'swift run app Ada', 'swift format lint --strict -r Sources', 'swift package resolve', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -859,7 +898,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

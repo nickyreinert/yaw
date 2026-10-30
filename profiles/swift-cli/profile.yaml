@@ -1,0 +1,11 @@
+# profiles/swift-cli
+# Picked for Swift x your computer (ADR-0054, T-001): command-line tools built with Swift Package Manager.
+name: swift-cli
+title: Swift command-line tool
+summary: Swift command-line tool; Swift Package Manager, swift format, XCTest, no third-party packages.
+stack:
+  language: [swift]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [swift>=5.9, just]

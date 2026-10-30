@@ -12,7 +12,7 @@ const EXPECTED = {
   'kotlin-basic': { language: ['kotlin'], runsOn: ['local', 'self-hosted', 'serverless'] },
   'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['local', 'self-hosted', 'serverless', 'edge', 'app-store'] },
-  'swift-basic': { language: ['swift'], runsOn: ['local', 'self-hosted', 'app-store'] },
+  'swift-basic': { language: ['swift'], runsOn: ['self-hosted', 'app-store'] },
   'java-basic': { language: ['java'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
 };
 const SOURCE_FILES = {

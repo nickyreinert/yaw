@@ -269,6 +269,7 @@ Describe this area's responsibility.
   - `examples/python-vercel/`
   - `examples/python-web/`
   - `examples/static-site/`
+  - `examples/swift-cli/`
   - `examples/wordpress-plugin/`
 <!-- yaw:map:end area-examples -->
 
@@ -377,6 +378,7 @@ Describe this area's responsibility.
   - `profiles/rust-basic/`
   - `profiles/static-site/`
   - `profiles/swift-basic/`
+  - `profiles/swift-cli/`
   - `profiles/wordpress-plugin/`
 <!-- yaw:map:end area-profiles -->
 

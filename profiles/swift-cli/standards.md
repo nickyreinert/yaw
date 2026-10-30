@@ -1,0 +1,10 @@
+- Swift 6.0+ toolchain, Swift Package Manager, tools version 5.9; Linux and macOS must both build (no AppKit/UIKit, import Foundation only).
+- Logic lives in the `AppCore` library (`Sources/AppCore`); `Sources/app/main.swift` stays a thin entry point that calls `runCli` and exits with its code.
+- Commands read arguments, write results to the `TextSink` they are given and errors to stderr; exit 0 on success, non-zero on failure.
+- Tests use XCTest in `Tests/AppCoreTests`, are deterministic, make no network calls and never touch the real home directory.
+- Format with `swift format` (`just fmt`; `just lint` only checks, strict); do not add a second formatter.
+- Prefer the standard library and Foundation; every third-party package needs a reason, an exact version and a committed `Package.resolved`.
+- Mark public API `public` deliberately; avoid force unwraps, `try!` and `fatalError` outside tests.
+- Validate arguments and file paths before use; never build shell commands from input (use `Process` with an argument array).
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- Installing the tool elsewhere, publishing a package and reaching remote hosts need the user's approval.
