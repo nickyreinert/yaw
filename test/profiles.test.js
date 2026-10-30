@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-basic', 'php-cli', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-basic', 'php-cli', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -436,6 +436,45 @@ test('php-cli guards block machine-wide Composer changes and remote hosts, not l
   for (const cmd of ['composer install', 'composer require x/y', 'composer audit --locked', 'composer dump-autoload', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'php bin/app', 'vendor/bin/phpunit', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
+// node-app (ADR-0106): one smoke test per framework variant (ADR-0105); none needs Xcode, the Android SDK or signing.
+const NODE_APP_EXAMPLES = { capacitor: 'node-app', expo: 'node-app-expo', electron: 'node-app-electron', tauri: 'node-app-tauri' };
+
+test('node-app: verbs that do not apply print a note and exit 0, deploy included', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('node-app', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'fmt', 'deploy']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+for (const [variant, example] of Object.entries(NODE_APP_EXAMPLES)) {
+  test(`smoke node-app (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs npm and network)`, { skip: nodeTsSkip, timeout: 600000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /2 passed/);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    const marker = { capacitor: 'capacitor.config.ts', expo: 'app.json', electron: 'electron/main.ts', tauri: 'src/main.ts' }[variant];
+    assert.ok(existsSync(join(cwd, marker)), marker);
+    assert.match(readFileSync(join(cwd, 'package.json'), 'utf8'), new RegExp({ capacitor: '@capacitor/core', expo: '"expo"', electron: '"electron"', tauri: '@tauri-apps/api' }[variant]));
+    const fixtures = join(KIT_ROOT, 'test', 'profiles', 'node-app');
+    const bad = join(cwd, 'src', 'bad.ts');
+    copyFileSync(join(fixtures, 'lint_error.ts'), bad);
+    assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
+    copyFileSync(join(fixtures, 'type_error.ts'), bad);
+    assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+  });
+}
+
+test('node-app guards block store uploads, signing, publishing and remote hosts, not local work', () => {
+  const guards = parse(readFileSync(dir('node-app', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['eas submit -p ios', 'npx eas build --platform android', 'eas update', 'fastlane deliver', 'xcrun altool --upload-app -f a.ipa', 'xcrun notarytool submit a.zip', 'codesign -s X App.app', 'apksigner sign a.apk', 'jarsigner a.aab key', 'keytool -genkey', 'security import cert.p12', 'npx tauri signer generate', 'npx electron-builder --publish always', 'electron-forge publish', 'gh release create v1', 'npm publish', 'just deploy', 'ssh me@host']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['npm install', 'npx eslint .', 'npx tsc --noEmit', 'npx vitest run', 'npm run build', 'npx expo export --platform android', 'npx cap sync', 'npx tauri dev', 'npm start', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -766,7 +805,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
-    ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'],
+    ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
     ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);

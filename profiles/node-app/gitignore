@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-electron/
+.expo/
+ios/
+android/
+src-tauri/target/
+*.tsbuildinfo

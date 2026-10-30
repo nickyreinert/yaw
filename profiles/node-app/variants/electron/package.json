@@ -1,0 +1,25 @@
+{
+  "name": "app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc -p tsconfig.main.json",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "audit": "npm audit --omit=dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.5",
+    "electron": "45.1.0",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

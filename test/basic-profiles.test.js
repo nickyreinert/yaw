@@ -8,7 +8,7 @@ import { KIT_ROOT } from './helpers/fixtures.js';
 
 const EXPECTED = {
   'python-basic': { language: ['python'], runsOn: ['edge'] },
-  'node-basic': { language: ['typescript'], runsOn: ['static', 'app-store'] },
+  'node-basic': { language: ['typescript'], runsOn: ['static'] },
   'php-basic': { language: ['php'], runsOn: ['serverless'] },
   'kotlin-basic': { language: ['kotlin'], runsOn: ['local', 'self-hosted', 'serverless'] },
   'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },

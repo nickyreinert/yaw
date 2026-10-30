@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "App",
+    "slug": "app",
+    "version": "0.0.0",
+    "ios": { "bundleIdentifier": "com.example.app" },
+    "android": { "package": "com.example.app" }
+  }
+}

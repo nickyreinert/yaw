@@ -5,7 +5,7 @@ title: Basic JavaScript project
 summary: JavaScript project; Node.js built-in test runner, zero dependencies.
 stack:
   language: [typescript]
-  runsOn: [static, app-store]
+  runsOn: [static]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

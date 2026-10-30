@@ -1,0 +1,17 @@
+# Input of the kit CI smoke test for profile node-app, framework expo (doc 05 §4, ADR-0105): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small app for my notes.
+  idea.team: solo
+  arch.language: typescript
+  arch.runs-on: app-store
+  arch.node-app-framework: expo
+proposal:
+  status: confirmed
+  summary: node-app (expo) - TypeScript app for app stores or desktop; tsc, ESLint, Vitest, a bundle build, npm audit.
+  profiles: [node-app]
+  modules: [core]

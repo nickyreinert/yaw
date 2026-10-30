@@ -1,0 +1,25 @@
+# profiles/node-app
+# Picked for TypeScript x app store (ADR-0054); the framework option picks the scaffold variant (ADR-0105).
+name: node-app
+title: TypeScript app for app stores
+dependencyEcosystems: [npm]
+summary: TypeScript app for app stores or desktop (Capacitor, Expo, Electron or Tauri); tsc, ESLint, Vitest, a bundle build, npm audit.
+stack:
+  language: [typescript]
+  runsOn: [app-store]
+  notes:
+    app-store: The gate runs without Xcode, the Android SDK or signing; native builds, signing and store uploads are yours.
+options:
+  framework:
+    label: "App framework (a library; overrides prefer built-in)"
+    hint: Capacitor and Expo target iOS/Android; Electron and Tauri target desktop.
+    choices:
+      - { value: capacitor, label: "Capacitor (web app in a native shell)" }
+      - { value: expo, label: "Expo / React Native" }
+      - { value: electron, label: "Electron (desktop)" }
+      - { value: tauri, label: "Tauri (desktop, Rust shell)" }
+    default: capacitor
+    scaffold: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [node>=22.13, just]
