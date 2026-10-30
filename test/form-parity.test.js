@@ -36,7 +36,7 @@ function nonDefaults(overrides = {}) {
   return { ...answers, ...overrides };
 }
 
-const BASE = { 'idea.text': 'A small tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+const BASE = { 'idea.text': 'A small tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
 const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
   { name: 'Quick, Gemini and GitHub', mode: 'quick', answers: { ...BASE, 'user.agents': ['gemini'], 'tasks.use-github': true } },

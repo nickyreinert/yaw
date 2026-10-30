@@ -6,7 +6,7 @@ title: TypeScript app on Vercel
 dependencyEcosystems: [npm]
 summary: TypeScript app with serverless functions for Vercel; tsc, ESLint, Vitest, npm audit.
 stack:
-  language: [javascript]
+  language: [typescript]
   runsOn: [serverless]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }

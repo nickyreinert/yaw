@@ -4,7 +4,7 @@ name: node-basic
 title: Basic JavaScript project
 summary: JavaScript project; Node.js built-in test runner, zero dependencies.
 stack:
-  language: [javascript]
+  language: [typescript]
   runsOn: [static, app-store]
   basic: true
 defaults:

@@ -4,7 +4,7 @@ name: node-cli
 title: Node command-line tool
 summary: Node CLI or tool, zero dependencies where possible; node --test, no Docker.
 stack:
-  language: [javascript]
+  language: [typescript]
   runsOn: [local]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }

@@ -6,7 +6,7 @@ title: Cloudflare Worker in TypeScript
 dependencyEcosystems: [npm]
 summary: Cloudflare Worker in TypeScript; Wrangler (local only), tsc, ESLint, Vitest in the Workers runtime, npm audit.
 stack:
-  language: [javascript]
+  language: [typescript]
   runsOn: [edge]
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }

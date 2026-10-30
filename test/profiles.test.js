@@ -729,7 +729,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
-    ['javascript', 'local', 'node-cli'], ['javascript', 'serverless', 'node-ts-vercel'], ['javascript', 'self-hosted', 'node-web'], ['javascript', 'edge', 'cloudflare-workers'],
+    ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'],
     ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);

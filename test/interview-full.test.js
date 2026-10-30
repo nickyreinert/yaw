@@ -41,7 +41,7 @@ async function init(replies) {
   return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, doc: text ? parseDocument(text).value : null, text };
 }
 
-const IDEA = { 'Purpose/Idea': 'A small tool.', 'What language do you want': 'javascript', 'Where will it run': 'local' };
+const IDEA = { 'Purpose/Idea': 'A small tool.', 'What language do you want': 'typescript', 'Where will it run': 'local' };
 const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential', 'quality.unit-tests': false };
 
 const SOLO_FULL = {
@@ -51,7 +51,7 @@ const SOLO_FULL = {
   'user.autonomy': 'ask-risky',
   'idea.text': 'A small tool.',
   'idea.team': 'solo',
-  'arch.language': 'javascript',
+  'arch.language': 'typescript',
   'arch.runs-on': 'local',
   ...CONSTRAINTS,
   'user.comfort': [],
@@ -71,7 +71,7 @@ const SOLO_FULL = {
 const QUICK = {
   'user.agents': ['claude'], 'user.expertise': 'intermediate', 'user.language': 'de', 'user.autonomy': 'ask-risky',
   'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
-  'arch.language': 'javascript', 'arch.runs-on': 'local', ...CONSTRAINTS,
+  'arch.language': 'typescript', 'arch.runs-on': 'local', ...CONSTRAINTS,
 };
 Object.assign(QUICK, { 'user.length': 'balanced', 'user.register': 'professional', 'user.examples': 'when-helpful', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];

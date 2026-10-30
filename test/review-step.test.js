@@ -23,13 +23,13 @@ function fixture(t) {
     { id: 'user.agents', label: 'Agents?', type: 'multi', choices: ['gemini'] },
     { id: 'user.expertise', label: 'Experience?', type: 'choice', choices: ['intermediate'] },
     { id: 'idea.text', label: 'Purpose?', type: 'text' },
-    { id: 'arch.language', label: 'Language?', type: 'choice', choices: ['javascript'] },
+    { id: 'arch.language', label: 'Language?', type: 'choice', choices: ['typescript'] },
     { id: 'arch.runs-on', label: 'Runtime?', type: 'choice', choices: ['local'] },
     { id: 'tasks.use-github', label: 'GitHub?', type: 'boolean' },
   ];
   const context = { questions, jump: (target) => jumps.push(target), modules: [{ name: 'core', title: 'Project rules', group: 'basics' }, { name: 'github', title: 'GitHub workflow', group: 'github' }],
     preview: { profile: 'node-cli', modules: ['core', 'github'], visible: questions.filter((q) => q.id !== 'user.expertise').map((q) => q.id), sources: {},
-      answers: { 'user.agents': ['gemini'], 'user.expertise': 'intermediate', 'idea.text': 'A small app.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'tasks.use-github': true },
+      answers: { 'user.agents': ['gemini'], 'user.expertise': 'intermediate', 'idea.text': 'A small app.', 'arch.language': 'typescript', 'arch.runs-on': 'local', 'tasks.use-github': true },
       files: [
         { path: 'AGENTS.md', module: 'core', action: 'create', excerpt: '<script>untrusted example</script>' },
         { path: '.yaw/manifest.json', module: 'core', action: 'write' },

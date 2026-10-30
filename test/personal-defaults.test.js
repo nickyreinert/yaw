@@ -14,7 +14,7 @@ import { visibleQuestions } from '../core/web/assets/ui-state.js';
 import { createStyle } from '../core/cli/style.js';
 import { KIT_ROOT, capture, cleanEnv, scripted, tmp } from './helpers/fixtures.js';
 
-const BASE = { 'idea.text': 'A local note organizer.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+const BASE = { 'idea.text': 'A local note organizer.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
 const PERSONAL = { 'user.expertise': 'layperson', 'user.language': 'en', 'user.autonomy': 'ask-often', 'user.length': 'brief', 'user.register': 'plain', 'user.examples': 'always', 'user.explain': 'one-line' };
 const fixture = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: cleanEnv(tmp()) });
 const profile = (f) => join(f.env.HOME, '.yaw/user-profile.yaml');

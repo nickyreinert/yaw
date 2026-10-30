@@ -7,7 +7,7 @@ answers:
   user.autonomy: ask-risky
   idea.text: A small command-line tool that renames photos by their EXIF date.
   idea.team: solo
-  arch.language: javascript
+  arch.language: typescript
   arch.runs-on: local
 proposal:
   status: confirmed

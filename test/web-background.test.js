@@ -160,7 +160,7 @@ test('background dashboard refuses unconfirmed initialization in a non-empty fol
     const response = await fetch(new URL('/api/interview-apply', url), {
       method: 'POST',
       headers: { cookie, 'x-yaw-token': csrf, 'content-type': 'application/json' },
-      body: JSON.stringify({ mode: 'quick', answers: { 'idea.text': 'Example tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, modules: ['core'] }),
+      body: JSON.stringify({ mode: 'quick', answers: { 'idea.text': 'Example tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local' }, modules: ['core'] }),
     });
     assert.equal(response.status, 400);
     assert.match((await response.json()).error, /confirm that YAW may write/);

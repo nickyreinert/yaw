@@ -232,7 +232,7 @@ test('init no longer offers a separate personal onboarding menu', async () => {
 
 test('runtime context hides irrelevant hosting/cost answers and preserves valid Kotlin dependency choices', () => {
   const model = createFormModel(fixture());
-  for (const language of ['kotlin', 'swift', 'javascript']) {
+  for (const language of ['kotlin', 'swift', 'typescript']) {
     const input = { ...BASE, 'arch.language': language, 'arch.runs-on': 'app-store', 'arch.hosting-control': 'managed',
       'arch.libraries': 'open-source', 'arch.services': 'none', 'arch.cost': 'capped', 'arch.cost-limit': 'USD 50/month' };
     const normalized = model.normalize({ mode: 'pro', answers: input });

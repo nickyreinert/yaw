@@ -12,7 +12,7 @@ import { setupPrompt } from '../core/lib/setup-prompts.js';
 import { planningFacts } from '../core/lib/kickoff.js';
 import { KIT_ROOT, tmp, cleanEnv } from './helpers/fixtures.js';
 
-const base = { 'idea.text': 'A reading tracker for small book clubs.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+const base = { 'idea.text': 'A reading tracker for small book clubs.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
 const fixture = () => ({ root: tmp('yaw-ui-texts-'), kitRoot: KIT_ROOT, env: cleanEnv(tmp('yaw-ui-texts-home-')) });
 
 test('wrapper selection changes generated entry points, engineering rules and planning facts', async () => {
@@ -66,7 +66,7 @@ test('preset cards expose bounded metadata without returning secret-bearing answ
   saveSetup({ env: f.env, kitRoot: KIT_ROOT, answers: { ...base, 'arch.framework': 'Existing framework' }, mode: 'basic', projectRoot: f.root, kit: '0.1.0', now: new Date('2026-10-30T12:00:00Z'), profile: false });
   const preset = createFormModel(f).bootstrap().presets[0];
   assert.equal(preset.created, '2026-10-30');
-  assert.equal(preset.language, 'javascript');
+  assert.equal(preset.language, 'typescript');
   assert.equal(preset.architecture, 'local');
   assert.equal(preset.framework, 'Existing framework');
   assert.equal(preset.purpose, base['idea.text']);

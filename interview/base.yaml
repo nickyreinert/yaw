@@ -86,7 +86,7 @@ questions:
     required: true
     choices:
       - { value: python, label: "Python" }
-      - { value: javascript, label: "TypeScript" }
+      - { value: typescript, label: "TypeScript" }
       - { value: php, label: "PHP" }
       - { value: kotlin, label: "Kotlin" }
       - { value: html, label: "HTML, CSS & JavaScript" }

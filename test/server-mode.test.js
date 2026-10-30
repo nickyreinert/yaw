@@ -43,7 +43,7 @@ async function setup(options = {}) {
   };
   return { env, base, settings, service, spawned, request, async close() { await service.close(); } };
 }
-const input = { mode: 'quick', answers: { 'user.agents': ['claude'], 'idea.text': 'A local project for testing hosted setup.', 'idea.team': 'solo', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'tasks.use-github': false }, modules: ['core'], gitInit: false };
+const input = { mode: 'quick', answers: { 'user.agents': ['claude'], 'idea.text': 'A local project for testing hosted setup.', 'idea.team': 'solo', 'arch.language': 'typescript', 'arch.runs-on': 'local', 'tasks.use-github': false }, modules: ['core'], gitInit: false };
 
 test('host selection requires exact workspace confirmation; LAN transport refuses public targets', async () => {
   const env = cleanEnv(realpathSync(tmp())), root = realpathSync(tmp());
@@ -70,7 +70,7 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     await f.request(route + '/draft', input);
     assert.deepEqual((await f.request(route + '/prefill', { kind: 'draft' })).body.answers, input.answers);
     const preview = await f.request(route + '/preview', input); assert.equal(preview.status, 200);
-    assert.equal(preview.body.destination, join(f.settings.workspaceRoot, 'javascript', 'sample'));
+    assert.equal(preview.body.destination, join(f.settings.workspaceRoot, 'typescript', 'sample'));
     assert.equal(existsSync(preview.body.destination), false);
     assert.equal((await f.request(route + '/apply', { ...input, answers: { ...input.answers, 'user.agents': ['claude', 'codex'] } })).status, 400);
     assert.equal((await f.request(route + '/apply', { ...input, secrets: { API_KEY: 'not-a-real-secret' } })).status, 400);
@@ -119,7 +119,7 @@ test('host refuses symlinked language folders and preserves failed verification 
   const f = await setup({ verify: async ({ io }) => { assert.equal(io.env.YAW_REMOTE_OWNER_TOKEN, undefined); return false; } });
   f.env.YAW_REMOTE_OWNER_TOKEN = 'fixture-controller-credential';
   try {
-    const outside = realpathSync(tmp()); symlinkSync(outside, join(f.settings.workspaceRoot, 'javascript'));
+    const outside = realpathSync(tmp()); symlinkSync(outside, join(f.settings.workspaceRoot, 'typescript'));
     const s = (await f.request('/api/interviews', { slug: 'no-escape' })).body;
     assert.equal((await f.request(`/api/interviews/${s.id}/apply`, input)).status, 400);
     assert.equal(existsSync(join(outside, 'no-escape')), false);
@@ -217,7 +217,7 @@ test('init-local can run outside the host folder and never initializes its curre
     const file = writeAnswers(realpathSync(tmp()), stringify({ mode: input.mode, answers: input.answers, proposal: { status: 'confirmed', summary: 'Hosted test', profiles: ['node-cli'], modules: ['core'] } }));
     const result = await hostInit({ local: true, values: { slug: 'from-anywhere', answers: file, yes: true, 'skip-verify': true }, positionals: [], io: { cwd, env: f.env, kitRoot: KIT_ROOT, stdout, stderr, prompter: { interactive: false } } });
     assert.equal(result, 0); assert.equal(existsSync(join(cwd, '.yaw')), false);
-    assert.equal(existsSync(join(f.settings.workspaceRoot, 'javascript/from-anywhere/.yaw/manifest.json')), true);
+    assert.equal(existsSync(join(f.settings.workspaceRoot, 'typescript/from-anywhere/.yaw/manifest.json')), true);
   } finally { await f.close(); }
 });
 

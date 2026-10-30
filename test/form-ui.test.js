@@ -17,7 +17,7 @@ import { main } from '../core/cli/main.js';
 import { verifyProject } from '../core/cli/init.js';
 import { KIT_ROOT, capture, fakeJust, readTree, tmp } from './helpers/fixtures.js';
 
-const setup = (extra = {}) => ({ mode: 'quick', ...extra, answers: { 'idea.text': 'A tiny tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local', ...extra.answers } });
+const setup = (extra = {}) => ({ mode: 'quick', ...extra, answers: { 'idea.text': 'A tiny tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local', ...extra.answers } });
 const fixture = () => {
   const root = tmp('yaw-form-project-'), home = tmp('yaw-form-home-');
   const env = { ...process.env, HOME: home, USERPROFILE: home, YAW_TEST_OFFLINE: '1' };
@@ -372,7 +372,7 @@ test('web API: draft is an explicit private save, can resume, and does not initi
   assert.equal(readManifest(f.root), null);
   const resumed = await (await f.post('prefill', { kind: 'draft' })).json();
   assert.equal(resumed.answers['idea.text'], 'A small tool');
-  assert.equal(resumed.answers['arch.language'], 'javascript');
+  assert.equal(resumed.answers['arch.language'], 'typescript');
   assert.ok(!Object.hasOwn(resumed, 'profile'));
   assert.deepEqual(readTree(f.home), {});
   assert.equal((await f.post('apply', resumed)).status, 400);
@@ -609,18 +609,18 @@ test('planning chat: the prompt carries the answers so far, the reply fills idea
   const f = await serverFixture(t);
   const prompt = await (await f.post('kickoff-prompt', { answers: { 'idea.text': 'A bike repair booking site.' } })).json();
   assert.match(prompt.prompt, /A bike repair booking site\./);
-  assert.match(prompt.prompt, /Languages: python \(Python\); javascript/);
+  assert.match(prompt.prompt, /Languages: python \(Python\); typescript/);
   assert.match(prompt.prompt, /## Stack\nlanguage:/);
   const secret = await f.post('kickoff-prompt', { answers: { 'idea.text': `key ${'sk-'}${'a1b2c3d4'.repeat(5)}` } });
   assert.equal(secret.status, 400, 'a secret never goes into a prompt that leaves the machine');
-  const reply = '```markdown\n# Plan: Bikes\n\n## Idea\nBooking for bike repairs.\n\n## Stack\nlanguage: javascript\nruns-on: nonsense\n\n## Phase 1: Core\nmodel: sonnet · effort: low\n- [ ] Create the booking form\n- [ ] Store bookings\n```';
+  const reply = '```markdown\n# Plan: Bikes\n\n## Idea\nBooking for bike repairs.\n\n## Stack\nlanguage: typescript\nruns-on: nonsense\n\n## Phase 1: Core\nmodel: sonnet · effort: low\n- [ ] Create the booking form\n- [ ] Store bookings\n```';
   const unconfirmed = await f.post('planning-start', { agent: 'claude', prompt: 'Draft a simple project plan.', confirm: false });
   assert.equal(unconfirmed.status, 400); assert.match((await unconfirmed.json()).error, /Confirm sending/);
   const parsed = await (await f.post('kickoff-reply', { text: reply })).json();
-  assert.deepEqual([parsed.idea, parsed.language, parsed.runsOn, parsed.tasks, parsed.phases], ['Booking for bike repairs.', 'javascript', null, 2, 1]);
+  assert.deepEqual([parsed.idea, parsed.language, parsed.runsOn, parsed.tasks, parsed.phases], ['Booking for bike repairs.', 'typescript', null, 2, 1]);
   assert.equal(parsed.warnings.length, 1);
   assert.equal((await f.post('kickoff-reply', { text: 'hello' })).status, 400);
-  const res = await f.post('apply', { ...setup({ modules: ['core', 'tasks'], answers: { 'arch.language': 'javascript', 'arch.runs-on': 'local', 'idea.text': parsed.idea } }), plan: reply });
+  const res = await f.post('apply', { ...setup({ modules: ['core', 'tasks'], answers: { 'arch.language': 'typescript', 'arch.runs-on': 'local', 'idea.text': parsed.idea } }), plan: reply });
   const events = (await res.text()).trim().split('\n').map((l) => JSON.parse(l));
   assert.ok(events.some((e) => e.type === 'kickoff' && e.plan?.tasks === 2));
   assert.match(readFileSync(join(f.root, 'docs/plan/kickoff.md'), 'utf8'), /Create the booking form/);

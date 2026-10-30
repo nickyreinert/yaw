@@ -86,7 +86,7 @@ test('interview in a folder without YAW: home is refused, a non-empty folder nee
   assert.equal(i.fresh, true);
   assert.equal(i.hash, null);
   assert.equal(i.folder.confirm, true);
-  const input = { mode: 'quick', answers: { 'user.agents': ['claude'], 'idea.text': 'A tiny tool.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, modules: ['core'], expected: null };
+  const input = { mode: 'quick', answers: { 'user.agents': ['claude'], 'idea.text': 'A tiny tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local' }, modules: ['core'], expected: null };
   await assert.rejects(interviewApply({ root, kitRoot: KIT_ROOT, env: e, input }), /confirm/);
   assert.equal(readManifest(root), null, 'nothing written without confirmation');
   const r = await interviewApply({ root, kitRoot: KIT_ROOT, env: e, input: { ...input, confirmFolder: true } });

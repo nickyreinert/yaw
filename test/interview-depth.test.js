@@ -14,7 +14,7 @@ import { settingsRoute, settingsPresentation, visibleQuestions } from '../core/w
 import { main } from '../core/cli/main.js';
 import { readAnswers } from '../core/render/project.js';
 import { KIT_ROOT, tmp, capture, scripted } from './helpers/fixtures.js';
-const base = { 'idea.text': 'A project.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+const base = { 'idea.text': 'A project.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
 const f = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: { HOME: tmp(), PATH: process.env.PATH } });
 
 test('Settings URLs keep interview as a feature and preserve deep-link parameters', () => {

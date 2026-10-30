@@ -12,7 +12,7 @@ import { schemas } from '../core/render/kit.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
-const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'javascript', 'local', 'n'];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'typescript', 'local', 'n'];
 const CANARY = 'ghp_CANARY0123456789abcdefghijklmnopqrst';
 const mode = (p) => statSync(p).mode & 0o777;
 

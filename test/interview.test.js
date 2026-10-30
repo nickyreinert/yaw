@@ -107,7 +107,7 @@ test('runInterview: saved answers are reviewable defaults without mutating the q
 });
 
 test('facts come only from answers that exist; auto leaves a fact unknown', () => {
-  assert.deepEqual(deriveFacts({ 'arch.language': 'javascript', 'arch.runs-on': 'local' }), { language: 'javascript', runsOn: 'local', hosted: false });
+  assert.deepEqual(deriveFacts({ 'arch.language': 'typescript', 'arch.runs-on': 'local' }), { language: 'typescript', runsOn: 'local', hosted: false });
   assert.deepEqual(deriveFacts({ 'arch.language': 'auto', 'arch.runs-on': 'auto' }), {});
   assert.deepEqual(deriveFacts({ 'arch.runs-on': 'edge', 'idea.audience': 'public', 'idea.team': 'team' }), { runsOn: 'edge', hosted: true, public: true, team: true, usesGitHub: true });
   assert.deepEqual(matchFacts({ language: ['python'], runsOn: ['local'], hasUI: [false] }, { language: 'python', runsOn: 'edge' }), { matched: 1, mismatched: 1 });
@@ -116,8 +116,8 @@ test('facts come only from answers that exist; auto leaves a fact unknown', () =
 test('stack: language x runs-on picks exactly one profile, tailored or basic; uncovered pairs describe kit coverage', () => {
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': runsOn }).profile;
-  assert.equal(pick('javascript', 'local'), 'node-cli');
-  assert.equal(pick('javascript', 'static'), 'node-basic');
+  assert.equal(pick('typescript', 'local'), 'node-cli');
+  assert.equal(pick('typescript', 'static'), 'node-basic');
   assert.equal(pick('python', 'local'), 'python-cli');
   assert.equal(pick('python', 'app-store'), null);
   assert.match(stackProfile(profiles, { 'arch.language': 'python', 'arch.runs-on': 'app-store' }).reason, /no YAW profile for python on app-store/);

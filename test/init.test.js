@@ -22,7 +22,7 @@ async function yaw(args, { cwd = tmp('yaw-proj-'), prompter, env = { PATH: NODE_
 }
 
 // Replies of a complete Quick interview (setup depth first) for a local JavaScript tool.
-const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'javascript', 'local', 'n'];
+const INTERVIEW = ['', '', 'Rename photos by EXIF date.', 'typescript', 'local', 'n'];
 
 function previousSetup(mode = 'quick') {
   const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
@@ -139,7 +139,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
-  assert.match(r.out, /profile: node-cli \(javascript on local\)/);
+  assert.match(r.out, /profile: node-cli \(typescript on local\)/);
   assert.match(r.out, /^ {4}user\.autonomy +ask-risky {2}\(documented default\)$/m);
   assert.match(r.out, /user\.language +de +\(documented default\)/);
   assert.match(r.out, /verification skipped/);
@@ -219,7 +219,7 @@ test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
 
 test('Quick answers-only footprint includes a README for the required purpose', async () => {
   for (const [agents, count] of [['claude', 11], ['claude, codex', 11]]) {
-    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n  arch.language: javascript\n  arch.runs-on: local\n`;
+    const text = `mode: quick\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny tool.\n  arch.language: typescript\n  arch.runs-on: local\n`;
     const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, /modules: core\n/);

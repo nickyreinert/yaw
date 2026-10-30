@@ -7,7 +7,7 @@ import { initProject } from '../core/render/project.js';
 import { RETIRED_ARCHITECTURE } from '../core/interview/depth.js';
 import { planningFacts } from '../core/lib/kickoff.js';
 import { KIT_ROOT, tmp, readTree } from './helpers/fixtures.js';
-const base = { 'idea.text': 'A reading tracker.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+const base = { 'idea.text': 'A reading tracker.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
 const fixture = () => ({ root: tmp('yaw-refinements-'), kitRoot: KIT_ROOT, env: { HOME: tmp('yaw-refinements-home-') } });
 
 test('lean architecture and code practices survive normalization, rendering and prompt generation without optional standards', async () => {

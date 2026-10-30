@@ -7,7 +7,7 @@ answers:
   user.autonomy: ask-risky
   idea.text: A small API for my notes.
   idea.team: solo
-  arch.language: javascript
+  arch.language: typescript
   arch.runs-on: serverless
 proposal:
   status: confirmed

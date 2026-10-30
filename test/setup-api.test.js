@@ -10,7 +10,7 @@ const fixture = () => {
   const root = tmp('yaw-setup-api-'), home = tmp('yaw-setup-home-');
   return { root, kitRoot: KIT_ROOT, env: { ...process.env, HOME: home, USERPROFILE: home, YAW_HOME: home, YAW_TEST_OFFLINE: '1' } };
 };
-const setup = { mode: 'pro', answers: { 'idea.text': 'An offline reading tracker for one person.', 'arch.language': 'javascript', 'arch.runs-on': 'local', 'tasks.use-github': false } };
+const setup = { mode: 'pro', answers: { 'idea.text': 'An offline reading tracker for one person.', 'arch.language': 'typescript', 'arch.runs-on': 'local', 'tasks.use-github': false } };
 
 test('setup prompts share validated answers and update without a reply/import cycle', async () => {
   const f = fixture(), api = createFormApi({ ...f, skipVerify: true });

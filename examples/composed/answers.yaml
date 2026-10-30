@@ -7,7 +7,7 @@ answers:
   user.autonomy: ask-risky
   idea.text: A landing page for my bakery.
   idea.team: solo
-  arch.language: javascript
+  arch.language: typescript
   arch.runs-on: edge
 proposal:
   status: confirmed

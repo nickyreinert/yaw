@@ -144,7 +144,7 @@ test('browser: exact foundation preview and acknowledgement precede Apply; chang
   const plan = bundle(CLI);
   const preview = await api.action('kickoff-reply', { text: plan });
   assert.equal(preview.foundations.length, 3);
-  const input = { mode: 'quick', modules: ['core', 'tasks'], answers: { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'local' }, plan };
+  const input = { mode: 'quick', modules: ['core', 'tasks'], answers: { 'idea.text': 'Rename photos.', 'arch.language': 'typescript', 'arch.runs-on': 'local' }, plan };
   assert.throws(() => api.prepareApply(input), /Review all three foundations/);
   assert.throws(() => api.prepareApply({ ...input, foundationsReviewed: true }), /not previewed/);
   const prepared = api.prepareApply({ ...input, foundationsReviewed: true, foundationReview: preview.foundationReview });
@@ -208,7 +208,7 @@ test('one reviewed planning reply completes setup; project changes require conti
   const root = tmp(), env = { HOME: tmp() }, api = createFormApi({ root, kitRoot: KIT_ROOT, env, skipVerify: true });
   try {
     const text = bundle(CLI), preview = await api.action('kickoff-reply', { text });
-    const answers = { 'idea.text': 'Rename photos.', 'arch.language': 'javascript', 'arch.runs-on': 'local' };
+    const answers = { 'idea.text': 'Rename photos.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
     const events = [];
     await api.apply(api.prepareApply({ mode: 'quick', modules: ['core'], answers, plan: text, planBasis: answers, foundationsReviewed: true, foundationReview: preview.foundationReview }), (e) => events.push(e));
     assert.equal(events.find((e) => e.type === 'kickoff').plan.complete, true);
@@ -217,7 +217,7 @@ test('one reviewed planning reply completes setup; project changes require conti
     const answerFile = join(root, '.yaw/answers.yaml'), before = readFileSync(answerFile, 'utf8');
     const personal = parse(before); personal.answers['user.length'] = 'brief'; writeFileSync(answerFile, stringify(personal));
     assert.equal(kickoffParts({ root, manifest: readManifest(root) }).plan.complete, true);
-    writeFileSync(answerFile, before.replace('arch.language: javascript', 'arch.language: python'));
+    writeFileSync(answerFile, before.replace('arch.language: typescript', 'arch.language: python'));
     const changed = kickoffParts({ root, manifest: readManifest(root) }).plan;
     assert.equal(changed.complete, false); assert.match(changed.warnings.join(' '), /choices changed/);
   } finally { api.close(); }

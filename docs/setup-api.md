@@ -29,7 +29,7 @@ Example update body (use the actual revision):
     "answers": {
       "user.agents": ["codex"],
       "idea.text": "An offline reading tracker for one person.",
-      "arch.language": "javascript",
+      "arch.language": "typescript",
       "arch.runs-on": "local",
       "tasks.use-github": false
     },

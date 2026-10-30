@@ -1,3 +1,4 @@
+import { currentValue } from '../interview/legacy.js';
 import { mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -36,7 +37,7 @@ export class HostedProjects {
     requireValue(interview && interview.owner === owner, 'Unknown interview', 404); return interview;
   }
   model(interview, input) {
-    const language = input?.answers?.['arch.language'];
+    const language = currentValue('arch.language', input?.answers?.['arch.language']);
     const base = interview.scratch;
     const model = interview.model;
     const choices = model.bootstrap().questions.find((q) => q.id === 'arch.language').choices.map((c) => c.value ?? c);

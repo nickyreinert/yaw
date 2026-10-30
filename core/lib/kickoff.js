@@ -1,3 +1,4 @@
+import { currentValue } from '../interview/legacy.js';
 import { RETIRED_ARCHITECTURE } from '../interview/depth.js';
 import { architectureApplies } from '../interview/policy.js';
 // Kickoff guidance (#173): a planning prompt built from the interview answers, and a parser for the plan the
@@ -202,7 +203,7 @@ export function parseKickoffReply(raw, { languages = [], hosts = [] } = {}) {
   let language = null;
   let runsOn = null;
   if (stackLines.length > 0) {
-    language = value(languages, field('language'));
+    language = value(languages, currentValue('arch.language', field('language')?.toLowerCase()));
     runsOn = value(hosts, field('runs-on', 'runs', 'hosting'));
     if (language === null) warnings.push('No usable language in the Stack section; choose it in step 4.');
     if (runsOn === null) warnings.push('No usable "runs-on" value in the Stack section; choose it in step 4.');
