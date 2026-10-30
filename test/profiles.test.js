@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { printProfileTools } from '../core/cli/tool-hints.js';
 import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
-import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
+import { listProfiles, loadProfile, profileTools, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
@@ -1122,4 +1123,21 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
+});
+
+test('profile tools: filtered by option, platform install command, only failing checks printed', () => {
+  const php = loadProfile(KIT_ROOT, 'php-serverless');
+  assert.deepEqual(profileTools(php, {}, 'darwin').map((t) => t.name), []);
+  const bref = profileTools(php, { 'arch.php-serverless-hosting': 'bref' }, 'darwin');
+  assert.deepEqual(bref.map((t) => [t.name, t.install]), [['aws', 'brew install awscli'], ['sam', 'brew install aws-sam-cli']]);
+  assert.match(profileTools(php, { 'arch.php-serverless-hosting': 'bref' }, 'linux')[0].install, /awscli/);
+  assert.equal(profileTools(php, null).length, 2);
+  assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'rust-serverless'), { 'arch.rust-serverless-hosting': 'lambda' }).map((t) => t.name), ['cargo-lambda']);
+  const tauri = loadProfile(KIT_ROOT, 'node-app');
+  assert.deepEqual(profileTools(tauri, { 'arch.node-app-framework': 'tauri' }).map((t) => t.name), ['rustc']);
+  assert.deepEqual(profileTools(tauri, {}), []);
+  let out = '';
+  printProfileTools({ write: (x) => { out += x; } }, [{ name: 'ok', check: 'true', install: 'i1' }, { name: 'gone', check: 'false', install: 'brew install gone' }]);
+  assert.match(out, /gone: brew install gone/);
+  assert.doesNotMatch(out, /ok:/);
 });

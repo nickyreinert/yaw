@@ -17,13 +17,13 @@ import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
 import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
-import { collectQuestions, hasModule, listProfiles, loadModule } from '../render/kit.js';
+import { collectQuestions, hasModule, listProfiles, loadModule, profileTools } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
 import { readManifest } from '../render/manifest.js';
 import { gitInit, isGitRepo, wantsGit } from '../lib/git-init.js';
 import { ANSWERS, ProjectError, initProject, parseAnswers, checkDependencies, renderInit, selectModules } from '../render/project.js';
 import { printReport, UsageError } from './commands.js';
-import { printToolHints } from './tool-hints.js';
+import { printProfileTools, printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { printNextSteps } from './next-steps.js';
@@ -72,6 +72,8 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
           prompter.show(`  choose one of: ${values.join(', ')}\n`);
         }
       }
+      const extra = profileTools(hit, next);
+      if (extra.length) prompter.show(`      Install: ${extra.map((t) => `${t.name} (${t.install})`).join(' · ')}\n`);
       return { profile: hit.name, answers: next };
     }
     const hosts = hostsFor(profiles, language, (hostQ?.choices ?? []).map((c) => c.value ?? c));
@@ -407,6 +409,7 @@ export async function init({ values, positionals, io }) {
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);
   printToolHints(io.stdout, modules);
+  printProfileTools(io.stdout, profileTools(profile, answersDoc.answers));
   io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 

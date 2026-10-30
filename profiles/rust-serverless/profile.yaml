@@ -21,3 +21,10 @@ options:
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }
 requires: [rustc>=1.84, cargo, just]
+tools:
+  - name: cargo-lambda
+    check: cargo lambda --version
+    install:
+      macos: brew tap cargo-lambda/cargo-lambda && brew install cargo-lambda
+      linux: pipx install cargo-lambda
+    when: { hosting: lambda }

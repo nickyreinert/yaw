@@ -22,3 +22,9 @@ export function printToolHints(out, modules) {
     }
   }
 }
+
+// Profile tools whose check fails, with the install command (T-004, ADR-0116).
+export function printProfileTools(out, tools) {
+  const missing = tools.filter((t) => spawnSync(t.check, { shell: true, stdio: 'ignore' }).status !== 0);
+  if (missing.length) out.write(`  missing tools:\n${missing.map((t) => `    ${t.name}: ${t.install}\n`).join('')}`);
+}

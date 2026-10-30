@@ -205,6 +205,8 @@ export function renderStack(root, ctx) {
     result.append(el('h2', { class: 'module-group-title' }, decisionIcon('box'), el('span', { text: `Your stack: ${langName(lang)} · ${hostName(host)}` })),
       el('p', { class: 'small', text: profile.summary }),
       el('ul', {}, ...(profile.requires ?? []).map((tool) => el('li', {}, el('code', { text: tool })))));
+    const extra = (profile.tools ?? []).filter((t) => !t.when || Object.entries(t.when).every(([id, v]) => (ctx.answers[id] ?? q(id)?.default) === v));
+    if (extra.length) result.append(el('p', { class: 'small', text: 'Install:' }), el('ul', {}, ...extra.map((t) => el('li', {}, el('code', { text: t.name }), ': ', el('code', { text: t.install })))));
   } else result.append(el('p', { text: lang && host ? 'Choose a supported language and destination.' : 'Choose a language and destination.' }));
   root.replaceChildren(
     el('h2', { class: 'module-group-title' }, decisionIcon('terminal'), el('span', { text: 'Language' })), langRow,

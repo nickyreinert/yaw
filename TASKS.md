@@ -4,6 +4,10 @@
 
 ## Backlog
 
+- T-004 Tell users which third-party tools a stack needs
+  model: sonnet · effort: medium
+  acceptance: Every arch stack requiring third-party tools (e.g. AWS CLI) tells the user while selecting it and at the end of setup, with copy-paste install commands per platform. Profiles declare them in an optional `tools` list (ADR-0116); proof: php-serverless (bref), rust-serverless (lambda), node-app (tauri). Add the remaining profiles' tools as they are tailored.
+
 - T-001 Deliver tailored profiles for all offered language and destination combinations
   model: sonnet · effort: high
   acceptance: Replace generic basic-profile fallbacks with verified installation, run, test, build and deployment or packaging configuration for each supported destination. Cover environment requirements and verify each profile with an appropriate smoke test. Track remaining combinations explicitly; do not imply that a basic toolchain includes deployment scaffolding.

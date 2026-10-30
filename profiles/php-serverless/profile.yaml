@@ -21,3 +21,16 @@ options:
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }
 requires: [php>=8.2, composer, just]
+tools:
+  - name: aws
+    check: aws --version
+    install:
+      macos: brew install awscli
+      linux: curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip awscliv2.zip && sudo ./aws/install
+    when: { hosting: bref }
+  - name: sam
+    check: sam --version
+    install:
+      macos: brew install aws-sam-cli
+      linux: pipx install aws-sam-cli
+    when: { hosting: bref }

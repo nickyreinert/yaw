@@ -132,6 +132,17 @@ export function profileOptionValues(profile, answers = {}) {
   }));
 }
 
+// Third-party tools a profile needs for the chosen options (T-004, ADR-0116), with the install command of this platform.
+// answers null keeps every tool (the browser filters by the live answers). -> [{ name, check, install, when? }]; when is { questionId: choice }.
+export function profileTools(profile, answers = {}, platform = process.platform) {
+  const values = answers && profileOptionValues(profile, answers);
+  const key = platform === 'darwin' ? 'macos' : 'linux';
+  return (profile.tools ?? [])
+    .filter((t) => !t.when || !values || Object.entries(t.when).every(([option, choice]) => values[option] === choice))
+    .map((t) => ({ name: t.name, check: t.check, install: t.install[key],
+      ...(t.when ? { when: Object.fromEntries(Object.entries(t.when).map(([o, c]) => [optionQuestionId(profile.name, o), c])) } : {}) }));
+}
+
 export function listProfiles(kitRoot) {
   const dir = join(kitRoot, 'profiles');
   if (!existsSync(dir)) return [];

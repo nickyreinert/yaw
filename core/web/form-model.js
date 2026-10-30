@@ -8,7 +8,7 @@ import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
-import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, schemas } from '../render/kit.js';
+import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, profileTools, schemas } from '../render/kit.js';
 import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
 import { MANIFEST, hashContent, readProjectFile, resolveInside } from '../render/files.js';
 import { parse, stringify } from '../lib/yaml.js';
@@ -310,7 +310,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   function bootstrap() {
     return {
       kit: kitVersion(kitRoot),
-      profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
+      profiles: profiles.map((p) => ({ name: p.name, title: p.title, summary: p.summary, stack: p.stack, requires: p.requires ?? [], tools: profileTools(p, null).map(({ name, install, when }) => ({ name, install, ...(when ? { when } : {}) })) })),
       modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo, outputs }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo, plannedFiles: outputs?.templates ?? [] })),
       gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env, verifyAuth: false })).map((q) => {
