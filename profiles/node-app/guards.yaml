@@ -1,7 +1,7 @@
 # Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
 # pattern is a regular expression matched against the command line.
 guards:
-  - { id: store-upload, pattern: "\\beas\\s+(submit|update|build)\\b|\\bfastlane\\b|\\bxcrun\\s+(altool|notarytool)\\b|\\biTMSTransporter\\b", reason: Store builds and uploads run on your account; only you run them. }
+  - { id: store-upload, pattern: "\\bfastlane\\b|\\bxcrun\\s+(altool|notarytool)\\b|\\biTMSTransporter\\b", reason: Store builds and uploads run on your account; only you run them. }
   - { id: signing, pattern: "\\b(codesign|jarsigner|apksigner|signtool|keytool)\\b|\\bsecurity\\s+(import|unlock-keychain)\\b|\\btauri\\s+signer\\b", reason: Signing uses your keys; only you run it. }
   - { id: release-publish, pattern: "\\belectron-builder\\b.*--publish\\b|\\belectron-forge\\s+publish\\b|\\bgh\\s+release\\s+(create|upload)\\b", reason: Publishing a release needs your approval. }
   - { id: npm-publish, pattern: "\\b(npm|pnpm|yarn)\\s+publish\\b", reason: Publishing to the npm registry needs your approval. }

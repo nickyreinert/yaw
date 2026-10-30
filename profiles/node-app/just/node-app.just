@@ -36,7 +36,7 @@ preview:
 preview-share:
     @echo "preview-share: not applicable for node-app (share only with your approval)"
 
-# Shipped dependencies only. Expo runs at --audit-level=critical: its CLI pins zod 3 and deepmerge with open advisories and no fix (ADR-0106).
+# Shipped dependencies only.
 audit:
     npm run audit
 

@@ -1,5 +1,5 @@
 - TypeScript in strict mode; `just typecheck` (`tsc --noEmit`) must pass. No `any` without a comment saying why.
-- The framework (Capacitor, Expo, Electron or Tauri) was chosen in setup; it overrides "prefer built-in". Do not add a second app framework.
+- The framework (Capacitor, Electron or Tauri) was chosen in setup; it overrides "prefer built-in". Do not add a second app framework.
 - App logic lives in plain functions in `src/`; framework entry files stay thin and call them.
 - Tests use Vitest, live in `tests/` as `*.spec.ts`, are deterministic and make no network calls.
 - `just build` is the web/JS bundle build; native builds (Xcode, Android SDK, Rust shell) are not part of the gate.

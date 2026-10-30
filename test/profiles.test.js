@@ -437,7 +437,7 @@ test('php-cli guards block machine-wide Composer changes and remote hosts, not l
 });
 
 // node-app (ADR-0106): one smoke test per framework variant (ADR-0105); none needs Xcode, the Android SDK or signing.
-const NODE_APP_EXAMPLES = { capacitor: 'node-app', expo: 'node-app-expo', electron: 'node-app-electron', tauri: 'node-app-tauri' };
+const NODE_APP_EXAMPLES = { capacitor: 'node-app', electron: 'node-app-electron', tauri: 'node-app-tauri' };
 
 test('node-app: verbs that do not apply print a note and exit 0, deploy included', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
@@ -455,9 +455,9 @@ for (const [variant, example] of Object.entries(NODE_APP_EXAMPLES)) {
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /2 passed/);
     assert.match(r.stdout, /verified: just setup and just check passed/);
-    const marker = { capacitor: 'capacitor.config.ts', expo: 'app.json', electron: 'electron/main.ts', tauri: 'src/main.ts' }[variant];
+    const marker = { capacitor: 'capacitor.config.ts', electron: 'electron/main.ts', tauri: 'src/main.ts' }[variant];
     assert.ok(existsSync(join(cwd, marker)), marker);
-    assert.match(readFileSync(join(cwd, 'package.json'), 'utf8'), new RegExp({ capacitor: '@capacitor/core', expo: '"expo"', electron: '"electron"', tauri: '@tauri-apps/api' }[variant]));
+    assert.match(readFileSync(join(cwd, 'package.json'), 'utf8'), new RegExp({ capacitor: '@capacitor/core', electron: '"electron"', tauri: '@tauri-apps/api' }[variant]));
     const fixtures = join(KIT_ROOT, 'test', 'profiles', 'node-app');
     const bad = join(cwd, 'src', 'bad.ts');
     copyFileSync(join(fixtures, 'lint_error.ts'), bad);
@@ -470,8 +470,8 @@ for (const [variant, example] of Object.entries(NODE_APP_EXAMPLES)) {
 test('node-app guards block store uploads, signing, publishing and remote hosts, not local work', () => {
   const guards = parse(readFileSync(dir('node-app', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
   const blocked = (cmd) => guards.some((re) => re.test(cmd));
-  for (const cmd of ['eas submit -p ios', 'npx eas build --platform android', 'eas update', 'fastlane deliver', 'xcrun altool --upload-app -f a.ipa', 'xcrun notarytool submit a.zip', 'codesign -s X App.app', 'apksigner sign a.apk', 'jarsigner a.aab key', 'keytool -genkey', 'security import cert.p12', 'npx tauri signer generate', 'npx electron-builder --publish always', 'electron-forge publish', 'gh release create v1', 'npm publish', 'just deploy', 'ssh me@host']) assert.ok(blocked(cmd), cmd);
-  for (const cmd of ['npm install', 'npx eslint .', 'npx tsc --noEmit', 'npx vitest run', 'npm run build', 'npx expo export --platform android', 'npx cap sync', 'npx tauri dev', 'npm start', 'just check']) assert.ok(!blocked(cmd), cmd);
+  for (const cmd of ['fastlane deliver', 'xcrun altool --upload-app -f a.ipa', 'xcrun notarytool submit a.zip', 'codesign -s X App.app', 'apksigner sign a.apk', 'jarsigner a.aab key', 'keytool -genkey', 'security import cert.p12', 'npx tauri signer generate', 'npx electron-builder --publish always', 'electron-forge publish', 'gh release create v1', 'npm publish', 'just deploy', 'ssh me@host']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['npm install', 'npx eslint .', 'npx tsc --noEmit', 'npx vitest run', 'npm run build', 'npx cap sync', 'npx tauri dev', 'npm start', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
 

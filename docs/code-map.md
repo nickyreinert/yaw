@@ -257,7 +257,6 @@ Describe this area's responsibility.
   - `examples/composed/`
   - `examples/node-app/`
   - `examples/node-app-electron/`
-  - `examples/node-app-expo/`
   - `examples/node-app-tauri/`
   - `examples/node-cli/`
   - `examples/node-ts-vercel/`

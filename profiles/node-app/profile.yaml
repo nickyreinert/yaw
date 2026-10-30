@@ -3,7 +3,7 @@
 name: node-app
 title: TypeScript app for app stores
 dependencyEcosystems: [npm]
-summary: TypeScript app for app stores or desktop (Capacitor, Expo, Electron or Tauri); tsc, ESLint, Vitest, a bundle build, npm audit.
+summary: TypeScript app for app stores or desktop (Capacitor, Electron or Tauri); tsc, ESLint, Vitest, a bundle build, npm audit.
 stack:
   language: [typescript]
   runsOn: [app-store]
@@ -12,10 +12,9 @@ stack:
 options:
   framework:
     label: "App framework (a library; overrides prefer built-in)"
-    hint: Capacitor and Expo target iOS/Android; Electron and Tauri target desktop.
+    hint: Capacitor targets iOS/Android; Electron and Tauri target desktop.
     choices:
       - { value: capacitor, label: "Capacitor (web app in a native shell)" }
-      - { value: expo, label: "Expo / React Native" }
       - { value: electron, label: "Electron (desktop)" }
       - { value: tauri, label: "Tauri (desktop, Rust shell)" }
     default: capacitor
