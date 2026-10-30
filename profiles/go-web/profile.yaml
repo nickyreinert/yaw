@@ -1,0 +1,13 @@
+# profiles/go-web
+# Picked for Go x self-hosted (ADR-0054, T-001): an HTTP service on your own server or container host.
+name: go-web
+title: Go web service
+summary: Go HTTP service on net/http (ServeMux); gofmt, go vet, go test, Dockerfile, standard library only.
+stack:
+  language: [go]
+  runsOn: [self-hosted]
+  notes:
+    self-hosted: The gate runs without Docker; building and pushing the image and reaching your server are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [go>=1.22, just]

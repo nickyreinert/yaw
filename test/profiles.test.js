@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -782,6 +782,103 @@ test('rust-serverless guards block registry pushes, cloud CLIs, cargo lambda dep
   for (const cmd of ['cargo build --release --locked', 'cargo lambda build --release --arm64', 'cargo lambda watch', 'cargo test', 'cargo audit', 'cargo fetch', 'docker build -t app .', 'git push origin main', 'rsync -av a/ b/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
+// go-cli, go-web, go-serverless (ADR-0121..0123): the Go toolchain; the gate needs no Docker or AWS account, only go-serverless (lambda) fetches aws-lambda-go once.
+const goSkip = (!haveJust && 'just is not installed') || (!hasTool('go') && 'go is not installed');
+const goOffline = goSkip || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (the Lambda flavor fetches a module)');
+const GO_SERVERLESS_EXAMPLES = { container: 'go-serverless', lambda: 'go-serverless-lambda' };
+
+function badGo(cwd, name) {
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', name);
+  const bad = join(cwd, 'bad.go');
+  copyFileSync(join(fixtures, 'lint_error.go'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+  copyFileSync(join(fixtures, 'type_error.go'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+}
+
+for (const name of ['go-cli', 'go-web', 'go-serverless']) {
+  test(`${name}: the core verbs exist, no echo-only stubs, deploy is not defined`, { skip: skipJust }, () => {
+    const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
+    for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    for (const verb of OPTIONAL_VERBS) assert.doesNotMatch(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+    const { cwd } = initExample(name, env, ['--skip-verify']);
+    assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
+  });
+}
+
+test('go-serverless: hosting option has container (default) and lambda, aws-lambda-go is pinned exactly with go.sum, gomod is watched', () => {
+  const profile = loadProfile(KIT_ROOT, 'go-serverless');
+  assert.deepEqual(profile.options.hosting.choices.map((c) => c.value), ['container', 'lambda']);
+  assert.equal(profile.options.hosting.default, 'container');
+  assert.deepEqual(profile.dependencyEcosystems, ['gomod']);
+  assert.match(readFileSync(dir('go-serverless', 'variants', 'lambda', 'go.mod'), 'utf8'), /^require github\.com\/aws\/aws-lambda-go v\d+\.\d+\.\d+$/m);
+  assert.ok(existsSync(dir('go-serverless', 'variants', 'lambda', 'go.sum')));
+  assert.doesNotMatch(readFileSync(dir('go-serverless', 'variants', 'container', 'go.mod'), 'utf8'), /require/);
+  for (const name of ['go-cli', 'go-web']) assert.equal(loadProfile(KIT_ROOT, name).dependencyEcosystems, undefined, name);
+});
+
+test('go-basic only keeps app-store', () => {
+  assert.deepEqual(loadProfile(KIT_ROOT, 'go-basic').stack.runsOn, ['app-store']);
+});
+
+test('smoke go-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs go)', { skip: goSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('go-cli', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.equal(run('go', ['run', '.', 'Ada'], { cwd }).stdout, 'Hello, Ada!\n');
+  const tooMany = run('go', ['run', '.', 'a', 'b'], { cwd });
+  assert.notEqual(tooMany.status, 0);
+  assert.match(tooMany.stderr, /usage: app \[name\]/);
+  badGo(cwd, 'go-cli');
+});
+
+test('smoke go-web: yaw init, just setup && just check pass; the service answers; bad code fails the gate (needs go)', { skip: goSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('go-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'Dockerfile')));
+  assert.ok(existsSync(join(cwd, 'bin', 'app')), 'just check builds the binary');
+  badGo(cwd, 'go-web');
+});
+
+for (const [variant, example] of Object.entries(GO_SERVERLESS_EXAMPLES)) {
+  test(`smoke go-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs go${variant === 'lambda' ? ' and network' : ''})`, { skip: variant === 'lambda' ? goOffline : goSkip, timeout: 600000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, 'greeting.go')));
+    assert.equal(existsSync(join(cwd, 'Dockerfile')), variant === 'container');
+    assert.equal(existsSync(join(cwd, 'go.sum')), variant === 'lambda');
+    assert.ok(existsSync(join(cwd, variant === 'lambda' ? 'dist/bootstrap' : 'bin/app')));
+    badGo(cwd, 'go-serverless');
+  });
+}
+
+const goGuards = (name) => parse(readFileSync(dir(name, 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+const GO_BLOCKED = ['go install golang.org/x/vuln/cmd/govulncheck@latest', 'go env -w GOFLAGS=-mod=mod', 'go clean -modcache', 'go run example.com/tool@v1.0.0', 'git push --tags', 'git push origin v1.0.0', 'ssh me@host', 'scp a me@host:/srv', 'rsync -av out/ me@host:/srv'];
+const GO_ALLOWED = ['go build ./...', 'go test ./...', 'go vet ./...', 'go run . Ada', 'go mod tidy', 'go mod download', 'go env GOPATH', 'gofmt -l .', 'git push origin main', 'rsync -av a/ b/', 'just check'];
+
+test('go guards block tool installs, remote modules, release tags and remote hosts, not local work', () => {
+  for (const name of ['go-cli', 'go-web', 'go-serverless']) {
+    const guards = goGuards(name);
+    const blocked = (cmd) => guards.some((re) => re.test(cmd));
+    for (const cmd of GO_BLOCKED) assert.ok(blocked(cmd), `${name}: ${cmd}`);
+    for (const cmd of GO_ALLOWED) assert.ok(!blocked(cmd), `${name}: ${cmd}`);
+  }
+});
+
+test('go-web and go-serverless guards also block image pushes and remote Docker; go-serverless blocks cloud CLIs', () => {
+  for (const name of ['go-web', 'go-serverless']) {
+    const guards = goGuards(name);
+    const blocked = (cmd) => guards.some((re) => re.test(cmd));
+    for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'podman push me/app', 'docker -H ssh://h ps', 'DOCKER_HOST=ssh://h docker ps']) assert.ok(blocked(cmd), `${name}: ${cmd}`);
+    for (const cmd of ['docker build -t app .', 'docker compose up']) assert.ok(!blocked(cmd), `${name}: ${cmd}`);
+  }
+  const cloud = goGuards('go-serverless');
+  for (const cmd of ['aws lambda create-function --function-name x', 'sam deploy', 'gcloud run deploy', 'gcloud builds submit']) assert.ok(cloud.some((re) => re.test(cmd)), cmd);
+});
+
 // kotlin-cli, kotlin-web, kotlin-serverless (ADR-0117..0119): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.
 const kotlinSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
 const KOTLIN_SERVERLESS_EXAMPLES = { container: 'kotlin-serverless', lambda: 'kotlin-serverless-lambda' };
@@ -1224,7 +1321,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
@@ -1237,6 +1334,8 @@ test('profile tools: filtered by option, platform install command, only failing 
   assert.deepEqual(bref.map((t) => [t.name, t.install]), [['aws', 'brew install awscli'], ['sam', 'brew install aws-sam-cli']]);
   assert.match(profileTools(php, { 'arch.php-serverless-hosting': 'bref' }, 'linux')[0].install, /awscli/);
   assert.equal(profileTools(php, null).length, 2);
+  assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'go-serverless'), { 'arch.go-serverless-hosting': 'lambda' }).map((t) => t.name), ['aws']);
+  assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'go-serverless'), {}), []);
   assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'rust-serverless'), { 'arch.rust-serverless-hosting': 'lambda' }).map((t) => t.name), ['cargo-lambda']);
   const tauri = loadProfile(KIT_ROOT, 'node-app');
   assert.deepEqual(profileTools(tauri, { 'arch.node-app-framework': 'tauri' }).map((t) => t.name), ['rustc']);

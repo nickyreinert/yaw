@@ -1,0 +1,9 @@
+- Go 1.22+, one module; `net/http` with `http.ServeMux` method patterns (`GET /hello/{name}`) is the server stack. Add a router or framework only with a reason.
+- Routes live in `NewHandler()` (`server.go`); `main.go` stays a thin entry point that reads `HOST` and `PORT`, serves with timeouts and shuts down gracefully on SIGINT/SIGTERM.
+- Tests drive `NewHandler()` with `net/http/httptest` (no sockets), are deterministic and make no network calls.
+- Handlers validate path, query and body input before use (`http.MaxBytesReader` for bodies), return explicit status codes and never log secrets or request bodies.
+- Format with gofmt (`just fmt`; `just lint` only checks) and keep `go vet` clean.
+- Expose `GET /health` for the host's health check.
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- The `Dockerfile` builds a static binary and runs as a non-root user; building it needs Docker, pushing it needs the user's approval.
+- `go install`, running remote modules, release tags (they publish a module version), image pushes and reaching remote hosts need the user's approval.

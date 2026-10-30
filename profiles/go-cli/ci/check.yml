@@ -1,0 +1,11 @@
+# CI steps fragment: the Go toolchain and govulncheck, then `just check` (same gate as local). No deploy, no credentials, no Docker.
+# Actions are pinned by commit SHA (Y-5.5, ADR-0027); the comment names the version the SHA was verified for.
+steps:
+  - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+  - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+    with:
+      go-version: stable
+  - run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+  - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+  - run: just setup
+  - run: just check

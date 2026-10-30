@@ -1,0 +1,8 @@
+# Dangerous command patterns of this stack (doc 04 §3). Read by the security module (step 5.0).
+# pattern is a regular expression matched against the command line.
+guards:
+  - { id: go-install, pattern: "\\bgo\\s+(install|env\\s+-w|clean\\s+-modcache)\\b|\\bgo\\s+run\\s+\\S+@\\S", reason: Installing tools or running remote modules or changing the machine-wide Go setup needs your approval. }
+  - { id: tag-push, pattern: "\\bgit\\s+push\\b.*(--tags|\\brefs/tags/|\\sv[0-9])", reason: Pushing a release tag publishes a Go module version and needs your approval. }
+  - { id: docker-push, pattern: "\\b(docker|podman)(-compose)?\\b.*(\\bpush\\b|--push)", reason: Pushing an image to a registry needs your approval. }
+  - { id: remote-host, pattern: "\\b(ssh|scp|sftp|ftp|lftp)\\s+\\S|\\brsync\\b.*\\s[^\\s/.][^\\s/]*:\\S|\\bDOCKER_HOST=", reason: Reaching a remote host (production) needs your approval. }
+  - { id: remote-docker, pattern: "\\bdocker\\s+(-H|--host\\b|--context\\b)", reason: Running Docker against a remote host needs your approval. }

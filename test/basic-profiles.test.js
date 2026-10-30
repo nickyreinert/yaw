@@ -9,7 +9,7 @@ import { KIT_ROOT } from './helpers/fixtures.js';
 const EXPECTED = {
   'python-basic': { language: ['python'], runsOn: ['edge'] },
   'node-basic': { language: ['typescript'], runsOn: ['static'] },
-  'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
+  'go-basic': { language: ['go'], runsOn: ['app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['edge', 'app-store'] },
   'java-basic': { language: ['java'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
 };

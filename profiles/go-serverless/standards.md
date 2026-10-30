@@ -1,0 +1,9 @@
+- Go 1.22+, one module. Container: standard library only (`net/http`). Lambda: `github.com/aws/aws-lambda-go`, pinned exactly in `go.mod` with `go.sum` committed; add modules only with a reason (cold start and binary size).
+- Logic lives in the library part: `Greeting` plus `NewHandler()` (container) or `Handler()` (Lambda); `main.go` stays a thin entry point.
+- Container: reads `HOST` and `PORT` (the platform sets `PORT`), serves `GET /health`, shuts down gracefully on SIGTERM, runs as non-root.
+- Lambda: the handler is a plain function from the API Gateway v2 event to a response; keep state out of globals and create clients in `main`, not per request. Build for `linux/arm64` as `bootstrap` on `provided.al2023` (`just build` writes `dist/bootstrap`).
+- Tests call `NewHandler()` (`httptest`) or `Handler()` directly: deterministic, no sockets, no network, no cloud account.
+- Format with gofmt (`just fmt`; `just lint` only checks) and keep `go vet` clean.
+- Validate path, query and body input before use; return explicit status codes; never log secrets or request bodies.
+- Settings and secrets come from environment variables or the platform's secret store; never hard-code or commit them.
+- Building images, `aws`/`sam`/`gcloud`, registry pushes, `go install`, release tags and reaching remote hosts need the user's approval.
