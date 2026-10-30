@@ -263,6 +263,8 @@ Describe this area's responsibility.
   - `examples/node-ts-vercel/`
   - `examples/node-web/`
   - `examples/php-cli/`
+  - `examples/php-serverless/`
+  - `examples/php-serverless-bref/`
   - `examples/php-web/`
   - `examples/python-cli/`
   - `examples/python-vercel/`
@@ -366,8 +368,8 @@ Describe this area's responsibility.
   - `profiles/node-cli/`
   - `profiles/node-ts-vercel/`
   - `profiles/node-web/`
-  - `profiles/php-basic/`
   - `profiles/php-cli/`
+  - `profiles/php-serverless/`
   - `profiles/php-web/`
   - `profiles/python-basic/`
   - `profiles/python-cli/`

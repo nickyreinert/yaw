@@ -1,0 +1,17 @@
+# Input of the kit CI smoke test for profile php-serverless, hosting bref (doc 05 §4, ADR-0105): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small API that greets people.
+  idea.team: solo
+  arch.language: php
+  arch.runs-on: serverless
+  arch.php-serverless-hosting: bref
+proposal:
+  status: confirmed
+  summary: php-serverless (bref) - PHP serverless app; Composer, PHPStan, PHP-CS-Fixer, PHPUnit, composer audit.
+  profiles: [php-serverless]
+  modules: [core]

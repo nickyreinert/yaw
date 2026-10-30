@@ -8,10 +8,10 @@
   model: sonnet · effort: high
   acceptance: Replace generic basic-profile fallbacks with verified installation, run, test, build and deployment or packaging configuration for each supported destination. Cover environment requirements and verify each profile with an appropriate smoke test. Track remaining combinations explicitly; do not imply that a basic toolchain includes deployment scaffolding.
 
-  progress: 4/26, done: python×serverless → python-vercel (ADR-0101), typescript×self-hosted → node-web (ADR-0102), php×local → php-cli (ADR-0104), typescript×app-store → node-app (ADR-0106) (a combination is done when a tailored profile owns the pair, its fixture is smoke-tested and CI runs `yaw init` + `just check`)
+  progress: 5/26, done: python×serverless → python-vercel (ADR-0101), typescript×self-hosted → node-web (ADR-0102), php×local → php-cli (ADR-0104), typescript×app-store → node-app (ADR-0106), php×serverless → php-serverless (ADR-0107; php-basic removed) (a combination is done when a tailored profile owns the pair, its fixture is smoke-tested and CI runs `yaw init` + `just check`)
   - python: ~~serverless~~ (done) · edge (to consider later: Python Workers are beta, handler not testable outside the runtime; stays on python-basic) · app-store (dropped: no sensible Python app-store path; the interview rejects the pair)
   - typescript: ~~self-hosted~~ (done) · static (keep: Vite + TypeScript build to a static site, differs from html static-site) · ~~app-store~~ (done)
-  - php: ~~local~~ (done) · serverless (Bref or container: use a profile option, ADR-0105)
+  - php: ~~local~~ (done) · ~~serverless~~ (done: container or Bref option, ADR-0107)
   - kotlin: local · self-hosted · serverless
   - go: local · self-hosted · serverless · app-store
   - java: local · self-hosted · serverless · app-store

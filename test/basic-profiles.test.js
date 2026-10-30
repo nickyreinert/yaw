@@ -9,7 +9,6 @@ import { KIT_ROOT } from './helpers/fixtures.js';
 const EXPECTED = {
   'python-basic': { language: ['python'], runsOn: ['edge'] },
   'node-basic': { language: ['typescript'], runsOn: ['static'] },
-  'php-basic': { language: ['php'], runsOn: ['serverless'] },
   'kotlin-basic': { language: ['kotlin'], runsOn: ['local', 'self-hosted', 'serverless'] },
   'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['local', 'self-hosted', 'serverless', 'edge', 'app-store'] },
@@ -19,7 +18,6 @@ const EXPECTED = {
 const SOURCE_FILES = {
   'python-basic': 'src/app.py',
   'node-basic': 'src/index.js',
-  'php-basic': 'src/Greeting.php',
   'kotlin-basic': 'src/main/kotlin/com/example/app/Greeting.kt',
   'go-basic': 'greeting.go',
   'rust-basic': 'src/lib.rs',

@@ -12,7 +12,7 @@ import { listProfiles, loadProfile, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-basic', 'php-cli', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-basic', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'static-site', 'swift-basic', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
@@ -475,6 +475,60 @@ test('node-app guards block store uploads, signing, publishing and remote hosts,
 });
 
 
+// php-serverless (ADR-0107): one smoke test per hosting variant (ADR-0105); none needs Docker, AWS credentials or the SAM CLI.
+const PHP_SERVERLESS_EXAMPLES = { container: 'php-serverless', bref: 'php-serverless-bref' };
+const phpSkip = (!haveJust && 'just is not installed') || (!hasTool('php') && 'php is not installed') || (!hasTool('composer') && 'composer is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (composer install needs the network)');
+
+test('php-serverless: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('php-serverless', env, ['--skip-verify']);
+  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
+    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+});
+
+test('php-serverless: the uniform verbs exist and the hosting option has the two variants, container by default', () => {
+  const just = readFileSync(dir('php-serverless', 'just', 'php-serverless.just'), 'utf8');
+  for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+  const { hosting } = loadProfile(KIT_ROOT, 'php-serverless').options;
+  assert.deepEqual(hosting.choices.map((c) => c.value), ['container', 'bref']);
+  assert.equal(hosting.default, 'container');
+  assert.match(hosting.label, /container.*Bref/i);
+});
+
+for (const [variant, example] of Object.entries(PHP_SERVERLESS_EXAMPLES)) {
+  test(`smoke php-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs php, composer and network)`, { skip: phpSkip, timeout: 300000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /OK \(\d+ tests/);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, variant === 'bref' ? 'template.yaml' : 'Dockerfile')));
+    assert.ok(!existsSync(join(cwd, variant === 'bref' ? 'public/index.php' : 'handler.php')));
+    const fixtures = join(KIT_ROOT, 'test', 'profiles', 'php-serverless');
+    const bad = join(cwd, 'src', 'Bad.php');
+    copyFileSync(join(fixtures, 'lint_error.php'), bad);
+    assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+    copyFileSync(join(fixtures, 'type_error.php'), bad);
+    assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+    if (variant === 'bref') {
+      unlinkSync(bad);
+      writeFileSync(join(cwd, 'template.yaml'), 'Resources: [unclosed\n');
+      assert.notEqual(run('just', ['test'], { cwd }).status, 0, 'a broken template.yaml fails just test');
+    }
+  });
+}
+
+test('php-serverless guards block registry pushes, cloud CLIs, remote hosts and composer global, not local work', () => {
+  const guards = parse(readFileSync(dir('php-serverless', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'docker compose push', 'podman push me/app', 'gcloud builds submit --tag gcr.io/p/app', 'gcloud run deploy app --source .', 'aws lambda update-function-code --function-name x', 'aws s3 cp a s3://b', 'sam deploy --guided', 'sam build', 'cd x && sam deploy', 'AWS_PROFILE=p aws sts get-caller-identity', 'ssh me@host', 'scp a me@host:/srv', 'rsync -av out/ me@host:/srv', 'DOCKER_HOST=ssh://me@host docker ps', 'docker --context prod ps', 'composer global require x/y', 'composer --no-interaction global require x/y', 'composer self-update']) {
+    assert.ok(blocked(cmd), cmd);
+  }
+  for (const cmd of ['composer install', 'composer require x/y', 'composer audit --locked', 'docker build -t app .', 'php -S 127.0.0.1:8080 -t public', 'vendor/bin/phpunit', 'vendor/bin/phpstan analyse', 'just check', 'rsync -av a/ b/']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
@@ -485,7 +539,6 @@ test('php-web: verbs that do not apply print a note and exit 0; deploy only prin
   }
 });
 
-const phpSkip = (!haveJust && 'just is not installed') || (!hasTool('php') && 'php is not installed') || (!hasTool('composer') && 'composer is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (composer install needs the network)');
 
 test('smoke php-web: yaw init, just setup && just check pass; bad code fails the gate (needs php, composer and network)', { skip: phpSkip, timeout: 300000 }, () => {
   const { cwd, r } = initExample('php-web', { ...process.env });
@@ -806,7 +859,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
