@@ -1,0 +1,12 @@
+# profiles/php-cli
+# Picked for PHP x your computer (ADR-0054, T-001): command-line tools, scripts and jobs.
+name: php-cli
+title: PHP command-line tool
+dependencyEcosystems: [composer]
+summary: PHP command-line tool; Composer, PHPStan, PHP-CS-Fixer, PHPUnit, composer audit.
+stack:
+  language: [php]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [php>=8.2, composer, just]

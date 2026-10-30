@@ -8,10 +8,10 @@
   model: sonnet · effort: high
   acceptance: Replace generic basic-profile fallbacks with verified installation, run, test, build and deployment or packaging configuration for each supported destination. Cover environment requirements and verify each profile with an appropriate smoke test. Track remaining combinations explicitly; do not imply that a basic toolchain includes deployment scaffolding.
 
-  progress: 2/26, done: python×serverless → python-vercel (ADR-0101), typescript×self-hosted → node-web (ADR-0102) (a combination is done when a tailored profile owns the pair, its fixture is smoke-tested and CI runs `yaw init` + `just check`)
+  progress: 3/26, done: python×serverless → python-vercel (ADR-0101), typescript×self-hosted → node-web (ADR-0102), php×local → php-cli (ADR-0104) (a combination is done when a tailored profile owns the pair, its fixture is smoke-tested and CI runs `yaw init` + `just check`)
   - python: ~~serverless~~ (done) · edge (to consider later: Python Workers are beta, handler not testable outside the runtime; stays on python-basic) · app-store (dropped: no sensible Python app-store path; the interview rejects the pair)
   - typescript: ~~self-hosted~~ (done) · static (keep: Vite + TypeScript build to a static site, differs from html static-site) · app-store (blocked by T-003)
-  - php: local · serverless
+  - php: ~~local~~ (done) · serverless (blocked by T-003)
   - kotlin: local · self-hosted · serverless
   - go: local · self-hosted · serverless · app-store
   - java: local · self-hosted · serverless · app-store

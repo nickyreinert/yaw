@@ -6,7 +6,7 @@ dependencyEcosystems: [composer]
 summary: PHP project; Composer, PHPStan, PHP-CS-Fixer, PHPUnit.
 stack:
   language: [php]
-  runsOn: [local, serverless]
+  runsOn: [serverless]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

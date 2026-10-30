@@ -1,0 +1,10 @@
+- PHP >= 8.2 with `declare(strict_types=1);` in every file and types on all parameters and returns; `phpstan` must pass (`just typecheck`).
+- Code in `src/` (namespace `App`), tests in `tests/` (namespace `Tests`); `bin/app` stays a thin entry point that calls `App\Cli::run()` and exits with its code.
+- Commands read their input from arguments and write results to the output stream they are given, errors to stderr; exit 0 on success, non-zero on failure.
+- Manage dependencies with Composer (`composer require`, `composer install`); commit `composer.lock`; never edit `vendor/`.
+- Format with `php-cs-fixer` (`just fmt`; `just lint` only checks); do not add a second formatter.
+- Tests use PHPUnit, live in `tests/`, are deterministic and make no network calls; give files and streams to the code, do not touch the real home directory.
+- Validate arguments and file paths before use; never `eval`, `unserialize` input, or build shell commands from input (use `proc_open` with an argument array).
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- Keep dependencies few; run `just audit` (`composer audit`) after changing them.
+- Installing tools globally (`composer global`) and reaching remote hosts need the user's approval.
