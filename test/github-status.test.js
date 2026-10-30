@@ -52,7 +52,7 @@ test('init without GitHub shows the check, hides the task-mode choice and says t
     p.asked.push(prompt);
     assert.ok(p.asked.length < 100, 'interview must make progress');
     const screen = [...p.shown].reverse().find((s) => /^  \d+\/\d+ /.test(s)) ?? '';
-    if (screen.includes('Describe the idea')) return 'A tool.';
+    if (screen.includes('Purpose/Idea')) return 'A tool.';
     if (screen.includes('What language do you want')) return 'javascript';
     if (screen.includes('Where will it run')) return 'local';
     return '';

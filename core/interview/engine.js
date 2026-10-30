@@ -61,7 +61,7 @@ const available = (c) => !(typeof c === 'object' && c.phase && c.phase > 1);
 export function validAnswer(q, value) {
   const allowed = (v) => (q.choices ?? []).some((c) => available(c) && choiceValue(c) === v);
   switch (q.type) {
-    case 'text': return typeof value === 'string';
+    case 'text': return typeof value === 'string' && (!q.maxWords || value.trim().split(/\s+/).filter(Boolean).length <= q.maxWords);
     case 'boolean': return typeof value === 'boolean';
     case 'number': return typeof value === 'number' && Number.isFinite(value);
     case 'choice': return allowed(value);
@@ -79,6 +79,7 @@ function formatDefault(q) {
 // Parse one reply. -> { value } | { error } | { help: true } | { skip: true }
 export function parseReply(q, reply) {
   const text = reply.trim();
+  if (q.type === 'text' && q.maxWords && text.split(/\s+/).filter(Boolean).length > q.maxWords) return { error: `Use at most ${q.maxWords} words.` };
   if (text === '?') return { help: true };
   if (text.toLowerCase() === 'skip') return { skip: true };
   if (text === '') return { value: q.default };

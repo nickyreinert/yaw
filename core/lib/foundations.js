@@ -169,7 +169,7 @@ export function foundationContext({ root, kitRoot } = {}) {
   const savedAnswers = readRegular(root, '.yaw/answers.yaml', kitRoot);
   if (savedAnswers !== null) {
     const answers = parseAnswers(savedAnswers).answers;
-    for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework', 'arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.unit-tests']) {
+    for (const key of [...CONSTRAINT_FIELDS.map(([key]) => key), 'arch.cost-limit', 'arch.framework', 'arch.library-strategy', 'arch.wrapper', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.unit-tests']) {
       if (answers[key] !== undefined && architectureApplies(key, answers)) result.constraints[key] = answers[key];
     }
     if (secretValueRule(rulesFor(kitRoot), Object.values(result.constraints))) throw new FoundationError('Unsafe setup constraints; nothing was included.');

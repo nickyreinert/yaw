@@ -29,6 +29,7 @@ const assets = new Map([
   ['/chat-services.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/chat-services.js', import.meta.url))]],
   ['/planning-handoff.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/planning-handoff.js', import.meta.url))]],
   ['/plan-card.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/plan-card.js', import.meta.url))]],
+  ['/project-tree.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/project-tree.js', import.meta.url))]],
   ['/review-step.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-step.js', import.meta.url))]],
   ['/review-prompts-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/review-prompts-view.js', import.meta.url))]],
   ['/workspace.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/workspace.js', import.meta.url))]],

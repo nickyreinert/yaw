@@ -15,7 +15,7 @@ depends: []
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:
-  templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile, docs/engineering.md]
+  templates: [AGENTS.md, CLAUDE.md, GEMINI.md, .gitignore, justfile, docs/engineering.md, project.sh, Makefile]
 agentsMd: |
   - Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
   - Run `just check` before you report a task as done; `just --list` shows all recipes.

@@ -1,0 +1,7 @@
+<% if wrapper.shell %>
+#!/bin/sh
+# Project command wrapper. Usage: sh project.sh setup|dev|check|build
+set -eu
+cd -- "$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+exec just "$@"
+<% end %>

@@ -51,7 +51,8 @@ questions:
     ref: "1.1"
     mode: Q
     type: text
-    label: Describe the idea in a few sentences.
+    label: Purpose/Idea
+    maxWords: 500
     help: idea
     hint: Include the intended users, their main task, and important data or interface constraints.
     required: true
@@ -119,11 +120,22 @@ questions:
       - { value: prefer-built-in, label: Prefer built-in and own code }
       - { value: prefer-libraries, label: Use suitable libraries }
     default: prefer-built-in
+  - id: arch.wrapper
+    mode: S
+    type: choice
+    label: Wrapper
+    hint: Common project commands.
+    choices:
+      - { value: off, label: Off }
+      - { value: shell, label: Shell }
+      - { value: just, label: Just }
+      - { value: make, label: Make }
+    default: just
   - id: arch.docker
     mode: S
     type: boolean
-    label: Require Docker?
-    hint: A requirement for the architecture plan; no containers are started here.
+    label: Support Docker
+    hint: Tells the agent to set up Docker support.
     default: false
   - id: quality.unit-tests
     mode: S

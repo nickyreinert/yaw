@@ -2,19 +2,21 @@
    Brand styling is separate from app.css's shared component geometry. No remote fonts. */
 :root {
   --ink: #142d46;
-  --muted: #52677a;
-  --line: #bccdd9;
-  --accent: #2154c7;
-  --wash: #eaf1fc;
+  --muted: #73636b;
+  --line: #d9cdd0;
+  --accent: #a04b63;
+  --wash: #fff0e7;
   --paper: #fcfdff;
   --teal: #49b8cc;
   --orange: #ff856b;
   --sun: #ffe56b;
   --sun-wash: #fff7cc;
-  --sea: #eef4f8;
+  --sea: #f7f3ef;
   --notice-ink: #81365d;
   --notice-line: #cc8eae;
   --notice-wash: #fff0f7;
+  --section-title-size: 1.1rem;
+  --section-title-weight: 700;
   --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   color: var(--ink);
   background: var(--sea);
@@ -32,7 +34,7 @@ h1 { font-size: clamp(1.9rem, 2.8vw, 2.7rem); font-weight: 800; letter-spacing: 
   content: ''; display: inline-block; width: 17px; height: 22px; margin-left: 12px;
   background: var(--orange); clip-path: polygon(0 100%, 30% 0, 100% 100%);
 }
-h2 { font-weight: 750; letter-spacing: -.025em; }
+h2 { font-size: var(--section-title-size); font-weight: var(--section-title-weight); line-height: 1.4; letter-spacing: -.02em; }
 h3 { font-weight: 700; }
 .eyebrow, .nav-label, .content-footer, .metric-group-label, .stack-step {
   font-family: var(--mono); text-transform: uppercase; letter-spacing: .07em;
@@ -95,8 +97,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .activity-chart rect:hover { fill: var(--orange); }
 th { background: var(--wash); color: var(--ink); }
 th, td { border-bottom-color: #dae4ec; }
-tbody tr:hover { background: #f0f5ff; }
-pre, .command { background: #edf2fa; color: var(--ink); border-color: var(--line); }
+tbody tr:hover { background: #fff1e8; }
+pre, .command { background: #fff1e8; color: var(--ink); border-color: var(--line); }
 .editor-tabs button, .data-tabs button { border-color: var(--line); border-radius: 6px 6px 2px 2px; }
 .editor-tabs button[aria-pressed=true], .data-tabs button[aria-pressed=true] {
   background: var(--ink); color: #fff; border-color: var(--ink); box-shadow: inset 0 -3px var(--sun);
@@ -124,7 +126,7 @@ pre, .command { background: #edf2fa; color: var(--ink); border-color: var(--line
 .stack-result.invalid h3 { color: var(--notice-ink); }
 .fit.no { color: var(--muted); }
 .fit.basic { color: var(--accent); }
-.depth-default.quick { background: #e6edff; color: #304f8b; }
+.depth-default.quick { background: #fbe5ed; color: #81365d; }
 .depth-default.basic { background: #fff1bc; color: #6d581e; }
 .decision-icon { color: var(--accent); }
 .focus-toggle[aria-checked=true] .switch-track, .module-switch:checked { background: var(--accent); }

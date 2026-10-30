@@ -20,7 +20,7 @@ const TASK_TARGET = {
 // Only project choices influence whether an earlier plan needs revisiting; personal preferences do not.
 export function planningFacts(answers = {}) {
   const defaults = { 'idea.text': '', 'arch.language': '', 'arch.runs-on': '', 'arch.framework': '',
-    'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential', 'quality.unit-tests': false,
+    'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential', 'quality.unit-tests': false,
     'idea.team': 'solo', 'tasks.use-github': false, 'tasks.mode': 'local', 'arch.cost-limit': '',
     ...Object.fromEntries(CONSTRAINT_FIELDS.map(([key]) => [key, 'undecided'])) };
   return Object.fromEntries(Object.entries(defaults).filter(([key]) => architectureApplies(key, answers) && (!RETIRED_ARCHITECTURE.has(key) || Object.hasOwn(answers, key))).map(([key, fallback]) => [key, answers[key] ?? fallback]));

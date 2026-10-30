@@ -76,7 +76,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       const q = byId.get(id);
       if (!q) throw new FormError('Unknown answer key');
       const valid = (validAnswer(q, value) || (q.required && value === '')) && !(q.type === 'text' && value.length > 8192);
-      if (!valid) throw new FormError(`Invalid answer for ${q.id}`);
+      if (!valid) throw new FormError(q.maxWords && typeof value === 'string' ? `Use at most ${q.maxWords} words for ${q.label}.` : `Invalid answer for ${q.id}`);
       // Use the interview parser too, without returning its input-echoing error messages.
       if (q.type !== 'text' && !(q.required && value === '') && !(q.type === 'multi' && value.length === 0)) {
         const reply = Array.isArray(value) ? value.join(',') : String(value);
@@ -202,7 +202,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
         : current === null ? (entry ? 'missing' : 'create')
           : d.managed === false || entry?.managed === false ? 'kept'
             : entry && hashContent(current) === entry.hash ? (hashContent(d.content) === entry.hash ? 'kept' : 'update') : 'kept';
-      return { path, module: d.module ?? 'core', bytes: Buffer.byteLength(d.content), managed: d.managed !== false, action, excerpt: excerpt(path, d.content) };
+      return { path, module: d.module ?? 'core', bytes: Buffer.byteLength(d.content), managed: d.managed !== false, action, contributors: (d.fragments ?? []).map((fragment) => fragment.module), excerpt: excerpt(path, d.content) };
     });
     if (edit) for (const entry of manifest.files) {
       if (entry.path === ANSWERS || desired.has(entry.path)) continue;
@@ -284,7 +284,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return {
       kit: kitVersion(kitRoot),
       profiles: profiles.map(({ name, title, summary, stack, requires }) => ({ name, title, summary, stack, requires: requires ?? [] })),
-      modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo })),
+      modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo, outputs }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo, plannedFiles: outputs?.templates ?? [] })),
       gitRepo: existsSync(join(root, '.git')),
       questions: withGitHubHint(questions, githubStatus({ root, env, verifyAuth: false })).map((q) => {
         let help = '';
@@ -295,7 +295,14 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
         return { ...q, ...(edit && sections.length && editable(q) ? { reviewSelected: true } : {}), owner: owner.get(q.id) ?? 'core', helpText: help };
       }),
       agents: loadCapabilities(kitRoot).agents,
-      presets: listPresets(env).map(({ name }) => ({ name })),
+      presets: listPresets(env).map((preset) => {
+        try {
+          const saved = parse(readPreset(env, preset.name));
+          const safe = secretFindings({ answers: saved?.answers ?? {}, kitRoot }).length === 0;
+          const answers = safe ? saved?.answers ?? {} : {};
+          return { ...preset, architecture: answers['arch.runs-on'] ?? '', language: answers['arch.language'] ?? '', framework: answers['arch.framework'] ?? '', purpose: String(answers['idea.text'] ?? '').slice(0, 160) };
+        } catch { return { name: preset.name }; }
+      }),
       hasUserProfile: preferences.hasDefaults === true,
       personalDefaultsNotice: !edit && !preferences.hasDefaults && !preferences.warning ? 'No personal defaults set. Quick uses factory defaults. In Basic or All, the personal answers you confirm will become your defaults after Apply. Project and tool choices stay project-specific.' : null,
       personalWarning: [preferences.warning, setupPolicy.warning].filter(Boolean).join(' ') || null,

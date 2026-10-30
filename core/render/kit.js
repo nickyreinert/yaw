@@ -304,6 +304,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     composedVerbs: composedVerbs(profiles),
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
+    wrapper: { shell: flat['arch.wrapper'] === 'shell', make: flat['arch.wrapper'] === 'make' },
     codingPractices: codingPractices(flat),
     architecturePractices: architecturePractices(flat),
     stack,

@@ -73,7 +73,7 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.ok(!handoff.includes('Refresh from project answers') && !handoff.includes("text: 'Reply'"));
   assert.match(cards, /GROUP_INTRO = new Map\(\[\['tasks\.use-github', 'github'\], \['quality\.unit-tests', 'basics'\]\]\)/);
   assert.ok(!cards.includes("el('select', { id, disabled"));
-  assert.equal(app.split("element('select'").length - 1, 1, 'the only dropdown is the preset list');
+  assert.equal(app.split("element('select'").length - 1, 0, 'presets use cards rather than a dropdown');
   assert.match(app, /q\.id === 'tasks\.use-github'/);
   assert.ok(!cards.includes('No git repository yet: create one') || /gitInitControl/.test(cards));
   assert.match(cards, /INLINE_OWNERS = new Set\(\['comfort', 'team', 'tasks'\]\)/);

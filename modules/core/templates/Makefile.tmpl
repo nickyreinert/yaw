@@ -1,0 +1,6 @@
+<% if wrapper.make %>
+# Project commands share YAW's checks and the selected stack recipes.
+.PHONY: setup dev check test build fmt lint typecheck
+setup dev check test build fmt lint typecheck:
+	@just $@
+<% end %>

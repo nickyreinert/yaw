@@ -170,7 +170,7 @@ test('paired Telegram runs the hosted questionnaire and requires final confirmat
   };
   try {
     await reply('/init telegram-check');
-    for (const [label, answer] of [[/coding agents/, 'claude'], [/Describe the idea/, 'A disposable Telegram project for local notes.'], [/language/, 'python'], [/run/, 'local'], [/GitHub/, 'no']]) {
+    for (const [label, answer] of [[/coding agents/, 'claude'], [/Purpose\/Idea/, 'A disposable Telegram project for local notes.'], [/language/, 'python'], [/run/, 'local'], [/GitHub/, 'no']]) {
       assert.match(messages.at(-1), label);
       const previous = messages.length; await reply(answer); await waitForQuestion(previous);
     }

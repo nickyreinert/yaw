@@ -21,13 +21,7 @@ export const INLINE_OWNERS = new Set(['comfort', 'team', 'tasks']);
 // Questions that open a group instead of sitting in a card: "Use GitHub for the repo?" leads the Git & GitHub group.
 export const GROUP_INTRO = new Map([['tasks.use-github', 'github'], ['quality.unit-tests', 'basics']]);
 export const isInline = (q) => INLINE_OWNERS.has(q.owner) && !GROUP_INTRO.has(q.id);
-const HOST_EXTRA = {
-  'self-hosted': 'Dockerfile and compose.yaml when the stack ships them',
-  serverless: 'the deploy configuration is up to you',
-  edge: 'the edge runtime configuration is up to you',
-  'app-store': 'packaging and signing are up to you',
-  static: 'no server code',
-};
+
 
 export function el(tag, attrs = {}, ...kids) {
   const node = document.createElement(tag);
@@ -83,6 +77,8 @@ const ICONS = {
   terminal: 'M3 4h18v16H3zM7 9l3 3-3 3m6 0h4',
   bolt: 'm13 2-9 12h7l-1 8L21 9h-8Z',
   window: 'M3 4h18v16H3zM3 8h18M7 6h.01m3 0h.01',
+  folder: 'M3 6h7l2 2h9v13H3zM3 6V3h7l2 3',
+  chevron: 'm6 9 6 6 6-6',
   phone: 'M7 2h10v20H7zM10 18h4',
 };
 export function decisionIcon(kind) {
@@ -106,6 +102,7 @@ const ARCH_DECISIONS = {
   'arch.hosting-control': { 'on-premises': 'building', 'self-hosted': 'server', managed: 'cloud' },
   'arch.libraries': { 'standard-only': 'box', 'open-source': 'open', 'commercial-allowed': 'briefcase' },
   'arch.services': { none: 'unplug', 'approved-only': 'shield', allowed: 'globe' },
+  'arch.wrapper': { off: 'unplug', shell: 'terminal', just: 'list', make: 'building' },
   'arch.cost': { 'free-only': 'gift', capped: 'wallet', flexible: 'chart' },
 };
 
@@ -173,7 +170,7 @@ export function renderStack(root, ctx) {
   const lang = ctx.answers['arch.language'] ?? langQ.default;
   const host = ctx.answers['arch.runs-on'] ?? hostQ.default;
   const langName = (k) => k ? shortLabel(langs.find((l) => l.value === k)?.label ?? k) : 'Choose a language';
-  const hostName = (k) => { const s = shortLabel(hosts.find((h) => h.value === k)?.label ?? k ?? ''); return s ? s[0].toUpperCase() + s.slice(1) : 'Choose where it runs'; };
+  const hostName = (k) => ({ local: 'Computer', 'self-hosted': 'Server', serverless: 'Serverless', edge: 'Edge / CDN', static: 'Static hosting', wordpress: 'WordPress', 'app-store': 'Desktop / mobile' })[k] ?? 'Choose destination';
   const fit = (l, h) => {
     const p = profileFor(ctx.profiles, l, h);
     return p ? (p.stack.basic ? 'basic' : 'tailored') : 'none';
@@ -188,7 +185,7 @@ export function renderStack(root, ctx) {
   for (const h of hosts) {
     const f = fit(lang, h.value);
     const p = profileFor(ctx.profiles, lang, h.value);
-    const text = !lang ? 'Choose a language to see the matching stack' : f === 'tailored' ? `✓ ${p.title}` : f === 'basic' ? `◐ basic ${langName(lang)} stack` : 'No YAW profile yet';
+    const text = p ? (p.requires ?? []).join(' · ') : !lang ? '' : 'Unsupported combination';
     hostGrid.append(el('button', { type: 'button', class: 'host decision-option', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
     decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone' })[h.value]),
@@ -197,37 +194,23 @@ export function renderStack(root, ctx) {
     el('span', { class: `fit ${f === 'tailored' ? 'yes' : f === 'basic' ? 'basic' : 'no'}`, text })));
   }
 
-  const explainLanguage = () => ctx.onExplain?.(langQ.label, [el('p', { text: langQ.helpText ?? 'Sets the project language and available checks.' })]);
-  const explainHost = () => ctx.onExplain?.(hostQ.label, [el('p', { text: hostQ.helpText ?? 'Sets the runtime, deployment configuration and applicable project constraints.' })]);
+  const explainTools = (title, id) => ctx.onExplain?.(title, [el('p', { text: 'Environment tools' }), el('ul', {}, ...(profileFor(ctx.profiles, lang, host)?.requires ?? []).map((tool) => el('li', {}, el('code', { text: tool })))), el('p', {}, 'Agent instructions: ', el('code', { text: 'AGENTS.md' }), ' and ', el('code', { text: 'docs/engineering.md' }))], { question: id });
+  const explainLanguage = () => explainTools('Language', 'arch.language');
+  const explainHost = () => explainTools('Destination', 'arch.runs-on');
   langRow.addEventListener('focusin', explainLanguage); langRow.addEventListener('mouseenter', explainLanguage);
   hostGrid.addEventListener('focusin', explainHost); hostGrid.addEventListener('mouseenter', explainHost);
   const profile = profileFor(ctx.profiles, lang, host);
   const result = el('div', { class: `stack-result${profile ? (profile.stack.basic ? ' basic' : '') : ' invalid'}`, role: 'status' });
-  const needs = (p) => el('li', { text: `Needs ${p.requires?.length ? p.requires.join(', ') : 'nothing extra'} on your computer (yaw doctor checks)` });
-  if (!lang || !host) {
-    result.append(el('h3', { text: 'Choose a language and where this project will run' }),
-      el('p', { text: 'Not sure? Use the planning guidance in Your project, then review its stack recommendation here.' }));
-  } else if (profile && !profile.stack.basic) {
-    result.append(
-      el('h3', { text: `Your stack: ${profile.title}` }),
-      el('ul', {}, el('li', { text: profile.summary }), profile.stack.notes?.[host] ? el('li', { text: profile.stack.notes[host] }) : null, needs(profile), el('li', { text: 'Adds its checks to just check and docs/standards.md' })),
-      el('p', { class: 'small muted' }, `${langName(lang)} · ${hostName(host)} → `, el('code', { text: profile.name })));
-  } else if (profile) {
-    result.append(
-      el('h3', { text: `Your stack: ${langName(lang)} · ${hostName(host)} (basic)` }),
-      el('ul', {}, el('li', { text: `No tailored profile yet; standard tools: ${profile.summary}` }), HOST_EXTRA[host] ? el('li', { text: HOST_EXTRA[host] }) : null, needs(profile),
-        el('li', { text: 'Tighten the checks later in the justfile and docs/standards.md' })));
-  } else {
-    const other = hosts.filter((h) => fit(lang, h.value) !== 'none').map((h) => hostName(h.value));
-    const here = langs.filter((l) => fit(l.value, host) !== 'none').map((l) => langName(l.value));
-    result.append(
-      el('h3', { text: `No YAW profile for ${langName(lang)} on ${hostName(host)}` }),
-      el('ul', {}, el('li', { text: `${langName(lang)} profiles available for: ${other.join(', ') || 'nothing yet'}` }), el('li', { text: `Profiles for ${hostName(host)}: ${here.join(', ') || 'nothing yet'}` })));
-  }
+  if (profile) {
+    result.append(el('h2', { class: 'module-group-title' }, decisionIcon('box'), el('span', { text: `Your stack: ${langName(lang)} · ${hostName(host)}` })),
+      el('p', { class: 'small', text: profile.summary }),
+      el('ul', {}, ...(profile.requires ?? []).map((tool) => el('li', {}, el('code', { text: tool })))));
+  } else result.append(el('p', { text: lang && host ? 'Choose a supported language and destination.' : 'Choose a language and destination.' }));
   root.replaceChildren(
-    el('h3', { class: 'stack-step', text: `1 · ${langQ.label}` }), langRow,
-    el('h3', { class: 'stack-step', text: `2 · ${hostQ.label}` }), hostGrid,
-    ...(ctx.dockerNode && !ctx.dockerNode.hidden ? [ctx.dockerNode] : []), result);
+    el('h2', { class: 'module-group-title' }, decisionIcon('terminal'), el('span', { text: 'Language' })), langRow,
+    el('h2', { class: 'module-group-title' }, decisionIcon('server'), el('span', { text: 'Destination' })), hostGrid);
+  if (ctx.architectureNode) root.append(ctx.architectureNode);
+  root.append(result);
   return { valid: Boolean(profile), profile };
 }
 
@@ -244,7 +227,7 @@ export function renderModuleGroups(root, ctx) {
   const selected = new Set(ctx.selected);
   const hasGit = ctx.gitRepo || ctx.gitInit;
   const groups = el('div', { class: 'module-groups' });
-  for (const [id, title, lead] of GROUPS) {
+  for (const [id, title] of GROUPS) {
     const mods = ctx.modules.filter((m) => (m.group ?? 'basics') === id);
     const intro = ctx.groupNodes?.(id) ?? [];
     if (!mods.length && !intro.length) continue;
@@ -254,13 +237,14 @@ export function renderModuleGroups(root, ctx) {
       if (m.name === 'review') grid.append(...reviewerCards(ctx, selected.has('review'), hasGit));
     }
     groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h2', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })),
-      ...(intro.length ? [el('div', { class: 'group-intro' }, ...intro)] : []),
-      ...(mods.some((m) => m.name === 'review') ? [el('label', { class: 'review-toggle' }, el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: 'module-review', checked: selected.has('review'), disabled: ctx.readOnly, onchange: (event) => ctx.onToggle('review', event.target.checked) }), ' Review agents')] : []), el('p', { class: 'small muted lead', text: lead }), grid));
+      ...(intro.length ? [el('div', { class: id === 'basics' ? 'module-grid' : 'group-intro' }, ...intro.map((node) => id === 'basics' ? el('article', { class: 'module-card option-card' }, node) : node))] : []),
+      ...(mods.some((m) => m.name === 'review') ? [el('label', { class: 'review-toggle' }, el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: 'module-review', checked: selected.has('review'), disabled: ctx.readOnly, onchange: (event) => ctx.onToggle('review', event.target.checked) }), ' Review agents')] : []), grid));
     const after = ctx.afterGroup?.(id);
     if (after) groups.append(after);
   }
   const compact = el('input', { id: 'compact-modules', type: 'checkbox', role: 'switch', class: 'module-switch', checked: ctx.compact, onchange: (event) => ctx.onCompact(event.target.checked) });
-  root.replaceChildren(el('div', { class: 'module-bar' }, el('label', { class: 'compact-control' }, compact, ' Compact')), groups);
+  ctx.compactRoot?.replaceChildren(el('label', { class: 'compact-control' }, compact, ' Compact'));
+  root.replaceChildren(groups);
 }
 
 function moduleCard(m, ctx, selected, hasGit) {
@@ -289,7 +273,7 @@ function moduleCard(m, ctx, selected, hasGit) {
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (ctx.compact === false) card.append(el('div', { class: 'card-more' }, ...more()));
   for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
-  const explain = () => ctx.onExplain?.(m.title ?? m.name, more());
+  const explain = () => ctx.onExplain?.(m.title ?? m.name, more(), { module: m.name });
   card.addEventListener('focusin', (e) => { if (!e.target.closest('.question')) explain(); }); card.addEventListener('mouseenter', explain);
   return card;
 }
@@ -301,7 +285,7 @@ function reviewerCards(ctx, on, hasGit) {
     const { node: choices } = choiceField({ name: `review-trigger-${k}`, id: `review-${k}`, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
       choices: TRIGGERS.map(([value, label]) => ({ value, label: value === 'push' && !hasGit ? `${label} (needs git)` : label, disabled: value === 'push' && !hasGit })),
       onChange: (value) => ctx.onAnswer(`quality.review-${k}`, value) });
-    const explain = () => ctx.onExplain?.(title, [el('p', { text: what }), el('p', { text: example })]);
+    const explain = () => ctx.onExplain?.(title, [el('p', { text: what })], { module: 'review' });
     cards.push(el('article', { class: `module-card reviewer${trig(k) === 'off' ? ' off' : ''}`, onfocusin: explain, onmouseenter: explain },
       el('h4', { class: 'module-group-title' }, decisionIcon(k === 'security' ? 'shield' : 'file'), el('span', { text: title })),
       choices, ctx.compact === false ? el('p', { class: 'small', text: what }) : null));
@@ -311,7 +295,7 @@ function reviewerCards(ctx, on, hasGit) {
     disabled: !on || !hasGit || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
     onChange: (value) => ctx.onAnswer('quality.review-gate', value) });
   const gateHelp = 'Warn asks before a push with findings; Block stops it. The gate requires Git and at least one reviewer required before push.';
-  const explainGate = () => ctx.onExplain?.('Push gate', [el('p', { text: gateHelp })]);
+  const explainGate = () => ctx.onExplain?.('Push gate', [el('p', { text: gateHelp })], { module: 'review' });
   cards.push(el('article', { class: 'module-card push-gate', onfocusin: explainGate, onmouseenter: explainGate },
     el('h4', { class: 'module-group-title' }, decisionIcon('branch'), el('span', { text: 'Push gate' })), field.node,
     ctx.compact === false || !hasGit || !gated ? el('p', { class: 'small muted', text: !hasGit ? 'Needs a Git repository.' : !gated ? 'Set a reviewer to Required before push.' : gateHelp }) : null));

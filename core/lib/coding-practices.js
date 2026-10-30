@@ -18,7 +18,10 @@ export function codingPractices(answers = {}) {
 }
 
 export function architecturePractices(answers = {}) {
+  const wrapper = answers['arch.wrapper'] ?? 'just';
+  const wrappers = { off: 'Do not add an application command wrapper; document native installation, running, checks and build commands.', shell: 'Use project.sh as the shell entry point for common project commands; keep argument forwarding safe and document sh project.sh setup, dev and check.', just: 'Use just as the command wrapper for installation, running, checks and builds; keep the existing justfile current.', make: 'Use Make as the command wrapper for installation, running, checks and builds; maintain Makefile targets and keep YAW checks available.' };
   return [
+    wrappers[wrapper],
     answers['arch.library-strategy'] === 'prefer-libraries'
       ? 'Use suitable maintained libraries when they simplify the solution; assess licensing, security, maintenance and dependency cost before adding them.'
       : 'Prefer standard-library features and small, maintainable project code; justify external dependencies. Use vetted security-sensitive components instead of inventing cryptography or authentication.',

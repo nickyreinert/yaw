@@ -780,7 +780,7 @@ a.button.primary { background: var(--accent); color: #fff; }
 .plan-card .plan-actions { display: flex; gap: 10px; margin-top: 12px; }
 .plan-card .setting-toggle { font-size: .82rem; line-height: 1.5; margin: 16px 0; }
 
-.plan-card > h2, .plan-card > h3 { font-size: 1rem; }
+.plan-card > h2, .plan-card > h3 { font-size: var(--section-title-size, 1.1rem); }
 
 /* Workspace Analytics only needs agent/model choices beside its date controls. */
 .workspace-filter-row { display: flex; flex-wrap: wrap; align-items: start; gap: 16px; }
@@ -845,10 +845,64 @@ button.decision-option[aria-pressed="true"] { background: var(--yellow, #ffe178)
 .interview-form .practice-grid > .question { padding: 14px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .module-grid .module-card.reviewer, .module-grid .module-card.push-gate { grid-column: auto; min-width: 0; }
 .module-grid .module-card :is(h4, .decision-options) { margin: 0 0 12px; }
-.module-grid .module-card .decision-options { margin-top: auto; }
+.module-grid .module-card .decision-options { margin-top: 8px; }
 .compact-control { display: inline-flex; align-items: center; gap: 8px; }
 .module-card .card-more { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 
-.help-changes pre { max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .72rem; }
 .module-group-title { font-size: 1.1rem; }
 .review-toggle { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; }
+
+/* Shared interview rhythm: section headings, cards and fields use one spacing scale. */
+.interview-form, .setting-help, .project-structure { --section-gap: 28px; --field-gap: 16px; --control-gap: 10px; }
+.interview-form :is(h2, .module-group-title), .setting-help .module-group-title, .project-structure .module-group-title { display: flex; align-items: center; gap: 10px; margin: 0 0 var(--field-gap); color: var(--ink); font-size: 1.1rem; font-weight: 700; line-height: 1.4; letter-spacing: -.02em; }
+.interview-form .settings-group, .interview-form > section, .module-group, .stack-result { margin-block: 0 var(--section-gap); padding-block: 0; }
+.interview-form .question { padding-block: var(--field-gap); margin: 0; }
+.interview-form :is(legend, .question > label) { font-size: .9rem; font-weight: 650; margin-bottom: 8px; }
+.interview-form .hint, .setting-help p, .setting-help li, .module-card p:last-child { font-size: .82rem; line-height: 1.6; }
+.interview-form .hint { margin: 8px 0 0; }
+.section-heading { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: var(--field-gap, 16px); }
+.section-heading > :is(h2, .module-group-title) { margin: 0; }
+#module-tools { margin-left: auto; }
+.section-heading .tree-toggle { margin-left: auto; }
+.section-heading .tree-toggle .decision-icon { width: 18px; height: 18px; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 16px; }
+.preset-grid .preset-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 16px; gap: 8px; min-width: 0; }
+.preset-card :is(span, small) { font-size: .8rem; font-weight: 400; overflow-wrap: anywhere; }
+.preset-card small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; color: var(--muted); }
+.preset-card .decision-icon { align-self: flex-end; }
+.interview-form .module-grid, .interview-form .practice-grid { gap: 16px; }
+.interview-form .module-grid > .module-card { padding: 16px; }
+.module-group > .module-grid + .module-grid { margin-top: 16px; }
+.option-card .question { padding: 0; }
+.option-card legend { display: flex; align-items: center; gap: 8px; }
+.interview-form .settings-group[data-section=arch], .settings-form .interview-form .settings-group[data-section=arch] { border: 0; background: none; border-radius: 0; padding: 0; margin-top: var(--section-gap); }
+.stack-result { margin-top: var(--section-gap); padding: 16px; }
+.agent-support { padding-left: 12px; border-left: 2px solid var(--notice-line, var(--line)); }
+.agent-support ul { padding-left: 20px; margin-block: 8px 0; }
+.agent-support p { margin: 0; }
+.setting-help code, .interview-form code { font-size: .85em; background: var(--wash); border-radius: 3px; padding: 1px 4px; overflow-wrap: anywhere; }
+.interview-form .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.save-action { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.save-action button, .interview-form .actions > button { display: inline-flex; align-items: center; gap: 8px; }
+.plan-card > summary { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.plan-card > summary::after { content: '⌄'; margin-left: auto; }
+.plan-card[open] > summary::after { transform: rotate(180deg); }
+.project-structure { margin-top: 24px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.project-structure[aria-busy=true] .project-tree-body { opacity: .7; }
+.project-tree-list, .project-tree-list ul { list-style: none; margin: 0; padding-left: 20px; }
+.project-tree-list { padding: 0; }
+.project-tree-list summary { cursor: pointer; padding: 5px 0; }
+.project-tree-list .decision-icon { width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; }
+.project-tree-file { padding: 5px 8px; border-radius: 4px; overflow-wrap: anywhere; }
+.project-tree-file.in-section { background: var(--sun-wash, #fff7cc); }
+.project-tree-file.is-changed { border-left: 3px solid var(--notice-line, #cc8eae); }
+.project-tree-file.is-focused { background: var(--notice-wash, #fff0f7); box-shadow: inset 0 0 0 1px var(--notice-line, #cc8eae); }
+.project-tree-file.is-removed { text-decoration: line-through; }
+.project-tree-file small { margin-left: 12px; color: var(--muted); }
+.tree-toggle[aria-expanded=true] .decision-icon { transform: rotate(180deg); }
+@media (max-width: 760px) { .section-heading { gap: 10px; } .save-action { flex-basis: 100%; } .setting-help { grid-row: auto; } }
+
+.project-tree-folder > summary.in-section { background: var(--sun-wash, #fff7cc); border-radius: 4px; }
+.project-tree-folder > summary.is-focused { background: var(--notice-wash, #fff0f7); border-radius: 4px; }
+
+.preset-card strong { overflow-wrap: anywhere; }

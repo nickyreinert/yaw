@@ -1,0 +1,140 @@
+<div id="yaw-interview-preview" aria-label="YAW interview clickthrough">
+  <style>
+    #yaw-interview-preview { --yp-ink: light-dark(#252d3d,#f3ede5); --yp-paper: light-dark(#fffdf9,#25242a); --yp-ground: light-dark(#f6f1ed,#1d1c21); --yp-line: light-dark(#ded2cf,#5b5159); --yp-muted: light-dark(#73626c,#c8b7bf); --yp-sun: light-dark(#ffe56b,#ffe56b); --yp-select: light-dark(#fff6cc,#4e4529); --yp-pink: light-dark(#fff0f6,#4a2e3c); --yp-orange: light-dark(#fff0e4,#4b3428); --yp-rose: light-dark(#994962,#f2abc3); --yp-space: 22px; color: var(--yp-ink); background: var(--yp-ground); font: 14px/1.55 'Trebuchet MS',Arial,sans-serif; border: 1px solid var(--yp-line); border-radius: 12px; overflow: hidden; }
+    #yaw-interview-preview * { box-sizing: border-box; }
+    #yaw-interview-preview [hidden] { display: none !important; }
+    #yaw-interview-preview .yp-top { padding: 16px 24px; background: var(--yp-paper); border-bottom: 1px solid var(--yp-line); display: flex; gap: 18px; align-items: center; flex-wrap: wrap; padding-right: 96px; }
+    #yaw-interview-preview .yp-brand { font-size: 24px; font-weight: 700; letter-spacing: -.06em; }
+    #yaw-interview-preview .yp-label { color: var(--yp-muted); font-size: 12px; }
+    #yaw-interview-preview .yp-layout { display: grid; grid-template-columns: 170px minmax(0,1fr); }
+    #yaw-interview-preview .yp-nav { padding: 24px 14px; border-right: 1px solid var(--yp-line); }
+    #yaw-interview-preview button { color: inherit; background: var(--yp-paper); border: 1px solid var(--yp-line); border-radius: 7px; padding: 10px 13px; font: inherit; }
+    #yaw-interview-preview .yp-nav button { display: flex; align-items: center; gap: 10px; width: 100%; border-color: transparent; text-align: left; margin-bottom: 5px; padding: 11px 9px; }
+    #yaw-interview-preview button[aria-pressed=true], #yaw-interview-preview .yp-nav button[aria-current] { background: var(--yp-select); border-color: var(--yp-rose); }
+    #yaw-interview-preview .yp-step-no { color: var(--yp-muted); font-size: 12px; }
+    #yaw-interview-preview .yp-main { padding: 24px; min-width: 0; }
+    #yaw-interview-preview .yp-columns { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 24px; align-items: start; }
+    #yaw-interview-preview .yp-pane { background: var(--yp-paper); padding: var(--yp-space); border: 1px solid var(--yp-line); border-radius: 9px; min-width: 0; }
+    #yaw-interview-preview h2 { font-size: 17px; line-height: 1.4; font-weight: 700; letter-spacing: -.02em; margin: 0 0 16px; display: flex; gap: 9px; align-items: center; }
+    #yaw-interview-preview h3 { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+    #yaw-interview-preview p { margin: 0 0 14px; }
+    #yaw-interview-preview .yp-heading { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    #yaw-interview-preview .yp-heading h2 { margin: 0; }
+    #yaw-interview-preview .yp-heading label { margin-left: auto; font-size: 12px; }
+    #yaw-interview-preview .yp-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); gap: 12px; margin-bottom: 22px; }
+    #yaw-interview-preview .yp-single { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    #yaw-interview-preview .yp-choice { text-align: left; min-width: 0; display: flex; flex-direction: column; align-items: start; gap: 8px; padding: 15px; }
+    #yaw-interview-preview .yp-choice small { color: var(--yp-muted); font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+    #yaw-interview-preview .yp-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    #yaw-interview-preview .yp-field { display: block; margin-bottom: 18px; }
+    #yaw-interview-preview .yp-field > span { display: block; margin-bottom: 8px; font-weight: 700; }
+    #yaw-interview-preview input[type=text], #yaw-interview-preview textarea { width: 100%; border: 1px solid var(--yp-line); border-radius: 6px; background: var(--yp-paper); color: inherit; padding: 10px; font: inherit; }
+    #yaw-interview-preview textarea { min-height: 120px; resize: vertical; }
+    #yaw-interview-preview .yp-check { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; }
+    #yaw-interview-preview input[type=checkbox] { accent-color: var(--yp-rose); width: 17px; height: 17px; }
+    #yaw-interview-preview .yp-feature { border: 1px solid var(--yp-line); padding: 15px; border-radius: 7px; }
+    #yaw-interview-preview .yp-feature .yp-check { font-weight: 700; }
+    #yaw-interview-preview .yp-feature .yp-buttons { margin: 0; }
+    #yaw-interview-preview .yp-feature .yp-buttons button { padding: 8px 10px; }
+    #yaw-interview-preview .yp-hint { color: var(--yp-muted); font-size: 12px; }
+    #yaw-interview-preview .yp-support { border-left: 3px solid var(--yp-rose); padding: 8px 0 8px 14px; margin: 12px 0 20px; background: var(--yp-pink); font-size: 12px; }
+    #yaw-interview-preview code { font: 12px/1.5 ui-monospace,monospace; background: var(--yp-orange); border-radius: 3px; padding: 2px 4px; overflow-wrap: anywhere; }
+    #yaw-interview-preview .yp-detail { color: var(--yp-muted); padding-top: 4px; font-size: 12px; }
+    #yaw-interview-preview .yp-detail h2 { font-size: 14px; color: var(--yp-ink); }
+    #yaw-interview-preview .yp-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 20px; }
+    #yaw-interview-preview .yp-primary { color: #252d3d; background: var(--yp-sun); border-color: var(--yp-ink); }
+    #yaw-interview-preview .yp-tree { margin-top: 20px; border-top: 1px solid var(--yp-line); padding-top: 18px; }
+    #yaw-interview-preview .yp-tree-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    #yaw-interview-preview .yp-tree-title h2 { margin: 0; font-size: 15px; }
+    #yaw-interview-preview .yp-tree-title button { margin-left: auto; padding: 6px 10px; }
+    #yaw-interview-preview .yp-files { list-style: none; padding: 12px 0 0; margin: 0; }
+    #yaw-interview-preview .yp-files li { display: flex; align-items: center; gap: 8px; padding: 4px 8px; overflow-wrap: anywhere; border-radius: 4px; }
+    #yaw-interview-preview .yp-files li[data-section=true] { background: var(--yp-select); }
+    #yaw-interview-preview .yp-files li[data-focus=true] { background: var(--yp-pink); box-shadow: inset 3px 0 var(--yp-rose); }
+    #yaw-interview-preview .yp-files li[data-changed=true]::after { content: 'Changed'; color: var(--yp-rose); margin-left: auto; font-size: 11px; }
+    #yaw-interview-preview .yp-files code { background: transparent; }
+    #yaw-interview-preview .yp-summary { border-top: 1px solid var(--yp-line); padding: 12px 0; }
+    #yaw-interview-preview details { border: 1px solid var(--yp-line); border-radius: 7px; padding: 14px; margin-top: 20px; }
+    #yaw-interview-preview summary { font-weight: 700; }
+    #yaw-interview-preview details p { margin-top: 14px; }
+    #yaw-interview-preview .yp-save { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-block: 12px; }
+    #yaw-interview-preview .yp-compact .yp-feature .yp-hint { display: none; }
+    #yaw-interview-preview svg { flex-shrink: 0; width: 17px; height: 17px; }
+    @media(max-width:800px) { #yaw-interview-preview .yp-columns { grid-template-columns: minmax(0,1fr); } #yaw-interview-preview .yp-detail { padding-top: 8px; border-top: 1px solid var(--yp-line); } }
+    @media(max-width:560px) { #yaw-interview-preview .yp-layout { grid-template-columns: minmax(0,1fr); } #yaw-interview-preview .yp-nav { display: flex; flex-wrap: wrap; gap: 4px; border: 0; padding: 12px; } #yaw-interview-preview .yp-nav button { width: auto; font-size: 12px; } #yaw-interview-preview .yp-main { padding: 14px; } #yaw-interview-preview .yp-pane { padding: 16px; } #yaw-interview-preview .yp-single { grid-template-columns: minmax(0,1fr); } }
+  </style>
+  <header class="yp-top"><strong class="yp-brand">YAW</strong><span>Project setup / Interview</span><span class="yp-label">Temporary preview</span></header>
+  <div class="yp-layout">
+    <nav class="yp-nav" aria-label="Interview steps"></nav>
+    <main class="yp-main">
+      <div class="yp-columns"><section class="yp-pane" aria-label="Interview choices"></section><aside class="yp-detail" aria-label="Selection details"></aside></div>
+      <div class="yp-foot"><button type="button" class="cursor-interaction" data-back>← Back</button><button type="button" class="yp-primary cursor-interaction" data-next>Continue →</button></div>
+      <section class="yp-tree" aria-label="Project structure"><div class="yp-tree-title"><h2><i data-lucide="folder-tree" aria-hidden="true"></i>Project structure</h2><span class="yp-label" data-file-count></span><button type="button" class="cursor-interaction" data-tree-toggle aria-expanded="true" aria-label="Collapse project structure">⌃</button></div><ul class="yp-files" aria-label="Planned project files"></ul></section>
+      <p class="yp-hint" data-status role="status" aria-live="polite"></p>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const root = document.getElementById('yaw-interview-preview');
+      const saved = window.openai?.widgetState;
+      const state = Object.assign({ step: 0, depth: 'Basic', preset: 'new', language: 'TypeScript', destination: 'Computer', wrapper: 'Just', docker: false, unit: false, reviews: false, map: false, decisions: false, compact: true, gate: 'Warn', quality: 'On request', agent: 'Claude Code', tone: 'Balanced', logs: 'Console', purpose: 'A reading tracker for book clubs. Members log books and share progress. Keep personal notes private.', tree: true }, saved?.modelContent ?? {});
+      state.step = Math.max(0, Math.min(5, Number(state.step) || 0));
+      const names = ['Starting point','About you','Purpose/Idea','Architecture','Collaboration','Review & apply'];
+      const pane = root.querySelector('.yp-pane'), detail = root.querySelector('.yp-detail'), filesNode = root.querySelector('.yp-files');
+      let focused = '', changed = '', lastPaths = new Set();
+      const icons = () => globalThis.lucide?.createIcons({ attrs: { width: 17, height: 17 } });
+      const el = (tag,text,cls) => { const node = document.createElement(tag); if(text !== undefined) node.textContent = text; if(cls) node.className = cls; return node; };
+      const icon = (name) => { const node = el('i'); node.dataset.lucide = name; node.setAttribute('aria-hidden','true'); return node; };
+      const title = (text,kind='file') => { const h = el('h2'); h.append(icon(kind),el('span',text)); return h; };
+      const save = () => window.openai?.setWidgetState({ modelContent: {...state}, privateContent: null })?.catch(() => {});
+      function showDetail(label,text,key='') { focused=key; detail.replaceChildren(title(label,'book-open')); for(const sentence of text.split('\n')) { const p=el('p'); sentence.split(/(`[^`]+`)/g).forEach(part=>p.append(part.startsWith('`')?el('code',part.slice(1,-1)):document.createTextNode(part))); detail.append(p); } drawFiles(); icons(); }
+      function bind(node,key,label,text) { node.addEventListener('mouseenter',()=>showDetail(label,text,key)); node.addEventListener('focusin',()=>showDetail(label,text,key)); return node; }
+      function choices(key,options,label,text) { const row=el('div',undefined,'yp-buttons'); for(const value of options) { const b=el('button',value,'cursor-interaction'); b.type='button'; b.setAttribute('aria-pressed',String(state[key]===value)); b.addEventListener('click',()=>{state[key]=value; changed=key; if(key==='destination'&&!['Computer','Server','Serverless'].includes(value)) state.docker=false; render(); showDetail(label,text,key); save();}); row.append(b); } return bind(row,key,label,text); }
+      function check(key,label,text) { const row=el('label',undefined,'yp-check'); const input=el('input'); input.type='checkbox'; input.checked=state[key]; input.addEventListener('change',()=>{state[key]=input.checked; changed=key; render(); showDetail(label,text,key); save();}); row.append(input,document.createTextNode(label)); return bind(row,key,label,text); }
+      const defaults = [
+        ['Interview depth','Can always be changed',''],
+        ['About you','Creates one `AGENTS.md` as the global entry point for all agents, referring to individual agent files within the project.','agent'],
+        ['Purpose/Idea','Describe what your app does, its target users and its constraints.\nWill be stored as a global entry in `AGENTS.md`.','purpose'],
+        ['Architecture','Environment tools: `node>=22.13`, `just`.\nAgent instructions: `AGENTS.md` and `docs/engineering.md`.','language'],
+        ['Collaboration','Choose project rules and review sub-agents.',''],
+        ['Review & apply','Save draft: Continue later.\nSave preset: Save for future use.','']
+      ];
+      function fileList() { const files=[['AGENTS.md','agent purpose'],[state.agent==='Gemini CLI'?'GEMINI.md':state.agent==='Codex'?'.agents/skills/':state.agent==='Copilot'?'.github/copilot-instructions.md':'CLAUDE.md','agent'],['.yaw/answers.yaml',''],['.yaw/manifest.json',''],['docs/engineering.md','unit docker wrapper language destination'],['justfile','wrapper language'],['just/node-cli.just','language destination'],['package.json','language']]; if(state.wrapper==='Shell') files.push(['project.sh','wrapper']); if(state.wrapper==='Make') files.push(['Makefile','wrapper']); if(state.map) files.push(['docs/code-map.md','map']); if(state.decisions) files.push(['.decisions/','decisions']); if(state.reviews) files.push(['just/review.just','reviews quality gate'],['.claude/agents/review-quality.md','reviews quality gate']); return files; }
+      function drawFiles() { const list=fileList(); filesNode.replaceChildren(); for(const [path,keys] of list) { const li=el('li'); li.append(icon(path.endsWith('/')?'folder':'file'),el('code',path)); const section=state.step===1?'agent':state.step===2?'purpose':state.step===3?'language destination wrapper docker':state.step===4?'unit reviews quality gate map decisions':''; li.dataset.section=String(Boolean(section&&keys.split(' ').some(key=>key&&section.includes(key)))); li.dataset.focus=String(Boolean(focused&&keys.split(' ').includes(focused))); li.dataset.changed=String(Boolean(changed&&(keys.split(' ').includes(changed)||lastPaths.size&&!lastPaths.has(path)))); filesNode.append(li); } lastPaths=new Set(list.map(item=>item[0])); root.querySelector('[data-file-count]').textContent=`${list.length} files`; filesNode.hidden=!state.tree; icons(); }
+      function render() {
+        root.querySelector('.yp-nav').replaceChildren(...names.map((name,index)=>{const b=el('button',undefined,'cursor-interaction');b.type='button';b.append(el('span',String(index+1).padStart(2,'0'),'yp-step-no'),document.createTextNode(name));if(index===state.step)b.setAttribute('aria-current','step');b.addEventListener('click',()=>{state.step=index;focused='';changed='';render();save();});return b;}));
+        pane.classList.toggle('yp-compact',state.compact);pane.replaceChildren();
+        if(state.step===0) {
+          pane.append(title('Interview depth','sliders-horizontal'),choices('depth',['Quick','Basic','All'],'Interview depth','Quick: MVP and prototype. Default LLM communication settings apply.\nBasic: Quick plus collaboration and review gates.\nAll: Basic plus advanced features.'),el('p','Can always be changed','yp-hint'),title('Presets','layers'));
+          const grid=el('div',undefined,'yp-grid'); for(const [key,label,meta,summary] of [['new','New setup','From global defaults','If this is your first initialization, the general settings apply as defaults.'],['tracker','Reading tracker','30 Oct 2026 · Computer · TypeScript','A reading tracker for book clubs with private notes.'],['api','Notes API','28 Oct 2026 · Serverless · Python','A private notes API for a small team.']]) {const b=el('button',undefined,'yp-choice cursor-interaction');b.type='button';b.setAttribute('aria-pressed',String(state.preset===key));b.append(icon(key==='new'?'file-plus':'layers'),el('strong',label),el('small',meta),el('small',summary));b.addEventListener('click',()=>{state.preset=key;if(key==='api'){state.language='Python';state.destination='Serverless';state.purpose='A private notes API for a small team.';}else if(key==='tracker'){state.language='TypeScript';state.destination='Computer';}render();save();});grid.append(b);}pane.append(grid);
+        } else if(state.step===1) {
+          pane.append(title('About you','users'),choices('agent',['Claude Code','Codex','Copilot','Gemini CLI'],'About you',defaults[1][1]));
+          if(state.agent==='Codex'){const box=el('div',undefined,'yp-support');const p=el('p');p.append('Trust hooks once via ',el('code','/hooks'),'; ',el('code','yaw doctor'),' reminds you.');const p2=el('p');p2.append('Telemetry is partially supported via ',el('code','~/.codex/config.toml'),' only.');box.append(p,p2);pane.append(box);}else if(['Copilot','Gemini CLI'].includes(state.agent))pane.append(el('p','Some telemetry and hook features are unsupported.','yp-support'));
+          pane.append(title('Communication style','messages-square'),el('p','From global defaults','yp-hint'),choices('tone',['Concise','Balanced','Detailed'],'Communication style','Default settings for LLM communication styles apply.'));
+        } else if(state.step===2) {
+          pane.append(title('Purpose/Idea','lightbulb'),el('p','Include the intended users, their main task, and important data or interface constraints.','yp-hint'));
+          const area=el('textarea');area.value=state.purpose;area.setAttribute('aria-label','Purpose/Idea');const count=el('p',`${state.purpose.trim().split(/\s+/).length} / 500 words`,'yp-hint');area.addEventListener('input',()=>{state.purpose=area.value;const words=area.value.trim().split(/\s+/).filter(Boolean).length;count.textContent=`${words} / 500 words`;area.setCustomValidity(words>500?'Use at most 500 words.':'');changed='purpose';drawFiles();save();});pane.append(bind(area,'purpose','Purpose/Idea',defaults[2][1]),count);
+          const llm=el('details'),support=el('button','Copy prompt','cursor-interaction');support.type='button';support.addEventListener('click',()=>{root.querySelector('[data-status]').textContent='Preview only · LLM support prompt selected';});llm.append(el('summary','LLM Support'),el('p','Use any LLM to support you with project decisions.'),support);pane.append(llm);
+        } else if(state.step===3) {
+          pane.append(title('Language','code'),choices('language',['TypeScript','Python','PHP','Go'],'Language',defaults[3][1]),title('Destination','server'),choices('destination',['Computer','Server','Serverless','Edge / CDN','Static hosting'],'Destination',defaults[3][1]),title('Architecture','blocks'));
+          if(['Computer','Server','Serverless'].includes(state.destination))pane.append(check('docker','Support Docker','Tells the agent to set up Docker support.'));
+          pane.append(el('h3','Wrapper'),choices('wrapper',['Off','Shell','Just','Make'],'Wrapper','Tells the agent to add a wrapper script for common commands like installing, running and checking the project.'),el('div',undefined,'yp-summary'));
+          const stack=pane.lastElementChild;stack.append(title(`Your stack: ${state.language} · ${state.destination}`,'package'),el('code',state.language==='Python'?'python>=3.12 · uv · just':'node>=22.13 · just'));
+        } else if(state.step===4) {
+          const head=el('div',undefined,'yp-heading');head.append(title('Collaboration','users'),check('compact','Compact','Show concise controls.'));pane.append(head,title('Coding Style','ruler'));
+          const grid=el('div',undefined,'yp-grid yp-single'),unit=el('article',undefined,'yp-feature');unit.append(check('unit','Unit Tests','Require a meaningful, non-empty suite in checks and Quality reviews.'),el('p','Quality follows this setting.','yp-hint'));grid.append(unit);pane.append(grid,title('Coding Practices','code'),choices('logs',['Console','Files','Both'],'Diagnostic logs','Use structured logs with redaction and bounded retention.'),title('Advanced Coding Rules','notebook-pen'));
+          const advanced=el('div',undefined,'yp-grid');for(const [key,label] of [['map','Code map'],['decisions','Decision journal']]){const box=el('article',undefined,'yp-feature');box.append(check(key,label,`Add ${label.toLowerCase()} to the project.`));advanced.append(box);}pane.append(advanced,title('Review Sub-Agents','shield-check'),check('reviews','Review agents','Read-only reviewers. Quality follows the Unit Tests setting.'));
+          const rg=el('div',undefined,'yp-grid'),quality=el('article',undefined,'yp-feature'),gate=el('article',undefined,'yp-feature');quality.append(el('h3','Quality'),choices('quality',['Off','On request','Before push'],'Quality',state.unit?'An empty or failing unit-test suite is a finding.':'A unit-test suite is optional.'));gate.append(el('h3','Push gate'),choices('gate',['Warn','Block'],'Push gate','Warn asks before pushing with findings. Block stops the push.'));quality.querySelectorAll('button').forEach(button=>button.disabled=!state.reviews);gate.querySelectorAll('button').forEach(button=>button.disabled=!state.reviews||state.quality!=='Before push');rg.append(quality,gate);pane.append(rg,title('Coding Assistance','bell'),el('p','Notifications · local helpers','yp-hint'));
+        } else {
+          pane.append(title('Review & apply','clipboard-check'));for(const [label,value] of [['Purpose',state.purpose],['Architecture',`${state.language} · ${state.destination}`],['Wrapper',state.wrapper],['Unit Tests',state.unit?'Required':'Optional'],['Review agents',state.reviews?'Enabled':'Off']]){const row=el('div',undefined,'yp-summary');row.append(el('strong',label),el('p',value,'yp-hint'));pane.append(row);}for(const [label,hint] of [['Save draft','Continue later'],['Save preset','Save for future use']]){const row=el('div',undefined,'yp-save'),b=el('button',label,'cursor-interaction');b.type='button';b.addEventListener('click',()=>{root.querySelector('[data-status]').textContent=`Preview only · ${label} selected`;});row.append(b,el('span',hint,'yp-hint'));pane.append(bind(row,'',label,hint));}pane.append(title('Create project foundations','files'),el('p','Task your agent to create Architecture, Data Model and UI/UX documents for project setup, documentation and workflow guidance.','yp-hint'));const b=el('button','Copy prompt','cursor-interaction');b.type='button';b.addEventListener('click',()=>{root.querySelector('[data-status]').textContent='Preview only · Foundation prompt selected';});pane.append(b);
+        }
+        root.querySelector('[data-back]').disabled=state.step===0;root.querySelector('[data-next]').textContent=state.step===5?'Apply preview':'Continue →';showDetail(...defaults[state.step]);drawFiles();icons();
+      }
+      root.querySelector('[data-back]').addEventListener('click',()=>{if(state.step>0)state.step--;focused='';render();save();});
+      root.querySelector('[data-next]').addEventListener('click',()=>{const area=pane.querySelector('textarea');if(area&&!area.reportValidity())return;if(state.step<5){state.step++;focused='';changed='';render();save();}else root.querySelector('[data-status]').textContent='Preview only · No project files written.';});
+      root.querySelector('[data-tree-toggle]').addEventListener('click',()=>{state.tree=!state.tree;const button=root.querySelector('[data-tree-toggle]');button.setAttribute('aria-expanded',String(state.tree));button.setAttribute('aria-label',`${state.tree?'Collapse':'Expand'} project structure`);button.textContent=state.tree?'⌃':'⌄';drawFiles();save();});
+      render();
+      if(globalThis.Tweak){const design={spacing:22};const tweak=new Tweak({container:root,onChange:()=>root.style.setProperty('--yp-space',`${design.spacing}px`)});tweak.addSlider(design,'spacing',{label:'Section spacing',min:16,max:30,step:2,unit:'px'});}
+    })();
+  </script>
+</div>

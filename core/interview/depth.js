@@ -1,14 +1,14 @@
 // Shared terminal/browser contract. Old file values remain readable.
 export const DEPTHS = [
-  { value: 'quick', label: 'Quick', description: 'Agents, purpose, stack and GitHub. Saved defaults for the rest.' },
-  { value: 'basic', label: 'Basic', description: 'Quick plus personal preferences, collaboration and review gates.' },
-  { value: 'pro', label: 'All', description: 'Every applicable question and optional tool.' },
+  { value: 'quick', label: 'Quick', description: 'MVP and prototype. Default settings for LLM communication styles apply.' },
+  { value: 'basic', label: 'Basic', description: 'All from Quick, with collaborative features and review gates.' },
+  { value: 'pro', label: 'All', description: 'All from Basic, with advanced features.' },
 ];
 export const depthOf = (mode) => ({ full: 'pro', standard: 'pro', all: 'pro' }[mode] ?? mode);
 export const depthLabel = (mode) => DEPTHS.find((depth) => depth.value === depthOf(mode))?.label ?? mode;
 export const validDepth = (mode) => ['quick', 'basic', 'pro'].includes(depthOf(mode));
 export const RETIRED_ARCHITECTURE = new Set(['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']);
-export const BASIC_QUESTIONS = new Set(['user.agents', 'idea.team', 'tasks.use-github', 'tasks.mode', 'quality.review-quality', 'quality.review-logic', 'quality.review-ux', 'quality.review-feature', 'quality.review-security', 'quality.review-gate', 'arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.unit-tests']);
+export const BASIC_QUESTIONS = new Set(['user.agents', 'idea.team', 'tasks.use-github', 'tasks.mode', 'quality.review-quality', 'quality.review-logic', 'quality.review-ux', 'quality.review-feature', 'quality.review-security', 'quality.review-gate', 'arch.library-strategy', 'arch.wrapper', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.unit-tests']);
 export function asksAtDepth(q, mode) {
   const depth = depthOf(mode);
   if (RETIRED_ARCHITECTURE.has(q.id)) return false;
