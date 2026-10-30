@@ -1,0 +1,10 @@
+- Stable Rust, edition 2021, `rust-version` stays explicit in `Cargo.toml`; `unsafe` is forbidden (`[lints.rust]`).
+- Logic lives in the library (`src/lib.rs`); `src/main.rs` stays a thin entry point that calls `app::run` and exits with its code.
+- Commands read arguments, write results to the writer they are given and errors to stderr; exit 0 on success, non-zero on failure.
+- Return `Result` for recoverable errors; no `unwrap`/`expect`/`panic!` in library code (tests may use them).
+- Format with `cargo fmt` (`just fmt`; `just lint` only checks) and keep `cargo clippy -- -D warnings` clean.
+- Tests: unit tests next to the code, binary tests in `tests/` via `CARGO_BIN_EXE_app`; deterministic, no network, no real home directory.
+- Commit `Cargo.lock`; every crate needs a reason and an exact version (`=1.2.3`); prefer the standard library.
+- Validate arguments and file paths before use; never build shell commands from input (use `Command` with an argument list).
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- `cargo install`, publishing to crates.io, release tags and reaching remote hosts need the user's approval.

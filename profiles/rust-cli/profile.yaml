@@ -1,0 +1,11 @@
+# profiles/rust-cli
+# Picked for Rust x your computer (ADR-0054, T-001): command-line tools built with Cargo.
+name: rust-cli
+title: Rust command-line tool
+summary: Rust command-line tool; Cargo, rustfmt, clippy, cargo test, no third-party crates.
+stack:
+  language: [rust]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [rustc>=1.80, cargo, just]
