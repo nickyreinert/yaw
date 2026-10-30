@@ -1,0 +1,9 @@
+- Kotlin/JVM on JDK 17+ (`jvmToolchain(17)`); no Android plugins or SDK requirements.
+- Use the Gradle wrapper (checksum-pinned in `gradle-wrapper.properties`) and pin every plugin and dependency exactly; prefer the standard library.
+- Logic lives in plain functions (`greeting`, `run`); `Main.kt` stays a thin entry point that calls `run` and exits with its code.
+- Commands read arguments, write results to the `Appendable` they are given and errors to stderr; exit 0 on success, non-zero on failure.
+- Format and lint with ktlint (`just fmt` writes, `just lint` only checks).
+- Tests use JUnit 5 and call `run` with in-memory writers: deterministic, no network, no real home directory.
+- Validate arguments and file paths before use; never build shell commands from input (use `ProcessBuilder` with an argument list).
+- Settings and secrets come from environment variables; never hard-code, log or commit them.
+- Publishing artifacts, release tags and reaching remote hosts need the user's approval.

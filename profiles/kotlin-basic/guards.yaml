@@ -1,3 +1,0 @@
-# Dangerous command patterns of this stack (doc 04 §3).
-guards:
-  - { id: gradle-publish, pattern: "\\bgradlew?\\b[^;&|\\n]*\\bpublish\\b", reason: Publishing artifacts needs your approval. }

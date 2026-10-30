@@ -1,0 +1,9 @@
+- Kotlin/JVM on JDK 17+; Ktor on Netty; no Android plugins or SDK requirements.
+- Use the Gradle wrapper (checksum-pinned in `gradle-wrapper.properties`) and pin every plugin and library exactly (Ktor through its BOM); add libraries only with a reason.
+- Routes live in `Application.module()`; `main` stays a thin entry point that reads `HOST` and `PORT` (the platform sets `PORT`) and starts Netty, which shuts down gracefully on SIGTERM.
+- Serve `GET /health`; return explicit status codes and validate path, query and body input before use.
+- The container runs as non-root and the `Dockerfile` builds with the Gradle wrapper (`installDist`).
+- Tests drive `module()` with Ktor `testApplication`: deterministic, no sockets, no network, no database.
+- Format and lint with ktlint (`just fmt` writes, `just lint` only checks).
+- Never log secrets or request bodies; settings and secrets come from environment variables or the platform's secret store, never hard-coded or committed.
+- Publishing artifacts, building or pushing images, release tags and reaching remote hosts need the user's approval.

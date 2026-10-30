@@ -1,0 +1,36 @@
+# profiles/kotlin-serverless
+# Picked for Kotlin x serverless (ADR-0054); the hosting option picks the scaffold variant (ADR-0105, ADR-0119).
+name: kotlin-serverless
+title: Kotlin serverless app
+dependencyEcosystems: [gradle]
+summary: Kotlin/JVM app for serverless hosts, as a container or on AWS Lambda; Gradle, ktlint, JUnit 5.
+stack:
+  language: [kotlin]
+  runsOn: [serverless]
+  notes:
+    serverless: The gate runs without Docker or AWS accounts; building images, deploying and cloud accounts are yours.
+options:
+  hosting:
+    label: "Serverless flavor: container (Cloud Run style) or AWS Lambda"
+    hint: Container ships a Ktor service with a Dockerfile; Lambda ships an API Gateway handler packaged as a zip.
+    choices:
+      - { value: container, label: "Container (Ktor, Dockerfile, Cloud Run style)" }
+      - { value: lambda, label: "AWS Lambda (RequestHandler, zip package)" }
+    default: container
+    scaffold: true
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]
+tools:
+  - name: aws
+    check: aws --version
+    install:
+      macos: brew install awscli
+      linux: curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip awscliv2.zip && sudo ./aws/install
+    when: { hosting: lambda }
+  - name: sam
+    check: sam --version
+    install:
+      macos: brew install aws-sam-cli
+      linux: pipx install aws-sam-cli
+    when: { hosting: lambda }

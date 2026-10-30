@@ -1,0 +1,14 @@
+# profiles/kotlin-web
+# Picked for Kotlin x self-hosted (ADR-0054, T-001, ADR-0118): an HTTP service on your own server or container host.
+name: kotlin-web
+title: Kotlin web service
+dependencyEcosystems: [gradle]
+summary: Kotlin/JVM HTTP service on Ktor and Netty; Gradle, ktlint, JUnit 5, Dockerfile.
+stack:
+  language: [kotlin]
+  runsOn: [self-hosted]
+  notes:
+    self-hosted: The gate runs without Docker; building and pushing the image and reaching your server are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]

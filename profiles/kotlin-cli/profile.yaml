@@ -1,0 +1,12 @@
+# profiles/kotlin-cli
+# Picked for Kotlin x your computer (ADR-0054, T-001, ADR-0117): command-line tools on the JVM built with Gradle.
+name: kotlin-cli
+title: Kotlin command-line tool
+dependencyEcosystems: [gradle]
+summary: Kotlin/JVM command-line tool; Gradle application plugin, ktlint, JUnit 5, no third-party libraries.
+stack:
+  language: [kotlin]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]

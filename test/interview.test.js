@@ -124,7 +124,9 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   assert.match(stackProfile(profiles, { 'arch.language': 'python', 'arch.runs-on': 'app-store' }).reason, /no YAW profile for python on app-store/);
   assert.equal(pick('html', 'static'), 'static-site');
   assert.equal(pick('kotlin', 'app-store'), 'android-kotlin');
-  assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-basic');
+  assert.equal(pick('kotlin', 'local'), 'kotlin-cli');
+  assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-web');
+  assert.equal(pick('kotlin', 'serverless'), 'kotlin-serverless');
   for (const language of ['go', 'java']) assert.equal(pick(language, 'local'), `${language}-basic`);
   assert.equal(pick('rust', 'local'), 'rust-cli');
   assert.equal(pick('rust', 'self-hosted'), 'rust-web');

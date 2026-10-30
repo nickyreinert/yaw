@@ -1,0 +1,10 @@
+- Kotlin/JVM on JDK 17+; no Android plugins or SDK requirements. Container: Ktor on Netty. Lambda: `RequestHandler` with `aws-lambda-java-core` and `-events`.
+- Use the Gradle wrapper (checksum-pinned in `gradle-wrapper.properties`) and pin every plugin and library exactly; keep the dependency set small (cold start and package size).
+- Logic lives in plain functions: `greeting` plus `Application.module()` (container) or `Handler.handleRequest` (Lambda); `main` stays a thin entry point.
+- Container: reads `HOST` and `PORT` (the platform sets `PORT`), serves `GET /health`, shuts down gracefully, runs as non-root; the `Dockerfile` builds with the Gradle wrapper (`installDist`).
+- Lambda: the handler is stateless; keep state out of globals and create clients in a field of the handler class, not per request. `just build` writes the zip to `build/distributions/`; handler `com.example.app.Handler::handleRequest`, runtime java17 or newer.
+- Tests drive `module()` with Ktor `testApplication` or call `Handler` directly: deterministic, no sockets, no network, no cloud account.
+- Format and lint with ktlint (`just fmt` writes, `just lint` only checks).
+- Validate path, query and body input before use; return explicit status codes; never log secrets or request bodies.
+- Settings and secrets come from environment variables or the platform's secret store; never hard-code or commit them.
+- Building images, deploying, `aws`/`sam`/`gcloud`, registry pushes, publishing and release tags need the user's approval.

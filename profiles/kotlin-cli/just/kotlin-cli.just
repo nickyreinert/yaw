@@ -1,0 +1,65 @@
+# profiles/kotlin-cli: the uniform verbs (doc 01 §6). Verbs that do not apply print a note and exit 0.
+# `check` needs no Docker; the wrapper downloads Gradle and the libraries from Maven Central on first use (T-001, ADR-0117).
+
+# JDK 17+ and the checked-in Gradle wrapper; downloads Gradle on first use.
+setup:
+    @command -v java >/dev/null 2>&1 || { echo "setup: install JDK 17 or newer" >&2; exit 1; }
+    @v=$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1); if [ -z "$v" ] || [ "$v" -lt 17 ]; then echo "setup: JDK 17 or newer is required, found: ${v:-none}" >&2; exit 1; fi
+    @test -f gradlew && test -f gradle/wrapper/gradle-wrapper.jar || { echo "setup: Gradle wrapper files are missing" >&2; exit 1; }
+    chmod +x gradlew
+    ./gradlew --version
+
+# Run the tool; arguments after the recipe name are passed on: just dev Ada.
+dev *args:
+    @command -v java >/dev/null 2>&1 || { echo "dev: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew --quiet run --args='{{args}}'
+
+fmt:
+    @command -v java >/dev/null 2>&1 || { echo "fmt: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew ktlintFormat
+
+lint:
+    @command -v java >/dev/null 2>&1 || { echo "lint: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew ktlintCheck
+
+typecheck:
+    @command -v java >/dev/null 2>&1 || { echo "typecheck: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew compileKotlin compileTestKotlin
+
+test:
+    @command -v java >/dev/null 2>&1 || { echo "test: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew test
+
+check: lint typecheck test build sync-check
+
+# Runs the Gradle build and installs the launcher in build/install/app/bin/app.
+build:
+    @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
+    ./gradlew build installDist
+
+screenshot:
+    @echo "screenshot: not applicable for kotlin-cli"
+
+preview:
+    @echo "preview: not applicable for kotlin-cli"
+
+preview-share:
+    @echo "preview-share: not applicable for kotlin-cli"
+
+audit:
+    @echo "audit: not applicable for kotlin-cli (Dependabot can monitor Gradle dependencies)"
+
+db-migrate:
+    @echo "db-migrate: not applicable for kotlin-cli"
+
+db-reset:
+    @echo "db-reset: not applicable for kotlin-cli"
+
+backup:
+    @echo "backup: not applicable for kotlin-cli"
+
+restore:
+    @echo "restore: not applicable for kotlin-cli"
+
+deploy env='':
+    @echo "deploy: not applicable for kotlin-cli (publishing and release tags need your approval)"

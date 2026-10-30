@@ -255,6 +255,10 @@ Describe this area's responsibility.
   - `examples/android-kotlin/`
   - `examples/cloudflare-workers/`
   - `examples/composed/`
+  - `examples/kotlin-cli/`
+  - `examples/kotlin-serverless/`
+  - `examples/kotlin-serverless-lambda/`
+  - `examples/kotlin-web/`
   - `examples/node-app/`
   - `examples/node-app-electron/`
   - `examples/node-app-tauri/`
@@ -368,7 +372,9 @@ Describe this area's responsibility.
   - `profiles/cloudflare-workers/`
   - `profiles/go-basic/`
   - `profiles/java-basic/`
-  - `profiles/kotlin-basic/`
+  - `profiles/kotlin-cli/`
+  - `profiles/kotlin-serverless/`
+  - `profiles/kotlin-web/`
   - `profiles/node-app/`
   - `profiles/node-basic/`
   - `profiles/node-cli/`

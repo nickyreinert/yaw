@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile kotlin-web (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small API that greets people.
+  idea.team: solo
+  arch.language: kotlin
+  arch.runs-on: self-hosted
+proposal:
+  status: confirmed
+  summary: kotlin-web - Kotlin web service; Ktor, Gradle, ktlint, JUnit 5, Dockerfile.
+  profiles: [kotlin-web]
+  modules: [core]
