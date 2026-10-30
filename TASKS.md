@@ -9,7 +9,7 @@
   acceptance: Replace generic basic-profile fallbacks with verified installation, run, test, build and deployment or packaging configuration for each supported destination. Cover environment requirements and verify each profile with an appropriate smoke test. Track remaining combinations explicitly; do not imply that a basic toolchain includes deployment scaffolding.
 
   progress: 1/27, done: python×serverless → python-vercel, ADR-0100 (a combination is done when a tailored profile owns the pair, its fixture is smoke-tested and CI runs `yaw init` + `just check`)
-  - python: serverless · edge · app-store
+  - python: ~~serverless~~ (done) · edge (to consider later: Python Workers are beta, handler not testable outside the runtime; stays on python-basic) · app-store
   - javascript: self-hosted · static · app-store
   - php: local · serverless
   - kotlin: local · self-hosted · serverless
