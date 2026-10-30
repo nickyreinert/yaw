@@ -14,7 +14,8 @@ const q = (over) => ({ id: 'idea.team', mode: 'Q', type: 'choice', label: 'Solo 
 test('interview/base.yaml validates, ids are unique, and Quick asks only Q questions', () => {
   const all = collectQuestions(KIT_ROOT, ['core']);
   assert.ok(all.length >= 5);
-  assert.deepEqual(loadBaseQuestions(KIT_ROOT), all);
+  // Base questions plus the generated profile option questions (ADR-0105).
+  assert.deepEqual(loadBaseQuestions(KIT_ROOT), all.filter((x) => !x.profileOption));
   assert.ok(all.filter((x) => asksIn(x, 'quick')).every((x) => x.mode === 'Q'));
   assert.ok(all.some((x) => x.mode === 'F'));
   assert.ok(all.some((x) => x.id === 'user.agents') && all.some((x) => x.id === 'arch.language'));

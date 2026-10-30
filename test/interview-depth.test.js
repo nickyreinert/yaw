@@ -37,7 +37,7 @@ test('Quick asks only project essentials and architecture; Basic adds GitHub/rev
   assert.deepEqual(DEPTHS.map((d) => d.label), ['Quick', 'Basic', 'All']);
   for (const mode of ['pro', 'all', 'full', 'standard']) assert.equal(depthLabel(mode), 'All');
   const ids = (mode) => questions.filter((q) => asksIn(q, mode)).map((q) => q.id);
-  assert.deepEqual(ids('quick'), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on']);
+  assert.deepEqual(ids('quick'), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on', 'arch.node-app-framework']);
   for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {
     assert.ok(!ids('basic').includes(id), `${id} belongs to Pro`);
     assert.ok(!ids('pro').includes(id), `${id} is retained only for legacy answers`);
