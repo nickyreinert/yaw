@@ -1,5 +1,0 @@
-- Use Node.js >= 22.13 and ECMAScript modules; prefer built-in APIs.
-- Keep the project dependency-free unless a written reason justifies a package.
-- Tests use `node:test` and `node:assert/strict`; run them with `just test`.
-- Validate command-line and external input at the boundary; report errors clearly.
-- Do not commit generated output, secrets, or local environment files.

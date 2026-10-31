@@ -1,0 +1,7 @@
+- TypeScript in strict mode; `just typecheck` (`tsc --noEmit`) must pass. No `any` without a comment saying why.
+- Logic lives in DOM-free modules under `src/` (like `greeting.ts`) and is tested; `src/main.ts` only wires it to the page.
+- Tests use Vitest, live in `tests/` as `*.spec.ts` and are deterministic.
+- Lint with ESLint (`just lint`); do not add a second linter or formatter without an ADR.
+- Dependencies are pinned exact versions; everything in the scaffold is a dev tool because Vite bundles the code. Run `just audit` after changing them.
+- `just build` runs `vite build` to `dist/`; that folder is the site. Publishing it to a host needs the user's approval; hosting configuration is not generated.
+- Everything shipped to the browser is public: no secrets in the code or in `VITE_*` variables.

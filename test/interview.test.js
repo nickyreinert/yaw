@@ -118,7 +118,7 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => stackProfile(profiles, { 'arch.language': language, 'arch.runs-on': runsOn }).profile;
   assert.equal(pick('typescript', 'local'), 'node-cli');
-  assert.equal(pick('typescript', 'static'), 'node-basic');
+  assert.equal(pick('typescript', 'static'), 'node-static');
   assert.equal(pick('python', 'local'), 'python-cli');
   assert.equal(pick('python', 'app-store'), null);
   assert.match(stackProfile(profiles, { 'arch.language': 'python', 'arch.runs-on': 'app-store' }).reason, /no YAW profile for python on app-store/);

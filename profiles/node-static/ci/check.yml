@@ -1,5 +1,5 @@
-# CI steps fragment: the toolchain, then the same gate as local.
-# Actions are pinned by commit SHA (ADR-0027).
+# CI steps fragment: toolchain, then `just check` (same gate as local). No deploy, no hosting credentials.
+# Actions are pinned by commit SHA (Y-5.5, ADR-0027); the comment names the version the SHA was verified for.
 steps:
   - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
   - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

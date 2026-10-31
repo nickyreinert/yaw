@@ -271,6 +271,7 @@ Describe this area's responsibility.
   - `examples/node-app-electron/`
   - `examples/node-app-tauri/`
   - `examples/node-cli/`
+  - `examples/node-static/`
   - `examples/node-ts-vercel/`
   - `examples/node-web/`
   - `examples/php-cli/`
@@ -390,8 +391,8 @@ Describe this area's responsibility.
   - `profiles/kotlin-serverless/`
   - `profiles/kotlin-web/`
   - `profiles/node-app/`
-  - `profiles/node-basic/`
   - `profiles/node-cli/`
+  - `profiles/node-static/`
   - `profiles/node-ts-vercel/`
   - `profiles/node-web/`
   - `profiles/php-cli/`

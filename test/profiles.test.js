@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-cli', 'node-static', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -383,6 +383,28 @@ test('smoke node-web: yaw init, just setup && just check pass and build the app;
   assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
   copyFileSync(join(fixtures, 'type_error.ts'), bad);
   assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('smoke node-static: yaw init, just setup && just check pass and build dist/; bad code fails the gate (needs npm and network)', { skip: nodeWebSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('node-static', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /1 passed/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'dist', 'index.html')), 'just check builds dist/index.html');
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'node-static');
+  const bad = join(cwd, 'src', 'bad.ts');
+  copyFileSync(join(fixtures, 'lint_error.ts'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'an unused variable fails just lint');
+  copyFileSync(join(fixtures, 'type_error.ts'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+});
+
+test('node-static guards block remote deploys, remote hosts and publishing, not local work', () => {
+  const guards = parse(readFileSync(dir('node-static', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['wrangler pages deploy dist', 'netlify deploy --prod', 'vercel deploy', 'rsync -av dist/ me@host:/srv', 'ssh me@host', 'npm publish']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['npm run build', 'npx vite build', 'npx vitest run', 'vite preview', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
 test('node-web guards block image pushes, remote hosts and publishing, not local work', () => {
@@ -1422,7 +1444,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const profiles = listProfiles(KIT_ROOT);
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
-    ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
+    ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'], ['typescript', 'static', 'node-static'],
     ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['java', 'serverless', 'java-serverless'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);

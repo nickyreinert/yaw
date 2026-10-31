@@ -1,0 +1,12 @@
+# profiles/node-static
+# Picked for JavaScript/TypeScript x static hosting (ADR-0128, T-001): a Vite + TypeScript build to dist/, unlike static-site (plain HTML).
+name: node-static
+title: TypeScript static site built with Vite
+dependencyEcosystems: [npm]
+summary: TypeScript site built with Vite to static files in dist/; tsc, ESLint, Vitest, npm audit.
+stack:
+  language: [typescript]
+  runsOn: [static]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [node>=22.13, just]
