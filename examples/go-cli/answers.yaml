@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile go-cli (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small command-line tool that greets people.
+  idea.team: solo
+  arch.language: go
+  arch.runs-on: local
+proposal:
+  status: confirmed
+  summary: go-cli - Go command-line tool; gofmt, go vet, go test.
+  profiles: [go-cli]
+  modules: [core]

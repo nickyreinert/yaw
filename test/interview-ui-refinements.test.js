@@ -142,3 +142,14 @@ test('console refuses symlinks and bounds large existing file previews', () => {
   writeFileSync(join(f.root, 'AGENTS.md'), 'large '.repeat(25000));
   assert.throws(() => model.filePreview(input, 'AGENTS.md'), /too large/);
 });
+
+
+test('communication preference help briefly distinguishes all available wording and length options', async () => {
+  const { interviewDetailText } = await import('../core/web/assets/ui-state.js');
+  const wording = interviewDetailText('user.register');
+  assert.equal(wording.length, 4);
+  for (const label of ['Plain words', 'Professional', 'Technical', 'Scientific']) assert.ok(wording.some((line) => line.startsWith(`${label}:`)), label);
+  assert.match(wording.join(' '), /everyday language|avoid jargon/);
+  assert.match(wording.join(' '), /basis for claims/);
+  for (const id of ['user.length', 'user.examples', 'user.explain', 'user.autonomy', 'user.language']) assert.ok(interviewDetailText(id)?.length, id);
+});

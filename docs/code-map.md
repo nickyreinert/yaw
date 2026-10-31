@@ -255,6 +255,14 @@ Describe this area's responsibility.
   - `examples/android-kotlin/`
   - `examples/cloudflare-workers/`
   - `examples/composed/`
+  - `examples/go-cli/`
+  - `examples/go-serverless/`
+  - `examples/go-serverless-lambda/`
+  - `examples/go-web/`
+  - `examples/java-cli/`
+  - `examples/java-serverless/`
+  - `examples/java-serverless-lambda/`
+  - `examples/java-web/`
   - `examples/kotlin-cli/`
   - `examples/kotlin-serverless/`
   - `examples/kotlin-serverless-lambda/`
@@ -371,7 +379,13 @@ Describe this area's responsibility.
   - `profiles/android-kotlin/`
   - `profiles/cloudflare-workers/`
   - `profiles/go-basic/`
+  - `profiles/go-cli/`
+  - `profiles/go-serverless/`
+  - `profiles/go-web/`
   - `profiles/java-basic/`
+  - `profiles/java-cli/`
+  - `profiles/java-serverless/`
+  - `profiles/java-web/`
   - `profiles/kotlin-cli/`
   - `profiles/kotlin-serverless/`
   - `profiles/kotlin-web/`

@@ -27,9 +27,12 @@ function initComposed(extra = []) {
 
 test('composedVerbs: nothing for one profile; every verb calls every profile, check ends with sync-check', () => {
   assert.equal(composedVerbs(['static-site']), '');
-  const text = composedVerbs(PROFILES);
+  const has = { 'cloudflare-workers': ['deploy'], 'static-site': ['preview'] };
+  const text = composedVerbs(PROFILES, (p, v) => (has[p] ?? []).includes(v));
   assert.match(text, /^check: static-site::check cloudflare-workers::check sync-check$/m);
-  assert.match(text, /^deploy env='': \(static-site::deploy env\) \(cloudflare-workers::deploy env\)$/m);
+  assert.match(text, /^deploy env='': \(cloudflare-workers::deploy env\)$/m);
+  assert.doesNotMatch(text, /^(db-migrate|backup|screenshot)/m, 'optional verbs only where a profile defines them');
+  assert.match(composedVerbs(PROFILES, (p, v) => p === 'static-site' && v === 'backup'), /^backup: static-site::backup$/m);
   assert.match(text, /^lint: static-site::lint cloudflare-workers::lint$/m);
 });
 
@@ -56,16 +59,14 @@ test('top-level verbs call both profiles, namespaced verbs stay; deploy keeps th
   assert.equal(out.status, 0, out.stderr);
   for (const p of PROFILES) assert.match(out.stdout, new RegExp(`^\\s+${p} \\.\\.\\.`, 'm'));
   for (const verb of ['db-migrate', 'backup', 'screenshot']) {
-    const r = run('just', [verb], { cwd, env });
-    assert.equal(r.status, 0, verb);
-    assert.equal((r.stdout.match(new RegExp(`^${verb}: not applicable`, 'gm')) ?? []).length, 2, `${verb} ran in both profiles`);
+    assert.notEqual(run('just', [verb], { cwd, env }).status, 0, `${verb} is not defined by either profile`);
   }
   const one = run('just', ['static-site::build'], { cwd, env });
   assert.equal(one.status, 0);
   assert.equal((one.stdout.match(/not applicable for/g) ?? []).length, 1, 'a namespaced verb runs one profile');
   const dev = run('just', ['dev'], { cwd, env });
   assert.match(dev.stdout, /just static-site::dev, just cloudflare-workers::dev/);
-  // deploy: static-site is inert, cloudflare-workers refuses without the production guard, so the top level fails
+  // deploy: only cloudflare-workers defines deploy, it refuses without the production guard, so the top level fails
   const deploy = run('just', ['deploy', 'prod'], { cwd, env: { ...env, PATH: process.env.PATH } });
   assert.notEqual(deploy.status, 0);
   assert.match(deploy.stderr, /deploy: refused/);

@@ -116,7 +116,7 @@ pre, .command { background: #fff1e8; color: var(--ink); border-color: var(--line
 [aria-current] .step-number { background: var(--ink); color: var(--sun); border-color: var(--ink); }
 .interview-depth-bar { background: var(--paper); border-color: var(--line); }
 .depth-card, .decision-option, .hosts button, .module-card, .tool-default { background: #fff; border-color: var(--line); }
-.depth-card:has(input:checked), .decision-option:has(input:checked), .module-card:has(input:checked), .tool-default:has(input:checked) {
+.depth-card:has(input:checked), .decision-option:has(input:checked), .tool-default:has(input:checked) {
   background: var(--sun-wash); border-color: #9c822c;
 }
 .hosts button[aria-pressed=true], .chips .chip[aria-pressed=true] { background: var(--sun-wash); border-color: var(--ink); color: var(--ink); }
@@ -219,3 +219,9 @@ meter::-webkit-meter-optimum-value { background: var(--accent); }
 .review-file-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; flex-wrap: wrap; }
 .review-file-row > code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .review-file-row .decision-icon { width: 19px; height: 19px; flex: 0 0 19px; }
+
+/* Switchable groups remain neutral; only their inactive content is subdued. */
+.module-card, .module-card:has(input:checked) { background: var(--paper); border-color: var(--line); }
+.module-card.off > :is(.what, .card-questions, .card-more, .card-note), .module-card.reviewer.off > .decision-options { opacity: .72; }
+.module-head { width: 100%; min-height: 32px; cursor: pointer; }
+.module-head:has(input:disabled) { cursor: default; opacity: 1; }

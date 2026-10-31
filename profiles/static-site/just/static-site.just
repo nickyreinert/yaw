@@ -29,30 +29,9 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for static-site (public/ is the build output; add a build step only with an ADR)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for static-site (browser screenshots need Playwright, not part of this profile)"
-
 preview:
     npx serve public
-
-preview-share:
-    @echo "preview-share: not applicable for static-site (share only with your approval)"
 
 # Only shipped dependencies: the site is static files, linters are dev tools (ADR-0034).
 audit:
     npm audit --omit=dev
-
-db-migrate:
-    @echo "db-migrate: not applicable for static-site"
-
-db-reset:
-    @echo "db-reset: not applicable for static-site"
-
-backup:
-    @echo "backup: not applicable for static-site"
-
-restore:
-    @echo "restore: not applicable for static-site"
-
-deploy env='':
-    @echo "deploy: not applicable for static-site (deploying is remote and needs your approval; add the command with your host)"

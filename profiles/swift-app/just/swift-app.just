@@ -30,29 +30,5 @@ check: lint typecheck test sync-check
 build:
     swift build -c release
 
-screenshot:
-    @echo "screenshot: not applicable for swift-app"
-
-preview:
-    @echo "preview: not applicable for swift-app (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for swift-app"
-
 audit:
     @echo "audit: not applicable for swift-app (no third-party packages; SwiftPM has no audit command)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for swift-app"
-
-db-reset:
-    @echo "db-reset: not applicable for swift-app"
-
-backup:
-    @echo "backup: not applicable for swift-app"
-
-restore:
-    @echo "restore: not applicable for swift-app"
-
-deploy env='':
-    @echo "deploy: not applicable for swift-app (signing, notarizing and uploading to App Store Connect need your approval)"

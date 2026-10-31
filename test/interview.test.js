@@ -127,7 +127,14 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   assert.equal(pick('kotlin', 'local'), 'kotlin-cli');
   assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-web');
   assert.equal(pick('kotlin', 'serverless'), 'kotlin-serverless');
-  for (const language of ['go', 'java']) assert.equal(pick(language, 'local'), `${language}-basic`);
+  assert.equal(pick('java', 'local'), 'java-cli');
+  assert.equal(pick('java', 'self-hosted'), 'java-web');
+  assert.equal(pick('java', 'serverless'), 'java-serverless');
+  assert.equal(pick('java', 'app-store'), 'java-basic');
+  assert.equal(pick('go', 'local'), 'go-cli');
+  assert.equal(pick('go', 'self-hosted'), 'go-web');
+  assert.equal(pick('go', 'serverless'), 'go-serverless');
+  assert.equal(pick('go', 'app-store'), 'go-basic');
   assert.equal(pick('rust', 'local'), 'rust-cli');
   assert.equal(pick('rust', 'self-hosted'), 'rust-web');
   assert.equal(pick('rust', 'serverless'), 'rust-serverless');

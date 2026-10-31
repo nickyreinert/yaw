@@ -29,29 +29,5 @@ check: lint typecheck test sync-check
 build:
     swift build -c release
 
-screenshot:
-    @echo "screenshot: not applicable for swift-cli"
-
-preview:
-    @echo "preview: not applicable for swift-cli (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for swift-cli"
-
 audit:
     @echo "audit: not applicable for swift-cli (no third-party packages; SwiftPM has no audit command)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for swift-cli"
-
-db-reset:
-    @echo "db-reset: not applicable for swift-cli"
-
-backup:
-    @echo "backup: not applicable for swift-cli"
-
-restore:
-    @echo "restore: not applicable for swift-cli"
-
-deploy env='':
-    @echo "deploy: not applicable for swift-cli (a local tool; installing or copying it elsewhere needs your approval)"

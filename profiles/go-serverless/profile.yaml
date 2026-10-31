@@ -1,0 +1,30 @@
+# profiles/go-serverless
+# Picked for Go x serverless (ADR-0054); the hosting option picks the scaffold variant (ADR-0105, ADR-0123).
+name: go-serverless
+title: Go serverless app
+summary: Go app for serverless hosts, as a container or on AWS Lambda; gofmt, go vet, go test, standard library plus aws-lambda-go for Lambda.
+stack:
+  language: [go]
+  runsOn: [serverless]
+  notes:
+    serverless: The gate runs without Docker or AWS accounts; building images, deploying and cloud accounts are yours.
+options:
+  hosting:
+    label: "Serverless flavor: container (Cloud Run style) or AWS Lambda"
+    hint: Container ships a net/http service with a Dockerfile; Lambda ships an API Gateway handler built as a provided.al2023 bootstrap binary.
+    choices:
+      - { value: container, label: "Container (net/http, Dockerfile, Cloud Run style)" }
+      - { value: lambda, label: "AWS Lambda (aws-lambda-go, provided.al2023)" }
+    default: container
+    scaffold: true
+dependencyEcosystems: [gomod]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [go>=1.22, just]
+tools:
+  - name: aws
+    check: aws --version
+    install:
+      macos: brew install awscli
+      linux: curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip awscliv2.zip && sudo ./aws/install
+    when: { hosting: lambda }

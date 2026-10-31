@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmp as makeTmp } from './helpers/fixtures.js';
 import { join } from 'node:path';
 import { findSessions, probeSource } from '../modules/sessions/lib/import.js';
 import { claudeFolder } from '../modules/sessions/lib/import.js';
 import { effectiveSources, saveSources, sourcesData } from '../core/lib/session-sources.js';
 import { readTurns } from '../core/lib/session-analysis.js';
 
-const tmp = () => realpathSync(mkdtempSync(join(tmpdir(), 'yaw-sources-')));
+const tmp = () => realpathSync(makeTmp('yaw-sources-'));
 const sha = (t) => createHash('sha256').update(t).digest('hex');
 const chat = { sessionId: 'abc-123', projectHash: 'x', startTime: '2026-10-01T10:00:00Z', lastUpdated: '2026-10-01T10:20:00Z', messages: [
   { id: '1', timestamp: '2026-10-01T10:00:05Z', type: 'user', content: 'hello there' },

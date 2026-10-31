@@ -32,30 +32,6 @@ check: lint typecheck test audit build sync-check
 build:
     cargo build --release --locked
 
-screenshot:
-    @echo "screenshot: not applicable for rust-web"
-
-preview:
-    @echo "preview: not applicable for rust-web (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for rust-web"
-
 # Vulnerability scan of Cargo.lock with cargo-audit (CI installs it; locally it is optional and installing it needs your approval).
 audit:
     @if cargo audit --version >/dev/null 2>&1; then cargo audit; else echo "audit: cargo-audit is not installed; skipped (CI runs it; installing it needs your approval)"; fi
-
-db-migrate:
-    @echo "db-migrate: not applicable for rust-web"
-
-db-reset:
-    @echo "db-reset: not applicable for rust-web"
-
-backup:
-    @echo "backup: not applicable for rust-web"
-
-restore:
-    @echo "restore: not applicable for rust-web"
-
-deploy env='':
-    @echo "deploy: not applicable for rust-web (deploying to your server needs your approval)"

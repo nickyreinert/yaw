@@ -30,29 +30,5 @@ build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
     ./gradlew build
 
-screenshot:
-    @echo "screenshot: not applicable for java-basic"
-
-preview:
-    @echo "preview: not applicable for java-basic"
-
-preview-share:
-    @echo "preview-share: not applicable for java-basic"
-
 audit:
     @echo "audit: not applicable for java-basic (Dependabot can monitor Gradle dependencies)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for java-basic"
-
-db-reset:
-    @echo "db-reset: not applicable for java-basic"
-
-backup:
-    @echo "backup: not applicable for java-basic"
-
-restore:
-    @echo "restore: not applicable for java-basic"
-
-deploy env='':
-    @echo "deploy: not applicable for java-basic (deployment needs your approval)"

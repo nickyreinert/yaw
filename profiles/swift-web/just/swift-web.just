@@ -30,29 +30,5 @@ check: lint typecheck test audit build sync-check
 build:
     swift build -c release
 
-screenshot:
-    @echo "screenshot: not applicable for swift-web"
-
-preview:
-    @echo "preview: not applicable for swift-web (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for swift-web (share only with your approval)"
-
 audit:
     @echo "audit: not applicable for swift-web (SwiftPM has no audit command; dependencies are pinned in Package.resolved and watched by Dependabot)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for swift-web"
-
-db-reset:
-    @echo "db-reset: not applicable for swift-web"
-
-backup:
-    @echo "backup: not applicable for swift-web"
-
-restore:
-    @echo "restore: not applicable for swift-web"
-
-deploy env='':
-    @echo "deploy: not applicable for swift-web (deploying to your server needs your approval)"

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, realpathSync, renameSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, realpathSync, renameSync } from 'node:fs';
+import { tmp as makeTmp } from './helpers/fixtures.js';
 import { join, resolve } from 'node:path';
 import { configureSync, runSync, syncStatus, syncedSessions } from '../core/lib/data-sync.js';
 import { writeUserData } from '../core/lib/user-store.js';
@@ -12,7 +12,7 @@ import { sessionsData } from '../core/web/dashboard.js';
 
 const kitRoot = resolve('.');
 function pair(scopes) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'yaw-sync-')));
+  const root = realpathSync(makeTmp('yaw-sync-'));
   const target = join(root, 'NAS'); mkdirSync(target);
   const a = { HOME: join(root, 'laptop') }, b = { HOME: join(root, 'pc') };
   configureSync({ env: a, target, name: 'Laptop', scopes });
@@ -93,7 +93,7 @@ test('CLI and authenticated workspace API share configuration, sync and device s
 });
 
 test('GitHub requires a private repository and publishes only the vault; failed push preserves local records', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'yaw-sync-git-'))), env = { HOME: root };
+  const root = realpathSync(makeTmp('yaw-sync-git-')), env = { HOME: root };
   configureSync({ env, github: 'owner/yaw-data', name: 'PC', scopes: ['settings'] });
   const calls = [];
   const execute = (bin, args) => {
@@ -144,7 +144,7 @@ test('sync HTTP actions require authentication and CSRF; reads never configure o
 test('--sync shortcut: a new machine joins the sync folder and gets the presets before the interview', async () => {
   const { target, a, run, preset } = pair();
   preset(a, 'en'); run(a);
-  const fresh = { HOME: join(realpathSync(mkdtempSync(join(tmpdir(), 'yaw-fresh-'))), 'new') };
+  const fresh = { HOME: join(realpathSync(makeTmp('yaw-fresh-')), 'new') };
   mkdirSync(fresh.HOME, { recursive: true });
   const { syncShortcut } = await import('../core/cli/sync.js');
   let out = '';
@@ -216,7 +216,7 @@ test('task snapshots sync as folder name plus items, appear on the other device 
 });
 
 test('tasks and knowledge are opt-in', () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'yaw-sync-'))), target = join(root, 'NAS'); mkdirSync(target);
+  const root = realpathSync(makeTmp('yaw-sync-')), target = join(root, 'NAS'); mkdirSync(target);
   assert.deepEqual(configureSync({ env: { HOME: root }, target }).config.scopes, ['settings', 'presets', 'statistics']);
   assert.throws(() => configureSync({ env: { HOME: join(root, 'x') }, target, scopes: ['nope'] }), /Scopes/);
 });

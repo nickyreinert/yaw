@@ -1,0 +1,6 @@
+- Go 1.22+, one module (`go.mod`); the standard library first, a dependency only with a clear reason (pin it in `go.mod`, commit `go.sum`).
+- Logic lives in `run(args, stdout, stderr) int`; `main` only calls it and exits. Tests call `run` with buffers: deterministic, no network.
+- Format with gofmt (`just fmt`; `just lint` only checks) and keep `go vet` clean.
+- Return errors with context (`fmt.Errorf("...: %w", err)`); never discard them silently.
+- Usage errors go to stderr with exit code 2; runtime failures exit 1.
+- `go install`, running remote modules (`go run pkg@version`), `go env -w`, release tags (they publish a module version) and reaching remote hosts need the user's approval.

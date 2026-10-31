@@ -1,0 +1,10 @@
+- Java 17+ (`options.release` 17). Container: the JDK's built-in `com.sun.net.httpserver`, no libraries. Lambda: `RequestHandler` with `aws-lambda-java-core` and `-events`.
+- Use the Gradle wrapper (checksum-pinned in `gradle-wrapper.properties`) and pin every plugin and library exactly; keep the dependency set small (cold start and package size).
+- Routing lives in `Routes.handle` (a pure function) for both flavors; `Server.main` (container) and `Handler.handleRequest` (Lambda) stay thin adapters.
+- Container: reads `HOST` and `PORT` (the platform sets `PORT`), serves `GET /health`, stops gracefully on SIGTERM, runs as non-root; the `Dockerfile` builds with the Gradle wrapper (`installDist`).
+- Lambda: the handler is stateless; keep state out of static fields and create clients in a field of the handler class, not per request. `just build` writes the zip to `build/distributions/`; handler `com.example.app.Handler::handleRequest`, runtime java17 or newer.
+- Tests call `Routes.handle` or `Handler` directly: deterministic, no sockets, no network, no cloud account.
+- Compile with `-Xlint:all -Werror`; format with Spotless and google-java-format (`just fmt` writes, `just lint` only checks).
+- Validate path, query and body input before use; return explicit status codes; never log secrets or request bodies.
+- Settings and secrets come from environment variables or the platform's secret store; never hard-code or commit them.
+- Building images, deploying, `aws`/`sam`/`gcloud`, registry pushes, publishing and release tags need the user's approval.

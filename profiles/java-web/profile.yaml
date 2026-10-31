@@ -1,0 +1,14 @@
+# profiles/java-web
+# Picked for Java x self-hosted (ADR-0054, T-001, ADR-0126): an HTTP service on your own server or container host.
+name: java-web
+title: Java web service
+dependencyEcosystems: [gradle]
+summary: Java HTTP service on the JDK's built-in server; Gradle, Spotless (google-java-format), javac -Xlint, JUnit 5, Dockerfile, no third-party libraries.
+stack:
+  language: [java]
+  runsOn: [self-hosted]
+  notes:
+    self-hosted: The gate runs without Docker; building and pushing the image and reaching your server are yours.
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]

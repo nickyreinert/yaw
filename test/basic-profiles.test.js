@@ -9,9 +9,9 @@ import { KIT_ROOT } from './helpers/fixtures.js';
 const EXPECTED = {
   'python-basic': { language: ['python'], runsOn: ['edge'] },
   'node-basic': { language: ['typescript'], runsOn: ['static'] },
-  'go-basic': { language: ['go'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
+  'go-basic': { language: ['go'], runsOn: ['app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['edge', 'app-store'] },
-  'java-basic': { language: ['java'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
+  'java-basic': { language: ['java'], runsOn: ['app-store'] },
 };
 const SOURCE_FILES = {
   'python-basic': 'src/app.py',
@@ -20,10 +20,7 @@ const SOURCE_FILES = {
   'rust-basic': 'src/lib.rs',
   'java-basic': 'src/main/java/com/example/app/Greeting.java',
 };
-const VERBS = [
-  'setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot',
-  'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy',
-];
+const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 
 function renderedTestFile(files) {
   return [...files.keys()].find((path) =>

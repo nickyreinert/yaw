@@ -28,30 +28,9 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for python-vercel (Vercel builds on its side)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for python-vercel (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for python-vercel"
-
-preview-share:
-    @echo "preview-share: not applicable for python-vercel (share only with your approval)"
-
 # Vulnerability scan of the installed dependencies (needs network).
 audit:
     uv run pip-audit
-
-db-migrate:
-    @echo "db-migrate: not applicable for python-vercel"
-
-db-reset:
-    @echo "db-reset: not applicable for python-vercel"
-
-backup:
-    @echo "backup: not applicable for python-vercel"
-
-restore:
-    @echo "restore: not applicable for python-vercel"
 
 # Production deploy with the Vercel CLI, only on your machine: refuses in CI, without the argument `prod`, and without YAW_CONFIRM_PROD=yes.
 deploy env='':

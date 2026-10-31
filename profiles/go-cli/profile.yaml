@@ -1,0 +1,11 @@
+# profiles/go-cli
+# Picked for Go x your computer (ADR-0054, T-001): command-line tools built with the Go toolchain.
+name: go-cli
+title: Go command-line tool
+summary: Go command-line tool; gofmt, go vet, go test, standard library only.
+stack:
+  language: [go]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [go>=1.22, just]

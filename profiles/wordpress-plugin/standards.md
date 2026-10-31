@@ -7,4 +7,4 @@
 - Dependencies via Composer; commit `composer.lock`; never edit `vendor/`; run `just audit` after changing them.
 - Tests use PHPUnit in `tests/`, are deterministic and make no network calls; `just dev` (wp-env, Docker) and Plugin Check (`wp plugin check` in wp-env) are for you to run when needed.
 - Secrets and settings come from environment variables or WordPress options; never hard-code or log them.
-- A release to the WordPress.org SVN (`svn commit`, deploy scripts), `rsync`/`ssh` to a host and wp-cli against a remote site need the user; `just deploy` does nothing.
+- A release to the WordPress.org SVN (`svn commit`, deploy scripts), `rsync`/`ssh` to a host and wp-cli against a remote site need the user.

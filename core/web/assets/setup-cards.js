@@ -258,7 +258,7 @@ function moduleCard(m, ctx, selected, hasGit) {
   const input = el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: `module-${m.name}`, checked: on, disabled: required || ctx.readOnly,
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
   const questions = ctx.questionNodes?.(m.name, on) ?? [];
-  const card = el('article', { class: `module-card${on ? ' on' : ''}` },
+  const card = el('article', { class: `module-card${on ? ' on' : ' off'}` },
     el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));

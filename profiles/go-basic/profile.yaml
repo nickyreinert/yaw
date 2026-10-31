@@ -5,7 +5,7 @@ title: Basic Go project
 summary: Go project; gofmt, go vet, go test, optional staticcheck.
 stack:
   language: [go]
-  runsOn: [local, self-hosted, serverless, app-store]
+  runsOn: [app-store]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

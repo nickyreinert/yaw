@@ -189,7 +189,7 @@ test('init records every written file with its SHA-256 and a pristine base copy'
   }
   assert.equal(manifest.files.find((f) => f.path === '.yaw/answers.yaml').managed, false);
   assert.deepEqual(manifest.files.filter((f) => !f.managed).map((f) => f.path), ['.yaw/answers.yaml', 'README.md', 'package.json', 'src/index.js', 'test/index.test.js']);
-  assert.match(read(root, 'AGENTS.md'), /^# AGENTS\.md\n\nRules for coding agents in this project, written by YAW \(quick setup\)/);
+  assert.match(read(root, 'AGENTS.md'), /^# AGENTS\.md\n\n## Project\n/);
   assert.match(read(root, 'AGENTS.md'), /<!-- yaw:core -->\n- Start every task/);
   assert.equal(read(root, 'CLAUDE.md'), '@AGENTS.md\n');
   assert.ok(!existsSync(join(root, '.yaw/base/.yaw')));

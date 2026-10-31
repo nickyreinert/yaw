@@ -13,10 +13,10 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'java-basic', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
-const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'screenshot', 'preview', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
-const NOT_APPLICABLE = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
+const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
+const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
 const haveJust = hasTool('just');
 const skipJust = !haveJust && 'just is not installed';
 const dir = (p, ...rest) => join(KIT_ROOT, 'profiles', p, ...rest);
@@ -73,11 +73,14 @@ test('ci/check.yml is a steps fragment that ends with just setup and just check'
   assert.equal(setup.with['node-version'], '22.13');
 });
 
-test('the just fragment defines every uniform verb (doc 01 §6) and nothing else', () => {
+test('the just fragment defines every core verb (ADR-0120) and optional verbs only as real recipes', () => {
   for (const name of PROFILES) {
     const text = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
     const recipes = [...text.matchAll(/^([a-z][a-z-]*)(?: [^:\n]*)?:(?!=)/gm)].map((m) => m[1]);
-    assert.deepEqual(recipes.sort(), [...VERBS].sort(), name);
+    assert.deepEqual(recipes.filter((r) => !OPTIONAL_VERBS.includes(r)).sort(), [...VERBS].sort(), name);
+    for (const verb of OPTIONAL_VERBS.filter((v) => recipes.includes(v))) {
+      assert.doesNotMatch(text, new RegExp(`^${verb}\\b[^\\n]*:[^\\n]*\\n\\s+@echo "${verb}: not applicable`, 'm'), `${name}: ${verb} is a stub`);
+    }
     assert.doesNotMatch(text, /^(task|gh|default)\b/m);
   }
 });
@@ -123,25 +126,23 @@ test('smoke node-cli: yaw init in an empty folder, just setup && just check pass
 test('node-cli: verbs that do not apply print a note and exit 0; deploy takes an environment', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('node-cli', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'fmt', 'typecheck', 'build']) {
+  for (const verb of ['fmt', 'typecheck', 'build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
-  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
-  assert.equal(deploy.status, 0);
-  assert.match(deploy.stdout, /deploy: not applicable/);
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('python-cli: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('python-cli', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'build']) {
+  for (const verb of ['build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
-  assert.equal(run('just', ['deploy', 'prod'], { cwd, env }).status, 0);
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 const pythonSkip = (!haveJust && 'just is not installed') || (!hasTool('uv') && 'uv is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (uv needs the network)');
@@ -205,14 +206,12 @@ test('static-site check-links: refuses targets outside public/ without reading t
 test('static-site: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('static-site', env, ['--skip-verify']);
-  for (const verb of ['screenshot', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'fmt', 'typecheck', 'build']) {
+  for (const verb of ['fmt', 'typecheck', 'build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
-  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
-  assert.equal(deploy.status, 0);
-  assert.match(deploy.stdout, /deploy: not applicable/);
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 const staticSkip = (!haveJust && 'just is not installed') || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
@@ -236,14 +235,8 @@ test('smoke static-site: yaw init, just setup && just check pass; broken pages f
 test('python-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('python-web', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'backup']) {
-    const r = run('just', [verb], { cwd, env });
-    assert.equal(r.status, 0, verb);
-    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
-  }
-  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
-  assert.equal(deploy.status, 0);
-  assert.match(deploy.stdout, /deploy: not applicable/);
+  assert.notEqual(run('just', ['backup'], { cwd, env }).status, 0, 'backup is not defined');
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('smoke python-web: yaw init, just setup && just check pass; bad code fails the gate (needs uv and network)', { skip: pythonSkip, timeout: 300000 }, () => {
@@ -276,7 +269,7 @@ test('python-web guards block publishing and remote forms, not local work', () =
 test('python-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('python-vercel', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'dev', 'build']) {
+  for (const verb of ['dev', 'build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
@@ -322,7 +315,7 @@ test('python-vercel guards block every Vercel CLI form, the deploy recipe and pu
 test('node-ts-vercel: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('node-ts-vercel', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'dev', 'fmt', 'build']) {
+  for (const verb of ['dev', 'fmt', 'build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
@@ -364,14 +357,15 @@ test('node-ts-vercel guards block every Vercel CLI form and the deploy recipe, n
   for (const cmd of ['vercel --version', 'vercel -v', 'vercel --help', 'npx vercel@65.0.0 --version', 'cat vercel.json', 'npx vitest run', 'just check', 'just test', 'npm test', 'npx tsc --noEmit', 'npx eslint .', 'git add vercel.json']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('node-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('node-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('node-web', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'fmt', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['fmt']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 const nodeWebSkip = (!haveJust && 'just is not installed') || (!hasTool('npm') && 'npm is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (npm install needs the network)');
@@ -400,14 +394,15 @@ test('node-web guards block image pushes, remote hosts and publishing, not local
   for (const cmd of ['docker build -t app .', 'docker compose up', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'npx vitest run', 'npm run build', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('php-cli: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('php-cli: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-cli', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['build']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('smoke php-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs php, composer and network)', { skip: (!haveJust && 'just is not installed') || (!hasTool('php') && 'php is not installed') || (!hasTool('composer') && 'composer is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (composer install needs the network)'), timeout: 300000 }, () => {
@@ -440,14 +435,15 @@ test('php-cli guards block machine-wide Composer changes and remote hosts, not l
 // node-app (ADR-0106): one smoke test per framework variant (ADR-0105); none needs Xcode, the Android SDK or signing.
 const NODE_APP_EXAMPLES = { capacitor: 'node-app', electron: 'node-app-electron', tauri: 'node-app-tauri' };
 
-test('node-app: verbs that do not apply print a note and exit 0, deploy included', { skip: skipJust }, () => {
+test('node-app: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('node-app', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'fmt', 'deploy']) {
+  for (const verb of ['fmt']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 for (const [variant, example] of Object.entries(NODE_APP_EXAMPLES)) {
@@ -480,14 +476,15 @@ test('node-app guards block store uploads, signing, publishing and remote hosts,
 const PHP_SERVERLESS_EXAMPLES = { container: 'php-serverless', bref: 'php-serverless-bref' };
 const phpSkip = (!haveJust && 'just is not installed') || (!hasTool('php') && 'php is not installed') || (!hasTool('composer') && 'composer is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (composer install needs the network)');
 
-test('php-serverless: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('php-serverless: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-serverless', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['build']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('php-serverless: the uniform verbs exist and the hosting option has the two variants, container by default', () => {
@@ -532,14 +529,15 @@ test('php-serverless guards block registry pushes, cloud CLIs, remote hosts and 
 
 const swiftSkip = (!haveJust && 'just is not installed') || (!hasTool('swift') && 'swift is not installed');
 
-test('swift-cli: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('swift-cli: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('swift-cli', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['audit']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('smoke swift-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs swift 6)', { skip: swiftSkip, timeout: 600000 }, () => {
@@ -569,14 +567,15 @@ test('swift-cli guards block release tags, package registry publishing and remot
   for (const cmd of ['swift build', 'swift test', 'swift run app Ada', 'swift format lint --strict -r Sources', 'swift package resolve', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('swift-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('swift-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('swift-web', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['audit']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('swift-web pins Hummingbird exactly', () => {
@@ -610,14 +609,15 @@ test('swift-web guards block image pushes, remote hosts, release tags and regist
   for (const cmd of ['docker build -t app .', 'docker compose up', 'swift build', 'swift test', 'swift run app', 'swift package resolve', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('swift-app: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('swift-app: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('swift-app', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['audit']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('swift-app keeps the SwiftUI views inside canImport(SwiftUI) and the logic UI-free', () => {
@@ -655,14 +655,15 @@ test('swift-app guards block store upload, notarization, signing changes, releas
 
 const rustSkip = (!haveJust && 'just is not installed') || (!hasTool('cargo') && 'cargo is not installed');
 
-test('rust-cli: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('rust-cli: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('rust-cli', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['audit']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('smoke rust-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs cargo, rustfmt and clippy)', { skip: rustSkip, timeout: 600000 }, () => {
@@ -692,14 +693,10 @@ test('rust-cli guards block crates.io changes, tool installs, release tags and r
   for (const cmd of ['cargo build', 'cargo test', 'cargo run -- Ada', 'cargo fmt --all', 'cargo clippy --all-targets -- -D warnings', 'cargo check', 'cargo fetch', 'rustup component list', 'git push origin main', 'rsync -av a/ b/', 'rsync -av a/ ./b:c/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('rust-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('rust-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('rust-web', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
-    assert.equal(r.status, 0, verb);
-    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
-  }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('rust-web pins its crates exactly and the profile watches cargo', () => {
@@ -737,14 +734,10 @@ test('rust-web guards block crates.io changes, image pushes, remote hosts, tool 
 // rust-serverless (ADR-0115): one smoke test per hosting variant (ADR-0105); none needs Docker, AWS accounts or cargo-lambda.
 const RUST_SERVERLESS_EXAMPLES = { container: 'rust-serverless', lambda: 'rust-serverless-lambda' };
 
-test('rust-serverless: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('rust-serverless: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('rust-serverless', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
-    assert.equal(r.status, 0, verb);
-    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
-  }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('rust-serverless: the uniform verbs exist and the hosting option has the two variants, container by default, with exact crate pins', () => {
@@ -789,6 +782,103 @@ test('rust-serverless guards block registry pushes, cloud CLIs, cargo lambda dep
   for (const cmd of ['cargo build --release --locked', 'cargo lambda build --release --arm64', 'cargo lambda watch', 'cargo test', 'cargo audit', 'cargo fetch', 'docker build -t app .', 'git push origin main', 'rsync -av a/ b/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
+// go-cli, go-web, go-serverless (ADR-0121..0123): the Go toolchain; the gate needs no Docker or AWS account, only go-serverless (lambda) fetches aws-lambda-go once.
+const goSkip = (!haveJust && 'just is not installed') || (!hasTool('go') && 'go is not installed');
+const goOffline = goSkip || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (the Lambda flavor fetches a module)');
+const GO_SERVERLESS_EXAMPLES = { container: 'go-serverless', lambda: 'go-serverless-lambda' };
+
+function badGo(cwd, name) {
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', name);
+  const bad = join(cwd, 'bad.go');
+  copyFileSync(join(fixtures, 'lint_error.go'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'unformatted code fails just lint');
+  copyFileSync(join(fixtures, 'type_error.go'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+}
+
+for (const name of ['go-cli', 'go-web', 'go-serverless']) {
+  test(`${name}: the core verbs exist, no echo-only stubs, deploy is not defined`, { skip: skipJust }, () => {
+    const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
+    for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    for (const verb of OPTIONAL_VERBS) assert.doesNotMatch(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+    const { cwd } = initExample(name, env, ['--skip-verify']);
+    assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
+  });
+}
+
+test('go-serverless: hosting option has container (default) and lambda, aws-lambda-go is pinned exactly with go.sum, gomod is watched', () => {
+  const profile = loadProfile(KIT_ROOT, 'go-serverless');
+  assert.deepEqual(profile.options.hosting.choices.map((c) => c.value), ['container', 'lambda']);
+  assert.equal(profile.options.hosting.default, 'container');
+  assert.deepEqual(profile.dependencyEcosystems, ['gomod']);
+  assert.match(readFileSync(dir('go-serverless', 'variants', 'lambda', 'go.mod'), 'utf8'), /^require github\.com\/aws\/aws-lambda-go v\d+\.\d+\.\d+$/m);
+  assert.ok(existsSync(dir('go-serverless', 'variants', 'lambda', 'go.sum')));
+  assert.doesNotMatch(readFileSync(dir('go-serverless', 'variants', 'container', 'go.mod'), 'utf8'), /require/);
+  for (const name of ['go-cli', 'go-web']) assert.equal(loadProfile(KIT_ROOT, name).dependencyEcosystems, undefined, name);
+});
+
+test('go-basic only keeps app-store', () => {
+  assert.deepEqual(loadProfile(KIT_ROOT, 'go-basic').stack.runsOn, ['app-store']);
+});
+
+test('smoke go-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs go)', { skip: goSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('go-cli', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.equal(run('go', ['run', '.', 'Ada'], { cwd }).stdout, 'Hello, Ada!\n');
+  const tooMany = run('go', ['run', '.', 'a', 'b'], { cwd });
+  assert.notEqual(tooMany.status, 0);
+  assert.match(tooMany.stderr, /usage: app \[name\]/);
+  badGo(cwd, 'go-cli');
+});
+
+test('smoke go-web: yaw init, just setup && just check pass; the service answers; bad code fails the gate (needs go)', { skip: goSkip, timeout: 600000 }, () => {
+  const { cwd, r } = initExample('go-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'Dockerfile')));
+  assert.ok(existsSync(join(cwd, 'bin', 'app')), 'just check builds the binary');
+  badGo(cwd, 'go-web');
+});
+
+for (const [variant, example] of Object.entries(GO_SERVERLESS_EXAMPLES)) {
+  test(`smoke go-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs go${variant === 'lambda' ? ' and network' : ''})`, { skip: variant === 'lambda' ? goOffline : goSkip, timeout: 600000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, 'greeting.go')));
+    assert.equal(existsSync(join(cwd, 'Dockerfile')), variant === 'container');
+    assert.equal(existsSync(join(cwd, 'go.sum')), variant === 'lambda');
+    assert.ok(existsSync(join(cwd, variant === 'lambda' ? 'dist/bootstrap' : 'bin/app')));
+    badGo(cwd, 'go-serverless');
+  });
+}
+
+const goGuards = (name) => parse(readFileSync(dir(name, 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+const GO_BLOCKED = ['go install golang.org/x/vuln/cmd/govulncheck@latest', 'go env -w GOFLAGS=-mod=mod', 'go clean -modcache', 'go run example.com/tool@v1.0.0', 'git push --tags', 'git push origin v1.0.0', 'ssh me@host', 'scp a me@host:/srv', 'rsync -av out/ me@host:/srv'];
+const GO_ALLOWED = ['go build ./...', 'go test ./...', 'go vet ./...', 'go run . Ada', 'go mod tidy', 'go mod download', 'go env GOPATH', 'gofmt -l .', 'git push origin main', 'rsync -av a/ b/', 'just check'];
+
+test('go guards block tool installs, remote modules, release tags and remote hosts, not local work', () => {
+  for (const name of ['go-cli', 'go-web', 'go-serverless']) {
+    const guards = goGuards(name);
+    const blocked = (cmd) => guards.some((re) => re.test(cmd));
+    for (const cmd of GO_BLOCKED) assert.ok(blocked(cmd), `${name}: ${cmd}`);
+    for (const cmd of GO_ALLOWED) assert.ok(!blocked(cmd), `${name}: ${cmd}`);
+  }
+});
+
+test('go-web and go-serverless guards also block image pushes and remote Docker; go-serverless blocks cloud CLIs', () => {
+  for (const name of ['go-web', 'go-serverless']) {
+    const guards = goGuards(name);
+    const blocked = (cmd) => guards.some((re) => re.test(cmd));
+    for (const cmd of ['docker push me/app', 'docker image push me/app', 'docker buildx build --push -t me/app .', 'podman push me/app', 'docker -H ssh://h ps', 'DOCKER_HOST=ssh://h docker ps']) assert.ok(blocked(cmd), `${name}: ${cmd}`);
+    for (const cmd of ['docker build -t app .', 'docker compose up']) assert.ok(!blocked(cmd), `${name}: ${cmd}`);
+  }
+  const cloud = goGuards('go-serverless');
+  for (const cmd of ['aws lambda create-function --function-name x', 'sam deploy', 'gcloud run deploy', 'gcloud builds submit']) assert.ok(cloud.some((re) => re.test(cmd)), cmd);
+});
+
 // kotlin-cli, kotlin-web, kotlin-serverless (ADR-0117..0119): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.
 const kotlinSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
 const KOTLIN_SERVERLESS_EXAMPLES = { container: 'kotlin-serverless', lambda: 'kotlin-serverless-lambda' };
@@ -799,7 +889,7 @@ function pinsAreExact(buildFile) {
   const versions = [...text.matchAll(/(?:implementation|testImplementation|platform)\(\s*(?:platform\()?"[\w.-]+:[\w.-]+:([^"]+)"/g)].map((m) => m[1]);
   const plugins = [...text.matchAll(/version "([^"]+)"/g)].map((m) => m[1]);
   for (const v of [...versions, ...plugins]) assert.match(v, /^\d+\.\d+(\.\d+)?$/, `${buildFile}: ${v}`);
-  assert.ok(coords.length && plugins.length >= 2, buildFile);
+  assert.ok(coords.length && plugins.length >= 1, buildFile);
   assert.doesNotMatch(text, /jvmToolchain|[:"]latest|\+"/, 'no toolchain download, no floating versions');
 }
 
@@ -820,12 +910,10 @@ for (const name of ['kotlin-cli', 'kotlin-web', 'kotlin-serverless']) {
   test(`${name}: verbs that do not apply print a note and exit 0; deploy only prints a note`, { skip: skipJust }, () => {
     const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
     const { cwd } = initExample(name, env, ['--skip-verify']);
-    const verbs = [...NOT_APPLICABLE, 'audit', 'deploy'];
-    for (const verb of verbs) {
-      const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
-      assert.equal(r.status, 0, verb);
-      assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
-    }
+    const r = run('just', ['audit'], { cwd, env });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^audit: not applicable/m);
+    assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
   });
 }
 
@@ -882,6 +970,108 @@ for (const [variant, example] of Object.entries(KOTLIN_SERVERLESS_EXAMPLES)) {
   });
 }
 
+// java-cli, java-web, java-serverless (ADR-0125..0127): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.
+const JAVA_SERVERLESS_EXAMPLES = { container: 'java-serverless', lambda: 'java-serverless-lambda' };
+const javaSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
+
+function javaBadCode(cwd, name) {
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', name);
+  const bad = join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', 'Bad.java');
+  copyFileSync(join(fixtures, 'lint_error.java'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'a style violation fails just lint');
+  copyFileSync(join(fixtures, 'type_error.java'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+}
+
+for (const name of ['java-cli', 'java-web', 'java-serverless']) {
+  test(`${name}: the uniform verbs exist, the wrapper is pinned by checksum, versions are exact, Gradle is watched`, () => {
+    const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
+    for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    assert.deepEqual(loadProfile(KIT_ROOT, name).dependencyEcosystems, ['gradle']);
+    const props = readFileSync(dir(name, 'scaffold', 'gradle', 'wrapper', 'gradle-wrapper.properties'), 'utf8');
+    assert.match(props, /^distributionSha256Sum=[0-9a-f]{64}$/m);
+    const builds = name === 'java-serverless' ? ['container', 'lambda'].map((v) => dir(name, 'variants', v, 'build.gradle.kts')) : [dir(name, 'scaffold', 'build.gradle.kts')];
+    for (const b of builds) pinsAreExact(b);
+    const ci = readFileSync(dir(name, 'ci', 'check.yml'), 'utf8');
+    assert.match(ci, /actions\/setup-java@[0-9a-f]{40}/);
+    assert.match(ci, /java-version: "17"/);
+  });
+
+  test(`${name}: audit prints a note and exits 0; deploy is not defined`, { skip: skipJust }, () => {
+    const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+    const { cwd } = initExample(name, env, ['--skip-verify']);
+    const r = run('just', ['audit'], { cwd, env });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^audit: not applicable/m);
+    assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
+  });
+}
+
+test('smoke java-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs JDK 17+ and network)', { skip: javaSkip, timeout: 900000 }, () => {
+  const { cwd, r } = initExample('java-cli', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /BUILD SUCCESSFUL/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  const hello = run(join(cwd, 'build', 'install', 'app', 'bin', 'app'), ['Ada'], { cwd });
+  assert.equal(hello.stdout, 'Hello, Ada!\n');
+  const bad = run(join(cwd, 'build', 'install', 'app', 'bin', 'app'), ['a', 'b'], { cwd });
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /usage: app/);
+  javaBadCode(cwd, 'java-cli');
+});
+
+test('smoke java-web: yaw init, just setup && just check pass; the server answers; bad code fails the gate (needs JDK 17+ and network)', { skip: javaSkip, timeout: 900000 }, () => {
+  const { cwd, r } = initExample('java-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /BUILD SUCCESSFUL/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'Dockerfile')));
+  assert.ok(existsSync(join(cwd, 'build', 'install', 'app', 'bin', 'app')));
+  javaBadCode(cwd, 'java-web');
+});
+
+test('java-web guards block publishing, image pushes, remote hosts and release tags, not local work', () => {
+  const guards = parse(readFileSync(dir('java-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'git push --tags', 'docker push me/app', 'docker buildx build --push -t me/app .', 'ssh me@host', 'rsync -av out/ me@host:/srv', 'DOCKER_HOST=ssh://me@host docker ps', 'docker --context prod ps']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build installDist', './gradlew test', 'docker build -t app .', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('java-serverless: the hosting option has the two variants, container by default, and lists aws and sam only for lambda', () => {
+  const profile = loadProfile(KIT_ROOT, 'java-serverless');
+  assert.deepEqual(profile.options.hosting.choices.map((c) => c.value), ['container', 'lambda']);
+  assert.equal(profile.options.hosting.default, 'container');
+  assert.match(profile.options.hosting.label, /container.*Lambda/i);
+  assert.deepEqual(profile.tools.map((t) => [t.name, t.when.hosting]), [['aws', 'lambda'], ['sam', 'lambda']]);
+});
+
+for (const [variant, example] of Object.entries(JAVA_SERVERLESS_EXAMPLES)) {
+  test(`smoke java-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs JDK 17+ and network)`, { skip: javaSkip, timeout: 900000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', 'Routes.java')));
+    assert.equal(existsSync(join(cwd, 'Dockerfile')), variant === 'container');
+    assert.equal(existsSync(join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', variant === 'lambda' ? 'Handler.java' : 'Server.java')), true);
+    if (variant === 'lambda') assert.ok(existsSync(join(cwd, 'build', 'distributions', 'app-0.0.0.zip')), 'the Lambda package was built');
+    javaBadCode(cwd, 'java-serverless');
+  });
+}
+
+test('java-serverless guards block publishing, registry pushes, cloud CLIs, remote hosts and release tags, not local work', () => {
+  const guards = parse(readFileSync(dir('java-serverless', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'docker push me/app', 'gcloud run deploy app --source .', 'aws lambda update-function-code --function-name x --zip-file fileb://app.zip', 'sam deploy --guided', 'git push --tags', 'ssh me@host', 'DOCKER_HOST=ssh://me@host docker ps']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build', './gradlew test', 'docker build -t app .', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('java-cli guards block publishing, release tags and remote hosts, not local work', () => {
+  const guards = parse(readFileSync(dir('java-cli', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'git push --tags', 'git push origin v1.0.0', 'ssh me@host', 'rsync -av out/ me@host:/srv']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build', './gradlew test', './gradlew run --args=Ada', './gradlew spotlessCheck', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
 test('kotlin-cli guards block publishing, release tags and remote hosts, not local work', () => {
   const guards = parse(readFileSync(dir('kotlin-cli', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
   const blocked = (cmd) => guards.some((re) => re.test(cmd));
@@ -903,14 +1093,15 @@ test('kotlin-serverless guards block publishing, registry pushes, cloud CLIs, re
   for (const cmd of ['./gradlew build', './gradlew test', 'docker build -t app .', 'git push origin main', 'rsync -av a/ b/', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
-test('php-web: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('php-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('php-web', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['build']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 
@@ -952,14 +1143,15 @@ test('php-web guards block migrations, remote hosts and registry pushes in every
   for (const cmd of ok) assert.ok(!blocked(cmd), cmd);
 });
 
-test('wordpress-plugin: verbs that do not apply print a note and exit 0; deploy only prints a note', { skip: skipJust }, () => {
+test('wordpress-plugin: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('wordpress-plugin', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'build', 'deploy']) {
-    const r = run('just', verb === 'deploy' ? [verb, 'prod'] : [verb], { cwd, env });
+  for (const verb of ['build']) {
+    const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('smoke wordpress-plugin: yaw init, just setup && just check pass; bad code fails the gate (needs php, composer and network)', { skip: phpSkip, timeout: 300000 }, () => {
@@ -1028,7 +1220,7 @@ test('cloudflare-workers: the gate recipes make no remote call; scaffold dev dep
 test('cloudflare-workers: verbs that do not apply print a note and exit 0; deploy refuses without the production guard and in CI', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('cloudflare-workers', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'fmt', 'build']) {
+  for (const verb of ['fmt', 'build']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
@@ -1124,17 +1316,15 @@ test('android-kotlin: gate recipes need no emulator, device, keystore or store; 
   assert.match(ci, /actions\/cache@/);
 });
 
-test('android-kotlin: verbs that do not apply print a note and exit 0; deploy refuses in CI and publishes nothing', { skip: skipJust }, () => {
+test('android-kotlin: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
   const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
   const { cwd } = initExample('android-kotlin', env, ['--skip-verify']);
-  for (const verb of [...NOT_APPLICABLE, 'audit', 'deploy']) {
+  for (const verb of ['audit']) {
     const r = run('just', [verb], { cwd, env });
     assert.equal(r.status, 0, verb);
     assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
   }
-  const ci = run('just', ['deploy', 'prod'], { cwd, env: { ...env, CI: 'true' } });
-  assert.notEqual(ci.status, 0);
-  assert.match(ci.stderr, /deploy: refused/);
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
 });
 
 test('android-kotlin: a symlinked or missing Gradle wrapper is refused before anything runs', { skip: skipJust }, () => {
@@ -1233,7 +1423,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['java', 'serverless', 'java-serverless'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
@@ -1246,6 +1436,8 @@ test('profile tools: filtered by option, platform install command, only failing 
   assert.deepEqual(bref.map((t) => [t.name, t.install]), [['aws', 'brew install awscli'], ['sam', 'brew install aws-sam-cli']]);
   assert.match(profileTools(php, { 'arch.php-serverless-hosting': 'bref' }, 'linux')[0].install, /awscli/);
   assert.equal(profileTools(php, null).length, 2);
+  assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'go-serverless'), { 'arch.go-serverless-hosting': 'lambda' }).map((t) => t.name), ['aws']);
+  assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'go-serverless'), {}), []);
   assert.deepEqual(profileTools(loadProfile(KIT_ROOT, 'rust-serverless'), { 'arch.rust-serverless-hosting': 'lambda' }).map((t) => t.name), ['cargo-lambda']);
   const tauri = loadProfile(KIT_ROOT, 'node-app');
   assert.deepEqual(profileTools(tauri, { 'arch.node-app-framework': 'tauri' }).map((t) => t.name), ['rustc']);

@@ -34,30 +34,9 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for cloudflare-workers (Wrangler bundles on deploy; the check never runs 'wrangler deploy --dry-run', ADR-0039)"
 
-screenshot:
-    @echo "screenshot: not applicable yet for cloudflare-workers (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for cloudflare-workers (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for cloudflare-workers (share only with your approval)"
-
 # Only shipped dependencies: everything in the scaffold is a dev tool (ADR-0039).
 audit:
     npm audit --omit=dev
-
-db-migrate:
-    @echo "db-migrate: not applicable yet for cloudflare-workers (the scaffold has no D1 database)"
-
-db-reset:
-    @echo "db-reset: not applicable for cloudflare-workers"
-
-backup:
-    @echo "backup: not applicable for cloudflare-workers"
-
-restore:
-    @echo "restore: not applicable for cloudflare-workers"
 
 # Production deploy with Wrangler, only on your machine: refuses in CI, without the argument `prod`, and without YAW_CONFIRM_PROD=yes.
 deploy env='':

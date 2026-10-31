@@ -27,30 +27,6 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for php-cli (no build step; a PHAR is optional and comes with an ADR)"
 
-screenshot:
-    @echo "screenshot: not applicable for php-cli"
-
-preview:
-    @echo "preview: not applicable for php-cli (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for php-cli"
-
 # Vulnerability scan of the locked dependencies (needs network).
 audit:
     composer audit --locked
-
-db-migrate:
-    @echo "db-migrate: not applicable for php-cli"
-
-db-reset:
-    @echo "db-reset: not applicable for php-cli"
-
-backup:
-    @echo "backup: not applicable for php-cli"
-
-restore:
-    @echo "restore: not applicable for php-cli"
-
-deploy env='':
-    @echo "deploy: not applicable for php-cli (a local tool; installing or copying it elsewhere needs your approval)"

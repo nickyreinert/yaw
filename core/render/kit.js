@@ -178,7 +178,7 @@ export function collectQuestions(kitRoot, modules, definitions) {
 
 const AUTONOMY = {
   'ask-often': 'Ask before every change that is not trivial.',
-  'ask-risky': 'Ask before risky or ambiguous steps; otherwise act.',
+  'ask-risky': 'Ask before risky steps; otherwise act.',
   'act-and-report': 'Act, then report what you did and why.',
 };
 
@@ -362,7 +362,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     profiles,
     // ADR-0041: several profiles are namespaced; the frame of the justfile defines the uniform verbs.
     composed: profiles.length > 1,
-    composedVerbs: composedVerbs(profiles),
+    composedVerbs: composedVerbs(profiles, (p, verb) => profileDefines(kitRoot, p, verb)),
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
     wrapper: { shell: flat['arch.wrapper'] === 'shell', make: flat['arch.wrapper'] === 'make' },
@@ -429,20 +429,36 @@ function reviewFlags(flat, modules) {
 // ADR-0041: with several profiles each profile is a `just` module (`just <profile>::<verb>`) that runs in its
 // own folder `<profile>/`; the root justfile defines the uniform verbs, each calling that verb of every profile.
 // dev and preview start servers that never end, so they only name the namespaced verbs.
-const PLAIN_VERBS = ['setup', 'fmt', 'lint', 'typecheck', 'test', 'build', 'screenshot', 'preview-share', 'audit', 'db-migrate', 'db-reset', 'backup', 'restore'];
+// Core verbs every profile defines; the optional ones (screenshot, preview-share, db-*, backup, restore, deploy) exist only
+// where a profile implements them (ADR-0120), so the root justfile calls them only on those profiles.
+const PLAIN_VERBS = ['setup', 'fmt', 'lint', 'typecheck', 'test', 'build', 'audit'];
+const OPTIONAL_PLAIN_VERBS = ['screenshot', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore'];
 
-export function composedVerbs(profiles) {
+// Does profiles/<p>/just/<p>.just define the recipe `verb`?
+export function profileDefines(kitRoot, name, verb) {
+  const file = join(profileDir(kitRoot, name), 'just', `${name}.just`);
+  if (!existsSync(file)) return false;
+  return new RegExp(`^${verb}\\b`, 'm').test(readFileSync(file, 'utf8'));
+}
+
+export function composedVerbs(profiles, defines = () => true) {
   if (profiles.length < 2) return '';
-  const all = (verb) => profiles.map((p) => `${p}::${verb}`).join(' ');
-  const serves = (verb) => `${verb}:\n    @echo "${verb}: ${profiles.length} profiles, each runs a server; start them in separate terminals: ${profiles.map((p) => `just ${p}::${verb}`).join(', ')}"`;
+  const all = (verb, list = profiles) => list.map((p) => `${p}::${verb}`).join(' ');
+  const serves = (verb) => {
+    const list = profiles.filter((p) => defines(p, verb));
+    return list.length === 0 ? null : `${verb}:\n    @echo "${verb}: ${list.length} profiles, each runs a server; start them in separate terminals: ${list.map((p) => `just ${p}::${verb}`).join(', ')}"`;
+  };
+  const optional = OPTIONAL_PLAIN_VERBS.map((v) => [v, profiles.filter((p) => defines(p, v))]).filter(([, list]) => list.length > 0).map(([v, list]) => `${v}: ${all(v, list)}`);
+  const deployers = profiles.filter((p) => defines(p, 'deploy'));
   return [
     `# Composed profiles (ADR-0041): each verb runs the verb of ${profiles.join(' and ')}; just <profile>::<verb> runs one.`,
     ...PLAIN_VERBS.map((v) => `${v}: ${all(v)}`),
+    ...optional,
     `check: ${all('check')} sync-check`,
     serves('dev'),
     serves('preview'),
-    `deploy env='': ${profiles.map((p) => `(${p}::deploy env)`).join(' ')}`,
-  ].join('\n');
+    deployers.length > 0 ? `deploy env='': ${deployers.map((p) => `(${p}::deploy env)`).join(' ')}` : null,
+  ].filter(Boolean).join('\n');
 }
 
 // A profile's just file as a `just` module in <profile>/ (ADR-0041): recipes run in the profile's folder, and

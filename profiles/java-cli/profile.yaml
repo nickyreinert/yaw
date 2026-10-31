@@ -1,0 +1,12 @@
+# profiles/java-cli
+# Picked for Java x your computer (ADR-0054, T-001, ADR-0125): command-line tools on the JVM built with Gradle.
+name: java-cli
+title: Java command-line tool
+dependencyEcosystems: [gradle]
+summary: Java command-line tool; Gradle application plugin, Spotless (google-java-format), javac -Xlint, JUnit 5, no third-party libraries.
+stack:
+  language: [java]
+  runsOn: [local]
+defaults:
+  modules: { devenv: false, ui-design: false, backup: false }
+requires: [jdk>=17, just]

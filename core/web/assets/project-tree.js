@@ -72,7 +72,7 @@ export function fileTreeEntries(files, options = {}) {
     if (!node.file) {
       const children = [...node.children.values()].map(render), key = `folder/${node.path}`;
       const purpose = folderPurpose(node.path), open = options.expanded?.get(node.path) ?? options.expandFolders ?? false;
-      const summary = el('summary', { class: 'review-summary' }, options.icons === false ? null : decisionIcon('folder'),
+      const summary = el('summary', { class: 'review-summary', title: `${node.path}/ — ${purpose}` }, options.icons === false ? null : decisionIcon('folder'),
         el('code', { class: 'review-branch-label', text: `${node.name}/` }), el('small', { class: 'review-count', text: purpose }));
       const branch = el('details', { class: 'review-branch project-tree-folder', 'data-review-key': key, 'data-plan-folder': node.path }, summary,
         el('div', { class: 'review-children' }, ...children.map((child) => child.node)));
@@ -87,7 +87,7 @@ export function fileTreeEntries(files, options = {}) {
     const file = node.file, purpose = filePurpose(file.path);
     const note = `${purpose} · ${ACTION[file.action] ?? 'planned'}`;
     const cls = ['review-file-row', options.onFile ? 'project-tree-file' : '', matchesTarget(file, options.section) ? 'in-section' : '', matchesTarget(file, options.target) ? 'is-focused' : '', options.changed?.has(file.path) ? 'is-changed' : ''].filter(Boolean).join(' ');
-    const row = el(options.onFile ? 'button' : 'div', { class: cls, 'data-review-file': file.path, 'data-plan-file': file.path,
+    const row = el(options.onFile ? 'button' : 'div', { class: cls, 'data-review-file': file.path, 'data-plan-file': file.path, title: `${file.path} — ${note}`,
       ...(options.onFile ? { type: 'button', 'aria-pressed': String(options.selected === file.path), 'aria-label': `Preview ${file.path}`, onclick: () => options.onFile(file) } : {}) },
       options.icons === false ? null : decisionIcon('file'), el('code', { text: node.name }), el('small', { class: 'muted', text: note }));
     return { ...record(row, `${file.path} ${note}`), file };
@@ -105,13 +105,16 @@ export function createProjectTree(root, { readFile } = {}) {
   const previewPane = el('aside', { class: 'project-file-preview', 'aria-label': 'File content preview' }, previewTitle, preview);
   const body = el('div', { class: 'project-tree-body', hidden: true }, tree, previewPane);
   const count = el('span', { class: 'small muted', text: 'Plan updating…', role: 'status' });
-  const toggle = el('button', { type: 'button', class: 'tree-toggle', 'aria-expanded': 'false', 'aria-label': 'Expand project structure' }, decisionIcon('chevron'));
+  body.id = `${root.id || 'project-structure'}-body`;
+  const toggle = el('button', { type: 'button', class: 'project-structure-heading', 'aria-expanded': 'false', 'aria-controls': body.id, 'aria-label': 'Expand project structure' },
+    el('span', { class: 'project-structure-title', text: 'Project structure' }), count,
+    el('span', { class: 'tree-toggle', 'aria-hidden': 'true' }, decisionIcon('chevron')));
   toggle.addEventListener('click', () => {
     body.hidden = !body.hidden;
     toggle.setAttribute('aria-expanded', String(!body.hidden));
     toggle.setAttribute('aria-label', `${body.hidden ? 'Expand' : 'Collapse'} project structure`);
   });
-  root.replaceChildren(el('div', { class: 'project-structure-heading' }, el('h2', { text: 'Project structure' }), count, toggle), body);
+  root.replaceChildren(toggle, body);
   function markSelection() {
     for (const row of renderedFiles) row.node.setAttribute('aria-pressed', String(row.file.path === selected));
   }

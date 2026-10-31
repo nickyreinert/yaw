@@ -27,30 +27,6 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for php-serverless (no build step; the container image or SAM package is built by you)"
 
-screenshot:
-    @echo "screenshot: not applicable for php-serverless"
-
-preview:
-    @echo "preview: not applicable for php-serverless (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for php-serverless"
-
 # Vulnerability scan of the locked dependencies (needs network).
 audit:
     composer audit --locked
-
-db-migrate:
-    @echo "db-migrate: not applicable for php-serverless"
-
-db-reset:
-    @echo "db-reset: not applicable for php-serverless"
-
-backup:
-    @echo "backup: not applicable for php-serverless"
-
-restore:
-    @echo "restore: not applicable for php-serverless"
-
-deploy env='':
-    @echo "deploy: not applicable for php-serverless (image pushes and cloud deploys run on your account, outside YAW)"

@@ -30,30 +30,6 @@ check: lint typecheck test audit build sync-check
 build:
     npm run build
 
-screenshot:
-    @echo "screenshot: not applicable yet for node-web (browser screenshots need Playwright, not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for node-web (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for node-web (share only with your approval)"
-
 # Only shipped dependencies: everything in the scaffold is a dev tool.
 audit:
     npm audit --omit=dev
-
-db-migrate:
-    @echo "db-migrate: not applicable for node-web (the scaffold has no database)"
-
-db-reset:
-    @echo "db-reset: not applicable for node-web (the scaffold has no database)"
-
-backup:
-    @echo "backup: not applicable for node-web"
-
-restore:
-    @echo "restore: not applicable for node-web"
-
-deploy env='':
-    @echo "deploy: not applicable for node-web (deploying and pushing images are remote and need your approval; add the command with your host)"

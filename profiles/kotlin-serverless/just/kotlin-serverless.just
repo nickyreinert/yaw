@@ -37,29 +37,5 @@ build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
     @if grep -q aws-lambda-java build.gradle.kts; then ./gradlew build; else ./gradlew build installDist; fi
 
-screenshot:
-    @echo "screenshot: not applicable for kotlin-serverless"
-
-preview:
-    @echo "preview: not applicable for kotlin-serverless"
-
-preview-share:
-    @echo "preview-share: not applicable for kotlin-serverless"
-
 audit:
     @echo "audit: not applicable for kotlin-serverless (Dependabot can monitor Gradle dependencies)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for kotlin-serverless"
-
-db-reset:
-    @echo "db-reset: not applicable for kotlin-serverless"
-
-backup:
-    @echo "backup: not applicable for kotlin-serverless"
-
-restore:
-    @echo "restore: not applicable for kotlin-serverless"
-
-deploy env='':
-    @echo "deploy: not applicable for kotlin-serverless (building images, deploying and cloud accounts need your approval)"

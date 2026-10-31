@@ -37,31 +37,5 @@ check: lint typecheck test sync-check
 build: _wrapper
     ./gradlew assembleDebug
 
-screenshot:
-    @echo "screenshot: not applicable yet for android-kotlin (Paparazzi, emulator screencap or Maestro are not part of this profile)"
-
-preview:
-    @echo "preview: not applicable for android-kotlin (use just dev)"
-
-preview-share:
-    @echo "preview-share: not applicable for android-kotlin (share only with your approval)"
-
 audit:
     @echo "audit: not applicable for android-kotlin (doc 05 lists no dependency audit; Dependabot covers the Gradle versions)"
-
-db-migrate:
-    @echo "db-migrate: not applicable for android-kotlin (the scaffold has no database)"
-
-db-reset:
-    @echo "db-reset: not applicable for android-kotlin"
-
-backup:
-    @echo "backup: not applicable for android-kotlin"
-
-restore:
-    @echo "restore: not applicable for android-kotlin"
-
-# Signing and publishing (Play Console tracks, Fastlane) are yours: refused in CI, and nothing is published from here.
-deploy env='':
-    @if [ -n "${CI:-}" ]; then echo "deploy: refused, signing and publishing run on your machine only, never in CI" >&2; exit 1; fi
-    @echo "deploy: not applicable for android-kotlin (signing and publishing to a Play Console track need your keystore and approval; run them yourself)"

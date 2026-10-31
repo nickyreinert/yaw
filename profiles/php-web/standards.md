@@ -6,4 +6,4 @@
 - Escape output (`htmlspecialchars`), use prepared statements for SQL, never `eval` or `unserialize` on input.
 - Secrets and settings come from environment variables (`.env` is local only); never hard-code them or log them.
 - Keep dependencies few; run `just audit` (`composer audit`) after changing them.
-- `rsync`/SFTP to a host and `artisan migrate` (other than `--pretend`) need the user's approval; `just deploy` does nothing yet.
+- `rsync`/SFTP to a host and `artisan migrate` (other than `--pretend`) need the user's approval.
