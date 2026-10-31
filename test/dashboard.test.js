@@ -117,3 +117,27 @@ test('yaw web: the dashboard opens without a setup prompt in an uninitialized pr
   await main(['help'], { cwd: root, env, kitRoot: KIT_ROOT, stdout: help, stderr: capture() });
   assert.match(help.text(), /^ {2}web {2,}open the local dashboard/m);
 });
+
+test('dashboard serves the complete browser module graph required to leave the loading screen', async (t) => {
+  const root = await makeProject({ modules: ['core'] });
+  const server = await startDashboard({ root, kitRoot: KIT_ROOT, env: home(), signals: false });
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.port}`;
+  const cookie = (await fetch(server.url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
+  const pending = ['/dashboard.js'], visited = new Set(), missing = [];
+  while (pending.length) {
+    const path = pending.pop();
+    if (visited.has(path)) continue;
+    visited.add(path);
+    const response = await fetch(`${base}${path}`, { headers: { cookie } });
+    if (!response.ok) { missing.push(path); continue; }
+    assert.match(response.headers.get('content-type'), /javascript/, path);
+    const source = await response.text();
+    for (const match of source.matchAll(/^\s*(?:import|export)\s+(?:[^;\n]*?\s+from\s+)?['"]([^'"]+)['"]/gm)) {
+      if (!match[1].startsWith('.')) continue;
+      pending.push(new URL(match[1], `${base}${path}`).pathname);
+    }
+  }
+  assert.deepEqual(missing, [], `Missing startup modules: ${missing.join(', ')}`);
+  assert.ok(visited.has('/project-tree.js'), 'interview tree imported by workspace settings');
+});

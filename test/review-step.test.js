@@ -8,7 +8,7 @@ class Element {
   constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.events = {}; this.dataset = {}; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
-  setAttribute(key, value) { this.attrs[key] = value; }
+  setAttribute(key, value) { this.attrs[key] = value; if (key === 'hidden') this.hidden = true; }
   addEventListener(name, handler) { this.events[name] = handler; }
   fire(name) { return this.events[name]?.({ target: this, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} }); }
   all(test) { return [...(test(this) ? [this] : []), ...this.children.flatMap((node) => node instanceof Element ? node.all(test) : [])]; }
@@ -89,8 +89,12 @@ test('console shows only affected folders, shares review rows and previews full 
   assert.deepEqual(rows().map((node) => node.attrs['data-review-file']), ['src/main.js']);
   assert.equal(root.all((node) => node.attrs['data-plan-folder'] === '.github').length, 0);
   assert.equal(root.all((node) => node.attrs['data-plan-folder'] === 'src')[0].open, true);
-  assert.equal(root.all((node) => node.tag === 'h2')[0].text, 'Project structure');
-  assert.equal(root.all((node) => node.tag === 'h2')[0].all((node) => node.tag === 'svg').length, 0);
+  const header = root.all((node) => node.tag === 'button' && node.attrs.class === 'project-structure-heading')[0];
+  assert.equal(root.all((node) => node.attrs.class === 'project-structure-title')[0].text, 'Project structure');
+  const body = root.all((node) => node.attrs.class === 'project-tree-body')[0];
+  assert.equal(body.hidden, true);
+  header.fire('click'); assert.equal(body.hidden, false); assert.equal(header.attrs['aria-expanded'], 'true');
+  header.fire('click'); assert.equal(body.hidden, true); assert.equal(header.attrs['aria-expanded'], 'false');
   const clicked = rows()[0];
   await clicked.fire('click');
   assert.equal(rows()[0], clicked, 'file selection preserves the focused button');
