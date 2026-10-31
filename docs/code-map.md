@@ -259,6 +259,7 @@ Describe this area's responsibility.
   - `examples/go-serverless/`
   - `examples/go-serverless-lambda/`
   - `examples/go-web/`
+  - `examples/java-cli/`
   - `examples/kotlin-cli/`
   - `examples/kotlin-serverless/`
   - `examples/kotlin-serverless-lambda/`
@@ -379,6 +380,7 @@ Describe this area's responsibility.
   - `profiles/go-serverless/`
   - `profiles/go-web/`
   - `profiles/java-basic/`
+  - `profiles/java-cli/`
   - `profiles/kotlin-cli/`
   - `profiles/kotlin-serverless/`
   - `profiles/kotlin-web/`

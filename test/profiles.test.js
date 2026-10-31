@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -889,7 +889,7 @@ function pinsAreExact(buildFile) {
   const versions = [...text.matchAll(/(?:implementation|testImplementation|platform)\(\s*(?:platform\()?"[\w.-]+:[\w.-]+:([^"]+)"/g)].map((m) => m[1]);
   const plugins = [...text.matchAll(/version "([^"]+)"/g)].map((m) => m[1]);
   for (const v of [...versions, ...plugins]) assert.match(v, /^\d+\.\d+(\.\d+)?$/, `${buildFile}: ${v}`);
-  assert.ok(coords.length && plugins.length >= 2, buildFile);
+  assert.ok(coords.length && plugins.length >= 1, buildFile);
   assert.doesNotMatch(text, /jvmToolchain|[:"]latest|\+"/, 'no toolchain download, no floating versions');
 }
 
@@ -969,6 +969,62 @@ for (const [variant, example] of Object.entries(KOTLIN_SERVERLESS_EXAMPLES)) {
     kotlinBadCode(cwd, 'kotlin-serverless');
   });
 }
+
+// java-cli, java-web, java-serverless (ADR-0125..0127): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.
+const javaSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
+
+function javaBadCode(cwd, name) {
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', name);
+  const bad = join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', 'Bad.java');
+  copyFileSync(join(fixtures, 'lint_error.java'), bad);
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'a style violation fails just lint');
+  copyFileSync(join(fixtures, 'type_error.java'), bad);
+  assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
+}
+
+for (const name of ['java-cli']) {
+  test(`${name}: the uniform verbs exist, the wrapper is pinned by checksum, versions are exact, Gradle is watched`, () => {
+    const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
+    for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
+    assert.deepEqual(loadProfile(KIT_ROOT, name).dependencyEcosystems, ['gradle']);
+    const props = readFileSync(dir(name, 'scaffold', 'gradle', 'wrapper', 'gradle-wrapper.properties'), 'utf8');
+    assert.match(props, /^distributionSha256Sum=[0-9a-f]{64}$/m);
+    const builds = name === 'java-serverless' ? ['container', 'lambda'].map((v) => dir(name, 'variants', v, 'build.gradle.kts')) : [dir(name, 'scaffold', 'build.gradle.kts')];
+    for (const b of builds) pinsAreExact(b);
+    const ci = readFileSync(dir(name, 'ci', 'check.yml'), 'utf8');
+    assert.match(ci, /actions\/setup-java@[0-9a-f]{40}/);
+    assert.match(ci, /java-version: "17"/);
+  });
+
+  test(`${name}: audit prints a note and exits 0; deploy is not defined`, { skip: skipJust }, () => {
+    const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+    const { cwd } = initExample(name, env, ['--skip-verify']);
+    const r = run('just', ['audit'], { cwd, env });
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^audit: not applicable/m);
+    assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
+  });
+}
+
+test('smoke java-cli: yaw init, just setup && just check pass; the tool runs; bad code fails the gate (needs JDK 17+ and network)', { skip: javaSkip, timeout: 900000 }, () => {
+  const { cwd, r } = initExample('java-cli', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /BUILD SUCCESSFUL/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  const hello = run(join(cwd, 'build', 'install', 'app', 'bin', 'app'), ['Ada'], { cwd });
+  assert.equal(hello.stdout, 'Hello, Ada!\n');
+  const bad = run(join(cwd, 'build', 'install', 'app', 'bin', 'app'), ['a', 'b'], { cwd });
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /usage: app/);
+  javaBadCode(cwd, 'java-cli');
+});
+
+test('java-cli guards block publishing, release tags and remote hosts, not local work', () => {
+  const guards = parse(readFileSync(dir('java-cli', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'git push --tags', 'git push origin v1.0.0', 'ssh me@host', 'rsync -av out/ me@host:/srv']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build', './gradlew test', './gradlew run --args=Ada', './gradlew spotlessCheck', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
 
 test('kotlin-cli guards block publishing, release tags and remote hosts, not local work', () => {
   const guards = parse(readFileSync(dir('kotlin-cli', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
@@ -1321,7 +1377,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

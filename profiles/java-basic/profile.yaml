@@ -6,7 +6,7 @@ dependencyEcosystems: [gradle]
 summary: Java project; Gradle, JUnit 5, javac -Xlint.
 stack:
   language: [java]
-  runsOn: [local, self-hosted, serverless, app-store]
+  runsOn: [app-store]
   basic: true
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }

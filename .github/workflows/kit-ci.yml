@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [static-site, python-web, python-vercel, node-ts-vercel, node-web, php-web, php-cli, php-serverless, php-serverless-bref, wordpress-plugin, cloudflare-workers, android-kotlin, node-app, node-app-electron, node-app-tauri, swift-cli, swift-web, swift-app, rust-cli, rust-web, rust-serverless, rust-serverless-lambda, kotlin-cli, kotlin-web, kotlin-serverless, kotlin-serverless-lambda, go-cli, go-web, go-serverless, go-serverless-lambda]
+        profile: [static-site, python-web, python-vercel, node-ts-vercel, node-web, php-web, php-cli, php-serverless, php-serverless-bref, wordpress-plugin, cloudflare-workers, android-kotlin, node-app, node-app-electron, node-app-tauri, swift-cli, swift-web, swift-app, rust-cli, rust-web, rust-serverless, rust-serverless-lambda, kotlin-cli, kotlin-web, kotlin-serverless, kotlin-serverless-lambda, go-cli, go-web, go-serverless, go-serverless-lambda, java-cli]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -70,7 +70,8 @@ jobs:
           coverage: none
       # android-kotlin (ADR-0040): ubuntu-latest, JDK 21, no emulator, no KVM, no secrets. The SDK goes to ~/android-sdk and is cached with the Gradle caches.
       # kotlin-cli, kotlin-web, kotlin-serverless (ADR-0117..0119): JDK 17; the Gradle wrapper downloads Gradle, no Docker or AWS account.
-      - if: startsWith(matrix.profile, 'kotlin-')
+      # java-cli, java-web, java-serverless (ADR-0125..0127): same JDK 17 setup.
+      - if: startsWith(matrix.profile, 'kotlin-') || startsWith(matrix.profile, 'java-')
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin

@@ -11,7 +11,7 @@ const EXPECTED = {
   'node-basic': { language: ['typescript'], runsOn: ['static'] },
   'go-basic': { language: ['go'], runsOn: ['app-store'] },
   'rust-basic': { language: ['rust'], runsOn: ['edge', 'app-store'] },
-  'java-basic': { language: ['java'], runsOn: ['local', 'self-hosted', 'serverless', 'app-store'] },
+  'java-basic': { language: ['java'], runsOn: ['app-store'] },
 };
 const SOURCE_FILES = {
   'python-basic': 'src/app.py',
