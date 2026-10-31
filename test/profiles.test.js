@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -971,6 +971,7 @@ for (const [variant, example] of Object.entries(KOTLIN_SERVERLESS_EXAMPLES)) {
 }
 
 // java-cli, java-web, java-serverless (ADR-0125..0127): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.
+const JAVA_SERVERLESS_EXAMPLES = { container: 'java-serverless', lambda: 'java-serverless-lambda' };
 const javaSkip = (!haveJust && 'just is not installed') || (!hasTool('java') && 'java is not installed') || (process.env.YAW_TEST_OFFLINE && 'YAW_TEST_OFFLINE is set (Gradle needs the network)');
 
 function javaBadCode(cwd, name) {
@@ -982,7 +983,7 @@ function javaBadCode(cwd, name) {
   assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
 }
 
-for (const name of ['java-cli', 'java-web']) {
+for (const name of ['java-cli', 'java-web', 'java-serverless']) {
   test(`${name}: the uniform verbs exist, the wrapper is pinned by checksum, versions are exact, Gradle is watched`, () => {
     const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
     for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
@@ -1034,6 +1035,34 @@ test('java-web guards block publishing, image pushes, remote hosts and release t
   const blocked = (cmd) => guards.some((re) => re.test(cmd));
   for (const cmd of ['./gradlew publish', 'git push --tags', 'docker push me/app', 'docker buildx build --push -t me/app .', 'ssh me@host', 'rsync -av out/ me@host:/srv', 'DOCKER_HOST=ssh://me@host docker ps', 'docker --context prod ps']) assert.ok(blocked(cmd), cmd);
   for (const cmd of ['./gradlew build installDist', './gradlew test', 'docker build -t app .', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
+});
+
+test('java-serverless: the hosting option has the two variants, container by default, and lists aws and sam only for lambda', () => {
+  const profile = loadProfile(KIT_ROOT, 'java-serverless');
+  assert.deepEqual(profile.options.hosting.choices.map((c) => c.value), ['container', 'lambda']);
+  assert.equal(profile.options.hosting.default, 'container');
+  assert.match(profile.options.hosting.label, /container.*Lambda/i);
+  assert.deepEqual(profile.tools.map((t) => [t.name, t.when.hosting]), [['aws', 'lambda'], ['sam', 'lambda']]);
+});
+
+for (const [variant, example] of Object.entries(JAVA_SERVERLESS_EXAMPLES)) {
+  test(`smoke java-serverless (${variant}): yaw init writes the variant, just setup && just check pass; bad code fails the gate (needs JDK 17+ and network)`, { skip: javaSkip, timeout: 900000 }, () => {
+    const { cwd, r } = initExample(example, { ...process.env });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /verified: just setup and just check passed/);
+    assert.ok(existsSync(join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', 'Routes.java')));
+    assert.equal(existsSync(join(cwd, 'Dockerfile')), variant === 'container');
+    assert.equal(existsSync(join(cwd, 'src', 'main', 'java', 'com', 'example', 'app', variant === 'lambda' ? 'Handler.java' : 'Server.java')), true);
+    if (variant === 'lambda') assert.ok(existsSync(join(cwd, 'build', 'distributions', 'app-0.0.0.zip')), 'the Lambda package was built');
+    javaBadCode(cwd, 'java-serverless');
+  });
+}
+
+test('java-serverless guards block publishing, registry pushes, cloud CLIs, remote hosts and release tags, not local work', () => {
+  const guards = parse(readFileSync(dir('java-serverless', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'docker push me/app', 'gcloud run deploy app --source .', 'aws lambda update-function-code --function-name x --zip-file fileb://app.zip', 'sam deploy --guided', 'git push --tags', 'ssh me@host', 'DOCKER_HOST=ssh://me@host docker ps']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build', './gradlew test', 'docker build -t app .', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
 test('java-cli guards block publishing, release tags and remote hosts, not local work', () => {
@@ -1394,7 +1423,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['java', 'serverless', 'java-serverless'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

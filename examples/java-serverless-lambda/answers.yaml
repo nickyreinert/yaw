@@ -1,0 +1,17 @@
+# Input of the kit CI smoke test for profile java-serverless, hosting lambda (doc 05 §4, ADR-0105): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small API that greets people.
+  idea.team: solo
+  arch.language: java
+  arch.runs-on: serverless
+  arch.java-serverless-hosting: lambda
+proposal:
+  status: confirmed
+  summary: java-serverless - Java serverless app (lambda); RequestHandler, Gradle, Spotless, JUnit 5.
+  profiles: [java-serverless]
+  modules: [core]
