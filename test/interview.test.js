@@ -128,6 +128,7 @@ test('stack: language x runs-on picks exactly one profile, tailored or basic; un
   assert.equal(pick('kotlin', 'self-hosted'), 'kotlin-web');
   assert.equal(pick('kotlin', 'serverless'), 'kotlin-serverless');
   assert.equal(pick('java', 'local'), 'java-cli');
+  assert.equal(pick('java', 'self-hosted'), 'java-web');
   assert.equal(pick('java', 'app-store'), 'java-basic');
   assert.equal(pick('go', 'local'), 'go-cli');
   assert.equal(pick('go', 'self-hosted'), 'go-web');

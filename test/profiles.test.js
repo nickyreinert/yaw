@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-basic', 'node-cli', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -982,7 +982,7 @@ function javaBadCode(cwd, name) {
   assert.notEqual(run('just', ['typecheck'], { cwd }).status, 0, 'a type error fails just typecheck');
 }
 
-for (const name of ['java-cli']) {
+for (const name of ['java-cli', 'java-web']) {
   test(`${name}: the uniform verbs exist, the wrapper is pinned by checksum, versions are exact, Gradle is watched`, () => {
     const just = readFileSync(dir(name, 'just', `${name}.just`), 'utf8');
     for (const verb of VERBS) assert.match(just, new RegExp(`^${verb}\\b`, 'm'), verb);
@@ -1017,6 +1017,23 @@ test('smoke java-cli: yaw init, just setup && just check pass; the tool runs; ba
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /usage: app/);
   javaBadCode(cwd, 'java-cli');
+});
+
+test('smoke java-web: yaw init, just setup && just check pass; the server answers; bad code fails the gate (needs JDK 17+ and network)', { skip: javaSkip, timeout: 900000 }, () => {
+  const { cwd, r } = initExample('java-web', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /BUILD SUCCESSFUL/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.ok(existsSync(join(cwd, 'Dockerfile')));
+  assert.ok(existsSync(join(cwd, 'build', 'install', 'app', 'bin', 'app')));
+  javaBadCode(cwd, 'java-web');
+});
+
+test('java-web guards block publishing, image pushes, remote hosts and release tags, not local work', () => {
+  const guards = parse(readFileSync(dir('java-web', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['./gradlew publish', 'git push --tags', 'docker push me/app', 'docker buildx build --push -t me/app .', 'ssh me@host', 'rsync -av out/ me@host:/srv', 'DOCKER_HOST=ssh://me@host docker ps', 'docker --context prod ps']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['./gradlew build installDist', './gradlew test', 'docker build -t app .', 'git push origin main', 'just check']) assert.ok(!blocked(cmd), cmd);
 });
 
 test('java-cli guards block publishing, release tags and remote hosts, not local work', () => {
@@ -1377,7 +1394,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   const pick = (language, runsOn) => profileForStack(profiles, language, runsOn)?.name ?? null;
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'],
-    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
+    ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
     ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);

@@ -1,0 +1,16 @@
+# Input of the kit CI smoke test for profile java-web (doc 05 §4): yaw init, then just setup && just check.
+mode: quick
+answers:
+  user.agents: [claude]
+  user.expertise: intermediate
+  user.language: en
+  user.autonomy: ask-risky
+  idea.text: A small web service that greets people.
+  idea.team: solo
+  arch.language: java
+  arch.runs-on: self-hosted
+proposal:
+  status: confirmed
+  summary: java-web - Java web service; JDK HTTP server, Gradle, Spotless, JUnit 5, Dockerfile.
+  profiles: [java-web]
+  modules: [core]
