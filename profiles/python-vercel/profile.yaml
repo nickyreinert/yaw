@@ -10,3 +10,9 @@ stack:
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [just, uv]
+tools:
+  - name: node
+    check: npx --version
+    install:
+      macos: brew install node
+      linux: curl -fsSL https://fnm.vercel.app/install | bash && fnm install --lts

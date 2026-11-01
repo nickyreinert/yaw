@@ -11,3 +11,9 @@ stack:
 defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [jdk>=17, android-sdk, just]
+tools:
+  - name: adb
+    check: adb version
+    install:
+      macos: brew install --cask android-platform-tools
+      linux: sudo apt install android-tools-adb
