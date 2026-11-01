@@ -3,9 +3,8 @@
 name: kit-ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # manual only (free-minutes budget): run once at the end of the build phase
+  workflow_dispatch:
 
 permissions:
   contents: read
