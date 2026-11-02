@@ -14,7 +14,7 @@ import { removeKnowledge, saveKnowledge } from '../lib/knowledge-store.js';
 import { interviewApply, interviewData, interviewAction, interviewPreview, saveTaxonomy, settingsFile, settingsFiles, taxonomyData } from './settings.js';
 import { ProjectError } from '../render/project.js';
 import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
-import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
+import { globalFile, globalFiles, presetAction, presetData, presetSave, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
 import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
 import { createImproveRunner, improveSettings, saveImproveSettings, planningAgents } from './improve-agents.js';
@@ -28,7 +28,7 @@ import { improveHistory, savedImprovement, saveImprovement, importImprovement, d
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
-  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
+  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -73,6 +73,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       '/api/global/setup-defaults': () => loadSetupDefaults({ env, kitRoot }),
       '/api/global/profile': () => profileData({ kitRoot, env }),
       '/api/global/presets': () => presetsData({ env }),
+      '/api/global/preset': (params) => presetData({ env, name: params?.get('name') }),
       '/api/global/files': () => globalFiles({ env }),
       '/api/global/review-prompts': () => reviewPromptsData({ kitRoot, env }),
       '/api/review-prompts': (params) => userError(() => reviewPromptsData({ root: rootOf(params?.get('workspace')), kitRoot, env })),
@@ -184,6 +185,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       // Global Settings: personal files under ~/.yaw, independent of the open workspace.
       if (name === 'profile-preview') return profilePreview({ kitRoot, env, input });
       if (name === 'profile-apply') return profileApply({ kitRoot, env, input });
+      if (name === 'preset-save') return presetSave({ kitRoot, env, input });
       if (name === 'preset-rename' || name === 'preset-delete') return presetAction({ env, input, remove: name === 'preset-delete' });
       // Review prompts: scope global is the user's blueprint, scope project the open workspace's override.
       if ((name === 'review-prompt-save' || name === 'review-prompt-remove') && input.scope === 'global') {

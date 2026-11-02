@@ -436,6 +436,9 @@ label.check input { width: auto; margin: 0; }
 .q .checks label { display: inline-flex; gap: .3rem; margin-right: 1rem; font-weight: 400; }
 .preset-table td:last-child { white-space: nowrap; }
 .preset-table button { padding: .3rem .6rem; font-size: .8rem; margin: 0 .3rem 0 0; }
+.preset-table tr.is-selected td { background: var(--sun-wash, #fff7cc); }
+.preset-editor .section-heading .row-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.editor-tabs.sub-tabs { margin: 4px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 #global-detail { position: fixed; left: 220px; right: 0; bottom: 0; height: 46vh; z-index: 6; background: var(--paper); border-top: 2px solid #67bfc2; box-shadow: 0 -8px 24px #0000001a; display: flex; flex-direction: column; padding: 12px 30px 14px; }
 #global-detail[hidden] { display: none; }
 @media (max-width: 1000px) { .chart-grid { grid-template-columns: 1fr; } .q { grid-template-columns: 1fr; } }
@@ -794,6 +797,8 @@ a.button.primary { background: var(--accent); color: #fff; }
 /* Settings uses the shared controls as a grouped form; the wizard is opt-in. */
 .settings-presentation { display: flex; gap: 8px; margin: 0 0 20px; }
 .settings-presentation [aria-pressed=true] { background: var(--ink); color: var(--sun); border-color: var(--ink); }
+/* Interview presentation: the full wizard, without the Settings heading and tabs. */
+#settings-view.interview-mode > :is(.page-heading, #settings-tabs, .note-inline) { display: none; }
 .settings-form .wizard-layout { display: block; }
 .settings-form .wizard-nav, .settings-form .interview-depth-bar, .settings-form .wizard-footer { display: none; }
 .settings-form .interview-form { padding: 0; border: 0; background: transparent; }
@@ -935,6 +940,14 @@ body.interview-focus .workspace { --workspace-inset: 0px; }
 .project-structure .project-tree-file.in-section { background: none; }
 .project-structure .project-tree-file:is(.is-focused, [aria-pressed=true]) { background: var(--console-selected); box-shadow: inset 2px 0 #737983; }
 .project-structure .project-tree-file.is-changed { border-left: 2px solid #979ca4; }
+/* A short flash marks files the last answer added, changed or removed. */
+@keyframes tree-flash { from { background: var(--flash); } to { background: transparent; } }
+.project-structure .project-tree-file.flash-added { --flash: #bfe6cf; animation: tree-flash 1.6s ease-out; }
+.project-structure .project-tree-file.flash-changed { --flash: #ffe28a; animation: tree-flash 1.6s ease-out; }
+.project-structure .project-tree-file.flash-removed { --flash: #f6c3cf; animation: tree-flash 1.6s ease-out forwards; text-decoration: line-through; opacity: .75; }
+.project-structure .project-structure-heading.is-flashing { --flash: #ffe28a; animation: tree-flash 1.6s ease-out; }
+.project-tree-delta { font-weight: 600; color: var(--console-ink); }
+@media (prefers-reduced-motion: reduce) { .project-structure :is(.project-tree-file, .project-structure-heading) { animation: none !important; } }
 .project-file-preview { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--console-line); padding: 6px 10px; }
 .project-file-preview h3 { font: 600 11px/1.4 var(--mono); color: inherit; margin: 0 0 5px; overflow-wrap: anywhere; }
 .project-file-preview .project-file-content { flex: 1; min-height: 0; max-height: 100%; overflow: auto; border: 0; padding: 0; margin: 0; color: inherit; background: none; font: 11px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -238,6 +238,15 @@ export function renamePreset(env, name, to) {
   return to;
 }
 
+// The dashboard's Global Settings: edited answers are merged into the preset; other keys stay as they are.
+export function writePresetAnswers(env, name, answers) {
+  const file = existingPreset(env, name);
+  const doc = parse(read(file)) ?? {};
+  doc.answers = { ...doc.answers, ...answers };
+  check(`presets/${name}.yaml`, 'preset.schema.json', doc);
+  write(file, stringify(doc));
+}
+
 // -> { before: text | null, after: text } for the given personal answers; nothing is written.
 export function nextUserProfile(env, answers) {
   directory(userDir(env));
