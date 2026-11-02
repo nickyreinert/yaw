@@ -28,7 +28,7 @@ function prompts({ mode = 'basic', answers = PERSONAL, apply = true, offer = tru
     if (/^\s*Modules /.test(prompt)) return 'none';
     if (/Write these files/.test(prompt)) return apply ? 'y' : 'n';
     if (/Save these personal defaults/.test(prompt)) return save ? 'y' : 'n';
-    if (/Save |guidance to kick off|create one now/.test(prompt)) return 'n';
+    if (/Save |Kick off the project documents|create one now/.test(prompt)) return 'n';
     const screen = [...p.shown].map((s) => s.replace(/\x1b\[[0-9;]*m/g, '')).reverse().find((s) => /^  \d+\/\d+ /.test(s));
     const q = questions.find((q) => screen?.split('\n')[0].endsWith(q.label));
     assert.ok(q, `unexpected prompt ${prompt}`);

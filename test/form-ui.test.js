@@ -61,7 +61,9 @@ test('interview UI: concise setup, focus switch and final module review', () => 
     assert.match(page, /data-tab="kickoff"/);
     assert.match(page, /class="page-actions"/);
   }
-  assert.match(app, /finalCard\.node/);
+  // Review & apply shows no prompt; Finished offers the concept prompt or the local kickoff prompt.
+  assert.ok(!app.includes("$('confirm').append(finalCard.node)"));
+  assert.match(app, /replaceChildren\([^;]*conceptCard\.node, finalCard\.node\)/);
   assert.match(cards, /'aria-pressed'/);
   assert.ok(!cards.includes("type: 'radio'"));
   assert.ok(!html.includes('save-consent') && !html.includes('I explicitly agree'));

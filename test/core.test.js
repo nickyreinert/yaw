@@ -65,7 +65,7 @@ test('machine-local YAW files are git-ignored; committed YAW files are not (#170
   const ignored = (root, path) => run('git', ['check-ignore', '--quiet', path], { cwd: root }).status === 0;
   const claude = await init();
   run('git', ['init', '-q'], { cwd: claude });
-  for (const p of ['.yaw/draft.yaml', '.claude/settings.local.json']) assert.ok(ignored(claude, p), p);
+  for (const p of ['.yaw/draft.yaml', '.yaw/concept-prompt.md', '.yaw/kickoff-prompt.md', '.claude/settings.local.json']) assert.ok(ignored(claude, p), p);
   for (const p of ['.yaw/answers.yaml', '.yaw/manifest.json', '.yaw/base/AGENTS.md', 'AGENTS.md']) assert.equal(ignored(claude, p), false, p);
   const codex = await init(ANSWERS_YAML.replace('user.agents: [claude]', 'user.agents: [codex]'));
   run('git', ['init', '-q'], { cwd: codex });
@@ -92,6 +92,9 @@ test('justfile: core frame, one import per profile, composed in marked blocks (A
   assert.equal(read(root, '.gitignore'), [
     '# local web-form draft (yaw init --web); it can hold unfinished answers',
     '.yaw/draft.yaml',
+    '# kickoff prompts (yaw init, yaw kickoff concept); they hold setup facts and documents, regenerated on demand',
+    '.yaw/concept-prompt.md',
+    '.yaw/kickoff-prompt.md',
     '# personal Claude Code settings (status line, local permissions)',
     '.claude/settings.local.json',
     '',

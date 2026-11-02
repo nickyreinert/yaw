@@ -142,7 +142,7 @@ export function kickoffGuide({ tasksMode = 'local', hasTasks = true } = {}) {
 export function conceptGuide() {
   return [
     'Copy the prompt into the chat that holds your concept (only if the concept is not confidential). It lists your setup facts and current project documents; review it before sharing, nothing is sent automatically.',
-    `Save the reply as a file, for example ${PLAN_FILE}, or paste it in the dashboard: Settings → Kickoff → Import a concept.`,
+    `Save the reply as a file, for example ${PLAN_FILE}, or paste it in the dashboard: Settings → Kickoff → Import your own concept.`,
     `Check it with yaw kickoff import ${PLAN_FILE} --dry-run: it shows each document and task. Then import it with --reviewed; updated documents replace the current ones.`,
   ];
 }

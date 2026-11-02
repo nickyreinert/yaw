@@ -82,7 +82,7 @@ function prompts(answers = BASE, mode = 'quick') {
     if (/Setup depth/.test(prompt)) return mode;
     if (/^Modules \(comma-separated/.test(prompt)) return 'none';
     if (/Write these files/.test(prompt)) return 'y';
-    if (/Save |guidance to kick off/.test(prompt)) return 'n';
+    if (/Save |Kick off the project documents/.test(prompt)) return 'n';
     const screen = [...p.shown].reverse().find((text) => /^  \d+\/\d+ /.test(text));
     const q = questions.find((q) => screen?.split('\n')[0].endsWith(q.label));
     assert.ok(q, `unexpected prompt: ${prompt}`);
