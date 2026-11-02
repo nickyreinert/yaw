@@ -3,79 +3,358 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f5ed">
-  <meta name="description" content="Set up a project once for Claude Code, Codex and Copilot CLI. YAW gives agents shared instructions, project commands, tasks and decisions, with a local dashboard to review the work.">
-  <title>YAW — Set up once. Keep Bad Requestthe project context.</title>
+  <meta name="theme-color" content="#f7f3ef">
+  <meta name="description" content="YAW is a control room for coding agents. Define how your agents talk, code and check their work once, run it with Claude Code, Codex, Copilot CLI or Gemini CLI, and watch tokens, tasks and sessions from one local dashboard.">
+  <title>YAW — Control room for coding agents</title>
   <link rel="icon" type="image/svg+xml" href="assets/yaw-shark.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
-  <div class="page-shell">
-    <header class="site-header">
-      <a class="brand" href="#top" aria-label="YAW home"><img src="assets/yaw-shark.svg" alt="" width="46" height="46"><span>YAW<span class="brand-dot">.</span></span></a>
-      <nav aria-label="Main navigation"><a href="#why">Why YAW</a><a href="#how">Setup</a><a href="#features">Features</a><a class="nav-cta" href="#start">Get started <span aria-hidden="true">↗</span></a></nav>
-    </header>
 
-    <main id="main">
-      <section class="hero" id="top">
-        <div class="hero-copy">
-          <div class="eyebrow"><span class="signal"></span> PROJECT SETUP FOR CODING AGENTS</div>
-          <h1>Set up once.<br><em>Keep the context.</em></h1>
-          <p class="lead">Give Claude Code, Codex and Copilot CLI the same project instructions, commands and next tasks. YAW creates files you can review and edit, then helps each new session pick up where the last one left off.</p>
-          <div class="hero-actions"><a class="button primary" href="#start">See the setup <span aria-hidden="true">→</span></a><a class="text-link" href="https://github.com/nickyreinert/yaw">View on GitHub <span aria-hidden="true">↗</span></a></div>
-          <p class="small-proof">Source on GitHub · Zero runtime dependencies · Local first</p>
-        </div>
-        <div class="hero-art" aria-label="YAW setup illustration">
-          <div class="art-sticker">One project.<br>Many sessions.</div>
-          <div class="window terminal">
-            <div class="window-top"><span class="dots"><i></i><i></i><i></i></span><span>your-project / terminal</span><span>⌘</span></div>
-            <div class="terminal-body"><div><span class="prompt">$</span> yaw init</div><div class="terminal-muted">Review the project setup before writing files.</div><div><span class="terminal-check">✓</span> Shared agent instructions</div><div><span class="terminal-check">✓</span> Tasks and project commands</div><div class="terminal-rule"></div><div><span class="prompt">$</span> yaw kickoff</div><div class="terminal-muted">Turn an idea into a plan and tasks.</div><div><span class="prompt">$</span> yaw web</div><div class="terminal-muted">Explore the workspace locally.</div></div>
-          </div>
-          <img class="hero-shark" src="assets/yaw-shark.svg" alt="Friendly YAW shark mascot" width="154" height="154">
-        </div>
-      </section>
-
-      <section class="promise" id="why">
-        <p class="section-kicker">WHY YAW</p>
-        <h2>Less to repeat<br><span>at the next prompt.</span></h2>
-        <div class="promise-grid">
-          <article><span class="card-index">01 / START</span><h3>Project rules in one place</h3><p>YAW writes shared <code>AGENTS.md</code> instructions, selected agent adapters and repeatable project commands. A new session has a place to start.</p></article>
-          <article><span class="card-index">02 / KEEP</span><h3>Files you can own</h3><p>Review every proposed file before setup. Edit the result yourself; later updates keep those edits unless you choose to replace or merge them.</p></article>
-          <article><span class="card-index">03 / RESUME</span><h3>A visible next step</h3><p>Tasks, decisions, knowledge and session links help you find what happened and what to do next, even when you switch agents.</p></article>
-        </div>
-      </section>
-
-      <section class="flow" id="how">
-        <div class="section-head"><div><p class="section-kicker">HOW EASY IS SETUP?</p><h2>One interview.<br>Then use the files.</h2></div><p>Install the CLI, answer the project questions in your terminal or local browser, and review the file plan before applying it.</p></div>
-        <div class="steps"><div class="step"><span>1</span><h3>Install YAW</h3><p>Install the zero-runtime-dependency CLI once. You need Node.js 22.13+ and Git; <code>just</code> is recommended for generated commands.</p></div><div class="step"><span>2</span><h3>Run <code>yaw init</code></h3><p>Choose a profile, agents and Quick or Full setup. Preview the files, then apply them. Use <code>yaw init --web</code> if you prefer a browser form.</p></div><div class="step"><span>3</span><h3>Work and adjust</h3><p>Use the generated instructions and commands. Later, <code>yaw edit</code> or the dashboard can preview setup changes; <code>yaw add</code> adds a module.</p></div></div>
-      </section>
-
-      <section class="features" id="features">
-        <div class="feature-intro"><p class="section-kicker">AFTER THE FIRST SETUP</p><h2>Useful on the next task, too.</h2><p>Start with a small kit. Add planning, project memory and session tools when your work calls for them.</p></div>
-        <div class="feature-grid">
-          <article><span class="feature-number">01 / PLAN</span><h3>Kick off an idea</h3><p><code>yaw kickoff</code> produces a project-aware prompt. Save the resulting plan and import it as tasks, including model tier and effort hints.</p><span class="feature-command">yaw kickoff import plan.md</span></article>
-          <article><span class="feature-number">02 / TRACK</span><h3>Tasks your way</h3><p>Use a local <code>TASKS.md</code>, GitHub issues, or both. Optional team mode adds issue-linked commit and PR checks; GitHub forms and planning skills help structure work.</p><span class="feature-command">yaw task next</span></article>
-          <article><span class="feature-number">03 / REMEMBER</span><h3>Keep project knowledge</h3><p>Record decisions and risks, recall relevant records at task start, and search or edit project and personal Markdown knowledge in the CLI or dashboard.</p><span class="feature-command">yaw knowledge list</span></article>
-          <article><span class="feature-number">04 / UNDERSTAND</span><h3>Profile sessions</h3><p>Explicitly scan local Claude Code, Codex and Copilot CLI history. Compare session counts, lengths and timing; optional local Laya classification is experimental.</p><span class="feature-command">yaw sessions scan</span></article>
-          <article><span class="feature-number">05 / ADJUST</span><h3>Change the setup later</h3><p>Revisit saved answers, preview the diff and apply changes from the terminal or dashboard. Inspect YAW-written files before changing your project.</p><span class="feature-command">yaw edit</span></article>
-          <article><span class="feature-number">06 / BUILD</span><h3>Keep the dev loop repeatable</h3><p>Profiles generate <code>just</code> setup and check commands. Optional hooks, skills, code maps, GitHub workflows and notifications can be added when useful.</p><span class="feature-command">just check</span></article>
-        </div>
-      </section>
-
-      <section class="dashboard-band" id="dashboard"><div class="dashboard-copy"><p class="section-kicker">LOCAL DASHBOARD</p><h2>See where the<br>work stands.</h2><p><code>yaw web</code> shows the selected workspace's tasks, sessions, knowledge and setup. Global views span projects and session history. Filter and bookmark session views, edit knowledge, and preview setup changes in Settings. Transcript scans and optional classification use explicit controls.</p><a class="text-link" href="https://github.com/nickyreinert/yaw/blob/main/docs/workspace-dashboard.md">Explore dashboard details <span aria-hidden="true">↗</span></a></div><div class="dashboard-preview" aria-label="Illustration of YAW dashboard sections"><div class="preview-top"><span class="preview-dots">● ● ●</span><strong>yaw web</strong><span>LOCAL</span></div><div class="preview-body"><div class="preview-side"><b>Overview</b><span>Projects</span><span>Sessions</span><span>Tasks</span><span>Knowledge</span><span>Settings</span></div><div class="preview-main"><small>WORKSPACE / OVERVIEW</small><strong>Keep the thread.</strong><div class="preview-metrics"><div><b>Tasks</b><span>Local or GitHub</span></div><div><b>Sessions</b><span>Explicit analysis</span></div></div><div class="preview-row"><span>◇</span><div><b>Knowledge</b><small>Decisions · notes · specs</small></div></div><div class="preview-row"><span>↗</span><div><b>Settings</b><small>Preview before applying</small></div></div></div></div><p class="preview-caption">Illustration of dashboard areas</p></div></section>
-
-      <section class="showcase" id="inside">
-        <div class="showcase-copy"><p class="section-kicker">REVIEW BEFORE APPLYING</p><h2>See what YAW will write.<br><span>Then make it yours.</span></h2><p>The local browser interview shows Quick and Full choices, project questions and a live file plan. You can switch from the terminal interview to the browser at any question.</p><ul><li>Preview files before they are written</li><li>Choose agents, modules and task mode</li><li>Revisit answers and modules later</li></ul><a class="text-link" href="https://github.com/nickyreinert/yaw/blob/main/docs/getting-started.md">Read the full guide <span aria-hidden="true">↗</span></a></div>
-        <figure class="form-figure"><img src="assets/setup-screenshot.png" alt="Current YAW browser setup form with six steps, Quick and Full choices, and a file plan" width="1413" height="772"><figcaption>The current local browser setup flow</figcaption></figure>
-      </section>
-
-      <section class="choice"><div><p class="section-kicker">GROWS WITH THE PROJECT</p><h2>Start light. Add depth when it helps.</h2></div><div class="choice-cards"><article><span>QUICK</span><h3>Start with the basics</h3><p>Shared instructions, development commands, local tasks and essential guards. Add modules whenever you need them.</p></article><article><span>FULL</span><h3>Carry more context</h3><p>Include decisions, sessions, comfort features and a code map. GitHub and CI options follow your project choices.</p></article></div></section>
-
-      <section class="start" id="start"><div><p class="section-kicker">GET STARTED</p><h2>One install. One project interview.</h2><p>Install the current main channel for the features shown here, go to your project root, then run <code>yaw init</code>. Review the proposed files and apply them. Requires Node.js 22.13+ and Git on macOS or Linux; Windows works through WSL. <code>just</code> is recommended.</p></div><div class="install-card"><div class="install-head"><span>TERMINAL · MAIN CHANNEL</span><button type="button" id="copy" aria-label="Copy installation command">Copy</button></div><pre><code id="install-command">curl -fsSL https://raw.githubusercontent.com/nickyreinert/yaw/main/install.sh | bash -s -- --channel main</code></pre><div class="install-next"><span>Then in your project:</span><code>yaw init</code></div><a href="https://github.com/nickyreinert/yaw/blob/main/docs/getting-started.md">Pinned release and installation guide <span aria-hidden="true">↗</span></a></div></section>
-    </main>
-    <footer><a class="brand" href="#top"><img src="assets/yaw-shark.svg" alt="" width="34" height="34"><span>YAW<span class="brand-dot">.</span></span></a><p>Yet Another Wrapper. Project setup and context for coding agents.</p><a href="https://github.com/nickyreinert/yaw">GitHub ↗</a></footer>
+  <div class="progress" aria-hidden="true">
+    <svg viewBox="0 0 100 14" preserveAspectRatio="none"><line x1="0" y1="13" x2="100" y2="13" vector-effect="non-scaling-stroke"/></svg>
+    <svg class="fin" id="fin" viewBox="0 0 24 14"><path d="M0 13 L9 1 L14 13 Z"/></svg>
   </div>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="YAW home"><img src="assets/yaw-shark.svg" alt="" width="34" height="34"><span>YAW</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#why">Why</a><a href="#what">What</a><a href="#control">Control room</a><a href="#how">How</a>
+      <a class="nav-cta" href="#start">Install</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" id="top">
+      <div class="hero-copy">
+        <p class="kicker">CLAUDE CODE · CODEX · COPILOT CLI · GEMINI CLI</p>
+        <h1>One control room for all your coding agents.</h1>
+        <p class="lead">Define once how your agents talk to you, how they code, and which skills, hooks and checks they use. Any language, any stack. Switch agents; your setup stays.</p>
+        <ul class="ticks">
+          <li>From idea to MVP in one sitting, or a full product with the gates a dev team has.</li>
+          <li>Plain files in your repo. No lock-in.</li>
+          <li>Tokens, tasks, sessions and decisions in one local dashboard.</li>
+        </ul>
+        <div class="install-inline"><code>curl -fsSL https://raw.githubusercontent.com/nickyreinert/yaw/main/install.sh | bash -s -- --channel main</code><button type="button" id="copy" aria-label="Copy installation command">Copy</button></div>
+        <p class="note">Then in your project: <code>yaw init</code> · macOS, Linux, Windows via WSL · Node.js 22.13+, Git</p>
+      </div>
+      <figure class="hero-shot">
+        <img src="assets/shot-global-overview.jpg" alt="YAW dashboard, Global overview: five projects, sessions, tokens, cost and open tasks, with a project table" width="1483" height="812">
+        <figcaption>Global overview with demo data: projects, tokens, cost, open tasks.</figcaption>
+      </figure>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="what-is">
+      <p class="kicker">WHAT IS YAW</p>
+      <h2>Define. Run. Learn.</h2>
+      <div class="flow">
+        <article><span>1</span><h3>Define once</h3><p>Your communication style, coding standards, skills, hooks, review gates and knowledge live in one place, on your machine.</p></article>
+        <article><span>2</span><h3>Run any agent</h3><p>YAW writes that setup into each project as plain files. Claude Code, Codex, Copilot CLI and Gemini CLI read the same rules.</p></article>
+        <article><span>3</span><h3>Watch and improve</h3><p>The dashboard shows tokens, cost, tasks and decisions across projects, and shows where agents got stuck, so you can fix the cause.</p></article>
+      </div>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="why">
+      <p class="kicker">WHY YAW</p>
+      <h2>Agents start every session from zero.</h2>
+      <p class="sub">You explain how to run the tests, how you want answers, what was decided last week. Again. And every agent has its own place for that. YAW makes it one.</p>
+      <ul class="facts">
+        <li><b>No blank starts.</b> Rules, commands, next task and past decisions are files in the repo. A new session reads them.</li>
+        <li><b>No bloat.</b> You pick modules; only those are installed. Zero runtime dependencies.</li>
+        <li><b>No lock-in.</b> <code>AGENTS.md</code>, a <code>justfile</code>, <code>TASKS.md</code>, Markdown records. Change agent and take it all with you.</li>
+        <li><b>Team-grade quality, solo.</b> Review agents, pre-commit and pre-push gates, CI, decision records: switch them on per project.</li>
+        <li><b>You stay in control.</b> A diff is shown before anything is written. Your edits survive updates. Everything runs locally.</li>
+      </ul>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="what">
+      <p class="kicker">WHAT IT DOES</p>
+      <h2>Everything in one place.</h2>
+      <p class="sub">15 modules, 30+ stack profiles. Each line is one feature; switch on only what you need.</p>
+      <div class="grid">
+        <article>
+          <h3>How your agent works with you</h3>
+          <ul>
+            <li>Answer length, register, examples, explanations, your experience level</li>
+            <li>How often it asks before acting</li>
+            <li>Chat language separate from code language</li>
+            <li>Claude output style generated from your choices</li>
+            <li>Personal defaults, applied to every new project</li>
+            <li>Presets for different kinds of work: save, load, rename</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Any agent, any stack</h3>
+          <ul>
+            <li>Claude Code, Codex, Copilot CLI, Gemini CLI</li>
+            <li>One <code>AGENTS.md</code> as entry point; thin per-agent files</li>
+            <li>Compatibility matrix per agent: <code>yaw agents</code></li>
+            <li>Adapter drift check when an agent's config changes</li>
+            <li>Python, TypeScript, PHP, Kotlin, Go, Rust, Swift, Java, static sites</li>
+            <li>CLI, web app, serverless, edge, mobile, WordPress: 30+ profiles</li>
+          </ul>
+        </article>
+        <article>
+          <h3>From idea to MVP</h3>
+          <ul>
+            <li>Quick, Basic or All interview; terminal or browser form</li>
+            <li><code>yaw kickoff</code>: architecture, data model, UI/UX foundations</li>
+            <li>Import the plan as tasks with model tier and effort</li>
+            <li>Tasks in <code>TASKS.md</code>, GitHub issues, or both</li>
+            <li>Project commands as <code>just</code> recipes; setup and check run on apply</li>
+            <li>Local <code>.env</code> handling; Docker files when the stack uses them</li>
+            <li>Code map of your repo for faster orientation</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Quality gates, like a dev team</h3>
+          <ul>
+            <li>Review agents: quality, business logic, UI/UX, feature fit, security</li>
+            <li>Pre-push gate that warns or blocks</li>
+            <li>Pre-commit: format, lint, secret scan for every agent and for you</li>
+            <li>GitHub Actions quality gate, history scan, Dependabot</li>
+            <li>Team mode: no change without an issue; PR must link one</li>
+            <li>Coding, testing, review and git standards as a doc</li>
+            <li>Edit what each reviewer is told, per project or for all</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Safety</h3>
+          <ul>
+            <li>Agents cannot read <code>.env</code> and secret files</li>
+            <li>Destructive commands are guarded: <code>rm -rf</code>, force push, prod deploy</li>
+            <li>Secrets are entered by you, never by the agent</li>
+            <li>Diff and explicit Apply before any write</li>
+            <li>Guarded GitHub actions need your confirmation</li>
+            <li>Dashboard is loopback only; no message text is stored</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Memory that travels</h3>
+          <ul>
+            <li>Decision records and security, privacy and business-logic notices</li>
+            <li>Relevant decisions recalled at task start, with a note per prompt</li>
+            <li>Project knowledge and personal global knowledge in Markdown</li>
+            <li>Search and edit in the CLI or the dashboard</li>
+            <li>Skills for GitHub issues and epics, and for session handoff</li>
+            <li>Find the conversation behind a task, commit or file</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Control room</h3>
+          <ul>
+            <li>Global overview: projects, sessions, tokens, cost, open tasks</li>
+            <li>Analytics: duration, prompts, response time, tokens by model</li>
+            <li>Filter by device, folder, project, language, agent, model, period</li>
+            <li>Split every chart by agent, model, folder or project</li>
+            <li>Tasks and knowledge across all projects</li>
+            <li>Browse and edit the files YAW wrote; settings with diff preview</li>
+            <li>Every view is a bookmarkable address</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Learn from your sessions</h3>
+          <ul>
+            <li>Did the agent finish the task? Outcome per session</li>
+            <li>Where it went wrong: misunderstood intent, wrong scope, broke something</li>
+            <li>Frustration and apology-loop signals</li>
+            <li>Read the conversation with corrections highlighted</li>
+            <li>One-click review prompt: in your browser chat or your agent CLI</li>
+            <li>Local classification; suggestions are never applied automatically</li>
+          </ul>
+        </article>
+        <article>
+          <h3>Anywhere you work</h3>
+          <ul>
+            <li>Sync defaults, presets, stats and knowledge across devices: folder, NAS or private repo</li>
+            <li>Server mode: run a host on your LAN, start projects from a client</li>
+            <li>Run headless on a server; drive it with Claude Remote Control</li>
+            <li>Telegram message when a long run ends</li>
+            <li>Control remote sessions from Telegram: approve, deny, stop</li>
+            <li>Claude status line: task, context, cache, last check</li>
+            <li>Let an agent run the setup through a local API</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="control">
+      <p class="kicker">THE CONTROL ROOM · <code>yaw web</code></p>
+      <h2>See what your agents did, what it cost, and what to fix.</h2>
+      <p class="sub">All screenshots show demo data: five fictional projects, 109 sessions.</p>
+
+      <div class="showcase">
+        <div class="showcase-copy">
+          <h3>Analytics</h3>
+          <ul class="tight">
+            <li>Tokens, cost and time per agent, model or project</li>
+            <li>Session length and response time</li>
+            <li>The filter bar collapses to two rows while you scroll</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-analytics.jpg" alt="YAW Analytics: usage cards, message insights and a chart of sessions per day split by agent" width="1483" height="812" loading="lazy"></figure>
+      </div>
+
+      <div class="showcase flip">
+        <div class="showcase-copy">
+          <h3>Learn</h3>
+          <ul class="tight">
+            <li>Was the task done? Where did it get difficult?</li>
+            <li>Sessions that need attention, first</li>
+            <li>Turn a bad session into a better rule</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-learn.jpg" alt="YAW Learn view: outcome, collaboration friction and user reaction counts per agent" width="1483" height="812" loading="lazy"></figure>
+      </div>
+
+      <div class="showcase">
+        <div class="showcase-copy">
+          <h3>Tasks across projects</h3>
+          <ul class="tight">
+            <li>Every project's <code>TASKS.md</code> in one list</li>
+            <li>Progress and resume points</li>
+            <li>Jump into any project from here</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-global-tasks.jpg" alt="YAW global tasks: tasks from five projects with status and progress" width="1483" height="812" loading="lazy"></figure>
+      </div>
+
+      <div class="showcase flip">
+        <div class="showcase-copy">
+          <h3>Decisions and knowledge</h3>
+          <ul class="tight">
+            <li>Architecture decisions, risks, notes</li>
+            <li>Agents recall them before they start</li>
+            <li>Edit in the browser or as Markdown</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-decisions.jpg" alt="YAW knowledge view showing decision records and one opened decision" width="1483" height="812" loading="lazy"></figure>
+      </div>
+
+      <div class="showcase">
+        <div class="showcase-copy">
+          <h3>Your defaults</h3>
+          <ul class="tight">
+            <li>How the agent talks to you</li>
+            <li>Applied to every new project</li>
+            <li>Saved as presets for different work</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-defaults.jpg" alt="YAW global settings, Defaults tab: agents, experience level, answer length, register and comfort features" width="1483" height="812" loading="lazy"></figure>
+      </div>
+
+      <div class="showcase flip">
+        <div class="showcase-copy">
+          <h3>Sync your devices</h3>
+          <ul class="tight">
+            <li>Folder, NAS or private GitHub repo</li>
+            <li>Choose what travels: defaults, presets, stats, tasks, knowledge</li>
+            <li>Statistics merge by device name</li>
+          </ul>
+        </div>
+        <figure><img src="assets/shot-sync.jpg" alt="YAW global settings, Sync tab: folder or private repository, and what to transfer" width="1483" height="812" loading="lazy"></figure>
+      </div>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="how">
+      <p class="kicker">HOW IT HELPS</p>
+      <h2>Same tool whether you code daily or just started.</h2>
+      <div class="two">
+        <article class="card">
+          <h3>New to coding agents</h3>
+          <ul>
+            <li>Answer a form in your browser. Describe your idea in plain words.</li>
+            <li>Pick Quick: five questions, sensible defaults.</li>
+            <li>Choose "Layperson": answers come in plain words.</li>
+            <li>Read the list of files. Nothing is written until you press Apply.</li>
+            <li>Safety guards are on by default.</li>
+            <li>Change your mind later; the setup reopens as a form.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Running agents every day</h3>
+          <ul>
+            <li>Compose modules per repo: <code>yaw add review</code>, <code>yaw remove sessions</code>.</li>
+            <li>Everything has a <code>just</code> recipe and runs headless.</li>
+            <li>Claude Code and Codex on one repo, one source of truth.</li>
+            <li>Gates before commit, before push and in CI.</li>
+            <li>Audit tokens, cost and where agents got stuck.</li>
+            <li>Run it on a server; check in from Telegram.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="shots">
+        <figure><img src="assets/shot-agents.jpg" alt="YAW setup form, About you step: choose Claude Code, Codex, Copilot or Gemini CLI" width="1483" height="812" loading="lazy"><figcaption>Pick your agents. Hints say what each one supports.</figcaption></figure>
+        <figure><img src="assets/shot-stack.jpg" alt="YAW setup form, Architecture step: language and destination cards with the tools each needs" width="1483" height="812" loading="lazy"><figcaption>Pick language and destination. YAW lists the tools needed.</figcaption></figure>
+      </div>
+      <figure class="wide"><img src="assets/shot-plan.jpg" alt="YAW setup form, Review and apply: the eleven files YAW will write" width="1483" height="812" loading="lazy"><figcaption>Review every file before it is written.</figcaption></figure>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="portable">
+      <p class="kicker">NO LOCK-IN</p>
+      <h2>Your customisation is a folder of text files.</h2>
+      <p class="sub">This is what YAW put in <code>AGENTS.md</code> for a demo project. Any agent that reads <code>AGENTS.md</code> follows it.</p>
+      <div class="split">
+        <pre class="code" aria-label="Excerpt of a generated AGENTS.md"><code># AGENTS.md
+
+## Project
+- Purpose: A small CLI that renames photo files by EXIF date.
+- Stack: node-cli, zero dependencies, node --test
+
+## Working agreement
+- Ask before risky steps; otherwise act.
+- Give balanced answers: the result first, then the reasoning.
+- Keep changes small; do what was asked, no more.
+
+- Run `just check` before you report a task as done.
+- Never read, print or commit secrets.
+
+## Tasks
+- Work through `just task` (list, next, start,
+  log, done, new). Done = implemented + `just check`
+  green + reviewed.</code></pre>
+        <ul class="facts tight">
+          <li><b>Edit it.</b> It's yours. YAW keeps your edits when it updates.</li>
+          <li><b>Commit it.</b> Teammates and CI see the same rules.</li>
+          <li><b>Move it.</b> Swap Claude Code for Codex, Copilot or Gemini; rules, commands and tasks come along.</li>
+          <li><b>Remove it.</b> <code>yaw remove &lt;module&gt;</code> deletes exactly the files that module added.</li>
+        </ul>
+      </div>
+    </section>
+
+    <hr class="fin-rule" aria-hidden="true">
+
+    <section class="wrap" id="start">
+      <p class="kicker">GET STARTED</p>
+      <h2>Two commands.</h2>
+      <pre class="term" aria-label="Install and run"><code><span class="dim"># install</span>
+curl -fsSL https://raw.githubusercontent.com/nickyreinert/yaw/main/install.sh | bash -s -- --channel main
+
+<span class="dim"># in your project</span>
+cd your-project
+yaw init          <span class="dim"># or: yaw init --web</span>
+yaw web           <span class="dim"># the control room</span></code></pre>
+      <p class="note">Needs Node.js 22.13+ and Git. <a href="https://just.systems">just</a> is recommended for the generated commands. <a href="https://github.com/nickyreinert/yaw/blob/main/docs/getting-started.md">Pinned release and full guide ↗</a></p>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <span>YAW · Yet Another Wrapper</span>
+    <a href="https://github.com/nickyreinert/yaw">GitHub ↗</a>
+  </footer>
   <script src="script.js" defer></script>
 </body>
 </html>

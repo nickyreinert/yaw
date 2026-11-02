@@ -286,7 +286,31 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const str = (key, label, value, show) => ({ key, label, value, text: (r) => String(value(r) ?? '—'), show });
 
   // ---------- sticky filter bar ----------
+  // The filter bar shrinks to two rows (lists become dropdowns) once the page scrolls; the button overrides that until reload.
+  let compactAuto = false, compactManual = null;
+  const filterCompact = () => compactManual ?? compactAuto;
+  function setCompact(value, manual = false) {
+    if (manual) compactManual = value; else compactAuto = value;
+    for (const bar of document.querySelectorAll('.gfilter.analytics-filter')) {
+      bar.classList.toggle('compact', filterCompact());
+      const button = bar.querySelector('.filter-toggle');
+      if (button) { button.textContent = filterCompact() ? 'Expand filters' : 'Collapse filters'; button.setAttribute('aria-expanded', String(!filterCompact())); }
+      if (!filterCompact()) for (const open of bar.querySelectorAll('.facet-column.open')) open.classList.remove('open');
+    }
+  }
+  // Hysteresis (collapse past 160px, expand again near the top) so the shrinking page cannot make the bar flicker.
+  document.addEventListener('scroll', (e) => {
+    if (compactManual !== null) return;
+    const slot = document.querySelector('.gfilter-slot:has(.analytics-filter)');
+    const box = e.target === document ? document.scrollingElement : e.target;
+    if (!slot || !box?.contains?.(slot)) return;
+    const top = box.scrollTop;
+    if (!compactAuto && top > 160) setCompact(true);
+    else if (compactAuto && top < 20) setCompact(false);
+  }, true);
+
   function filterBar(mode) {
+    const end = [];
     const select = (label, key, options, all, display = (o) => o) => h('label', key === 'language' ? { title: 'Project programming language: configured in YAW or detected from local file names. Unknown when no evidence is available.' } : {}, label, h('select', { on: { change: (e) => set({ [key]: e.target.value }) } },
       h('option', { value: '' }, all), options.map((o) => h('option', { value: o, selected: Array.isArray(state[key]) ? state[key].includes(o) : state[key] === o }, display(o)))));
     const seg = (label, key, opts) => h('div', { class: 'lbl', role: 'group', 'aria-label': label }, h('span', {}, label), h('div', { class: 'presets' }, opts.map(([v, l]) =>
@@ -311,8 +335,14 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         seg('Split charts by', 'split', locked() ? DIMS.slice(0, 3) : DIMS));
       bar.append(...(locked() ? [h('div', { class: 'workspace-filter-row' }, facets, dates)] : [facets, dates]));
     }
+    if (mode !== 'tasks') {
+      if (filterCompact()) bar.classList.add('compact');
+      end.push(h('button', { type: 'button', class: 'filter-toggle', 'aria-expanded': String(!filterCompact()), title: 'Show the filter lists, or shrink them to two rows',
+        on: { click: () => setCompact(!filterCompact(), true) } }, filterCompact() ? 'Expand filters' : 'Collapse filters'));
+    }
     bar.append(h('div', { class: 'gfilter-end' }, mode === 'tasks' ? null : h('strong', {}, `${fmt(filtered().length)} sessions`),
       ['sessions', 'improve', 'overview'].includes(mode) ? collectControls() : null,
+      ...end,
       h('button', { type: 'button', title: 'Clear filters, list searches and chart split', on: { click: () => { facetSearches[route] = {}; set({ ...DEFAULTS, table: state.table }); } } }, 'Reset')));
     if (['sessions', 'improve', 'overview'].includes(mode)) bar.append(collectStatus());
     return bar;

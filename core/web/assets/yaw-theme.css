@@ -30,10 +30,6 @@ body {
 ::selection { color: var(--ink); background: var(--sun); }
 h1, h2, h3 { color: var(--ink); font-family: 'Trebuchet MS', 'Avenir Next', Arial, sans-serif; }
 h1 { font-size: clamp(1.9rem, 2.8vw, 2.7rem); font-weight: 800; letter-spacing: -.065em; line-height: 1.08; }
-.page-heading h1::after {
-  content: ''; display: inline-block; width: 17px; height: 22px; margin-left: 12px;
-  background: var(--orange); clip-path: polygon(0 100%, 30% 0, 100% 100%);
-}
 h2 { font-size: var(--section-title-size); font-weight: var(--section-title-weight); line-height: 1.4; letter-spacing: -.02em; }
 h3 { font-weight: 700; }
 .eyebrow, .nav-label, .content-footer, .metric-group-label, .stack-step {
@@ -64,10 +60,6 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .sidebar nav button { position: relative; color: #d6e4ef; border: 1px solid transparent; border-radius: 7px 2px 7px 7px; }
 .sidebar nav button:hover { color: #fff; background: #23425f; border-color: #3e5c76; }
 .sidebar nav button[aria-current], .sidebar nav button[aria-current]:hover { background: var(--sun); color: var(--ink); border-color: var(--sun); }
-.sidebar nav button[aria-current]::after {
-  content: ''; position: absolute; right: 10px; width: 10px; height: 13px;
-  background: var(--ink); clip-path: polygon(0 100%, 32% 0, 100% 100%);
-}
 .side-search input[type=search] { background: #203d59; color: #fff; border-color: #536d85; }
 .side-search input::placeholder { color: #c0d3e5; }
 .side-search input:focus { background: #294965; outline-color: var(--sun); }

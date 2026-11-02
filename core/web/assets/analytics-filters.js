@@ -83,7 +83,30 @@ export function renderFacetBrowser({ rows, selection, scope = 'global', root = '
     };
     search.addEventListener('input', () => { searches[key] = search.value; filterList(); });
     list.append(empty); filterList();
-    field.append(legend, search, list); browser.append(field);
+    // Compact filter bar: the column collapses to this button and the list opens as a dropdown.
+    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'facet-toggle'; toggle.setAttribute('aria-haspopup', 'listbox'); toggle.setAttribute('aria-expanded', 'false');
+    const summary = !selected.length ? 'All' : selected.length === 1 ? label(key, selected[0]) : `${selected.length} selected`;
+    const name = document.createElement('span'); name.textContent = title;
+    const value = document.createElement('strong'); value.textContent = summary;
+    toggle.append(name, value);
+    toggle.addEventListener('click', () => {
+      const open = !field.classList.contains('open');
+      for (const other of browser.querySelectorAll('.facet-column.open')) { other.classList.remove('open'); other.querySelector('.facet-toggle')?.setAttribute('aria-expanded', 'false'); }
+      field.classList.toggle('open', open); toggle.setAttribute('aria-expanded', String(open));
+    });
+    field.append(legend, toggle, search, list); browser.append(field);
   }
   return browser;
+}
+
+// Close an open dropdown of the compact filter bar on an outside click or Escape.
+if (typeof document !== 'undefined') {
+  const closeFacets = (keep) => {
+    for (const field of document.querySelectorAll('.facet-column.open')) {
+      if (field === keep) continue;
+      field.classList.remove('open'); field.querySelector('.facet-toggle')?.setAttribute('aria-expanded', 'false');
+    }
+  };
+  document.addEventListener('click', (e) => closeFacets(e.target.closest?.('.facet-column')));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFacets(null); });
 }

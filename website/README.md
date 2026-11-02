@@ -1,9 +1,9 @@
-# YAW launch page
+# YAW website
 
-Static, dependency-free landing page for YAW. It introduces kickoff planning, local and GitHub tasks, knowledge and decisions, session profiling, optional local Laya classification, Telegram notifications, and the local dashboard. Open `index.html` locally or serve this folder with any static host. The page and assets use relative paths, so it can be published from a subdirectory.
+Static, dependency-free page. Open `index.html` or serve the folder:
 
 ```sh
 python3 -m http.server 8080 --directory website
 ```
 
-The setup screenshot was captured from the current six-step local browser form in a temporary demo project with the node-cli profile selected. The dashboard graphic is an illustration, labeled as such. The page itself does not collect information or call a service.
+Screenshots in `assets/shot-*.jpg` come from a demo project (node-cli profile) with a clean `HOME`, so no personal presets or paths appear. The page makes no network calls.
