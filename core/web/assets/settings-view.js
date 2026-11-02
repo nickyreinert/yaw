@@ -12,6 +12,11 @@ export function el(tag, text, cls) {
   if (cls) node.className = cls;
   return node;
 }
+// Hints that name another section link to it.
+export function link(label, route) { const a = el('a', label); a.href = `#${route}`; return a; }
+export function hint(cls, ...parts) { const p = el('p', null, cls); p.append(...parts); return p; }
+// A file description with links to where that file is edited (`links`: [[label, route]]).
+export const about = (f, cls = 'small muted') => hint(cls, f.about ?? '', ...(f.links ?? []).flatMap(([label, route]) => [' ', link(`${label} →`, route)]));
 export function button(text, fn, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
 export function grid(head, rows) {
   const wrap = el('div', null, 'table-scroll'), t = el('table'), tr = t.createTHead().insertRow();
@@ -231,7 +236,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
         const left = el('span'); left.append(el('span', expanded ? '▾ ' : '▸ ', 'caret'), code(`${f.path}/`), el('span', `${f.files.length}${f.limited ? '+' : ''} files`, 'badge'));
         b.append(left); box.append(b);
         if (expanded) {
-          const tree = el('div', null, 'file-tree'); tree.append(el('p', f.about, 'small muted'));
+          const tree = el('div', null, 'file-tree'); tree.append(about(f));
           for (const child of f.files) tree.append(row({ ...child, about: f.about }, child.path.slice(f.path.length + 1)));
           box.append(tree);
         }
@@ -250,13 +255,14 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     title.append(el('span', `${file.module ?? ''}${file.managed ? ' · YAW keeps it current' : ' · yours after the first write'} · updated ${day(file.modified)}`, 'eyebrow'), el('h2', file.path));
     bar.append(title, button('✕ Close', closeDrawer));
     drawer.replaceChildren(bar);
-    if (file.about ?? f.about) drawer.append(el('p', file.about ?? f.about, 'small muted'));
+    if (file.about ?? f.about) drawer.append(about(file.about ? file : f));
     if (file.tooLarge) { drawer.append(el('p', `Larger than ${Math.round(file.limit / 1024)} KiB; open it in your editor.`, 'warn')); return; }
     const k = kind(file.path), pane = el('div', null, 'drawer-pane');
     const form = () => { const v = el('div', null, 'file-view'); try { VIEWS[k](file.content, v, { openInterview: () => { closeDrawer(); go('interview'); } }); } catch (e) { v.append(el('p', `Not readable as ${k}: ${e.message}. Use Raw.`, 'warn')); } return v; };
     const pick = (id) => { press(nav, id); pane.replaceChildren(id === 'form' ? form() : source(file.content)); };
     const nav = tabs([['form', 'Form', !k], ['raw', 'Raw']], pick);
-    nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : file.editable ? 'Edit on the Project tab' : 'Read-only · yaw apply refreshes it', 'small muted'));
+    if (file.editable && !file.path.startsWith('.yaw/base/')) { const note = el('span', 'Edit on the ', 'small muted'); note.append(link('Project tab', 'settings')); nav.append(note); }
+    else nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : 'Read-only · yaw apply refreshes it', 'small muted'));
     drawer.append(nav, pane); pick(k ? 'form' : 'raw'); drawer.querySelector('.drawer-bar button').focus();
   }
 

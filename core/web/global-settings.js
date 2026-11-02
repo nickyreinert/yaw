@@ -105,18 +105,20 @@ export function presetAction({ env, input, remove }) {
   return { name: to, message: `Renamed preset ${input.name} to ${to}.` };
 }
 
-// Every file the dashboard may show. `base` is the folder it lives in (YAW_HOME can move the data files).
+// Every file the dashboard may show. `base` is the folder it lives in (YAW_HOME can move the data files); `links`
+// ([label, route]) point to where it is edited.
+const DEFAULTS = ['Edit in Defaults', 'global-settings/interview'];
 const FILES = [
   ['Your settings', [
-    [PROFILE, 'user', 'Your defaults for new projects (Defaults tab).'],
-    ['notification-settings.json', 'data', 'Personal notification channels (Notifications tab). Holds variable names, never tokens.'],
-    ['web-preferences.json', 'data', 'Dashboard: Auto refresh for Sessions pages and the local Laya classifier settings.'],
-    ['improve-settings.json', 'data', 'Improve review destinations: enabled CLI names and the default browser or CLI target; no conversation text.'],
+    [PROFILE, 'user', 'Your defaults for new projects.', [DEFAULTS]],
+    ['notification-settings.json', 'data', 'Personal notification channels. Holds variable names, never tokens.', [['Edit in Notifications', 'global-settings/notifications']]],
+    ['web-preferences.json', 'data', 'Dashboard: Auto refresh on the Analytics pages and the local Laya classifier settings.', [['Analytics', 'global-analytics'], ['Edit in Classification', 'global-settings/classification']]],
+    ['improve-settings.json', 'data', 'Learn review destinations: enabled CLI names and the default browser or CLI target; no conversation text.', [['Edit in Learn', 'global-settings/improve']]],
     ['web-projects.json', 'data', 'Projects added to the dashboard project switcher.'],
   ]],
   ['Presets', []],
   ['Collected data', [
-    ['session-sources.json', 'data', 'The folders Sessions › Refresh reads (Global settings → Sessions).'],
+    ['session-sources.json', 'data', 'The history folders Refresh on the Analytics pages reads.', [['Analytics', 'global-analytics'], ['Edit in Data sources', 'global-settings/sessions']]],
     ['session-analysis.json', 'data', 'Saved session scan: counts, lengths and timing; never message text.'],
     ['history.jsonl', 'user', 'Setup history: one line per saved yaw init.'],
     ['notification-delivery.json', 'data', 'Last notification deliveries, used to avoid duplicates.'],
@@ -127,16 +129,17 @@ const stat = (path) => { try { return lstatSync(path); } catch { return null; } 
 
 export function globalFiles({ env }) {
   const bases = { user: userDir(env), data: userDataDir(env) };
-  const entry = (path, base, about) => {
+  const entry = (path, base, about, links) => {
     const st = stat(join(bases[base], ...path.split('/')));
-    if (!st) return { path, base, about, missing: true };
-    if (st.isSymbolicLink() || !st.isFile()) return { path, base, about, blocked: true };
-    return { path, base, about, size: st.size, modified: st.mtime.toISOString() };
+    const known = { path, base, about, ...(links ? { links } : {}) };
+    if (!st) return { ...known, missing: true };
+    if (st.isSymbolicLink() || !st.isFile()) return { ...known, blocked: true };
+    return { ...known, size: st.size, modified: st.mtime.toISOString() };
   };
-  const groups = FILES.map(([title, files]) => ({ title, files: files.map(([path, base, about]) => entry(path, base, about)) }));
+  const groups = FILES.map(([title, files]) => ({ title, files: files.map(([path, base, about, links]) => entry(path, base, about, links)) }));
   let presets = [];
   try { presets = readdirSync(join(bases.user, 'presets')).filter((f) => /^[a-z0-9][a-z0-9-]*\.yaml$/.test(f)).sort(); } catch { /* no presets yet */ }
-  groups[1].files = presets.map((f) => entry(`presets/${f}`, 'user', 'Saved setup; yaw init --preset uses it.'));
+  groups[1].files = presets.map((f) => entry(`presets/${f}`, 'user', 'Saved setup; yaw init --preset uses it.', [DEFAULTS]));
   const runtime = RUNTIME.map(([name, about]) => {
     const st = stat(join(bases.user, name));
     if (!st?.isDirectory() || st.isSymbolicLink()) return null;

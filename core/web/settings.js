@@ -36,7 +36,7 @@ const ABOUT = {
   '.codex/hooks.json': 'Registers YAW hooks with Codex. Codex asks you to trust them once with /hooks.',
   '.yaw/bin/yaw-hook': 'Launcher every agent hook calls; finds the installed YAW and runs the hook.',
   justfile: 'Project recipes (just check, just test …). Imports the YAW recipe files.',
-  [ANSWERS]: 'Your interview answers. Change them on the Project tab; Apply re-renders the files that depend on them.',
+  [ANSWERS]: 'Your interview answers. Apply re-renders the files that depend on them.',
   [MANIFEST]: 'Which files YAW wrote, from which module, and the kit version used.',
   [BASE_DIR]: 'Copies of what YAW last wrote. yaw apply compares against them so your own edits survive a merge.',
 };
@@ -79,7 +79,8 @@ export function settingsFiles({ root, kitRoot }) {
     const e = entry(root, path, rules);
     if (!e) { excluded += 1; continue; }
     const m = byPath.get(path);
-    const file = { ...e, module: m?.module ?? 'core', managed: m ? m.managed !== false : false, about: ABOUT[path] ?? null, editable: path === ANSWERS ? 'interview' : null };
+    const file = { ...e, module: m?.module ?? 'core', managed: m ? m.managed !== false : false, about: ABOUT[path] ?? null, editable: path === ANSWERS ? 'interview' : null,
+      ...(path === ANSWERS ? { links: [['Edit on the Project tab', 'settings']] } : {}) };
     groups[CATEGORIES.findIndex((c) => c.test(path))].files.push(file);
   }
   const base = baseFiles(root, rules);

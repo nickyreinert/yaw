@@ -304,7 +304,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         if (job) {
           job.status = 'completed';
           job.message = job.controller.signal.aborted ? 'Classification stopped; unfinished results were not saved.' :
-            `Classified ${result.sessions} session(s).${result.skipped ? ` Skipped ${result.skipped} unavailable or unreadable transcripts; existing results kept. Check Global Settings → Sessions for history folders.` : ''}`;
+            `Classified ${result.sessions} session(s).${result.skipped ? ` Skipped ${result.skipped} unavailable or unreadable transcripts; existing results kept.` : ''}`;
           Object.assign(job, { unavailable: result.unavailable, skipped: result.skipped, sessionComplete: true, complete: true });
         }
         return { ...result, message: `${scanSummary(result)} ${name === 'evaluate' ? result.sessions ? 'Local classifications included.' : 'No readable sessions to classify; no model was called.' : 'No model was called.'}` };

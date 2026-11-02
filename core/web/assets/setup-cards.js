@@ -275,6 +275,8 @@ function moduleCard(m, ctx, selected, hasGit) {
   if (questions.length) card.append(el('div', { class: 'card-questions' }, ...questions));
   if (ctx.compact === false) card.append(el('div', { class: 'card-more' }, ...more()));
   for (const n of notes) card.append(el('p', { class: 'small warn-text card-note', text: n }));
+  if (m.name === 'comfort') card.append(el('p', { class: 'small muted card-note' }, 'Where notifications go (terminal, ntfy, Telegram) is personal and applies to all your projects: ',
+    el('a', { href: '#global-settings/notifications', target: '_blank', rel: 'noopener noreferrer' }, 'Global → Settings → Notifications'), '.'));
   const explain = () => ctx.onExplain?.(m.title ?? m.name, more(), { module: m.name });
   card.addEventListener('focusin', (e) => { if (!e.target.closest('.question')) explain(); }); card.addEventListener('mouseenter', explain);
   return card;

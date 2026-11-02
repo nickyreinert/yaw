@@ -1,6 +1,6 @@
 // Global Settings: Defaults (your defaults for new projects or one preset, in sub-tabs), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
-import { button, el, grid, press, source, tabs } from './settings-view.js';
+import { about, button, el, grid, hint, link, press, source, tabs } from './settings-view.js';
 import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { GROUPS, choiceField } from './setup-cards.js';
@@ -240,9 +240,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const github = field('Or private GitHub repository (owner/repository)', data.config?.github ?? '');
     const scopes = [];
     const SCOPE_TEXT = { settings: 'Personal defaults (About you answers)', presets: 'Presets', statistics: 'Session statistics (counts, times, model names; shown in Analytics)',
-      tasks: 'Tasks (the Global → Tasks snapshots: project folder name, task ids, titles and status)', knowledge: 'Global knowledge (Markdown records in ~/.yaw/knowledge)' };
+      tasks: ['Tasks (the ', link('Global → Tasks', 'global-tasks'), ' snapshots: project folder name, task ids, titles and status)'], knowledge: 'Global knowledge (Markdown records in ~/.yaw/knowledge)' };
     for (const key of ['settings', 'presets', 'statistics', 'tasks', 'knowledge']) {
-      const label = el('label', ` ${SCOPE_TEXT[key]}`), input = document.createElement('input'); input.type = 'checkbox';
+      const label = el('label', ' '), input = document.createElement('input'); input.type = 'checkbox'; label.append(...[SCOPE_TEXT[key]].flat());
       input.checked = data.config ? data.config.scopes.includes(key) : !['tasks', 'knowledge'].includes(key);
       label.prepend(input); root.append(label); scopes.push([key, input]);
     }
@@ -434,7 +434,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   function renderFiles() {
     const root = $('gs-files'); root.replaceChildren();
     if (!files) return;
-    root.append(el('p', `Your YAW folder ${files.dir}${files.dataDir ? ` (collected data in ${files.dataDir})` : ''}. Read-only here: change settings on the Interview and Notifications tabs or with the yaw CLI. It never holds secrets.`, 'small muted'));
+    root.append(hint('small muted', `Your YAW folder ${files.dir}${files.dataDir ? ` (collected data in ${files.dataDir})` : ''}. Read-only here: change settings on the `, link('Defaults', 'global-settings/interview'), ' and ', link('Notifications', 'global-settings/notifications'), ' tabs or with the yaw CLI. It never holds secrets.'));
     const cols = el('div', null, 'settings-groups');
     for (const g of files.groups) {
       const box = el('section', null, 'card settings-group'); box.append(el('h2', g.title));
@@ -444,7 +444,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
         b.append(left, el('span', f.folder ? `${f.entries} entries · not browsable` : f.missing ? 'not created yet' : f.blocked ? 'not a regular file' : `${size(f.size)} · ${day(f.modified)}`, 'small muted'));
         b.disabled = Boolean(f.folder || f.missing || f.blocked);
         b.setAttribute('aria-pressed', String(selected === f.path));
-        box.append(b, el('p', f.about, 'small muted file-about'));
+        box.append(b, about(f, 'small muted file-about'));
       }
       cols.append(box);
     }
@@ -457,7 +457,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     try { file = await get('global/file', { path }); } catch (e) { drawer.replaceChildren(drawerBar(path, ''), el('p', e.message, 'warn')); return; }
     if (selected !== path) return;
     drawer.replaceChildren(drawerBar(path, `~/.yaw · updated ${day(file.modified)} · ${size(file.size)}`));
-    if (file.about) drawer.append(el('p', file.about, 'small muted'));
+    if (file.about) drawer.append(about(file));
     if (file.tooLarge) { drawer.append(el('p', `Larger than ${Math.round(file.limit / 1024)} KiB; open it in your editor.`, 'warn')); return; }
     const pane = el('div', null, 'drawer-pane');
     const pick = (id) => { press(nav, id); pane.replaceChildren(id === 'form' ? el('div', null, 'file-view') : source(file.content)); if (id === 'form') pane.firstChild.append(formView(file.data)); };
@@ -496,7 +496,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
     const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
-    card.append(el('p', 'Classify (in the filter bar of Analytics, or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.', 'small muted'));
+    card.append(hint('small muted', 'Classify (in the filter bar of ', link('Analytics', 'global-analytics'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
     const form = el('div', null, 'classifier-form'), inputs = {};
     for (const [key, label, type, help, step] of FIELDS) {
       const wrap = el('label', label), input = el('input'), range = limits[key];
@@ -583,7 +583,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const card = el('section', null, 'card laya-setup'); card.append(el('h2', 'Set up Laya'));
     const step = (title, text, command) => {
       const box = el('div', null, 'setup-step'); box.append(el('h3', title));
-      if (text) box.append(el('p', text, 'small'));
+      if (text) box.append(hint('small', ...[text].flat()));
       if (command) {
         const pre = el('pre', null, 'command'), copy = button('Copy', async () => {
           try { await navigator.clipboard.writeText(command); copy.textContent = 'Copied'; } catch { copy.textContent = 'Select and copy'; }
@@ -599,7 +599,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     step('2. Start the service on this computer only', 'Keep this terminal open while you classify. LAYA_HOST matters: by default laya-serve listens on all network interfaces (0.0.0.0). Add LAYA_DEVICE=mps (Apple), cuda or cpu to pick the device.',
       `LAYA_HOST=${host} LAYA_PORT=${port} LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve`);
     step('3. Test it', 'Press Test connection above. The first answer may take a while as the checkpoint downloads and loads.', null);
-    step('4. Classify', 'Press Classify in the filter bar of Global → Sessions (all workspaces) or Workspace → Sessions (this workspace), or run:', 'yaw sessions evaluate --days 30');
+    step('4. Classify', ['Press Classify in the filter bar of ', link('Global → Analytics', 'global-analytics'), ' (all workspaces) or ', link('Workspace → Analytics', 'analytics'), ' (this workspace), or run:'], 'yaw sessions evaluate --days 30');
     const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), link = el('a', 'github.com/NandhaKishorM/laya');
     link.href = 'https://github.com/NandhaKishorM/laya'; link.target = '_blank'; link.rel = 'noopener noreferrer'; more.append(link, '. YAW never installs, downloads or starts anything for Laya.');
     card.append(more);

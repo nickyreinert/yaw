@@ -532,7 +532,10 @@ function update() {
       $('project-structure').setAttribute('aria-busy', 'false');
       planReady = false; projectTree.update(provisionalFiles(), { provisional: true });
       if (e.message.startsWith('Choose another stack')) {
-        $('summary').replaceChildren(element('p', 'Your file plan appears once language and place fit together (step 4).'), element('p', `Suggested modules: ${selectedModules().join(', ')}`));
+        const fix = element('button', 'Architecture (step 4)', { type: 'button', class: 'link' });
+        fix.addEventListener('click', () => showSection('stack'));
+        const plan = element('p', 'Your file plan appears once language and place fit together: '); plan.append(fix, '.');
+        $('summary').replaceChildren(plan, element('p', `Suggested modules: ${selectedModules().join(', ')}`));
         status('YAW has no profile for this combination; review your stack choices.');
       } else {
         $('summary').textContent = 'Preview unavailable. Fix the error before saving or applying.';
@@ -758,6 +761,15 @@ async function start() {
     status('Continued from the terminal: your answers so far are filled in. Nothing is written until Apply.');
   } else update();
 }
+function showSection(section) {
+  const index = ({ start: 0, user: 1, idea: 2, stack: STACK, workflow: WORKFLOW })[section];
+  if (index === undefined || phase !== 'edit') return;
+  if (presentation === 'settings') {
+    const node = section === 'stack' ? $('stack') : section === 'workflow' ? $('module-section') : sections.get(section === 'user' ? 'user' : 'idea')?.node;
+    node?.scrollIntoView({ block: 'start' }); return;
+  }
+  stepIndex = index; renderWizard(true);
+}
 await start();
 return {
   destroy() { dockObserver?.disconnect(); projectTree.destroy(); clearTimeout(timer); revision++; promptRevision++; prefillRevision++; root.replaceChildren(); syncDockHeight(); }, state: () => state,
@@ -765,14 +777,6 @@ return {
     if (!['settings', 'interview'].includes(mode) || presentation === mode) return;
     presentation = mode; update();
   },
-  showSection(section) {
-    const index = ({ start: 0, user: 1, idea: 2, stack: STACK, workflow: WORKFLOW })[section];
-    if (index === undefined || phase !== 'edit') return;
-    if (presentation === 'settings') {
-      const node = section === 'stack' ? $('stack') : section === 'workflow' ? $('module-section') : sections.get(section === 'user' ? 'user' : 'idea')?.node;
-      node?.scrollIntoView({ block: 'start' }); return;
-    }
-    stepIndex = index; renderWizard(true);
-  },
+  showSection,
 };
 }
