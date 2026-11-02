@@ -110,6 +110,7 @@ questions:
       - { value: static, label: "static hosting: GitHub Pages, Netlify; no server code" }
       - { value: wordpress, label: "inside WordPress: a plugin for an existing site" }
       - { value: app-store, label: "desktop or mobile app: macOS, Windows, Linux, iOS, Android" }
+      - { value: browser-extension, label: "browser extension: Chrome, Edge, Firefox" }
     default: ""
   - id: arch.library-strategy
     mode: S

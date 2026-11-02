@@ -251,7 +251,7 @@ test('answers without a proposal and without a stack are refused before anything
 test('an unknown profile and a profile listed twice are refused', async () => {
   const body = (profiles) => `mode: quick\nanswers:\n  user.agents: [claude]\nproposal:\n  status: confirmed\n  summary: x\n  profiles: [${profiles}]\n  modules: [core]\n`;
   const unknown = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('ruby-cli')), '--yes', '--skip-verify']);
-  assert.match(unknown.err, /profile "ruby-cli" does not exist in this kit \(available: android-kotlin, cloudflare-workers, go-basic, /);
+  assert.match(unknown.err, /profile "ruby-cli" does not exist in this kit \(available: android-kotlin, browser-extension, cloudflare-workers, go-basic, /);
   const several = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), body('node-cli, node-cli')), '--yes', '--skip-verify']);
   assert.match(several.err, /proposal\/profiles\/1 duplicates item 0/);
   assert.deepEqual(readdirSync(several.cwd), []);

@@ -253,6 +253,7 @@ Describe this area's responsibility.
 - Directories:
   - `examples/`
   - `examples/android-kotlin/`
+  - `examples/browser-extension/`
   - `examples/cloudflare-workers/`
   - `examples/composed/`
   - `examples/go-cli/`
@@ -378,6 +379,7 @@ Describe this area's responsibility.
 - Directories:
   - `profiles/`
   - `profiles/android-kotlin/`
+  - `profiles/browser-extension/`
   - `profiles/cloudflare-workers/`
   - `profiles/go-basic/`
   - `profiles/go-cli/`

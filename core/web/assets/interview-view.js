@@ -664,7 +664,7 @@ function renderPrefill() {
     if (preset.value === 'new') card.append(element('span', 'From global defaults'), element('small', 'If this is your first initialization, the general settings apply as defaults.'));
     else if (preset.value.startsWith('preset:')) {
       const date = /^\d{4}-\d{2}-\d{2}$/.test(preset.created ?? '') ? preset.created : 'Unknown date';
-      const destination = ({ local: 'Computer', 'self-hosted': 'Server', serverless: 'Serverless', edge: 'Edge / CDN', static: 'Static hosting', wordpress: 'WordPress', 'app-store': 'Desktop / mobile' })[preset.architecture] ?? preset.architecture;
+      const destination = ({ local: 'Computer', 'self-hosted': 'Server', serverless: 'Serverless', edge: 'Edge / CDN', static: 'Static hosting', wordpress: 'WordPress', 'app-store': 'Desktop / mobile', 'browser-extension': 'Browser extension' })[preset.architecture] ?? preset.architecture;
       const language = catalog.questions.find((question) => question.id === 'arch.language')?.choices.find((choice) => (choice.value ?? choice) === preset.language)?.label ?? preset.language;
       card.append(element('span', date), element('span', [destination, language, preset.framework].filter(Boolean).join(' · ') || 'No saved architecture'), element('small', preset.purpose || 'No saved purpose'));
     }

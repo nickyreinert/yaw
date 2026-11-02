@@ -1,0 +1,7 @@
+- Manifest V3 extension in `extension/`, plain HTML, CSS and JavaScript; add a bundler or framework only with a written reason (ADR).
+- One `manifest.json` serves Chrome, Edge and Firefox; keep browser-specific keys under `browser_specific_settings` and test in both engines (`just dev`, `just dev chromium`).
+- Request the fewest permissions and host permissions that work; explain each one in the README. Prefer `activeTab` over broad host access.
+- No remote code: every script ships inside `extension/`; no inline scripts, `eval` or code loaded from a URL (store policies and the extension CSP refuse it).
+- Every file the manifest names exists; `just test` fails otherwise. `just lint` runs web-ext lint, html-validate and stylelint.
+- No tracking or data collection without consent; declare what you collect in the store listing and in `data_collection_permissions` (privacy module).
+- `just build` writes the store package to `dist/`. Submitting to a browser store is remote and needs the user's approval; never do it on your own.

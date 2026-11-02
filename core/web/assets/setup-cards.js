@@ -170,7 +170,7 @@ export function renderStack(root, ctx) {
   const lang = ctx.answers['arch.language'] ?? langQ.default;
   const host = ctx.answers['arch.runs-on'] ?? hostQ.default;
   const langName = (k) => k ? shortLabel(langs.find((l) => l.value === k)?.label ?? k) : 'Choose a language';
-  const hostName = (k) => ({ local: 'Computer', 'self-hosted': 'Server', serverless: 'Serverless', edge: 'Edge / CDN', static: 'Static hosting', wordpress: 'WordPress', 'app-store': 'Desktop / mobile' })[k] ?? 'Choose destination';
+  const hostName = (k) => ({ local: 'Computer', 'self-hosted': 'Server', serverless: 'Serverless', edge: 'Edge / CDN', static: 'Static hosting', wordpress: 'WordPress', 'app-store': 'Desktop / mobile', 'browser-extension': 'Browser extension' })[k] ?? 'Choose destination';
   const fit = (l, h) => {
     const p = profileFor(ctx.profiles, l, h);
     return p ? (p.stack.basic ? 'basic' : 'tailored') : 'none';
@@ -188,7 +188,7 @@ export function renderStack(root, ctx) {
     const text = p ? (p.requires ?? []).join(' · ') : !lang ? '' : 'Unsupported combination';
     hostGrid.append(el('button', { type: 'button', class: 'host decision-option', 'aria-pressed': String(h.value === host), disabled: ctx.disabled,
       onclick: () => ctx.onChange('arch.runs-on', h.value) },
-    decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone' })[h.value]),
+    decisionIcon(({ local: 'terminal', 'self-hosted': 'server', serverless: 'cloud', edge: 'bolt', static: 'window', wordpress: 'window', 'app-store': 'phone', 'browser-extension': 'globe' })[h.value]),
     el('strong', { text: hostName(h.value) }),
     el('span', { class: 'small muted', text: h.label.slice(shortLabel(h.label).length).replace(/^[\s—(–:-]+/, '').replace(/\)$/, '') }),
     el('span', { class: `fit ${f === 'tailored' ? 'yes' : f === 'basic' ? 'basic' : 'no'}`, text })));
