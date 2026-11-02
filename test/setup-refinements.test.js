@@ -69,12 +69,12 @@ test('unit-test opt-in reaches generated rules, help and Quality review requirem
 
 test('Docker is normalized and rendered only for applicable runtime choices', () => {
   const model = createFormModel(fixture());
-  for (const runsOn of ['local', 'self-hosted', 'serverless', 'edge', 'static', 'wordpress', 'app-store']) {
+  for (const runsOn of ['local', 'self-hosted', 'serverless', 'edge', 'static', 'wordpress', 'app-store', 'browser-extension']) {
     const answers = { ...base, 'arch.runs-on': runsOn, 'arch.docker': true };
     const applicable = ['local', 'self-hosted', 'serverless'].includes(runsOn);
     // Use HTML's basic profile for static hosting; JavaScript supports the other hosts.
     if (runsOn === 'wordpress') answers['arch.language'] = 'php';
-    if (runsOn === 'static') answers['arch.language'] = 'html';
+    if (['static', 'browser-extension'].includes(runsOn)) answers['arch.language'] = 'html';
     const result = model.normalize({ mode: 'basic', answers, modules: ['core'] });
     assert.equal(Object.hasOwn(result.doc.answers, 'arch.docker'), applicable, runsOn);
     const preview = model.preview({ mode: 'basic', answers, modules: ['core'] });

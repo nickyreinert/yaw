@@ -101,7 +101,7 @@ test('dependabot keeps the pinned actions current', async () => {
 test('dependabot covers each profile dependency ecosystem and kit actions are SHA-pinned', async () => {
   const ecosystems = {
     'node-cli': [], 'python-cli': ['pip'], 'python-web': ['pip'], 'python-vercel': ['pip'], 'static-site': ['npm'],
-    'node-ts-vercel': ['npm'], 'node-app': ['npm'], 'node-web': ['npm'], 'node-static': ['npm'], 'cloudflare-workers': ['npm'], 'php-web': ['composer'], 'php-cli': ['composer'], 'php-serverless': ['composer'],
+    'node-ts-vercel': ['npm'], 'node-app': ['npm'], 'node-web': ['npm'], 'node-static': ['npm'], 'browser-extension': ['npm'], 'cloudflare-workers': ['npm'], 'php-web': ['composer'], 'php-cli': ['composer'], 'php-serverless': ['composer'],
     'wordpress-plugin': ['composer'], 'android-kotlin': ['gradle'], 'swift-cli': [], 'rust-cli': [], 'go-cli': [], 'java-cli': ['gradle'], 'java-web': ['gradle'], 'java-serverless': ['gradle'], 'go-web': [], 'go-serverless': ['gomod'], 'rust-web': ['cargo'], 'rust-serverless': ['cargo'], 'kotlin-cli': ['gradle'], 'kotlin-web': ['gradle'], 'kotlin-serverless': ['gradle'], 'swift-app': [], 'swift-web': ['swift'],
   };
   for (const [profile, expected] of Object.entries(ecosystems)) {

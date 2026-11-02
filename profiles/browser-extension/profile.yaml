@@ -1,0 +1,12 @@
+# profiles/browser-extension
+# Picked for HTML, CSS & JavaScript x browser extension (ADR-0129): a Manifest V3 extension for Chrome, Edge and Firefox, no build step.
+name: browser-extension
+title: Browser extension for Chrome, Edge and Firefox
+dependencyEcosystems: [npm]
+summary: Manifest V3 browser extension in extension/; plain HTML, CSS and JavaScript; web-ext lint, html-validate, stylelint, manifest check.
+stack:
+  language: [html]
+  runsOn: [browser-extension]
+defaults:
+  modules: { devenv: false, ui-design: true, backup: false }
+requires: [node>=22.13, just]

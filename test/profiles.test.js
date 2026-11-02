@@ -13,7 +13,7 @@ import { listProfiles, loadProfile, profileTools, schemas } from '../core/render
 import { profileForStack } from '../core/interview/suggest.js';
 import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
 
-const PROFILES = ['android-kotlin', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-cli', 'node-static', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
+const PROFILES = ['android-kotlin', 'browser-extension', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-cli', 'node-static', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const VERBS = ['setup', 'dev', 'fmt', 'lint', 'typecheck', 'test', 'check', 'build', 'audit'];
 const OPTIONAL_VERBS = ['screenshot', 'preview', 'preview-share', 'db-migrate', 'db-reset', 'backup', 'restore', 'deploy'];
@@ -230,6 +230,70 @@ test('smoke static-site: yaw init, just setup && just check pass; broken pages f
   const links = run('just', ['test'], { cwd });
   assert.notEqual(links.status, 0, 'a broken link fails just test');
   assert.match(links.stderr, /bad\.html: broken link "missing\.html"/);
+});
+
+test('browser-extension check-manifest: Manifest V3, named files inside extension/, no remote or inline scripts', () => {
+  const root = tmp('yaw-extension-');
+  const script = join(KIT_ROOT, 'profiles', 'browser-extension', 'scaffold', 'scripts', 'check-manifest.mjs');
+  const check = () => run(process.execPath, [script], { cwd: root });
+  const write = (manifest, popup = '<!DOCTYPE html><html lang="en"><head><title>p</title><script src="popup.js"></script></head><body></body></html>') => {
+    writeFileSync(join(root, 'extension', 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x', version: '1.0', description: 'd', action: { default_popup: 'popup.html' }, ...manifest }));
+    writeFileSync(join(root, 'extension', 'popup.html'), popup);
+  };
+  mkdirSync(join(root, 'extension'));
+  writeFileSync(join(root, 'extension', 'popup.js'), '');
+  write({});
+  const ok = check();
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /Manifest V3, 1 file\(s\) and 1 page\(s\) resolve/);
+  write({ manifest_version: 2, version: '01.2' });
+  assert.match(check().stderr, /manifest_version must be 3[\s\S]*version "01.2"/);
+  write({ background: { service_worker: 'missing.js' }, content_scripts: [{ matches: ['<all_urls>'], js: ['../outside.js'] }] });
+  writeFileSync(join(root, 'outside.js'), '');
+  const files = check().stderr;
+  assert.match(files, /"missing.js" does not exist/);
+  assert.match(files, /"..\/outside.js" points outside extension\//);
+  write({ background: { service_worker: 'https://cdn.example/x.js' } }, '<!DOCTYPE html><html lang="en"><head><title>p</title><script src="https://cdn.example/y.js"></script><script>alert(1)</script></head></html>');
+  const remote = check().stderr;
+  assert.match(remote, /must be a file inside extension\/ \(no remote code\)/);
+  assert.match(remote, /popup.html: inline scripts are refused/);
+  assert.match(remote, /popup.html: remote script "https:\/\/cdn.example\/y.js" is refused/);
+});
+
+test('browser-extension: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+  const { cwd } = initExample('browser-extension', env, ['--skip-verify']);
+  for (const verb of ['fmt', 'typecheck']) {
+    const r = run('just', [verb], { cwd, env });
+    assert.equal(r.status, 0, verb);
+    assert.match(r.stdout, new RegExp(`^${verb}: not applicable`, 'm'));
+  }
+  assert.notEqual(run('just', ['deploy', 'prod'], { cwd, env }).status, 0, 'deploy is not defined');
+});
+
+test('smoke browser-extension: yaw init, just setup && just check pass, just build packs dist/; broken files fail the gate (needs npm and network)', { skip: staticSkip, timeout: 300000 }, () => {
+  const { cwd, r } = initExample('browser-extension', { ...process.env });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /check-manifest: Manifest V3/);
+  assert.match(r.stdout, /verified: just setup and just check passed/);
+  assert.equal(run('just', ['build'], { cwd }).status, 0, 'just build packs the extension');
+  assert.ok(readdirSync(join(cwd, 'dist')).some((f) => f.endsWith('.zip')), 'dist/ holds the store package');
+
+  const fixtures = join(KIT_ROOT, 'test', 'profiles', 'browser-extension');
+  copyFileSync(join(fixtures, 'invalid.html'), join(cwd, 'extension', 'popup.html'));
+  assert.notEqual(run('just', ['lint'], { cwd }).status, 0, 'invalid HTML fails just lint');
+  const manifest = JSON.parse(readFileSync(join(cwd, 'extension', 'manifest.json'), 'utf8'));
+  writeFileSync(join(cwd, 'extension', 'manifest.json'), JSON.stringify({ ...manifest, background: { service_worker: 'missing.js' } }));
+  const test = run('just', ['test'], { cwd });
+  assert.notEqual(test.status, 0, 'a missing file fails just test');
+  assert.match(test.stderr, /"missing.js" does not exist/);
+});
+
+test('browser-extension guards block store submissions and publishing, not local work', () => {
+  const guards = parse(readFileSync(dir('browser-extension', 'guards.yaml'), 'utf8')).guards.map((g) => new RegExp(g.pattern));
+  const blocked = (cmd) => guards.some((re) => re.test(cmd));
+  for (const cmd of ['npx web-ext sign --channel listed', 'web-ext sign --api-key x', 'npx chrome-webstore-upload upload --source dist/x.zip', 'npm publish']) assert.ok(blocked(cmd), cmd);
+  for (const cmd of ['npx web-ext lint --source-dir extension', 'npx web-ext build --source-dir extension', 'npx web-ext run --target chromium', 'just check', 'git push origin main']) assert.ok(!blocked(cmd), cmd);
 });
 
 test('python-web: verbs that do not apply print a note and exit 0', { skip: skipJust }, () => {
@@ -1446,7 +1510,7 @@ test('every tailored profile is picked for exactly its language and host (ADR-00
   for (const [language, runsOn, name] of [
     ['typescript', 'local', 'node-cli'], ['typescript', 'serverless', 'node-ts-vercel'], ['typescript', 'self-hosted', 'node-web'], ['typescript', 'edge', 'cloudflare-workers'], ['typescript', 'app-store', 'node-app'], ['typescript', 'static', 'node-static'],
     ['python', 'local', 'python-cli'], ['python', 'self-hosted', 'python-web'], ['python', 'serverless', 'python-vercel'], ['php', 'self-hosted', 'php-web'], ['php', 'local', 'php-cli'], ['php', 'serverless', 'php-serverless'], ['swift', 'local', 'swift-cli'], ['rust', 'local', 'rust-cli'], ['go', 'local', 'go-cli'], ['go', 'self-hosted', 'go-web'], ['go', 'serverless', 'go-serverless'], ['rust', 'self-hosted', 'rust-web'], ['rust', 'serverless', 'rust-serverless'], ['kotlin', 'local', 'kotlin-cli'], ['java', 'local', 'java-cli'], ['java', 'self-hosted', 'java-web'], ['java', 'serverless', 'java-serverless'], ['kotlin', 'self-hosted', 'kotlin-web'], ['kotlin', 'serverless', 'kotlin-serverless'], ['swift', 'self-hosted', 'swift-web'], ['swift', 'app-store', 'swift-app'],
-    ['html', 'static', 'static-site'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
+    ['html', 'static', 'static-site'], ['html', 'browser-extension', 'browser-extension'], ['kotlin', 'app-store', 'android-kotlin'], ['php', 'wordpress', 'wordpress-plugin'],
   ]) assert.equal(pick(language, runsOn), name, `${language} on ${runsOn}`);
   for (const p of profiles.filter((x) => !x.stack.basic)) assert.ok(p.stack.language.length && p.stack.runsOn.length, p.name);
 });
