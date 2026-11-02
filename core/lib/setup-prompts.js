@@ -3,6 +3,7 @@ import { asksIn } from '../interview/policy.js';
 import { DEPTHS, RETIRED_ARCHITECTURE } from '../interview/depth.js';
 import { FOUNDATION_PATHS, PRACTICES } from './foundations.js';
 import { planningFacts } from './kickoff.js';
+import { EFFORTS } from './tasks.js';
 
 // What the local coding agent does with either kickoff prompt: write the three foundations directly in the project.
 const FOUNDATION_TASK = [
@@ -13,7 +14,12 @@ const FOUNDATION_TASK = [
   `- UI/UX (${FOUNDATION_PATHS['ui-ux']}): main tasks and flows, navigation, realistic content, empty/error/recovery states, keyboard access and acceptance criteria. Cover CLI or API interaction when there is no graphical UI.`,
   'Ask focused questions only for blocking gaps or conflicts. Label recommendations, assumptions and unresolved choices; never invent user approval, a budget or a purchase.',
   'Scale the documents to the project. Link shared concepts and decisions. Respect selected task/review tools. Offer a small layout or interaction example for review before substantial UI implementation.',
-  'Write the documents locally, then report their paths and any unresolved decisions. No reply needs to be pasted back into YAW. Do not start feature implementation until the foundations are reviewed.',
+  'Write the documents locally. No reply needs to be pasted back into YAW.',
+  'Then, in the same session, plan the build. If the tasks module is enabled (see modules), create the plan as tasks yourself: run `yaw task new "<title>" --model <tier> --effort <effort> --spec <document#section> --acceptance "<observable outcome>"` once per task, in build order. Never edit TASKS.md by hand; skip titles that already exist.',
+  '- 3 to 8 phases, from a thin working slice to the finished product; 2 to 8 tasks per phase. Each task is one small, testable change with a short imperative title (at most 80 characters).',
+  `- Model tier per task: a frontier model (for example opus) for architecture and hard problems, a mid tier (for example sonnet) for normal features, a small model (for example haiku) for routine edits. Effort is one of: ${EFFORTS.join(', ')}.`,
+  '- Every task points to a section of the reviewed foundations (spec) and states an observable acceptance outcome.',
+  'If the tasks module is not enabled, put the same plan in docs/plan/kickoff.md instead. Finally report the document paths, the number of tasks created and any unresolved decisions. Do not start feature implementation; the user starts with the first task.',
 ];
 
 // User answers are quoted as data; both prompts consume the same validated setup.
