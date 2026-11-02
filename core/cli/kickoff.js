@@ -4,12 +4,40 @@
 import { conceptGuide, kickoffGuide, kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
 import { checkTaskReferences, contextText, currentFoundations, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { modelEffort, parseTasks, tasksMode } from '../lib/tasks.js';
-import { hashContent, readProjectFile } from '../render/files.js';
+import { hashContent, readProjectFile, writeAtomic } from '../render/files.js';
 import { unifiedDiff } from '../render/reconcile.js';
 import { enabledModules, readAnswers, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 import { task } from './tasks.js';
 import { setupPrompt } from '../lib/setup-prompts.js';
+
+export const CONCEPT_PROMPT_FILE = '.yaw/concept-prompt.md';
+export const AGENT_PROMPT_FILE = '.yaw/kickoff-prompt.md';
+
+// Prompts for the user to copy or hand to an agent. They hold setup facts and documents: private, git-ignored,
+// rewritten on every run.
+const writePrompt = (root, file, text) => writeAtomic(root, file, `${text}\n`, { mode: 0o600 });
+const steps = (guide) => guide.map((l, i) => `  ${i + 1}. ${l}\n`).join('');
+
+// The end of a terminal `yaw init` offers the same two prompts as the browser's Finished step.
+export async function offerKickoff({ io, root, manifest }) {
+  io.stdout.write([
+    '', 'Next: your project documents',
+    'YAW has set up the working environment. Choose one way to write the Architecture, Data Model and UI/UX documents:',
+    `  1) I already have a concept: a prompt for the chat that holds it (${CONCEPT_PROMPT_FILE})`,
+    `  2) Let my coding agent write them (${AGENT_PROMPT_FILE})`,
+    '  n) Later: yaw kickoff concept, or yaw web → Settings → Kickoff', '',
+  ].join('\n'));
+  const reply = (await io.prompter.ask('Kick off the project documents [1, 2 or N] > ')).trim().toLowerCase();
+  if (reply !== '1' && reply !== '2') return;
+  const parts = kickoffParts({ root, manifest });
+  const file = reply === '1' ? CONCEPT_PROMPT_FILE : AGENT_PROMPT_FILE;
+  try { writePrompt(root, file, reply === '1' ? parts.conceptPrompt : parts.localPrompt); }
+  catch (e) { io.stderr.write(`Could not write ${file} (${e.code ?? e.message}); run yaw kickoff concept or open yaw web → Settings → Kickoff.\n`); return; }
+  io.stdout.write(reply === '1'
+    ? `Wrote the concept prompt to ${file}.\n${steps(parts.conceptGuide)}`
+    : `Wrote the prompt for your coding agent to ${file}. Start the agent in this folder and ask it to follow that file; it writes the documents directly, nothing to paste back.\n`);
+}
 
 // The guide lines and the planning prompt for a project; the terminal and the web UI show the same text.
 export function kickoffParts({ root, manifest }) {
@@ -77,14 +105,16 @@ export async function kickoff({ values, positionals, io }) {
   if (verb === 'concept') {
     if (file || extra.length) throw new UsageError('kickoff concept takes no positional arguments');
     const { conceptGuide: guide, conceptPrompt } = kickoffParts({ root, manifest });
-    io.stdout.write(`Import your own concept\n${guide.map((l, i) => `  ${i + 1}. ${l}\n`).join('')}\n----- prompt -----\n${conceptPrompt}\n----- end of prompt -----\n`);
+    if (values.stdout) { io.stdout.write(`${conceptPrompt}\n`); return 0; }
+    writePrompt(root, CONCEPT_PROMPT_FILE, conceptPrompt);
+    io.stdout.write(`Wrote the concept prompt to ${CONCEPT_PROMPT_FILE} (--stdout prints it instead).\n${steps(guide)}`);
     return 0;
   }
   if (verb === undefined) {
     io.stdout.write(kickoffText({ root, manifest }));
     return 0;
   }
-  if (verb !== 'import') throw new UsageError(`kickoff: unknown verb "${verb}"; use: yaw kickoff [concept | import <plan.md> [--dry-run]]`);
+  if (verb !== 'import') throw new UsageError(`kickoff: unknown verb "${verb}"; use: yaw kickoff [concept [--stdout] | import <plan.md> [--dry-run]]`);
   if (!file || extra.length > 0) throw new UsageError('kickoff import: give exactly one plan file');
   const hasTasks = enabledModules(manifest).includes('tasks');
   const needsTasks = () => new UsageError('kickoff import needs the tasks module; run: yaw add tasks');

@@ -58,8 +58,8 @@ const steps = [
 ];
 const LAST = steps.length - 1, REVIEW = LAST - 1, WORKFLOW = steps.findIndex((s) => s.groups === null), STACK = steps.findIndex((s) => s.ids.includes('stack'));
 let stepIndex = 0, helpStep = null;
-// Two copy-only prompts share the current validated setup.
-let planCard, finalCard;
+// The setup interview prompt follows the current validated setup; the two kickoff prompts appear once applied.
+let planCard, conceptCard, finalCard;
 let promptRevision = 0;
 // edit: answering; applying: the log streams; done: the server has stopped.
 let phase = 'edit', reviewReturn = false;
@@ -230,21 +230,22 @@ function provisionalFiles() {
 function buildPlan() {
   planCard = createPlanCard({ title: 'LLM Support', label: 'Setup interview prompt', chat: true, collapsed: true,
     instruction: 'Use any LLM to support you with project decisions.' });
-  finalCard = createPlanCard({ id: 'final-prompt', title: 'Create project foundations',
-    instruction: 'Task your agent to create Architecture, Data Model and UI/UX documents for project setup, documentation and workflow guidance.' });
+  conceptCard = createPlanCard({ id: 'concept-prompt', title: 'I already have a concept', label: 'Concept prompt', chat: true, collapsed: true,
+    instruction: 'Copy this into the chat that holds your concept. It rewrites the concept for this project. Import the reply in yaw web → Settings → Kickoff, or save it and run yaw kickoff import <file> --dry-run.' });
+  finalCard = createPlanCard({ id: 'final-prompt', title: 'Let my coding agent write them', collapsed: true,
+    instruction: 'Copy this into your local coding agent. It writes the missing documents directly in the project; nothing to paste back.' });
   sections.get('idea')?.node.append(planCard.node);
-  $('confirm').append(finalCard.node);
 }
 async function refreshPrompts() {
   const current = ++promptRevision;
-  planCard?.setPrompt('', 'Updating prompt…'); finalCard?.setPrompt('', 'Updating prompt…');
+  planCard?.setPrompt('', 'Updating prompt…');
   try {
     const result = await (await request('setup-prompts', state)).json();
     if (current !== promptRevision) return;
-    planCard?.setPrompt(result.interview); finalCard?.setPrompt(result.kickoff, result.kickoffStatus);
+    planCard?.setPrompt(result.interview);
   } catch (e) {
     if (current !== promptRevision) return;
-    planCard?.setPrompt('', e.message); finalCard?.setPrompt('', e.message);
+    planCard?.setPrompt('', e.message);
   }
 }
 function buildQuestions() {
@@ -505,7 +506,7 @@ function update() {
   lastPreview = null; promptRevision++;
   if (!planReady) projectTree.update(provisionalFiles(), { provisional: true });
   $('project-structure').setAttribute('aria-busy', 'true');
-  planCard?.setPrompt('', 'Updating prompt…'); finalCard?.setPrompt('', 'Updating prompt…');
+  planCard?.setPrompt('', 'Updating prompt…');
   error(''); actions(false);
   // Do not leave a stale preview or diff (possibly including an earlier value) on screen.
   $('summary').textContent = 'Updating preview…';
@@ -554,8 +555,7 @@ async function perform(name, input = state) {
 const code = (text) => element('code', text);
 const bullet = (...parts) => { const li = element('li'); li.append(...parts.map((p) => typeof p === 'string' ? document.createTextNode(p) : p)); return li; };
 // The last step: outcome, then what the user can do now. The server has stopped by then.
-function finish({ ok, message }, prompt) {
-  if (prompt) { promptRevision++; finalCard.setPrompt(prompt); }
+function finish({ ok, message }, kickoff) {
   phase = 'done';
   setInterviewDone(true);
   $('finished-status').textContent = message;
@@ -574,7 +574,13 @@ function finish({ ok, message }, prompt) {
     bullet(code('yaw doctor'), ' checks the setup; ', code('just --list'), ' shows all recipes.'),
     bullet(options.persistent ? 'The workspace remains open.' : 'This page is disconnected: the local server stopped after applying.'));
   $('next-steps').hidden = false;
-  $('kickoff-box').replaceChildren(finalCard.node);
+  // Two ways to the project documents: a concept from another chat, or the local coding agent.
+  if (kickoff) {
+    conceptCard.setPrompt(kickoff.conceptPrompt); finalCard.setPrompt(kickoff.localPrompt);
+    $('kickoff-box').replaceChildren(element('h3', 'Next: your project documents'),
+      element('p', 'YAW has set up the working environment. Choose one way to write the Architecture, Data Model and UI/UX documents.', { class: 'small muted' }),
+      conceptCard.node, finalCard.node);
+  }
   status(message);
   renderWizard(true);
 }
@@ -599,7 +605,7 @@ async function apply() {
       const event = JSON.parse(line);
       if (event.type === 'log') $('log').textContent += event.text;
       if (event.type === 'error') failure = event.message;
-      if (event.type === 'kickoff') kickoff = event.localPrompt;
+      if (event.type === 'kickoff') kickoff = event;
       if (event.type === 'done') outcome = event;
     };
     for (;;) {

@@ -247,9 +247,13 @@ test('concept import: the prompt carries existing documents; update replaces the
   const root = await project();
   // Documents a local agent wrote before any import: present, but not registered.
   writeTree(root, { [FOUNDATION_PATHS.architecture]: '# architecture\nLocal draft: one renamer.\n', [FOUNDATION_PATHS['ui-ux']]: '# ui-ux\nLocal draft: preview names.\n' });
-  const shown = await yaw(root, ['kickoff', 'concept']);
+  const written = await yaw(root, ['kickoff', 'concept']);
+  assert.equal(written.code, 0, written.err);
+  assert.match(written.out, /^Wrote the concept prompt to \.yaw\/concept-prompt\.md \(--stdout prints it instead\)\.\n {2}1\. Copy the prompt into the chat that holds your concept/);
+  assert.doesNotMatch(written.out, /YAW concept import prompt/, 'the prompt goes to the file, not the terminal');
+  const shown = await yaw(root, ['kickoff', 'concept', '--stdout']);
   assert.equal(shown.code, 0, shown.err);
-  assert.match(shown.out, /^Import your own concept\n {2}1\. Copy the prompt into the chat that holds your concept/);
+  assert.equal(readFileSync(join(root, '.yaw/concept-prompt.md'), 'utf8'), shown.out);
   assert.match(shown.out, /YAW concept import prompt/);
   assert.match(shown.out, /--- architecture: docs\/spec\/architecture\.md ---\n# architecture\nLocal draft: one renamer\./);
   assert.match(shown.out, /## Foundation: architecture\npath: docs\/spec\/architecture\.md\naction: update/);

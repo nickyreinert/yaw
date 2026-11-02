@@ -27,7 +27,7 @@ import { printProfileTools, printToolHints } from './tool-hints.js';
 import { confirm } from './prompt.js';
 import { codexTrustNote } from './doctor.js';
 import { printNextSteps } from './next-steps.js';
-import { kickoffText } from './kickoff.js';
+import { offerKickoff } from './kickoff.js';
 import { guardFolder } from './folder-guard.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { CODEX_HOOKS } from '../render/agents.js';
@@ -440,10 +440,8 @@ export async function init({ values, positionals, io }) {
 
   const done = async (code) => {
     printNextSteps(io.stdout, { root, kitRoot, answers: answersDoc.answers, modules, profiles: chosen, files: result.manifest.files.map((f) => f.path) });
-    // Kickoff guidance (#173): interview on a terminal only, like the save offer.
-    if (!fromFile && io.prompter.interactive && (await confirm(io.prompter, '\nDo you want guidance to kick off (a planning prompt for your idea)?'))) {
-      io.stdout.write(`\n${kickoffText({ root, manifest: result.manifest })}`);
-    }
+    // Kickoff (#173): interview on a terminal only, like the save offer.
+    if (!fromFile && io.prompter.interactive) await offerKickoff({ io, root, manifest: result.manifest });
     return code;
   };
   // verify

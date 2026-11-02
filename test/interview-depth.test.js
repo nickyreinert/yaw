@@ -99,7 +99,7 @@ test('Quick terminal and browser both reuse a saved review trigger without a red
   p.ask = async (prompt) => {
     if (/Setup depth/.test(prompt)) return 'quick';
     if (/Write these files/.test(prompt)) return 'y';
-    if (/Save |guidance to kick off/.test(prompt)) return 'n';
+    if (/Save |Kick off the project documents/.test(prompt)) return 'n';
     const screen = [...p.shown].reverse().find((s) => /^  \d+\/\d+ /.test(s));
     const q = questions.find((q) => screen?.split('\n')[0].endsWith(q.label));
     return q && Object.hasOwn(base, q.id) ? String(base[q.id]) : '';

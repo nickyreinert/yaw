@@ -45,7 +45,7 @@ test('init: p loads a saved setup as editable defaults, asks before writing and 
       assert.deepEqual(readdirSync(dir), []);
       return 'y';
     }
-    if (/Save |guidance to kick off/.test(question)) return 'n';
+    if (/Save |Kick off the project documents/.test(question)) return 'n';
     return '';
   };
   const r = await yaw(['init', '--skip-verify'], { cwd: dir, env, prompter });
@@ -128,7 +128,7 @@ test('init: browser handoff retains unreviewed saved defaults and newly edited a
 
 test('interview: nothing is written before the confirmation; yes writes, verify is skipped on request', async () => {
   const dir = tmp('yaw-proj-');
-  const prompter = scripted([...INTERVIEW, 'y', '', 'y']);
+  const prompter = scripted([...INTERVIEW, 'y', '', '2']);
   // look at the folder at the moment the confirmation is asked
   const ask = prompter.ask;
   const seen = [];
@@ -157,11 +157,13 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), []);
   assert.equal(readManifest(dir).files.length, 11);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
-  // kickoff guidance (#173): asked last, the prompt carries the idea and the task store
-  assert.match(prompter.asked.at(-1), /guidance to kick off/);
-  assert.match(r.out, /yaw kickoff prints a planning prompt/);
-  assert.match(r.out, /----- prompt -----\n[\s\S]*\nRename photos by EXIF date\.\n[\s\S]*Tasks are not enabled[\s\S]*----- end of prompt -----/);
-  assert.match(r.out, /yaw kickoff import docs\/plan\/kickoff\.md --dry-run/);
+  // kickoff (#173): asked last; the same two choices as the browser's Finished step, written to a file, not printed
+  assert.match(prompter.asked.at(-1), /Kick off the project documents/);
+  assert.match(r.out, /1\) I already have a concept: a prompt for the chat that holds it \(\.yaw\/concept-prompt\.md\)\n {2}2\) Let my coding agent write them/);
+  assert.match(r.out, /Wrote the prompt for your coding agent to \.yaw\/kickoff-prompt\.md\./);
+  assert.doesNotMatch(r.out, /Set up the project foundations/);
+  assert.match(readFileSync(join(dir, '.yaw/kickoff-prompt.md'), 'utf8'), /^Set up the project foundations[\s\S]*Rename photos by EXIF date\./);
+  assert.equal(existsSync(join(dir, '.yaw/concept-prompt.md')), false);
 });
 
 test('interview: declining writes nothing and exits 1', async () => {

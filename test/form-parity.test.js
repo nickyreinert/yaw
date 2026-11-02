@@ -66,7 +66,7 @@ async function viaCli({ mode, answers, modules }) {
     if (/create one now \(git init\)\?/.test(question)) return 'n';
     if (/Write these files\?/.test(question)) return 'y';
     if (/Save /.test(question)) return 'n';
-    if (/guidance to kick off/.test(question)) return 'n';
+    if (/Kick off the project documents/.test(question)) return 'n';
     const line = [...p.shown].reverse().join('').split('\n').find((l) => /^ {2}\d+\/\d+ /.test(l));
     const q = line && BY_LABEL.get(line.replace(/^ {2}\d+\/\d+ /, ''));
     if (!q || !/\] > $/.test(question)) throw new Error(`unexpected prompt: ${question}`);
