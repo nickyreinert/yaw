@@ -6,6 +6,7 @@ import { enabledModules, readAnswers } from '../render/project.js';
 import { collectQuestions } from '../render/kit.js';
 import { readManifest, writeManifest } from '../render/manifest.js';
 import { hashContent, readProjectFile, writeAtomic } from '../render/files.js';
+import { unifiedDiff } from '../render/reconcile.js';
 import { tasksMode } from '../lib/tasks.js';
 import { FormError, assertSafe } from './form-model.js';
 
@@ -36,7 +37,7 @@ function prepare({ root, kitRoot, input }) {
 }
 export function previewPlanning(ctx) {
   const p = prepare(ctx);
-  return { expected: p.expected, foundations: p.foundations?.entries.map(({ kind, path, text }) => ({ kind, path, text })) ?? [],
+  return { expected: p.expected, foundations: p.foundations?.entries.map(({ kind, path, text, action, before }) => ({ kind, path, text, action, ...(action === 'update' ? { diff: unifiedDiff(path, before, text) } : {}) })) ?? [],
     tasks: p.plan.tasks.length, phases: new Set(p.plan.tasks.map((t) => t.phase)).size, warnings: p.plan.warnings,
     titles: p.plan.tasks.map((t) => t.title), hasTasks: enabledModules(p.manifest).includes('tasks'), taskMode: tasksMode(p.answers, { teamModule: enabledModules(p.manifest).includes('team') }) };
 }

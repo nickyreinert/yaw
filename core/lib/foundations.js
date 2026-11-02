@@ -97,7 +97,8 @@ function readIndex(root, kitRoot) {
   return index;
 }
 
-// Preflight every document before any write. Reuse supports established equivalent documents.
+// Preflight every document before any write. Reuse supports established equivalent documents; update replaces one
+// with the reviewed revision, refused when the file changed since that review.
 export function prepareFoundations({ root, documents, reviewed = false, kitRoot }) {
   if (!documents?.length) return null;
   if (reviewed !== true) throw new FoundationError('Review all three foundations first; acknowledge with --reviewed or the review checkbox.');
@@ -108,13 +109,13 @@ export function prepareFoundations({ root, documents, reviewed = false, kitRoot 
     if (!Object.hasOwn(FOUNDATION_PATHS, d.kind)) throw new FoundationError('Unknown foundation kind.');
     foundationPath(d.path, kitRoot);
     if (['TASKS.md', 'TASKS.archive.md', 'docs/plan/kickoff.md'].includes(d.path)) throw new FoundationError('A foundation cannot use a task ledger or temporary plan path.');
-    if (!['create', 'reuse'].includes(d.action)) throw new FoundationError(`${d.path}: action must be create or reuse.`);
+    if (!['create', 'reuse', 'update'].includes(d.action)) throw new FoundationError(`${d.path}: action must be create, reuse or update.`);
     const current = readFoundationFile(root, d.path, { kitRoot });
-    if (d.action === 'reuse' && current === null) throw new FoundationError(`${d.path}: reuse requires an existing document.`);
+    if (d.action !== 'create' && current === null) throw new FoundationError(`${d.path}: ${d.action} requires an existing document.`);
     const text = d.action === 'reuse' ? current : String(d.text ?? '').trim() + '\n';
     if (!text.trim() || Buffer.byteLength(text) > 100000 || text.includes('\0') || secretValueRule(rulesFor(kitRoot), text)) throw new FoundationError(`${d.path}: empty, oversized or unsafe foundation.`);
-    if (current !== null && d.action === 'create' && hashContent(current) !== hashContent(text)) throw new FoundationError(`${d.path}: already exists; use reuse and edit the established document directly.`);
-    return { kind: d.kind, path: d.path, text, expected: current === null ? null : hashContent(current), hash: hashContent(text) };
+    if (current !== null && d.action === 'create' && hashContent(current) !== hashContent(text)) throw new FoundationError(`${d.path}: already exists; use update with the complete revised document, or reuse.`);
+    return { kind: d.kind, path: d.path, action: d.action, text, ...(d.action === 'update' ? { before: current } : {}), expected: current === null ? null : hashContent(current), hash: hashContent(text) };
   });
   if (existingIndex !== null) {
     const old = readIndex(root, kitRoot);
@@ -153,13 +154,20 @@ export function saveFoundations({ root, prepared, kitRoot, setupHash }) {
   const index = { version: 1, practicesVersion: PRACTICES_VERSION, kit: manifest.kit, ...(setupHash ? { setupHash } : {}),
     documents: prepared.entries.map(({ kind, path, hash }) => ({ kind, path, hash })) };
   const indexText = `${JSON.stringify(index, null, 2)}\n`;
-  for (const d of prepared.entries) if (d.expected === null) writeAtomic(root, d.path, d.text);
+  for (const d of prepared.entries) if (d.hash !== d.expected) writeAtomic(root, d.path, d.text);
   writeAtomic(root, FOUNDATION_INDEX, indexText);
   // User-owned artifacts survive kit updates and module removal. Existing ownership is preserved.
   for (const d of [...prepared.entries.filter((d) => d.expected === null), { path: FOUNDATION_INDEX, hash: hashContent(indexText) }]) {
     if (!manifest.files.some((f) => f.path === d.path)) manifest.files.push({ path: d.path, hash: d.hash, module: 'core', managed: false });
   }
   writeManifest(root, manifest);
+}
+
+// The documents a concept import merges into: the registered foundations, else existing files at the default paths.
+export function currentFoundations({ root, kitRoot } = {}) {
+  const index = readIndex(root, kitRoot);
+  const paths = index ? index.documents.map((d) => [d.kind, d.path]) : Object.entries(FOUNDATION_PATHS);
+  return paths.map(([kind, path]) => ({ kind, path, text: readFoundationFile(root, path, { kitRoot }) })).filter((d) => d.text !== null);
 }
 
 // Same source for humans, JSON consumers and optional reviewers; no model, vector service or hook injection.

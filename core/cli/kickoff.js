@@ -1,10 +1,11 @@
 // `yaw kickoff` (#173): print the kickoff guide and the planning prompt; `yaw kickoff import <plan.md>` turns
 // the plan into tasks through `yaw task new`, so every task store (local, both, github) works the same way.
 
-import { kickoffGuide, kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
-import { checkTaskReferences, contextText, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
+import { conceptGuide, kickoffGuide, kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
+import { checkTaskReferences, contextText, currentFoundations, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { modelEffort, parseTasks, tasksMode } from '../lib/tasks.js';
 import { hashContent, readProjectFile } from '../render/files.js';
+import { unifiedDiff } from '../render/reconcile.js';
 import { enabledModules, readAnswers, requireManifest } from '../render/project.js';
 import { UsageError } from './commands.js';
 import { task } from './tasks.js';
@@ -25,11 +26,14 @@ export function kickoffParts({ root, manifest }) {
     const complete = parsed.tasks.length > 0 && parsed.foundations.length === 3 && context.documents.length === 3 && !warnings.length;
     plan = { file: PLAN_FILE, tasks: parsed.tasks.length, foundations: context.documents.map((d) => d.path), complete, warnings };
   }
+  const facts = { answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks'), previousPlan };
   return {
     plan,
+    conceptGuide: conceptGuide(),
+    conceptPrompt: kickoffPrompt({ ...facts, concept: { documents: currentFoundations({ root }) } }),
     localPrompt: setupPrompt({ kind: 'kickoff', answers: doc.answers, modules }),
     guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
-    prompt: kickoffPrompt({ answers: doc.answers, summary: doc.proposal?.summary ?? '', tasksMode: mode, hasTasks: modules.includes('tasks'), previousPlan, projectContext: context.documents.length ? contextText(context) : '' }),
+    prompt: kickoffPrompt({ ...facts, projectContext: context.documents.length ? contextText(context) : '' }),
   };
 }
 
@@ -70,11 +74,17 @@ export async function kickoff({ values, positionals, io }) {
     io.stdout.write(`${contextText(foundationContext({ root, kitRoot: io.kitRoot }))}\n\nOptional UI/UX guidance: review this exact package before copying to your chosen local or external model. Ask for missing user evidence; label assumptions. Before substantial UI implementation, offer a rough wireframe, mockup or clickable example covering layout, content hierarchy, navigation, control placement and key states as well as colours. Review structure and the main flow before visual polish. Walk through the main task with realistic content, empty/error/recovery states and applicable accessibility criteria. Link the accepted example from the UI/UX foundation with observable acceptance criteria, linked domain/data effects and a plan to validate the riskiest assumption. Surface conflicts for a project decision; do not change accepted documents automatically.\n`);
     return 0;
   }
+  if (verb === 'concept') {
+    if (file || extra.length) throw new UsageError('kickoff concept takes no positional arguments');
+    const { conceptGuide: guide, conceptPrompt } = kickoffParts({ root, manifest });
+    io.stdout.write(`Import your own concept\n${guide.map((l, i) => `  ${i + 1}. ${l}\n`).join('')}\n----- prompt -----\n${conceptPrompt}\n----- end of prompt -----\n`);
+    return 0;
+  }
   if (verb === undefined) {
     io.stdout.write(kickoffText({ root, manifest }));
     return 0;
   }
-  if (verb !== 'import') throw new UsageError(`kickoff: unknown verb "${verb}"; use: yaw kickoff [import <plan.md> [--dry-run]]`);
+  if (verb !== 'import') throw new UsageError(`kickoff: unknown verb "${verb}"; use: yaw kickoff [concept | import <plan.md> [--dry-run]]`);
   if (!file || extra.length > 0) throw new UsageError('kickoff import: give exactly one plan file');
   const hasTasks = enabledModules(manifest).includes('tasks');
   const needsTasks = () => new UsageError('kickoff import needs the tasks module; run: yaw add tasks');
@@ -93,7 +103,7 @@ export async function kickoff({ values, positionals, io }) {
   const prepared = prepareFoundations({ root, kitRoot: io.kitRoot, documents: plan.foundations, reviewed: values.reviewed || values['dry-run'] });
   checkTaskReferences(plan.tasks, prepared);
   if (prepared) {
-    for (const d of prepared.entries) io.stdout.write(`Foundation ${d.kind}: ${d.path}\n${d.text}\n`);
+    for (const d of prepared.entries) io.stdout.write(`Foundation ${d.kind} (${d.action}): ${d.path}\n${d.action === 'update' ? unifiedDiff(d.path, d.before, d.text) || '(no change)' : d.text}\n`);
     if (!values['dry-run']) saveFoundations({ root, prepared, kitRoot: io.kitRoot, setupHash: hashContent(JSON.stringify(planningFacts(readAnswers(root).answers))) });
   }
   if (!hasTasks) {
