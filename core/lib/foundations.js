@@ -163,13 +163,6 @@ export function saveFoundations({ root, prepared, kitRoot, setupHash }) {
   writeManifest(root, manifest);
 }
 
-// The documents a concept import merges into: the registered foundations, else existing files at the default paths.
-export function currentFoundations({ root, kitRoot } = {}) {
-  const index = readIndex(root, kitRoot);
-  const paths = index ? index.documents.map((d) => [d.kind, d.path]) : Object.entries(FOUNDATION_PATHS);
-  return paths.map(([kind, path]) => ({ kind, path, text: readFoundationFile(root, path, { kitRoot }) })).filter((d) => d.text !== null);
-}
-
 // Same source for humans, JSON consumers and optional reviewers; no model, vector service or hook injection.
 export function foundationContext({ root, kitRoot } = {}) {
   const result = { version: 1, practicesVersion: PRACTICES_VERSION, practices: PRACTICES, constraints: {}, documents: [], warnings: [] };

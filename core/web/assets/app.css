@@ -798,7 +798,7 @@ a.button.primary { background: var(--accent); color: #fff; }
 .settings-presentation { display: flex; gap: 8px; margin: 0 0 20px; }
 .settings-presentation [aria-pressed=true] { background: var(--ink); color: var(--sun); border-color: var(--ink); }
 /* Interview presentation: the full wizard, without the Settings heading and tabs. */
-#settings-view.interview-mode > :is(.page-heading, #settings-tabs, .note-inline) { display: none; }
+#settings-view.interview-mode > :is(.page-heading, #settings-tabs) { display: none; }
 .settings-form .wizard-layout { display: block; }
 .settings-form .wizard-nav, .settings-form .interview-depth-bar, .settings-form .wizard-footer { display: none; }
 .settings-form .interview-form { padding: 0; border: 0; background: transparent; }

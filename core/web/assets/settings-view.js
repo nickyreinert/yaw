@@ -12,6 +12,11 @@ export function el(tag, text, cls) {
   if (cls) node.className = cls;
   return node;
 }
+// Hints that name another section link to it.
+export function link(label, route) { const a = el('a', label); a.href = `#${route}`; return a; }
+export function hint(cls, ...parts) { const p = el('p', null, cls); p.append(...parts); return p; }
+// A file description with links to where that file is edited (`links`: [[label, route]]).
+export const about = (f, cls = 'small muted') => hint(cls, f.about ?? '', ...(f.links ?? []).flatMap(([label, route]) => [' ', link(`${label} →`, route)]));
 export function button(text, fn, cls) { const b = el('button', text, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
 export function grid(head, rows) {
   const wrap = el('div', null, 'table-scroll'), t = el('table'), tr = t.createTHead().insertRow();
@@ -198,43 +203,10 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     if (!data.available) { root.append(el('p', data.message, 'muted')); return; }
     root.append(kickoffCard(data, { request: async (name, input) => new Response(JSON.stringify(await api(name, input)), { headers: { 'Content-Type': 'application/json' } }) }), conceptCard(data));
   }
-  // A concept from another chat: that chat rewrites it with the concept prompt; the reply is previewed, reviewed and imported.
+  // A concept from another chat: that chat adapts it for the local coding agent; nothing comes back to YAW.
   function conceptCard(data) {
-    const card = createPlanCard({ id: 'concept-prompt', title: 'Import your own concept', prompt: data.conceptPrompt, chat: true, label: 'Concept prompt',
-      instruction: 'Already have a bigger concept in another chat? Copy this prompt into that chat. It asks the chat to rewrite your concept for this project, merged into its current documents. Paste the reply below, review it, then import it.' });
-    const reply = el('textarea', null, 'planning-prompt'); reply.rows = 10; reply.setAttribute('aria-label', 'Reply from the chat'); reply.placeholder = '# Plan: …\nkickoff-format: 1\n…';
-    const status = el('p', '', 'small muted concept-status'); status.setAttribute('role', 'status');
-    const out = el('div', null, 'planning-preview');
-    let previewed = null;
-    const reviewed = el('input'); reviewed.type = 'checkbox';
-    const review = el('label', ' I reviewed every document and task above. Updated documents replace the current ones.'); review.prepend(reviewed);
-    const apply = button('Import', async () => {
-      try { apply.disabled = true; const r = await api('planning-apply', { text: previewed.text, expected: previewed.expected, reviewed: true }); await loadKickoff(); $('settings-kickoff').querySelector('.concept-status').textContent = r.message; }
-      catch (e) { status.textContent = e.message; apply.disabled = !reviewed.checked; }
-    }, 'primary');
-    const reset = () => { previewed = null; out.replaceChildren(); reviewed.checked = false; apply.disabled = true; };
-    reviewed.addEventListener('change', () => { apply.disabled = !reviewed.checked || !previewed; });
-    reply.addEventListener('input', () => { if (previewed) { reset(); status.textContent = 'Changed since the preview; preview again.'; } });
-    const preview = button('Preview', async () => {
-      reset(); status.textContent = 'Checking the reply…';
-      try {
-        const p = await api('planning-preview', { text: reply.value });
-        previewed = { ...p, text: reply.value };
-        for (const w of p.warnings) out.append(el('p', w, 'warn'));
-        for (const f of p.foundations) {
-          const d = el('details'); d.append(el('summary', `${f.kind} · ${f.action === 'update' ? 'update' : f.action === 'reuse' ? 'keep' : 'new'} · ${f.path}`), el('pre', f.action === 'update' ? f.diff || 'No change.' : f.text, 'file-source plain'));
-          out.append(d);
-        }
-        const tasks = el('details'); tasks.append(el('summary', `${p.tasks} task(s) in ${p.phases} phase(s)${p.hasTasks ? '' : ' · stay in the plan until the Tasks module is added'}`));
-        const list = el('ul'); for (const t of p.titles) list.append(el('li', t)); tasks.append(list);
-        out.append(tasks, review, apply);
-        status.textContent = 'Review the documents and tasks, then import.';
-      } catch (e) { status.textContent = e.message; }
-    }, 'primary');
-    const actions = el('div', null, 'interview-actions'); actions.append(preview, status);
-    card.node.classList.add('concept-import');
-    card.node.append(el('h3', 'Paste the reply'), reply, actions, out);
-    return card.node;
+    return createPlanCard({ id: 'concept-prompt', title: 'I already have a concept', prompt: data.conceptPrompt, chat: true, label: 'Concept prompt',
+      instruction: 'Copy this into the chat that holds your concept. Paste its answer into your coding agent; the agent writes the documents.' }).node;
   }
   // Files ---------------------------------------------------------------------------------------------
   async function loadFiles() { files = await get('settings'); renderFiles(); }
@@ -264,7 +236,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
         const left = el('span'); left.append(el('span', expanded ? '▾ ' : '▸ ', 'caret'), code(`${f.path}/`), el('span', `${f.files.length}${f.limited ? '+' : ''} files`, 'badge'));
         b.append(left); box.append(b);
         if (expanded) {
-          const tree = el('div', null, 'file-tree'); tree.append(el('p', f.about, 'small muted'));
+          const tree = el('div', null, 'file-tree'); tree.append(about(f));
           for (const child of f.files) tree.append(row({ ...child, about: f.about }, child.path.slice(f.path.length + 1)));
           box.append(tree);
         }
@@ -283,13 +255,14 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     title.append(el('span', `${file.module ?? ''}${file.managed ? ' · YAW keeps it current' : ' · yours after the first write'} · updated ${day(file.modified)}`, 'eyebrow'), el('h2', file.path));
     bar.append(title, button('✕ Close', closeDrawer));
     drawer.replaceChildren(bar);
-    if (file.about ?? f.about) drawer.append(el('p', file.about ?? f.about, 'small muted'));
+    if (file.about ?? f.about) drawer.append(about(file.about ? file : f));
     if (file.tooLarge) { drawer.append(el('p', `Larger than ${Math.round(file.limit / 1024)} KiB; open it in your editor.`, 'warn')); return; }
     const k = kind(file.path), pane = el('div', null, 'drawer-pane');
     const form = () => { const v = el('div', null, 'file-view'); try { VIEWS[k](file.content, v, { openInterview: () => { closeDrawer(); go('interview'); } }); } catch (e) { v.append(el('p', `Not readable as ${k}: ${e.message}. Use Raw.`, 'warn')); } return v; };
     const pick = (id) => { press(nav, id); pane.replaceChildren(id === 'form' ? form() : source(file.content)); };
     const nav = tabs([['form', 'Form', !k], ['raw', 'Raw']], pick);
-    nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : file.editable ? 'Edit on the Project tab' : 'Read-only · yaw apply refreshes it', 'small muted'));
+    if (file.editable && !file.path.startsWith('.yaw/base/')) { const note = el('span', 'Edit on the ', 'small muted'); note.append(link('Project tab', 'settings')); nav.append(note); }
+    else nav.append(el('span', file.path.startsWith('.yaw/base/') ? 'Read-only · snapshot, never edit' : 'Read-only · yaw apply refreshes it', 'small muted'));
     drawer.append(nav, pane); pick(k ? 'form' : 'raw'); drawer.querySelector('.drawer-bar button').focus();
   }
 

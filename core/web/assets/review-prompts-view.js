@@ -1,6 +1,6 @@
 // Review prompts editor (ADR-0056), shared by workspace Settings (project overrides) and Global Settings (your
 // blueprint). Each reviewer's prompt comes from the first layer that has it: project, blueprint, kit default.
-import { button, el } from './settings-view.js';
+import { button, el, hint, link } from './settings-view.js';
 
 const SOURCE = { project: 'This project', global: 'Your blueprint', kit: 'Kit default' };
 
@@ -8,12 +8,13 @@ const SOURCE = { project: 'This project', global: 'Your blueprint', kit: 'Kit de
 export function renderReviewPrompts(root, { data, scope, api, load, report }) {
   root.replaceChildren();
   if (scope === 'project' && !data.enabled) {
-    root.append(el('p', 'Review agents are off in this project. Turn on "Review agents" on the Project tab (Settings), then adjust their prompts here.', 'muted'));
+    root.append(hint('muted', 'Review agents are off in this project. Turn on Review agents in ', link('Settings → Project → Your workflow', 'settings?section=workflow'), ', then adjust their prompts here.'));
     return;
   }
-  root.append(el('p', scope === 'project'
-    ? 'What each review agent is told to look for. A prompt saved here is stored in .yaw/review/ and committed with the project, so the team and the push gate use the same one; otherwise your blueprint (Global → Settings) or the kit default applies. Read-only behaviour and the PASS/FINDINGS verdict are fixed and cannot be edited away.'
-    : 'Your blueprint: the prompts every project uses unless it saves its own (Workspace → Settings → Review prompts). Stored in ~/.yaw/review/. Read-only behaviour and the PASS/FINDINGS verdict are fixed and cannot be edited away.', 'small muted'));
+  const fixed = ' Read-only behaviour and the PASS/FINDINGS verdict are fixed and cannot be edited away.';
+  root.append(scope === 'project'
+    ? hint('small muted', 'What each review agent is told to look for. A prompt saved here is stored in .yaw/review/ and committed with the project, so the team and the push gate use the same one; otherwise your blueprint (', link('Global → Settings → Review prompts', 'global-settings/review'), `) or the kit default applies.${fixed}`)
+    : hint('small muted', 'Your blueprint: the prompts every project uses unless it saves its own (', link('Workspace → Settings → Review prompts', 'settings/review'), `). Stored in ~/.yaw/review/.${fixed}`));
   for (const p of data.prompts) root.append(card(p));
 
   function card(p) {
