@@ -2,7 +2,7 @@
 // the plan into tasks through `yaw task new`, so every task store (local, both, github) works the same way.
 
 import { conceptGuide, kickoffGuide, kickoffPrompt, parseKickoffReply, planningFacts, PLAN_FILE, PlanError } from '../lib/kickoff.js';
-import { checkTaskReferences, contextText, currentFoundations, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
+import { checkTaskReferences, contextText, foundationContext, prepareFoundations, readFoundationFile, saveFoundations } from '../lib/foundations.js';
 import { modelEffort, parseTasks, tasksMode } from '../lib/tasks.js';
 import { hashContent, readProjectFile, writeAtomic } from '../render/files.js';
 import { unifiedDiff } from '../render/reconcile.js';
@@ -58,7 +58,7 @@ export function kickoffParts({ root, manifest }) {
   return {
     plan,
     conceptGuide: conceptGuide(),
-    conceptPrompt: kickoffPrompt({ ...facts, concept: { documents: currentFoundations({ root }) } }),
+    conceptPrompt: setupPrompt({ kind: 'concept', answers: doc.answers }),
     localPrompt: setupPrompt({ kind: 'kickoff', answers: doc.answers, modules }),
     guide: kickoffGuide({ tasksMode: mode, hasTasks: modules.includes('tasks') }),
     prompt: kickoffPrompt({ ...facts, projectContext: context.documents.length ? contextText(context) : '' }),

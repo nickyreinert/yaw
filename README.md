@@ -45,7 +45,7 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 | When you need to… | Use… |
 | --- | --- |
 | Start a project or revise its setup | `yaw init`, `yaw edit`, `yaw status` and `yaw apply`. The dashboard's Settings view also previews and applies interview changes and lets you inspect YAW-written files. |
-| Turn an idea into work | `yaw kickoff` drafts architecture/domain, data model and UI/UX foundations before tasks. `yaw kickoff concept` has another chat rewrite a concept you already have. Preview with `yaw kickoff import <plan.md> --dry-run`, then import reviewed foundations with `--reviewed`. Legacy task plans still work. |
+| Turn an idea into work | `yaw kickoff` drafts architecture/domain, data model and UI/UX foundations before tasks. `yaw kickoff concept` has another chat adapt a concept you already have for your coding agent. Preview with `yaw kickoff import <plan.md> --dry-run`, then import reviewed foundations with `--reviewed`. Legacy task plans still work. |
 | Apply project rules | `yaw kickoff context` (or `--json`) shows project ground truth and generic YAW practices separately; `yaw kickoff ux` offers an optional design walkthrough prompt. |
 | Get a second opinion on a change | The optional review module adds four read-only reviewers (quality, business logic, UI/UX, feature fit). Run them with `just review <kind>`, get a hint when work is done, or make them a pre-push gate that warns or blocks `git push`. Edit their prompts in `yaw web`, per project or as your blueprint for all projects. |
 | Track the next task | `TASKS.md`, GitHub issues or both; `yaw task next` finds the next local task. Optional team mode adds issue-linked commit and PR checks. |

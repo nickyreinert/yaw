@@ -243,23 +243,27 @@ test('later planning previews then completes a partial plan, preserving reviewed
   assert.match(readFileSync(join(root, FOUNDATION_PATHS.architecture), 'utf8'), /Human revision/);
 });
 
-test('concept import: the prompt carries existing documents; update replaces them only after a reviewed, unchanged preview', async () => {
+test('concept prompt: written to a file; the other chat answers for the local coding agent, nothing comes back to YAW', async () => {
   const root = await project();
-  // Documents a local agent wrote before any import: present, but not registered.
-  writeTree(root, { [FOUNDATION_PATHS.architecture]: '# architecture\nLocal draft: one renamer.\n', [FOUNDATION_PATHS['ui-ux']]: '# ui-ux\nLocal draft: preview names.\n' });
+  writeTree(root, { [FOUNDATION_PATHS.architecture]: '# architecture\nLocal draft: one renamer.\n' });
   const written = await yaw(root, ['kickoff', 'concept']);
   assert.equal(written.code, 0, written.err);
-  assert.match(written.out, /^Wrote the concept prompt to \.yaw\/concept-prompt\.md \(--stdout prints it instead\)\.\n {2}1\. Copy the prompt into the chat that holds your concept/);
-  assert.doesNotMatch(written.out, /YAW concept import prompt/, 'the prompt goes to the file, not the terminal');
+  assert.match(written.out, /^Wrote the concept prompt to \.yaw\/concept-prompt\.md \(--stdout prints it instead\)\.\n {2}1\. Copy the prompt into the chat that holds your concept[\s\S]*\n {2}2\. Paste the chat’s answer into your coding agent/);
+  assert.doesNotMatch(written.out, /Rewrite my project concept/, 'the prompt goes to the file, not the terminal');
   const shown = await yaw(root, ['kickoff', 'concept', '--stdout']);
   assert.equal(shown.code, 0, shown.err);
   assert.equal(readFileSync(join(root, '.yaw/concept-prompt.md'), 'utf8'), shown.out);
-  assert.match(shown.out, /YAW concept import prompt/);
-  assert.match(shown.out, /--- architecture: docs\/spec\/architecture\.md ---\n# architecture\nLocal draft: one renamer\./);
-  assert.match(shown.out, /## Foundation: architecture\npath: docs\/spec\/architecture\.md\naction: update/);
-  assert.match(shown.out, /## Foundation: data-model\npath: docs\/spec\/data-model\.md\naction: create/);
-  assert.doesNotMatch(shown.out, /Ask me questions first if the idea is too vague/);
+  assert.match(shown.out, /^Rewrite my project concept for my local coding agent\./);
+  assert.match(shown.out, /"arch\.language": "typescript"/);
+  assert.match(shown.out, /----- instructions -----\nSet up the project foundations from the project concept below[\s\S]*docs\/spec\/data-model\.md[\s\S]*----- end of instructions -----$/m);
+  // The local agent reads the project itself: no documents, no import format, no personal answers.
+  assert.doesNotMatch(shown.out, /Local draft|kickoff-format|## Phase|"user\./);
+});
 
+test('foundation update: replaces a document only after a reviewed, unchanged preview', async () => {
+  const root = await project();
+  // Documents a local agent wrote before any import: present, but not registered.
+  writeTree(root, { [FOUNDATION_PATHS.architecture]: '# architecture\nLocal draft: one renamer.\n', [FOUNDATION_PATHS['ui-ux']]: '# ui-ux\nLocal draft: preview names.\n' });
   const reply = bundle(CLI).replace(/(path: docs\/spec\/(architecture|ui-ux)\.md\n)action: create/g, '$1action: update');
   const kinds = parseKickoffReply(reply).foundations.map((d) => d.action);
   assert.deepEqual(kinds, ['update', 'create', 'update']);

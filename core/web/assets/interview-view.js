@@ -231,7 +231,7 @@ function buildPlan() {
   planCard = createPlanCard({ title: 'LLM Support', label: 'Setup interview prompt', chat: true, collapsed: true,
     instruction: 'Use any LLM to support you with project decisions.' });
   conceptCard = createPlanCard({ id: 'concept-prompt', title: 'I already have a concept', label: 'Concept prompt', chat: true, collapsed: true,
-    instruction: 'Copy this into the chat that holds your concept. It rewrites the concept for this project. Import the reply in yaw web → Settings → Kickoff, or save it and run yaw kickoff import <file> --dry-run.' });
+    instruction: 'Copy this into the chat that holds your concept. Paste its answer into your coding agent; the agent writes the documents.' });
   finalCard = createPlanCard({ id: 'final-prompt', title: 'Let my coding agent write them', collapsed: true,
     instruction: 'Copy this into your local coding agent. It writes the missing documents directly in the project; nothing to paste back.' });
   sections.get('idea')?.node.append(planCard.node);
