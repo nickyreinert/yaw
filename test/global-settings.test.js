@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { globalFile, globalFiles, presetAction, presetsData, profileApply, profileData, profilePreview } from '../core/web/global-settings.js';
+import { globalFile, globalFiles, presetAction, presetData, presetSave, presetsData, profileApply, profileData, profilePreview } from '../core/web/global-settings.js';
 import { setupDefaults, saveSetupDefaults } from '../core/lib/setup-defaults.js';
 import { KIT_ROOT, tmp, writeTree } from './helpers/fixtures.js';
 
@@ -44,6 +44,21 @@ test('presets: rename keeps content, refuses clashes and bad names; delete needs
   assert.throws(() => presetAction({ env, input: { name: 'beta' }, remove: true }), /Confirm/);
   presetAction({ env, input: { name: 'beta', confirm: true }, remove: true });
   assert.deepEqual(presetsData({ env }).presets.map((p) => p.name), ['gamma']);
+});
+
+test('presets: edited answers merge into the preset, hash-checked and limited to Defaults questions', () => {
+  const { env, dir } = home();
+  writeTree(dir, { 'presets/alpha.yaml': 'name: alpha\nanswers:\n  idea.text: keep me\n  user.language: en\n' });
+  const before = presetData({ env, name: 'alpha' });
+  assert.equal(before.answers['user.language'], 'en');
+  const save = (answers, expected = before.hash) => presetSave({ kitRoot: KIT_ROOT, env, input: { name: 'alpha', answers, expected } });
+  assert.throws(() => save({ 'idea.text': 'x' }), /Unknown answer key/);
+  assert.throws(() => save({ 'user.expertise': 'wizard' }), /Invalid answer/);
+  assert.throws(() => save({ 'user.language': 'de' }, 'sha256:old'), /changed on disk/);
+  save({ 'user.language': 'de', 'tasks.mode': 'github' });
+  const after = presetData({ env, name: 'alpha' }).answers;
+  assert.deepEqual([after['user.language'], after['tasks.mode'], after['idea.text']], ['de', 'github', 'keep me']);
+  assert.throws(() => presetData({ env, name: '../x' }), /not a preset name/);
 });
 
 test('files: only listed ~/.yaw files are readable, links are refused, folders show counts only', () => {

@@ -8,7 +8,8 @@ import { collectQuestions, hasModule, schemas } from '../render/kit.js';
 import { parseReply, validAnswer } from '../interview/engine.js';
 import { asksIn } from '../interview/policy.js';
 import { parse } from '../lib/yaml.js';
-import { deletePreset, listPresets, nextUserProfile, renamePreset, userDataDir, userDir, writeUserProfile } from '../lib/user-store.js';
+import { deletePreset, listPresets, nextUserProfile, readPreset, renamePreset, secretFindings, userDataDir, userDir, writePresetAnswers, writeUserProfile } from '../lib/user-store.js';
+import { setupDefaults } from '../lib/setup-defaults.js';
 import { assertSafe, FormError, fullFileDiff } from './form-model.js';
 import { MAX_BYTES, readRegular } from './knowledge.js';
 
@@ -65,6 +66,32 @@ export function profileApply({ kitRoot, env, input }) {
 
 export function presetsData({ env }) {
   return { presets: userError(() => listPresets(env)) };
+}
+
+// One preset's answers for the Defaults tab, with a hash so a save cannot overwrite a newer file.
+export function presetData({ env, name }) {
+  const text = userError(() => readPreset(env, String(name ?? '')));
+  let doc;
+  try { doc = parse(text) ?? {}; } catch { throw new FormError('Saved preset is unreadable or invalid'); }
+  return { name: doc.name, description: doc.description ?? '', mode: doc.mode ?? '', answers: doc.answers ?? {}, hash: hash(text) };
+}
+
+// Only questions shown on the Defaults tab may be edited: personal answers and workflow defaults.
+export function presetSave({ kitRoot, env, input }) {
+  if (!input || typeof input !== 'object' || typeof input.name !== 'string') throw new FormError('Choose a preset');
+  const { name, answers, expected } = input;
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw new FormError('Expected your answers');
+  const byId = new Map([...questions(kitRoot), ...setupDefaults({ env, kitRoot }, {}).questions].map((q) => [q.id, q]));
+  if (Object.keys(answers).some((id) => !byId.has(id))) throw new FormError('Unknown answer key');
+  assertSafe(answers, kitRoot);
+  for (const [id, value] of Object.entries(answers)) {
+    const q = byId.get(id);
+    if (!validAnswer(q, value) || (q.type === 'text' && value.length > 8192)) throw new FormError(`Invalid answer for ${id}`);
+  }
+  if (secretFindings({ answers, kitRoot }).length) throw new FormError('An answer looks like a secret; nothing was saved');
+  if (expected !== presetData({ env, name }).hash) throw new FormError(`presets/${name}.yaml changed on disk; reload before saving`, 409);
+  userError(() => writePresetAnswers(env, name, answers));
+  return { message: Object.keys(answers).length ? `Saved preset ${name}.` : 'Nothing changed.' };
 }
 
 export function presetAction({ env, input, remove }) {

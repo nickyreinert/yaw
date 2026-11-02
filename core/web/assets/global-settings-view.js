@@ -1,4 +1,4 @@
-// Global Settings: Defaults (your defaults for new projects, plus presets), Files (~/.yaw, read-only),
+// Global Settings: Defaults (your defaults for new projects or one preset, in sub-tabs), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { button, el, grid, press, source, tabs } from './settings-view.js';
 import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
@@ -40,7 +40,7 @@ function formView(value, depth = 0) {
 }
 
 export function createGlobalSettings({ api, get, report, notifications, onFile }) {
-  let tab = 'interview', classifier = null, classifierSamples = null, profile = null, answers = null, presets = null, files = null, comfort = null, previewed = null, selected = null;
+  let tab = 'interview', classifier = null, classifierSamples = null, profile = null, answers = null, presets = null, files = null, comfort = null, selected = null;
   const drawer = $('global-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
@@ -64,7 +64,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     return tab;
   }
   function hide() { if (!drawer.hidden) { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; } }
-  function reset() { classifier = null; classifierSamples = null; profile = null; presets = null; files = null; comfort = null; previewed = null; }
+  function reset() { classifier = null; classifierSamples = null; profile = null; presets = null; files = null; comfort = null; }
 
   async function loadFeatures() {
     const data = await get('global/features'), root = $('gs-features'), settings = data.remoteControl;
@@ -275,33 +275,84 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     root.append(el('p', 'Overlapping session snapshots are counted once, using the observation with the most messages. Divergent copies are not combined. Device subtotals may overlap. GitHub requires Git and an authenticated gh CLI; the repository must already exist and be private.', 'small muted'));
   }
 
-  // Interview --------------------------------------------------------------------------------------------
-  let setupPolicy = null;
+  // Defaults ---------------------------------------------------------------------------------------------
+  // One editor for your defaults (profile + tool defaults) or one preset (answers only), chosen at the top.
+  const SUBTABS = [['about', 'About you'], ['communication', 'Communication'], ['tools', 'Tools'], ['workflow', 'Workflow']];
+  const subOf = (id) => ['user.agents', 'user.expertise'].includes(id) ? 'about' : 'communication';
+  let setupPolicy = null, target = '', preset = null, policy = {}, tools = new Set(), touched = new Set(), dirty = { profile: false, tools: false }, sub = 'about', note = '';
   async function loadInterview() {
-    setupPolicy = await get('global/setup-defaults');
-    [profile, presets] = await Promise.all([get('global/profile'), get('global/presets')]);
-    answers = structuredClone(profile.answers); previewed = null; renderInterview();
+    [setupPolicy, profile, presets] = await Promise.all([get('global/setup-defaults'), get('global/profile'), get('global/presets')]);
+    if (target && !presets.presets.some((p) => p.name === target)) target = '';
+    preset = target ? await get('global/preset', { name: target }) : null;
+    answers = structuredClone(preset ? preset.answers : profile.answers);
+    policy = preset ? answers : { ...setupPolicy.answers };
+    tools = new Set(setupPolicy.modules); touched = new Set(); dirty = { profile: false, tools: false };
+    renderInterview();
   }
-  const fingerprint = () => JSON.stringify(answers);
-  function status(text) { const s = $('gs-status'); if (s) s.textContent = text; }
+  const unsaved = () => touched.size > 0 || dirty.tools;
+  function status(text) { note = text; const s = $('gs-status'); if (s) s.textContent = text; }
+  function changed(id) {
+    if (id) { touched.add(id); dirty.profile = true; }
+    const save = $('gs-save'); if (save) save.disabled = !unsaved();
+    status('Unsaved changes.');
+  }
+  const fail = (e) => status(e.message);
+  function select(name) {
+    if (name === target) return;
+    if (unsaved() && !confirm('Discard your unsaved changes?')) return;
+    target = name; note = ''; loadInterview().catch(report);
+  }
   function renderInterview() {
     const root = $('gs-interview'); root.replaceChildren();
-    root.append(el('p', `Defaults for every new project · stored in ${profile.path}${profile.exists ? '' : ' (not created yet)'} · existing projects keep their own answers · nothing is written until Apply`, 'small muted'));
-    root.append(el('p', 'Depth badges show where a saved value is used without asking, when applicable.', 'small muted'));
-    const box = el('section', null, 'card interview-section'); box.append(el('h2', 'About you'));
-    for (const q of profile.questions) box.append(question(q));
-    if (!profile.questions.length) box.append(el('p', 'This kit asks no personal questions.', 'muted'));
-    const actions = el('div', null, 'interview-actions'), s = el('p', '', 'small muted'); s.id = 'gs-status'; s.setAttribute('role', 'status');
-    const apply = button('Apply', () => applyProfile().catch(fail), 'primary'); apply.id = 'gs-apply'; apply.disabled = !previewed || previewed.state !== fingerprint();
-    actions.append(button('Preview changes', () => previewProfile().catch(fail)), apply, button('Reset', () => loadInterview().catch(report)), s);
-    const out = el('div'); out.id = 'gs-preview';
-    if (previewed) out.append(previewCard(previewed.result));
-    box.append(actions, out); root.append(box, setupDefaultsCard(), presetsCard());
+    if (preset && sub === 'tools') sub = 'about';
+    const nav = tabs(SUBTABS.map(([id, label]) => [id, label, Boolean(preset) && id === 'tools']), (id) => { sub = id; renderInterview(); }, sub);
+    nav.classList.add('sub-tabs'); nav.setAttribute('aria-label', 'Defaults sections');
+    if (preset) nav.querySelector('[data-mode=tools]').title = 'Presets store answers only; tools apply to your defaults.';
+    root.append(presetsCard(), nav, sub === 'tools' ? toolsCard() : sub === 'workflow' ? workflowCard() : questionsCard(sub));
   }
-  function setupDefaultsCard() {
+  function presetsCard() {
+    const box = el('section', null, 'card preset-editor'), head = el('div', null, 'section-heading');
+    const s = el('span', note, 'small muted'); s.id = 'gs-status'; s.setAttribute('role', 'status');
+    const save = button('Save', () => saveTarget().catch(fail), 'primary'); save.id = 'gs-save'; save.disabled = !unsaved();
+    const actions = el('div', null, 'row-actions'); actions.append(s, button('Reset', () => { note = ''; loadInterview().catch(report); }), save);
+    head.append(el('h2', preset ? `Editing preset ${preset.name}` : 'Editing your defaults'), actions);
+    box.append(head, el('p', preset
+      ? `Changes are saved to ~/.yaw/presets/${preset.name}.yaml. Other answers in the preset (project idea, stack) are kept. yaw init --preset ${preset.name} uses it.`
+      : `Defaults for every new project · stored in ${profile.path}${profile.exists ? '' : ' (not created yet)'} · existing projects keep their own answers. Depth badges show where a saved value is used without asking.`, 'small muted'));
+    const run = (fn) => fn().catch(fail);
+    const view = (name) => { const b = button(name === target ? 'Viewing' : 'View', () => select(name)); b.setAttribute('aria-pressed', String(name === target)); return b; };
+    const rows = [[code('Your defaults'), 'Defaults for every new project', '—', '—', view('')]];
+    for (const p of presets?.presets ?? []) {
+      const cell = el('span', null, 'row-actions');
+      cell.append(view(p.name),
+        button('Rename', () => run(async () => {
+          const to = prompt(`New name for preset ${p.name} (lower-case letters, digits, hyphens):`, p.name);
+          if (!to || to === p.name) return;
+          const r = await api('preset-rename', { name: p.name, to }); if (target === p.name) target = to; files = null; await loadInterview(); status(r.message);
+        })),
+        button('Delete', () => run(async () => {
+          if (!confirm(`Delete preset ${p.name}? This removes ~/.yaw/presets/${p.name}.yaml.`)) return;
+          const r = await api('preset-delete', { name: p.name, confirm: true }); if (target === p.name) target = ''; files = null; await loadInterview(); status(r.message);
+        }), 'danger'));
+      rows.push([code(p.name), p.description || '—', depthLabel(p.mode) || '—', p.created ? day(p.created) : '—', cell]);
+    }
+    const t = grid(['Name', 'Description', 'Depth', 'Created', ''], rows);
+    t.classList.add('preset-table');
+    t.querySelectorAll('tbody tr').forEach((tr, i) => tr.classList.toggle('is-selected', (i === 0 ? '' : presets.presets[i - 1].name) === target));
+    box.append(t);
+    if (!presets?.presets.length) box.append(el('p', 'No presets saved yet. Save one from the interview (Save preset) or with yaw presets save in a configured project.', 'small muted'));
+    return box;
+  }
+  function questionsCard(group) {
+    const box = el('section', null, 'card interview-section');
+    const list = profile.questions.filter((q) => subOf(q.id) === group);
+    for (const q of list) box.append(question(q));
+    if (!list.length) box.append(el('p', 'This kit asks no personal questions here.', 'muted'));
+    return box;
+  }
+  function toolsCard() {
     const box = el('section', null, 'card'); box.append(el('h2', 'Optional tools for new projects'), el('p', 'Undecided tools start off. Quick reuses these defaults; Basic and All let you review them. Existing projects keep their selections.', 'small muted'));
     if (setupPolicy.warning) box.append(el('p', setupPolicy.warning, 'warn'));
-    const selected = new Set(setupPolicy.modules), values = { ...setupPolicy.answers };
     const groups = el('div', null, 'tool-default-groups');
     for (const [group, title] of GROUPS) {
       const modules = setupPolicy.catalog.filter((m) => m.group === group);
@@ -310,8 +361,8 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       section.append(el('h3', title));
       for (const m of modules) {
         const card = el('article', null, 'tool-default'), label = el('label', null, 'setting-toggle');
-        const input = el('input'); input.type = 'checkbox'; input.checked = selected.has(m.name);
-        input.addEventListener('change', () => { if (input.checked) selected.add(m.name); else selected.delete(m.name); });
+        const input = el('input'); input.type = 'checkbox'; input.checked = tools.has(m.name);
+        input.addEventListener('change', () => { if (input.checked) tools.add(m.name); else tools.delete(m.name); dirty.tools = true; changed(); });
         label.append(input, el('strong', m.title));
         const help = el('details', null, 'quick-help'), summary = el('summary', '?');
         summary.setAttribute('aria-label', `About ${m.title}`); summary.title = m.what;
@@ -323,29 +374,28 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       }
       section.append(cards); groups.append(section);
     }
-    box.append(...depthBadges(['quick']), groups, el('h3', 'Workflow defaults'));
+    box.append(...depthBadges(['quick']), groups); return box;
+  }
+  function workflowCard() {
+    const box = el('section', null, 'card'); box.append(el('h2', 'Workflow defaults'));
     const policies = el('div', null, 'settings-fields');
     for (const q of setupPolicy.questions) {
       const field = el('fieldset', null, 'interview-question'), legend = el('legend', q.label);
       legend.append(...depthBadges(['quick', 'basic'].filter((depth) => !asksIn(q, depth))));
       const choices = q.type === 'boolean' ? [{ value: 'false', label: 'Off' }, { value: 'true', label: 'On' }] : q.choices;
-      field.append(legend, choiceField({ name: `policy-${q.id}`, id: `policy-${q.id}`, choices, value: String(values[q.id] ?? q.default), label: q.label,
-        onChange: (v) => { values[q.id] = q.type === 'boolean' ? v === 'true' : v; } }).node);
+      field.append(legend, choiceField({ name: `policy-${q.id}`, id: `policy-${q.id}`, choices, value: String(policy[q.id] ?? q.default), label: q.label,
+        onChange: (v) => { policy[q.id] = q.type === 'boolean' ? v === 'true' : v; if (preset) changed(q.id); else { dirty.tools = true; changed(); } } }).node);
       if (q.hint) field.append(el('p', q.hint, 'small muted'));
       policies.append(field);
     }
-    box.append(policies);
-    const status = el('p', '', 'small muted'); status.setAttribute('role', 'status');
-    const actions = el('div', null, 'interview-actions');
-    actions.append(button('Save tool defaults', async () => { try { setupPolicy = await api('setup-defaults-save', { modules: [...selected], answers: values }); status.textContent = 'Saved for future project setups.'; } catch (e) { status.textContent = e.message; } }, 'primary'), status);
-    box.append(actions); return box;
+    box.append(policies); return box;
   }
   function question(q) {
     const multi = q.type === 'multi', radios = q.type === 'boolean' || q.type === 'choice';
     const wrap = el(multi || radios ? 'fieldset' : 'label', null, 'interview-question');
     const head = el(multi || radios ? 'legend' : 'span', q.label.replace(' (comma-separated)', '')); head.append(...depthBadges(q.assumedIn ?? [])); wrap.append(head);
     const value = answers[q.id] ?? q.default;
-    const set = (v) => { answers[q.id] = v; changed(); };
+    const set = (v) => { answers[q.id] = v; changed(q.id); };
     if (multi) {
       const box = el('div', null, 'checks');
       for (const c of q.choices ?? []) {
@@ -366,52 +416,17 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     if (q.hint) wrap.append(el('span', q.hint, 'small muted'));
     return wrap;
   }
-  function changed() {
-    const apply = $('gs-apply'); if (apply) apply.disabled = !previewed || previewed.state !== fingerprint();
-    if (previewed && previewed.state !== fingerprint()) status('Changed since the preview; preview again before applying.');
-  }
-  const fail = (e) => { if ($('gs-status')) status(e.message); else report(e); };
   // Only answered questions are sent; keys set by other commands stay as they are.
   const payload = () => Object.fromEntries(profile.questions.filter((q) => answers[q.id] !== undefined).map((q) => [q.id, answers[q.id]]));
-  async function previewProfile() {
-    status('Rendering preview…');
-    const result = await api('profile-preview', { answers: payload(), expected: profile.hash });
-    previewed = { state: fingerprint(), result }; renderInterview();
-    status(result.changed ? 'Review the change, then Apply.' : 'Nothing would change.');
-  }
-  function previewCard(r) {
-    const box = el('div', null, 'card'); box.append(el('h2', 'Preview'));
-    if (!r.changed) { box.append(el('p', 'No change.', 'muted')); return box; }
-    box.append(el('pre', r.diff, 'file-source plain')); return box;
-  }
-  async function applyProfile() {
-    if (!confirm(`Save your defaults to ${profile.path}?`)) return;
+  async function saveTarget() {
     status('Saving…');
-    const result = await api('profile-apply', { answers: payload(), expected: profile.hash });
-    files = null; await loadInterview(); status(result.message);
-  }
-  function presetsCard() {
-    const box = el('section', null, 'card'); box.append(el('h2', 'Presets'));
-    box.append(el('p', 'Saved setups for yaw init --preset <name>. Create one with yaw presets save in a configured project.', 'small muted'));
-    const list = presets?.presets ?? [];
-    if (!list.length) { box.append(el('p', 'No presets saved.', 'muted')); return box; }
-    const msg = el('p', '', 'small muted'); msg.setAttribute('role', 'status');
-    const run = (fn) => fn().catch((e) => { msg.textContent = e.message; });
-    const t = grid(['Name', 'Description', 'Depth', 'Created', ''], list.map((p) => {
-      const tools = el('span', null, 'row-actions');
-      tools.append(button('View', () => { location.hash = `#global-settings/files?file=${encodeURIComponent(`presets/${p.name}.yaml`)}`; }),
-        button('Rename', () => run(async () => {
-          const to = prompt(`New name for preset ${p.name} (lower-case letters, digits, hyphens):`, p.name);
-          if (!to || to === p.name) return;
-          const r = await api('preset-rename', { name: p.name, to }); presets = await get('global/presets'); files = null; renderInterview(); status(r.message);
-        })),
-        button('Delete', () => run(async () => {
-          if (!confirm(`Delete preset ${p.name}? This removes ~/.yaw/presets/${p.name}.yaml.`)) return;
-          const r = await api('preset-delete', { name: p.name, confirm: true }); presets = await get('global/presets'); files = null; renderInterview(); status(r.message);
-        }), 'danger'));
-      return [code(p.name), p.description || '—', depthLabel(p.mode) || '—', p.created ? day(p.created) : '—', tools];
-    }));
-    t.classList.add('preset-table'); box.append(t, msg); return box;
+    const messages = [];
+    if (preset) messages.push((await api('preset-save', { name: preset.name, answers: Object.fromEntries([...touched].map((id) => [id, answers[id]])), expected: preset.hash })).message);
+    else {
+      if (dirty.profile) messages.push((await api('profile-apply', { answers: payload(), expected: profile.hash })).message);
+      if (dirty.tools) { await api('setup-defaults-save', { modules: [...tools], answers: policy }); messages.push('Tool defaults saved for future project setups.'); }
+    }
+    files = null; await loadInterview(); status(messages.join(' '));
   }
 
   // Files ------------------------------------------------------------------------------------------------

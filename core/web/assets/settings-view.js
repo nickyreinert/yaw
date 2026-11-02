@@ -161,6 +161,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const section = params?.get('section');
     tab = ['files', 'review', 'kickoff'].includes(name) ? name : settingsPresentation(name, params) === 'interview' ? 'interview' : 'project';
     const pane = tab === 'project' ? 'interview' : tab;
+    $('settings-view').classList.toggle('interview-mode', tab === 'interview');
     document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === (tab === 'interview' ? 'project' : tab))));
     for (const id of ['interview', 'files', 'review', 'kickoff']) $(`settings-${id}`).hidden = id !== pane;
     if (tab !== 'files' && !drawer.hidden) closeDrawer();

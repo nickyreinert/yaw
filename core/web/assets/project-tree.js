@@ -96,7 +96,11 @@ export function fileTreeEntries(files, options = {}) {
 }
 
 export function createProjectTree(root, { readFile } = {}) {
-  let files = [], changed = new Set(), previous = new Map(), target = {}, section = {}, selected = null, requestRevision = 0;
+  let files = [], changed = new Set(), previous = new Map(), previousFiles = [], target = {}, section = {}, selected = null, requestRevision = 0;
+  // The last update's added, changed and removed files flash briefly; removed ones stay visible until it ends.
+  const FLASH_MS = 1600;
+  let flash = null, flashTimer;
+  const flashing = () => flash && performance.now() - flash.at < FLASH_MS;
   const expanded = new Map();
   let renderedFiles = [];
   const tree = el('div', { class: 'review-tree project-tree-items', 'aria-label': 'Planned project files' });
@@ -134,7 +138,8 @@ export function createProjectTree(root, { readFile } = {}) {
     } catch (error) { if (current === requestRevision) preview.textContent = error.message; }
   }
   function draw() {
-    const visible = filesForStep(files, section, target);
+    const active = flashing();
+    const visible = filesForStep(active ? [...files, ...flash.removed] : files, section, target);
     const entries = fileTreeEntries(visible, { expanded, expandFolders: true, icons: false, target, section, selected, changed, onFile: selectFile,
       onFolder: (folder) => { clearPreview(); previewTitle.textContent = `${folder.path}/`; preview.textContent = `${folder.purpose}\n${folder.files.length} files`; } });
     renderedFiles = [];
@@ -143,13 +148,34 @@ export function createProjectTree(root, { readFile } = {}) {
     tree.replaceChildren(...entries.map((entry) => entry.node));
     if (!visible.length) tree.append(el('p', { class: 'small muted', text: 'No files affected by this step.' }));
     count.textContent = `${visible.length} / ${files.length} files${root.dataset.provisional === 'true' ? ' · provisional' : ''}`;
+    if (!active) return;
+    const delay = `-${Math.round(performance.now() - flash.at)}ms`;
+    for (const row of renderedFiles) {
+      const kind = flash.added.has(row.file.path) ? 'added' : flash.changed.has(row.file.path) ? 'changed' : row.file.removed ? 'removed' : null;
+      if (kind) { row.node.classList.add(`flash-${kind}`); row.node.style.animationDelay = delay; }
+    }
+    const delta = [[flash.added.size, '+'], [flash.changed.size, '~'], [flash.removed.length, '−']].filter(([n]) => n).map(([n, sign]) => `${sign}${n}`).join(' ');
+    count.append(' · ', el('span', { class: 'project-tree-delta', text: delta }));
+  }
+  function startFlash(next) {
+    const known = new Set(next.map((file) => file.path));
+    const added = new Set(next.filter((file) => !previous.has(file.path)).map((file) => file.path));
+    const removed = previousFiles.filter((file) => !known.has(file.path)).map((file) => ({ ...file, action: 'delete', removed: true }));
+    const updated = new Set([...changed].filter((path) => !added.has(path)));
+    if (!added.size && !updated.size && !removed.length) return;
+    flash = { at: performance.now(), added, changed: updated, removed };
+    toggle.classList.remove('is-flashing'); void toggle.offsetWidth; toggle.classList.add('is-flashing');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { flash = null; toggle.classList.remove('is-flashing'); draw(); }, FLASH_MS);
   }
   return {
     update(next, { provisional = false } = {}) {
       files = next;
       const signatures = new Map(files.map((file) => [file.path, `${file.action}|${file.bytes}|${file.excerpt ?? ''}`]));
       changed = new Set([...signatures].filter(([path, signature]) => previous.size && previous.get(path) !== signature).map(([path]) => path));
-      previous = signatures; root.dataset.provisional = String(provisional);
+      // Switching between the provisional and the real plan is not a change the user made.
+      if (previous.size && root.dataset.provisional === String(provisional)) startFlash(files);
+      previous = signatures; previousFiles = files; root.dataset.provisional = String(provisional);
       const file = selected && filesForStep(files, section, target).find((entry) => entry.path === selected);
       if (file) selectFile(file); else clearPreview();
       draw();
@@ -160,6 +186,6 @@ export function createProjectTree(root, { readFile } = {}) {
       if (selected && !filesForStep(files, section, target).some((file) => file.path === selected)) clearPreview();
       draw();
     },
-    destroy() { requestRevision++; },
+    destroy() { requestRevision++; clearTimeout(flashTimer); },
   };
 }
