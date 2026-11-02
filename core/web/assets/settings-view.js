@@ -196,7 +196,45 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     const data = await get('kickoff'), root = $('settings-kickoff');
     root.replaceChildren();
     if (!data.available) { root.append(el('p', data.message, 'muted')); return; }
-    root.append(kickoffCard(data, { request: async (name, input) => new Response(JSON.stringify(await api(name, input)), { headers: { 'Content-Type': 'application/json' } }) }));
+    root.append(kickoffCard(data, { request: async (name, input) => new Response(JSON.stringify(await api(name, input)), { headers: { 'Content-Type': 'application/json' } }) }), conceptCard(data));
+  }
+  // A concept from another chat: that chat rewrites it with the concept prompt; the reply is previewed, reviewed and imported.
+  function conceptCard(data) {
+    const card = createPlanCard({ id: 'concept-prompt', title: 'Import your own concept', prompt: data.conceptPrompt, chat: true, label: 'Concept prompt',
+      instruction: 'Already have a bigger concept in another chat? Copy this prompt into that chat. It asks the chat to rewrite your concept for this project, merged into its current documents. Paste the reply below, review it, then import it.' });
+    const reply = el('textarea', null, 'planning-prompt'); reply.rows = 10; reply.setAttribute('aria-label', 'Reply from the chat'); reply.placeholder = '# Plan: …\nkickoff-format: 1\n…';
+    const status = el('p', '', 'small muted concept-status'); status.setAttribute('role', 'status');
+    const out = el('div', null, 'planning-preview');
+    let previewed = null;
+    const reviewed = el('input'); reviewed.type = 'checkbox';
+    const review = el('label', ' I reviewed every document and task above. Updated documents replace the current ones.'); review.prepend(reviewed);
+    const apply = button('Import', async () => {
+      try { apply.disabled = true; const r = await api('planning-apply', { text: previewed.text, expected: previewed.expected, reviewed: true }); await loadKickoff(); $('settings-kickoff').querySelector('.concept-status').textContent = r.message; }
+      catch (e) { status.textContent = e.message; apply.disabled = !reviewed.checked; }
+    }, 'primary');
+    const reset = () => { previewed = null; out.replaceChildren(); reviewed.checked = false; apply.disabled = true; };
+    reviewed.addEventListener('change', () => { apply.disabled = !reviewed.checked || !previewed; });
+    reply.addEventListener('input', () => { if (previewed) { reset(); status.textContent = 'Changed since the preview; preview again.'; } });
+    const preview = button('Preview', async () => {
+      reset(); status.textContent = 'Checking the reply…';
+      try {
+        const p = await api('planning-preview', { text: reply.value });
+        previewed = { ...p, text: reply.value };
+        for (const w of p.warnings) out.append(el('p', w, 'warn'));
+        for (const f of p.foundations) {
+          const d = el('details'); d.append(el('summary', `${f.kind} · ${f.action === 'update' ? 'update' : f.action === 'reuse' ? 'keep' : 'new'} · ${f.path}`), el('pre', f.action === 'update' ? f.diff || 'No change.' : f.text, 'file-source plain'));
+          out.append(d);
+        }
+        const tasks = el('details'); tasks.append(el('summary', `${p.tasks} task(s) in ${p.phases} phase(s)${p.hasTasks ? '' : ' · stay in the plan until the Tasks module is added'}`));
+        const list = el('ul'); for (const t of p.titles) list.append(el('li', t)); tasks.append(list);
+        out.append(tasks, review, apply);
+        status.textContent = 'Review the documents and tasks, then import.';
+      } catch (e) { status.textContent = e.message; }
+    }, 'primary');
+    const actions = el('div', null, 'interview-actions'); actions.append(preview, status);
+    card.node.classList.add('concept-import');
+    card.node.append(el('h3', 'Paste the reply'), reply, actions, out);
+    return card.node;
   }
   // Files ---------------------------------------------------------------------------------------------
   async function loadFiles() { files = await get('settings'); renderFiles(); }

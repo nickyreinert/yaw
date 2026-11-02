@@ -242,3 +242,40 @@ test('later planning previews then completes a partial plan, preserving reviewed
   await assert.rejects(applyPlanning({ ...ctx, input: { text: reuse, expected: again.expected, reviewed: true } }), /changed since preview/);
   assert.match(readFileSync(join(root, FOUNDATION_PATHS.architecture), 'utf8'), /Human revision/);
 });
+
+test('concept import: the prompt carries existing documents; update replaces them only after a reviewed, unchanged preview', async () => {
+  const root = await project();
+  // Documents a local agent wrote before any import: present, but not registered.
+  writeTree(root, { [FOUNDATION_PATHS.architecture]: '# architecture\nLocal draft: one renamer.\n', [FOUNDATION_PATHS['ui-ux']]: '# ui-ux\nLocal draft: preview names.\n' });
+  const shown = await yaw(root, ['kickoff', 'concept']);
+  assert.equal(shown.code, 0, shown.err);
+  assert.match(shown.out, /^Import your own concept\n {2}1\. Copy the prompt into the chat that holds your concept/);
+  assert.match(shown.out, /YAW concept import prompt/);
+  assert.match(shown.out, /--- architecture: docs\/spec\/architecture\.md ---\n# architecture\nLocal draft: one renamer\./);
+  assert.match(shown.out, /## Foundation: architecture\npath: docs\/spec\/architecture\.md\naction: update/);
+  assert.match(shown.out, /## Foundation: data-model\npath: docs\/spec\/data-model\.md\naction: create/);
+  assert.doesNotMatch(shown.out, /Ask me questions first if the idea is too vague/);
+
+  const reply = bundle(CLI).replace(/(path: docs\/spec\/(architecture|ui-ux)\.md\n)action: create/g, '$1action: update');
+  const kinds = parseKickoffReply(reply).foundations.map((d) => d.action);
+  assert.deepEqual(kinds, ['update', 'create', 'update']);
+  writeFileSync(join(root, 'plan.md'), reply);
+  const dry = await yaw(root, ['kickoff', 'import', 'plan.md', '--dry-run']);
+  assert.equal(dry.code, 0, dry.err);
+  assert.match(dry.out, /Foundation architecture \(update\): docs\/spec\/architecture\.md\n--- current\/docs\/spec\/architecture\.md[\s\S]*-Local draft: one renamer\.\n\+One local renamer/);
+  assert.match(readFileSync(join(root, FOUNDATION_PATHS.architecture), 'utf8'), /Local draft/, 'dry-run writes nothing');
+
+  const preview = previewPlanning({ root, kitRoot: KIT_ROOT, input: { text: reply } });
+  assert.deepEqual(preview.foundations.map((f) => f.action), ['update', 'create', 'update']);
+  assert.match(preview.foundations[0].diff, /\+One local renamer/);
+  writeFileSync(join(root, FOUNDATION_PATHS['ui-ux']), '# ui-ux\nEdited after the preview.\n');
+  await assert.rejects(applyPlanning({ root, kitRoot: KIT_ROOT, env: { HOME: tmp() }, input: { text: reply, expected: preview.expected, reviewed: true } }), /changed since preview/);
+  assert.match(readFileSync(join(root, FOUNDATION_PATHS['ui-ux']), 'utf8'), /Edited after the preview/);
+
+  const imported = await yaw(root, ['kickoff', 'import', 'plan.md', '--reviewed']);
+  assert.equal(imported.code, 0, imported.err);
+  for (const [kind, path] of Object.entries(FOUNDATION_PATHS)) assert.match(readFileSync(join(root, path), 'utf8'), new RegExp(CLI[kind].split('.')[0]));
+  assert.equal(foundationContext({ root }).documents.length, 3);
+  assert.ok(foundationContext({ root }).documents.every((d) => !d.changed));
+  assert.throws(() => prepareFoundations({ root: tmp(), documents: parseKickoffReply(reply).foundations, reviewed: true }), /update requires an existing document/);
+});
