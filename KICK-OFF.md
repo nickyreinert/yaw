@@ -34,6 +34,7 @@ Works for any kind of job: a quick Python script, a dockerized static page, a se
 | 13 | [kickoff/13-dashboard-and-evaluation.md](kickoff/13-dashboard-and-evaluation.md) | Local dashboard, metrics/profiling, token-free session evaluation |
 | 14 | [kickoff/14-team-mode.md](kickoff/14-team-mode.md) | Team mode: issue-driven work, enforcement, session-start sync, launch plan and freezes |
 | 15 | [kickoff/15-project-foundations.md](kickoff/15-project-foundations.md) | Implemented resolution: Quick vs. personal settings, reviewed project foundations and generic agent practices |
+| 16 | [kickoff/16-compact-output.md](kickoff/16-compact-output.md) | Concept, not decided: compact tool output (token saving) after rtk; levers, licence boundary, open decisions |
 | R | [kickoff/reference/governance-blueprint.md](kickoff/reference/governance-blueprint.md) | Original technical spec: decision journal, embeddings, hooks, gates |
 
 ## Status of decisions (concept level)
