@@ -6,6 +6,7 @@
 // Exit codes: 0 ok / push allowed, 1 findings block the push, 2 usage or environment.
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, writeFileSync, writeSync, chmodSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +132,12 @@ export function verdict(output) {
 
 // ------------------------------------------------------------------ cache (per commit, per reviewer)
 
+// A stored PASS is { <commit>: { <reviewer>: <fingerprint> } }. The fingerprint hashes the whole prompt the reviewer got
+// (effective prompt and rules, foundations, relevant configuration, reviewed range and diff), so any change in what is
+// reviewed or how makes the old PASS stale. Older entries (a plain list of reviewers) carry no fingerprint and never match.
+const fingerprint = (prompt) => createHash('sha256').update(prompt).digest('hex');
+const approved = (cache, commit, kind, print) => cache[commit]?.[kind] === print;
+
 function cacheFile(root) {
   const dir = git(root, ['rev-parse', '--git-dir'])?.trim();
   return dir ? join(resolve(root, dir), 'yaw', 'reviews.json') : null;
@@ -251,8 +258,16 @@ function gate({ io, stdin }) {
   }
   const { commits, ranges } = pushed;
   if (commits.length === 0) return 0;
+  let diff;
+  try {
+    diff = ranges.map((r) => gitStrict(io.root, ['diff', r.base, r.head])).join('\n');
+  } catch (e) {
+    return gitFailed(io, e);
+  }
+  const label = ranges.map((r) => `${r.base.slice(0, 7)}..${r.head.slice(0, 7)}`).join(', ');
+  const prompts = Object.fromEntries(required.map((kind) => [kind, buildPrompt({ root: io.root, kind, range: label, diff, env })]));
   const cache = readCache(io.root);
-  const todo = required.filter((k) => commits.some((c) => !(cache[c] ?? []).includes(k)));
+  const todo = required.filter((k) => commits.some((c) => !approved(cache, c, k, fingerprint(prompts[k]))));
   if (todo.length === 0) {
     io.stderr.write(`review gate: ${commits.length} commit(s) already reviewed\n`);
     return 0;
@@ -271,20 +286,13 @@ function gate({ io, stdin }) {
     io.stderr.write('review gate: no agent CLI found (claude, codex or copilot), so the push was not reviewed\n');
     return mode === 'block' ? stop(io) : 0;
   }
-  let diff;
-  try {
-    diff = ranges.map((r) => gitStrict(io.root, ['diff', r.base, r.head])).join('\n');
-  } catch (e) {
-    return gitFailed(io, e);
-  }
-  const label = ranges.map((r) => `${r.base.slice(0, 7)}..${r.head.slice(0, 7)}`).join(', ');
   const failed = [];
   for (const kind of todo) {
     io.stderr.write(`review gate: ${LABEL[kind]} review of ${commits.length} commit(s) (${agent.name})...\n`);
-    const result = runAgent({ agent, prompt: buildPrompt({ root: io.root, kind, range: label, diff, env }), root: io.root, env });
+    const result = runAgent({ agent, prompt: prompts[kind], root: io.root, env });
     const v = result.ok ? verdict(result.output) : null;
     if (v === 'PASS') {
-      for (const c of commits) cache[c] = [...new Set([...(cache[c] ?? []), kind])];
+      for (const c of commits) cache[c] = { ...(Array.isArray(cache[c]) ? {} : cache[c]), [kind]: fingerprint(prompts[kind]) };
       continue;
     }
     failed.push(kind);

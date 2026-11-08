@@ -105,7 +105,7 @@ test('gate: findings stop the push, a pass is cached per commit, YAW_REVIEW=skip
   const pass = io(root, { YAW_REVIEW_CMD: 'cat >/dev/null; echo "VERDICT: PASS"' });
   assert.equal(runReview({ verb: 'gate', io: pass.io, stdin }), 0);
   const cache = JSON.parse(readFileSync(join(root, '.git', 'yaw', 'reviews.json'), 'utf8'));
-  assert.deepEqual(Object.values(cache)[0].sort(), ['logic', 'quality']);
+  assert.deepEqual(Object.keys(Object.values(cache)[0]).sort(), ['logic', 'quality']);
 
   const again = io(root, { YAW_REVIEW_CMD: 'exit 9' });
   assert.equal(runReview({ verb: 'gate', io: again.io, stdin }), 0);
@@ -264,5 +264,60 @@ test('security reviewer renders agent adapters, participates in the gate and hon
   const pass = io(root, { YAW_REVIEW_CMD: 'cat >/dev/null; echo "VERDICT: PASS"' });
   assert.equal(runReview({ verb: 'gate', io: pass.io, stdin }), 0);
   const cache = JSON.parse(readFileSync(join(root, '.git/yaw/reviews.json'), 'utf8'));
-  assert.deepEqual(Object.values(cache)[0], ['security']);
+  assert.deepEqual(Object.keys(Object.values(cache)[0]), ['security']);
+});
+
+// A stored PASS only covers the exact requirements it was given: prompt text, rules, range and configuration.
+async function approvedProject(extra = '') {
+  const root = await project(['core', 'review'], extra);
+  const first = committed(root);
+  const home = tmp('yaw-home-');
+  const seen = join(tmp('yaw-review-seen-'), 'runs.txt');
+  const pass = (stdin) => {
+    const r = io(root, { HOME: home, YAW_REVIEW_CMD: `cat >/dev/null; echo run >> "${seen}"; echo "VERDICT: PASS"` });
+    assert.equal(runReview({ verb: 'gate', io: r.io, stdin }), 0);
+    return r.out.stderr;
+  };
+  const runs = () => (existsSync(seen) ? readFileSync(seen, 'utf8').split('\n').filter(Boolean).length : 0);
+  return { root, home, first, pass, runs };
+}
+
+test('gate: a changed project prompt or reporting rules invalidate a stored PASS', async () => {
+  const { root, home, first, pass, runs } = await approvedProject();
+  pass(first);
+  assert.equal(runs(), 2); // quality and logic
+  assert.match(pass(first), /already reviewed/);
+  assert.equal(runs(), 2);
+
+  savePrompt({ scope: 'project', kind: 'quality', text: 'Stricter quality prompt.', root, env: { HOME: home } });
+  pass(first);
+  assert.equal(runs(), 3); // only quality again
+  assert.match(pass(first), /already reviewed/);
+
+  savePrompt({ scope: 'global', kind: 'rules', text: 'New reporting rules.', root, env: { HOME: home } });
+  pass(first);
+  assert.equal(runs(), 5); // every reviewer reads the rules
+});
+
+test('gate: a changed relevant configuration or reviewed range invalidates a stored PASS', async () => {
+  const { root, first, pass, runs } = await approvedProject('  quality.unit-tests: false\n');
+  pass(first);
+  assert.equal(runs(), 2);
+  const file = join(root, '.yaw', 'answers.yaml');
+  writeFileSync(file, readFileSync(file, 'utf8').replace('quality.unit-tests: false', 'quality.unit-tests: true'));
+  pass(first);
+  assert.equal(runs(), 4); // every reviewer's prompt carries the setup constraints, including quality.unit-tests
+
+  // the same commit approved inside a larger range is not approved for a different range
+  const one = git(root, 'rev-parse', 'HEAD');
+  writeFileSync(join(root, 'x.txt'), 'x\n');
+  git(root, 'add', 'x.txt');
+  git(root, 'commit', '-qm', 'two');
+  const two = git(root, 'rev-parse', 'HEAD');
+  pass(`refs/heads/main ${two} refs/heads/main ${'0'.repeat(40)}\n`);
+  const before = runs();
+  assert.match(pass(`refs/heads/main ${two} refs/heads/main ${'0'.repeat(40)}\n`), /already reviewed/);
+  assert.equal(runs(), before);
+  pass(`refs/heads/main ${two} refs/heads/main ${one}\n`);
+  assert.ok(runs() > before);
 });

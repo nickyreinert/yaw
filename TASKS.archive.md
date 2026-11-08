@@ -1,5 +1,9 @@
 # Archive
 
+- T-022 Invalidate obsolete review approvals — done 2026-11-08
+  model: middle tier (Sonnet) · effort: high
+  done: modules/review/lib/cli.js caches `{ commit: { reviewer: sha256 of the full prompt } }` in .git/yaw/reviews.json. The prompt is what the reviewer receives (effective kind prompt and rules, foundation context with the setup constraints incl. quality.unit-tests, TASKS.md for feature, reviewed range label and diff), so a changed prompt, rule, relevant configuration or range makes the stored PASS stale; old list-format entries never match. The gate now builds the diff and prompts before the cache check. Tests in modules/review/tests/review.test.js (prompt/rules change; configuration and range change) fail on the old code and pass now; review tests 16/16.
+
 - T-008 Fail the push review gate on Git errors — done 2026-11-08
   model: middle tier (Sonnet) · effort: high
   done: modules/review/lib/cli.js `pushedCommits` and the push diff use a strict git call that throws on failure instead of reading it as zero commits or an empty diff; the gate then stops with exit 2 and `review gate: git failed`, unless `YAW_REVIEW=skip`. `verdict()` accepts only an exact final `VERDICT: PASS|FINDINGS` line (as the prompt already demands). Tests in modules/review/tests/review.test.js (verdict, pushedCommits with an unknown remote sha, gate with unknown sha and failing diff) fail on the old code (3 failures) and pass now; review tests 14/14, foundations/setup-refinements/improve-store 26/26. Commit b743793.

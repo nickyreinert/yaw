@@ -40,9 +40,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
   model: middle tier (Sonnet) · effort: medium
 
-- T-022 [P2] Invalidate obsolete review approvals — `modules/review/lib/cli.js` caches only commit SHA and reviewer kind. Include effective prompts/rules, reviewed range and relevant configuration so changed review requirements cannot reuse an old PASS.
-  model: middle tier (Sonnet) · effort: high
-
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
 
