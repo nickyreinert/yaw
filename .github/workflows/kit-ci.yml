@@ -1,14 +1,12 @@
 # Kit CI (Y-2.2, ADR-0008, ADR-0014, T-021): kit tests on Node 22.13 (floor) and 24, macOS and Linux;
 # install.sh end-to-end in a Debian container; shellcheck on every shell script; schema examples validate.
-# Pull requests run only the cheap `gate` job (Ubuntu, Node 22). The full suite runs nightly, on manual dispatch,
+# Pull requests run only the cheap `gate` job (Ubuntu, Node 22). The full suite runs on manual dispatch,
 # on milestone open/close and when an issue gets the `epic` label. The profile matrix and macOS stay manual-only.
 name: kit-ci
 
 on:
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '17 3 * * *'
   milestone:
     types: [opened, closed]
   issues:
@@ -38,7 +36,7 @@ jobs:
           node --test $files
 
   test:
-    # Full suite: nightly, manual, milestone, epic label. macOS only on manual dispatch (ADR-0008).
+    # Full suite: manual, milestone, epic label. macOS only on manual dispatch (ADR-0008).
     if: github.event_name != 'pull_request' && (github.event_name != 'issues' || github.event.label.name == 'epic')
     name: test (${{ matrix.os }}, node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
@@ -163,16 +161,3 @@ jobs:
       - run: shellcheck --version
       - name: shellcheck every shell script
         run: git ls-files -z '*.sh' | xargs -0 shellcheck
-
-  nightly-summary:
-    # The reminder that the full suite ran: a dated job summary; a failing nightly run also triggers GitHub's failure notification.
-    if: always() && github.event_name == 'schedule'
-    needs: [test, install-in-container, shellcheck]
-    runs-on: ubuntu-latest
-    steps:
-      - name: write job summary
-        run: |
-          {
-            echo "### Full suite, nightly run of $(date -u +%Y-%m-%d)"
-            echo "test: ${{ needs.test.result }}, install-in-container: ${{ needs.install-in-container.result }}, shellcheck: ${{ needs.shellcheck.result }}"
-          } >> "$GITHUB_STEP_SUMMARY"

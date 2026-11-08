@@ -1,4 +1,4 @@
-// T-021: kit-ci.yml has a cheap automatic PR gate; the full suite runs nightly, on dispatch, milestones and epics;
+// T-021: kit-ci.yml has a cheap automatic PR gate; the full suite runs on dispatch, milestones and epics;
 // the profile matrix and macOS stay manual (ADR-0008).
 
 import { test } from 'node:test';
@@ -12,12 +12,11 @@ const text = readFileSync(join(KIT_ROOT, '.github', 'workflows', 'kit-ci.yml'), 
 const doc = parse(text, { file: 'kit-ci.yml' });
 const runs = (job) => (doc.jobs[job]?.steps ?? []).map((s) => s.run).filter(Boolean).join('\n');
 
-test('triggers: pull_request, nightly schedule, dispatch, milestone and epic events', () => {
+test('triggers: pull_request, dispatch, milestone and epic events', () => {
   const on = doc.on;
   assert.ok(Object.hasOwn(on, 'pull_request'));
   assert.ok(Object.hasOwn(on, 'workflow_dispatch'));
-  assert.ok(Array.isArray(on.schedule) && on.schedule.length === 1);
-  assert.match(on.schedule[0].cron, /^\d+ \d+ \* \* \*$/, 'nightly');
+  assert.ok(!Object.hasOwn(on, 'schedule'), 'no nightly schedule: full runs are on demand');
   assert.ok(on.milestone.types.includes('closed'));
   assert.deepEqual(on.issues.types, ['labeled']);
   assert.ok(!Object.hasOwn(on, 'push'));
@@ -51,14 +50,9 @@ test('pull_request runs only the gate: no profile matrix, no macOS, no full suit
   assert.equal(doc.jobs.profile['runs-on'].includes('macos-latest'), true, 'macOS profile stays, behind the manual condition');
 });
 
-test('full suite runs npm test; issues events run only for the epic label; nightly writes a dated summary', () => {
+test('full suite runs npm test; issues events run only for the epic label', () => {
   assert.match(runs('test'), /npm test/);
   assert.match(doc.jobs.test.if, /issues/);
   assert.match(doc.jobs.test.if, /label\.name == 'epic'/);
-  const summary = doc.jobs['nightly-summary'];
-  assert.ok(summary);
-  assert.match(summary.if, /schedule/);
-  assert.match(summary.if, /always\(\)/);
-  assert.match(runs('nightly-summary'), /GITHUB_STEP_SUMMARY/);
-  assert.match(runs('nightly-summary'), /date/);
+  assert.ok(!doc.jobs['nightly-summary'], 'no nightly summary job without a schedule');
 });
