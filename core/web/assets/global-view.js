@@ -43,7 +43,7 @@ const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · proj
 
 const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
 const FILTERS = ['path', ...FACET_KEYS, 'period', 'from', 'to', 'split'];
-const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], profiling: ['agent', 'model', 'period', 'from', 'to', 'split', 'improveView', 'improveFocus'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
@@ -56,7 +56,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   let prefs = null, improvePrefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
   let ROOT = '/', ROOTP = '', PROJECTS = [], DEVICES = [], S;
-  const locked = () => route === 'analytics';
+  // Workspace pages (Analytics, Profiling) share the Global components; `locked` limits them to the open workspace.
+  const locked = () => route === 'analytics' || route === 'profiling';
+  const profilingPage = () => route === 'global-improve' || route === 'profiling';
   const rel = (p) => p === ROOTP ? base(p) : p.startsWith(ROOT) ? p.slice(ROOT.length) : p;
   const path = () => state.path ? ROOT + state.path : ROOTP;
   const inPath = (p) => !state.path || (`${p}/`).startsWith(`${path()}/`);
@@ -108,7 +110,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (!['7', '30', '90', 'all'].includes(state.period)) state.period = DEFAULTS.period;
     if (!DIMS.some(([d]) => d === state.split) || (locked() && ['folder', 'project'].includes(state.split))) state.split = DEFAULTS.split;
   }
-  const visibleTables = () => route === 'global-improve' ? [`improve-${state.improveView}`] : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
+  const visibleTables = () => profilingPage() ? [`improve-${state.improveView}`] : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
   function writeUrl() {
     if (!route) return;
     const p = new URLSearchParams();
@@ -359,7 +361,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const improveEligible = () => filtered().filter((r) => r.source !== 'synced' && r.prompts !== null);
   const improveToClassify = () => { const rows = improveEligible(), pending = rows.filter((r) => !r.evaluation); return pending.length ? pending : rows; };
   function collectControls() {
-    if (route === 'global-improve') {
+    if (profilingPage()) {
       const rows = improveToClassify(), pending = rows.some((r) => !r.evaluation);
       return h('div', { class: 'collect-actions' },
         h('button', { type: 'button', disabled: Boolean(job.busy), on: { click: () => run(false) }, title: 'Refresh saved metadata from configured local histories.' }, '↻ Refresh'),
@@ -452,7 +454,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   async function run(classify) {
     if (job.busy) return;
     const all = !locked();
-    const ids = classify && route === 'global-improve' ? improveToClassify().map((r) => r.id) : undefined;
+    const ids = classify && profilingPage() ? improveToClassify().map((r) => r.id) : undefined;
     if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Narrow the project, date or agent filters.', error: true }); render(); return; }
     const scope = ids ? `${ids.length} saved local sessions matching these filters` : `${scopeText()} for ${periodText()}`;
     if (classify && !confirm(`Classify ${scope}?\n\nYAW reads these conversations and sends eligible turns to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Only aggregate counts are saved. Pause and Stop remain available while it runs.`)) return;
@@ -611,8 +613,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       data.undated ? h('p', { class: 'small muted' }, `${fmt(data.undated)} session${data.undated === 1 ? ' has' : 's have'} no start time and cannot be charted. For synced sessions, update YAW on the other device and sync there again.`) : null);
   }
 
-  // ---------- Improve: shared metadata filters and sorting; explicit conversation reads ----------
+  // ---------- Profiling: shared metadata filters and sorting; explicit conversation reads ----------
   function improve() {
+    $('improve-intro').textContent = locked() ? `This workspace · ${data.current ?? ''}` : 'Find a difficult session. Make the next one better.';
     fill($('improve-filter'), filterBar('improve'));
     const rows = filtered(), [from, to] = bounds();
     if (!['projects', 'sessions'].includes(state.improveView)) state.improveView = 'projects';
@@ -641,7 +644,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function render() {
     if (!data || !route) return;
     try {
-      if (route === 'global-improve') improve();
+      if (profilingPage()) improve();
       else if (route === 'global') overview();
       else if (route === 'global-tasks') tasksView();
       else sessions();
@@ -649,11 +652,11 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   }
   return {
     async show(name, query = '') {
-      if (route !== name || name !== 'global-improve') insights.reset();
+      if (route !== name || !['global-improve', 'profiling'].includes(name)) insights.reset();
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
-      if (['analytics', 'global-analytics', 'global-improve', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
-      if (name === 'global-improve') improvePrefs = await get('improve/settings').catch(() => null);
+      if (['analytics', 'global-analytics', 'global-improve', 'profiling', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
+      if (['global-improve', 'profiling'].includes(name)) improvePrefs = await get('improve/settings').catch(() => null);
       if (route !== name) return;
       render();
       // Auto refresh once per page load and scope; all workspaces cover the open one too.

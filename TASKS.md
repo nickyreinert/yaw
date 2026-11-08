@@ -56,9 +56,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-037 [P2] Replace Settings/Interview buttons with a segmented switch — keep behavior; review its interplay with the Focus switch so the two switches have a clear hierarchy and do not change views ambiguously.
   model: middle tier (Sonnet) · effort: medium
 
-- T-042 [P2] Rename Learning to Profiling and add workspace scope — rename everywhere (menu, icon, labels, settings; "Learning" disappears as a feature name; Classification stays as the process, "Profiling Settings" as config). Add a Profiling menu entry inside a workspace limited to that workspace's sessions. Global and workspace views use the same components, configured by scope; no second system. Toggle lives in global Features (T-036).
-  model: middle tier (Sonnet) · effort: high
-
 - T-043 [P2] Classify controller and slimmer filter bar — remove Classify, Classify Unclassified and Classification Settings buttons from the shared filter bar (keep Search, Refresh, Auto, Expand filters, Reset, sticky). Add a separate controller above it (`/global/improve` and the workspace view) with 5 / 10 / All sessions, a start button and a deep link to Profiling Settings. First check how sessions are selected, whether batching exists, how "All" is handled and whether only unclassified sessions are processed; reuse the existing logic.
   model: middle tier (Sonnet) · effort: high
 

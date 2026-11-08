@@ -69,7 +69,7 @@ test('Codex reviewer is ephemeral and disables command execution, apps, hooks an
   for (const flag of ['shell_tool', 'apps', 'multi_agent', 'hooks']) assert.ok(args.includes(flag));
 });
 
-test('planning runs independently of Learn preferences and keeps the same restricted CLI sandbox', async (t) => {
+test('planning runs independently of Profiling preferences and keeps the same restricted CLI sandbox', async (t) => {
   const env = fixture(undefined, 'codex');
   saveImproveSettings(env, { enabledAgents: [], defaultTarget: 'browser:ChatGPT' });
   const runner = createImproveRunner({ env, purpose: 'planning' }); t.after(() => runner.clear());

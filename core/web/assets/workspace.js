@@ -60,14 +60,14 @@ let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
 const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
 // Routes are `#name[/sub][?query]`. Workspace and Global Analytics share one section, both Knowledge pages another.
-const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
-const SECTIONS = { 'global-analytics': 'analytics', 'global-knowledge': 'knowledge' };
+const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'profiling', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
+const SECTIONS = { 'global-analytics': 'analytics', profiling: 'global-improve', 'global-knowledge': 'knowledge' };
 const ALIASES = { sessions: 'analytics', 'global-sessions': 'global-analytics', decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
-  profiling: 'global-analytics', tasks: 'global-tasks', projects: 'global' };
+  tasks: 'global-tasks', projects: 'global' };
 const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', analytics: 'Workspace analytics', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
-  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-analytics': 'Global analytics', 'global-improve': 'Learn from sessions', 'global-tasks': 'Global tasks',
+  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-analytics': 'Global analytics', profiling: 'Workspace profiling', 'global-improve': 'Global profiling', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
-const GLOBAL_VIEWS = ['global', 'global-analytics', 'global-improve', 'global-tasks', 'analytics'];
+const GLOBAL_VIEWS = ['global', 'global-analytics', 'global-improve', 'global-tasks', 'analytics', 'profiling'];
 let settings, globalView, globalSettings, sidebarSearch, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
 const replace = (url) => { if (url !== location.hash) history.replaceState(null, '', url); shown = location.hash; };
 function setInterviewFocus(on) {
@@ -385,7 +385,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'interview', 'Defaults', 'about you personal defaults new projects presets'],
   ['global-settings', 'files', 'Files', '~/.yaw presets profile read-only'],
   ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
-  ['global-settings', 'improve', 'Learn', 'review destination installed CLI agents claude codex browser chat'],
+  ['global-settings', 'improve', 'Profiling Settings', 'learn profiling review destination installed CLI agents claude codex browser chat'],
   ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
   ['global-settings', 'sessions', 'Data sources', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],

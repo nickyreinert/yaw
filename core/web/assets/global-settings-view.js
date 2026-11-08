@@ -93,7 +93,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
       return [input, box, el('p', help, 'small muted')];
     };
     const [sync, syncLabel, syncHelp] = toggle('Settings Sync', data.features?.sync, 'Share defaults, presets and statistics between your devices through a folder or a private GitHub repository. Off hides the Sync tab; saved sync settings are kept.');
-    const [profiling, profilingLabel, profilingHelp] = toggle('Profiling', data.features?.profiling, 'Classification labels saved sessions with your local Laya service; Learn reviews the sessions that need attention. Off hides Learn, the Classification and Learn settings and the Classification parts of Analytics; saved results are kept.');
+    const [profiling, profilingLabel, profilingHelp] = toggle('Profiling', data.features?.profiling, 'Classification labels saved sessions with your local Laya service; reviews look at the sessions that need attention. Off hides the Profiling pages (Global and Workspace), the Classification and Profiling settings and the Classification parts of Analytics; saved results are kept.');
     const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), syncLabel, syncHelp, profilingLabel, profilingHelp, label, details);
     card.append(button('Save features', async () => {
       try {
@@ -155,16 +155,16 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
     const label = el('label', 'Preferred reviewer'); label.append(defaultTarget, el('span', 'Preselected when you request a review; you can change it for each review.', 'small muted'));
     root.replaceChildren(el('article', null, 'card'));
     const flow = el('ol', null, 'learn-flow');
-    for (const [title, text] of [['Choose sessions', 'In Learn, select saved conversations to inspect.'], ['Preview the prompt', 'Review the context before sharing it with a reviewer.'], ['Request a review', 'Use a browser chat or an enabled CLI. Review proposed changes before applying them.']]) {
+    for (const [title, text] of [['Choose sessions', 'In Profiling, select saved conversations to inspect.'], ['Preview the prompt', 'Review the context before sharing it with a reviewer.'], ['Request a review', 'Use a browser chat or an enabled CLI. Review proposed changes before applying them.']]) {
       const step = el('li'); step.append(el('strong', title), el('span', text, 'small muted')); flow.append(step);
     }
     const help = el('details', null, 'settings-help');
     help.append(el('summary', 'How are reviews run?'),
-      el('p', 'Learn runs only when you request a review. It does not forward each prompt. Session hooks collect metadata; model diagnosis happens separately on selected saved conversations.', 'small muted'),
+      el('p', 'Profiling reviews run only when you request one. It does not forward each prompt. Session hooks collect metadata; model diagnosis happens separately on selected saved conversations.', 'small muted'),
       el('p', 'Browser chats open empty: paste the reviewed prompt yourself. CLI reviews run on the computer running yaw web (normally this computer), in a separate temporary folder, using your existing sign-in and model provider. They may use paid hosted models. YAW shows the response here; it does not apply suggestions automatically.', 'small muted'),
       el('p', 'Install and sign in to Claude Code or Codex separately. YAW does not install them or store credentials. Codex user config is excluded for this restricted review; provider retention still applies.', 'small muted'));
     const actions = el('div', null, 'interview-actions');
-    root.firstChild.append(el('h2', 'Learn · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
+    root.firstChild.append(el('h2', 'Profiling Settings · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
       el('h3', 'CLI reviewers'), el('p', 'Allow these tools as review choices. Availability is checked on the computer running yaw web.', 'small muted'), choices,
       label, actions);
     actions.append(button('Save review destinations', async () => {

@@ -1,5 +1,8 @@
 # Archive
 
+- T-042 Rename Learn to Profiling and add workspace scope — done 2026-11-08
+  model: middle tier (Sonnet) · effort: high
+  done: "Learn" is no longer a feature name: Global menu/page heading/icon (profile icon replaces the mortarboard), the `improve` settings tab is "Profiling Settings", plus the Features toggle text, search hits, README, core/web/README.md, docs/workspace-dashboard.md and the website. Classification stays the process (its own tab, Classify). New Workspace → Profiling menu entry (route `profiling`, added to `FEATURE_ROUTES.profiling`, so the Features toggle hides it) is the same page as Global → Profiling: one `global-improve` section and one `createGlobal` component, with `locked()` limiting rows, facets, Classify and Refresh to the open workspace (as for Analytics). The stale `#profiling` alias to Global Analytics is removed. Internal ids (`global-improve`, tab `improve`, improve-settings.json) are kept so URLs and saved files still work. Test: test/profiling-scope.test.js. Suite: 1366 tests, 1276 passed / 4 failed / 86 skipped; failures outside this change (dogfood T-009 x2, hooks fixture normalisation, comfort hooks).
 - T-041 Rework Code Map view — done 2026-11-08 (table first with the shared pager; raw data collapsed as "Show raw data"; test/code-map-view.test.js)
 - T-038 Shared pagination component — done 2026-11-08
   model: middle tier (Sonnet) · effort: high

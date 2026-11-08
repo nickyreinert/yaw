@@ -75,7 +75,7 @@ and applies to all visible metrics, charts and tables.
   folders, projects, outcomes). The sessions table distinguishes project from
   device. The sticky filter bar also holds **Refresh**, **Auto** and
   **Classify**, described below.
-- **Learn**: classified projects and sessions, highlighted conversations, and browser or configured CLI reviews (below).
+- **Profiling**: classified projects and sessions, highlighted conversations, and browser or configured CLI reviews (below). Workspace → Profiling is the same page limited to this workspace's sessions.
 - **Tasks**: open tasks across projects, filterable by folder and project;
   **Open →** switches the dashboard to that project's Tasks page.
 - **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
@@ -91,9 +91,9 @@ and applies to all visible metrics, charts and tables.
   uses, and **Reset to kit default** removes it. **Features** switches the
   optional features, each on by default: **Server mode**, **Settings Sync**
   (off hides the **Sync** tab) and **Profiling**, which covers Classification
-  and Learn, two steps of one feature (Classification labels sessions, Learn
-  reviews the ones that need attention). Profiling off hides **Learn**, the
-  **Classification** and **Learn** settings tabs, **Classify** and the
+  and the reviews, two steps of one feature (Classification labels sessions,
+  reviews look at the ones that need attention). Profiling off hides **Profiling**
+  (Global and Workspace), the **Classification** and **Profiling Settings** tabs, **Classify** and the
   Analytics **Classification** table and chart; links, the sidebar search and
   typed addresses no longer reach them. Saved settings and results are kept.
 
@@ -103,9 +103,9 @@ table searches, sorting, pages and the open file are kept in the address
 view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
 same view locked to the current workspace.
 
-### Global → Learn
+### Global → Profiling
 
-Open **Global → Learn** to find a project or session that could teach you something. The same filters and sortable/searchable tables as Sessions apply here. Charts use already saved classification results, preserving unknown and mixed labels. **Needs attention** lists sessions with estimated friction or unresolved work; **All classified** and **All sessions** let you recognize work you remember. Click a project to browse its sessions.
+Open **Global → Profiling** (or **Workspace → Profiling** for this workspace only) to find a project or session that could teach you something. The same filters and sortable/searchable tables as Sessions apply here. Charts use already saved classification results, preserving unknown and mixed labels. **Needs attention** lists sessions with estimated friction or unresolved work; **All classified** and **All sessions** let you recognize work you remember. Click a project to browse its sessions.
 
 **Classify** processes unclassified local sessions matching the current filters. When those are classified, **Reclassify** updates matching local sessions. Classification is explicit, uses loopback Laya, and retains Pause, Resume and Stop. Missing or unreadable transcripts are skipped individually, with a count; existing results for those sessions remain available. If none can be read, no model runs. Check **Global → Settings → Sessions** for history-folder locations, or **Refresh** for a new scan; classifier settings do not restore missing histories. Unrelated saved sessions remain unchanged. Synced records contribute statistics but cannot open a transcript on this device.
 
@@ -113,9 +113,9 @@ Click **Read conversation** to authorize reading that session. You see the chron
 
 **Review this conversation** prepares relevant moments and their context automatically. Inspect and redact the editable prompt, then **Copy review prompt** and **Open ChatGPT**, Claude or another browser chat. This reuses the interview's destinations and sends no prompt in the link. The requested answer is one verdict sentence and up to three actions within 150 words. You decide which suggestion to apply.
 
-To use a coding agent directly, configure **Global → Settings → Learn**: enable an installed **Claude Code** or **Codex** CLI and select your default destination. Choose it in the review panel and press **Run review with CLI**. Confirmation identifies the deliberate disclosure: the CLI uses your sign-in and may send the prompt to a paid hosted provider. YAW starts a fresh, restricted review and displays the result here, without applying changes. Claude uses bare mode without tools; Codex excludes user config and uses an ephemeral read-only session with shell tools, apps, hooks and delegation disabled. Unsupported CLI versions or missing sign-in fail visibly. Vendor references: [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive), [Codex feature configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
+To use a coding agent directly, configure **Global → Settings → Profiling Settings**: enable an installed **Claude Code** or **Codex** CLI and select your default destination. Choose it in the review panel and press **Run review with CLI**. Confirmation identifies the deliberate disclosure: the CLI uses your sign-in and may send the prompt to a paid hosted provider. YAW starts a fresh, restricted review and displays the result here, without applying changes. Claude uses bare mode without tools; Codex excludes user config and uses an ephemeral read-only session with shell tools, apps, hooks and delegation disabled. Unsupported CLI versions or missing sign-in fail visibly. Vendor references: [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive), [Codex feature configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
 
-Stop a CLI review at any time; it times out after three minutes. Prompt size is capped at 24,000 characters and output at 32,000. YAW stores no conversation text, review prompts or verdicts in analytics, registry, sync or logs. Temporary reviews clear when you leave Learn, change filters or refresh; server verdicts expire after 15 minutes. Provider-side retention is separate. See ADR-0065.
+Stop a CLI review at any time; it times out after three minutes. Prompt size is capped at 24,000 characters and output at 32,000. YAW stores no conversation text, review prompts or verdicts in analytics, registry, sync or logs. Temporary reviews clear when you leave Profiling, change filters or refresh; server verdicts expire after 15 minutes. Provider-side retention is separate. See ADR-0065.
 
 ## Sync between devices
 
@@ -321,7 +321,7 @@ explicit outcome criteria. Model predictions below the unchanged threshold becom
 original model label and confidence alongside the applied label and source.
 Other classification categories continue to use Laya.
 
-Learn shows aggregate UNKNOWN reasons: model uncertainty, threshold rejection,
+Profiling shows aggregate UNKNOWN reasons: model uncertainty, threshold rejection,
 or no user verdict. Older evaluations may have no recorded reason; use
 **Reclassify** on the matching local sessions to update them. Refresh alone does
 not reclassify. Only aggregate reason and rule-use counts are saved.

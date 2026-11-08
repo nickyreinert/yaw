@@ -23,12 +23,12 @@ export function settingsRoute(page, tab, query = '') {
 export const settingsPresentation = (tab, params = new URLSearchParams()) =>
   tab === 'interview' || params.has('interview') ? 'interview' : 'settings';
 // Optional features, switched under Global → Settings → Features (personal, both on by default). Settings Sync is the
-// Sync tab. Profiling is two steps of one feature: Classification (local Laya labels per session) feeds Learn
-// (reviews of selected sessions). A feature that is off hides every page, tab, sidebar entry, search hit and link
-// listed here; its saved data and settings stay as they are.
+// Sync tab. Profiling is two steps of one feature: Classification (local Laya labels per session) feeds the
+// reviews of selected sessions; it has a Global page and a Workspace page (`profiling`, this workspace only).
+// A feature that is off hides every page, tab, sidebar entry, search hit and link listed here; its saved data and settings stay as they are.
 export const FEATURE_ROUTES = {
   sync: ['global-settings/sync'],
-  profiling: ['global-improve', 'global-settings/classification', 'global-settings/improve'],
+  profiling: ['global-improve', 'profiling', 'global-settings/classification', 'global-settings/improve'],
 };
 const features = { sync: true, profiling: true };
 export const featureOn = (name) => features[name] !== false;

@@ -128,7 +128,7 @@ test('chart splitting uses the selected series rather than ignoring the shared s
   assert.equal(bars[0].children[0].style.width, '50%');
 });
 
-test('Learn explains UNKNOWN causes and tells users how to update older results', (t) => {
+test('Profiling explains UNKNOWN causes and tells users how to update older results', (t) => {
   const { host, context } = environment(t);
   const fresh = { ...row, evaluation: { classified: 3, skipped: 0, counts: { outcome: { unknown: 3 } }, outcomeUnknown: { model: 1, lowConfidence: 2 } } };
   const view = createInsights({ api: () => { throw new Error('Metadata only'); } });

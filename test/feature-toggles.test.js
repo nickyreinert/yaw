@@ -1,5 +1,5 @@
 // T-036: optional features under Global → Settings → Features. "Settings Sync" is the Sync tab; "Profiling" is
-// Classification (local Laya labels) plus Learn (reviews of selected sessions). Off hides every way to reach them.
+// Classification (local Laya labels) plus the reviews of selected sessions. Off hides every way to reach them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, realpathSync } from 'node:fs';
@@ -107,7 +107,7 @@ test('features: the Features card has Settings Sync and Profiling checkboxes; of
   assert.deepEqual(calls[0], ['features-save', { sync: true, profiling: false }]);
   assert.deepEqual(applied, [{ sync: true, profiling: false }]);
   assert.equal(calls[1][0], 'remote-settings', 'Server Mode is still saved as before');
-  // Profiling off: Classification and Learn tabs are hidden and cannot be opened by route.
+  // Profiling off: Classification and Profiling Settings tabs are hidden and cannot be opened by route.
   assert.equal(ui.show('features'), 'features');
   const hidden = Object.fromEntries(tabs.map((b) => [b.dataset.tab, b.hidden]));
   assert.deepEqual(hidden, { interview: false, classification: true, improve: true, sync: false, features: false });
@@ -127,7 +127,7 @@ test('features: links to a hidden page are not shown anywhere', async (t) => {
   assert.equal(link('Edit in Classification', 'global-settings/classification').hidden, false);
   setFeatures({ profiling: false });
   assert.equal(link('Edit in Classification', 'global-settings/classification').hidden, true);
-  assert.equal(link('Edit in Learn', 'global-settings/improve').hidden, true);
+  assert.equal(link('Edit in Profiling Settings', 'global-settings/improve').hidden, true);
   assert.equal(link('Analytics', 'global-analytics').hidden, false);
 });
 
@@ -174,7 +174,7 @@ test('features: the workspace applies the toggles to the sidebar, the router and
   assert.match(workspace, /import \{[^}]*routeHidden[^}]*\} from '\.\/ui-state\.js'/);
   // Router: a hidden page falls back instead of opening (typed URL, link, back button).
   assert.match(workspace, /routeHidden\(sub \? `\$\{name\}\/\$\{sub\}` : name\)/);
-  // Sidebar entries (the Learn / Profiling section) and sidebar search hits follow the toggles.
+  // Sidebar entries (the Profiling entries) and sidebar search hits follow the toggles.
   assert.match(workspace, /#side-nav \[data-route\]/);
   assert.match(workspace, /filter\(\(entry\) => !routeHidden\(entry\.route\)\)/);
   assert.match(workspace, /get\('preferences'\)[^\n]*applyFeatures/);

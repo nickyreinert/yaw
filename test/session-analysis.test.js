@@ -245,7 +245,7 @@ test('UNKNOWN reasons distinguish model abstention from threshold rejection with
   }
 });
 
-test('saved UNKNOWN diagnostics reach Learn as metadata without conversation text', async () => {
+test('saved UNKNOWN diagnostics reach Profiling as metadata without conversation text', async () => {
   const env = environment(), root = tmp(); fixture(env, root);
   const response = responseFor();
   response.answers.outcome = { choice: 'fulfilled', probabilities: { fulfilled: 0.6, partially: 0, not_fulfilled: 0, abandoned: 0, unknown: 0.4 } };

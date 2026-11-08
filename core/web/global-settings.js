@@ -113,7 +113,7 @@ const FILES = [
     [PROFILE, 'user', 'Your defaults for new projects.', [DEFAULTS]],
     ['notification-settings.json', 'data', 'Personal notification channels. Holds variable names, never tokens.', [['Edit in Notifications', 'global-settings/notifications']]],
     ['web-preferences.json', 'data', 'Dashboard: Auto refresh on the Analytics pages, the local Laya classifier settings and the Settings Sync and Profiling switches.', [['Analytics', 'global-analytics'], ['Edit in Classification', 'global-settings/classification'], ['Edit in Features', 'global-settings/features']]],
-    ['improve-settings.json', 'data', 'Learn review destinations: enabled CLI names and the default browser or CLI target; no conversation text.', [['Edit in Learn', 'global-settings/improve']]],
+    ['improve-settings.json', 'data', 'Profiling review destinations: enabled CLI names and the default browser or CLI target; no conversation text.', [['Edit in Profiling Settings', 'global-settings/improve']]],
     ['web-projects.json', 'data', 'Projects added to the dashboard project switcher.'],
   ]],
   ['Presets', []],
