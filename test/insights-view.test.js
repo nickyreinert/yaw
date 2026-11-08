@@ -191,6 +191,8 @@ test('a configured installed CLI receives only the inspected prompt and renders 
   await button(host, 'Run review with CLI').fire('click');
   assert.deepEqual(calls.find((c) => c.action === 'improve-agent-start').input, { agent: 'claude', prompt: 'Inspected, redacted prompt', confirm: true });
   assert.match(host.text, /Verdict: Possible scope confusion/);
+  assert.doesNotMatch(host.text, /Saved verdicts|No saved verdicts|Save this verdict|Import a verdict|Set retention/);
+  assert.ok(!calls.some((c) => /history/.test(c.action)), 'a review never touches stored history');
   field(host, 'Review prompt').value = 'Changed evidence'; await field(host, 'Review prompt').fire('input');
   assert.doesNotMatch(host.text, /Verdict: Possible scope confusion/);
   assert.equal(calls.at(-1).action, 'improve-agent-clear');

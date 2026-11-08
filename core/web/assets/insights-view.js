@@ -21,15 +21,15 @@ const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${r
 
 export function createInsights({ api, get }) {
   let host, context, scope, version = 0, message = '', draft = '', target = null, job = null, poll = 0;
-  let saved = null, selectedReview = null, instructionPreview = null;
-  let imported = '', taskContext = '', structured = false;
+  let instructionPreview = null;
+  let taskContext = '', structured = false;
   const report = (error) => say(error.message);
-  // Drops everything tied to the open conversation: the review draft, a running review and its saved-verdict view.
+  // Drops everything tied to the open conversation: the review draft, a running review.
   function discard() {
     version++; poll++;
     if (job?.id) api('improve-agent-clear', { id: job.id }).catch(() => {});
     draft = ''; job = null; message = '';
-    taskContext = ''; imported = ''; selectedReview = null; instructionPreview = null;
+    taskContext = ''; instructionPreview = null;
   }
   const preview = createSessionPreview({ api, onChange: () => draw(), onClose: discard, rel: (path) => context.rel(path), extra: () => ({
     before: [...(message ? [el('p', { className: 'improve-notice', role: 'status' }, message)] : []), reviewOptions()],
@@ -154,47 +154,11 @@ export function createInsights({ api, get }) {
     return [el('h3', {}, job.status === 'completed' ? 'Your reviewer’s verdict' : 'CLI review'), el('p', { role: 'status' }, job.message),
       job.status === 'running' ? button('Stop review', async () => { await api('improve-agent-clear', { id: job.id }); poll++; job = null; draw(); }) : null,
       job.output && job.status === 'completed' ? el('pre', { className: 'improve-verdict' }, job.output) : null,
-      job.output && job.status === 'completed' ? button('Save this verdict', () => saveVerdict(job.output).catch(report)) : null,
-      job.output && job.status === 'completed' ? button('Save verdict and edited prompt', () => saveVerdict(job.output, true).catch(report)) : null];
+      job.output && job.status === 'completed' ? instructionEditor({ instruction: suggestedInstruction(job.output) }) : null];
   }
-  async function saveVerdict(output, includePrompt = false) {
-    if (!confirm(`Save this verdict in local Improve history?${includePrompt ? ' The edited review prompt will also be retained.' : ' The prompt and conversation will not be saved.'} History is separate from analytics and sync.`)) return;
-    selectedReview = await api('improve-history-save', { title: preview.row?.title || 'Conversation review', verdict: output, confirm: true, includePrompt, ...(includePrompt ? { prompt: draft } : {}) });
-    saved = await get('improve/history'); say('Verdict saved. You can export, delete or review an instruction addition below.');
-  }
-  async function loadSaved() { saved = await get('improve/history'); selectedReview = null; instructionPreview = null; draw(); }
-  function historyPanel() {
-    const box = el('section', { className: 'card improve-history' }, el('h2', {}, 'Saved verdicts'),
-      el('p', { className: 'small muted' }, 'Private local history, separate from analytics and sync. Prompts are retained only when you explicitly include them. Expired reviews are purged when history is accessed.'));
-    if (!saved) { box.append(button('Open saved verdicts', () => loadSaved().catch(report))); return box; }
-    const days = el('select', { 'aria-label': 'Verdict retention' }, ...saved.retentionChoices.map((value) => el('option', { value: String(value) }, `${value} days`))); days.value = String(saved.retentionDays);
-    box.append(days, button('Set retention', async () => {
-      if (!confirm('Change saved-verdict retention? Shortening it can permanently remove expired verdicts and their retained prompts.')) return;
-      try { saved = await api('improve-history-retention', { days: Number(days.value), confirm: true }); selectedReview = null; draw(); } catch (e) { report(e); }
-    }));
-    for (const entry of saved.records) box.append(el('div', { className: 'improve-history-row' }, button(entry.title, async () => {
-      try { selectedReview = await api('improve-history-read', { id: entry.id }); instructionPreview = null; draw(); } catch (e) { report(e); }
-    }), el('span', { className: 'small muted' }, `Saved ${date(entry.createdAt)} · expires ${date(entry.expiresAt)}`)));
-    if (!saved.records.length) box.append(el('p', {}, 'No saved verdicts.'));
-    const text = el('textarea', { rows: '5', maxlength: '64000', 'aria-label': 'Import verdict text or JSON', value: imported, oninput: () => { imported = text.value; } });
-    const retainPrompt = el('input', { type: 'checkbox' });
-    box.append(el('h3', {}, 'Import a verdict'), text, el('label', {}, retainPrompt, ' Also retain an included prompt'), button('Import verdict', async () => {
-      if (!confirm('Save this imported verdict in local Improve history?')) return;
-      try { selectedReview = await api('improve-history-import', { text: imported, confirm: true, includePrompt: retainPrompt.checked }); saved = await get('improve/history'); imported = ''; draw(); } catch (e) { report(e); }
-    }));
-    if (selectedReview) {
-      const record = selectedReview;
-      box.append(el('h3', {}, record.title), el('pre', {}, record.verdict));
-      if (record.assessment) box.append(el('p', { className: 'small muted' }, `Model estimates: ${Object.entries(record.assessment).map(([key, value]) => `${key}: ${value}`).join(' · ')}`));
-      if (record.prompt) box.append(el('details', {}, el('summary', {}, 'Retained review prompt'), el('pre', {}, record.prompt)));
-      box.append(button('Copy exported JSON', async () => { try { await navigator.clipboard.writeText(JSON.stringify(record, null, 2)); say('Saved review copied. Inspect it before sharing.'); } catch (e) { report(e); } }),
-        button('Delete saved verdict', async () => {
-          if (!confirm('Permanently delete this saved verdict and any retained prompt? Applied instruction changes will be kept.')) return;
-          try { await api('improve-history-delete', { id: record.id, confirm: true }); selectedReview = null; saved = await get('improve/history'); draw(); } catch (e) { report(e); }
-        }));
-      box.append(instructionEditor(record));
-    }
-    return box;
+  // A structured verdict may carry a candidate instruction; plain text verdicts start with an empty editor.
+  function suggestedInstruction(output) {
+    try { const doc = JSON.parse(String(output).replace(/^```(?:json)?\s*\n([\s\S]*?)\n```\s*$/, '$1')); return typeof doc?.instruction === 'string' ? doc.instruction : ''; } catch { return ''; }
   }
   function instructionEditor(record) {
     const box = el('section', { className: 'improve-instruction' }, el('h3', {}, 'Review an instruction addition'),
@@ -247,7 +211,7 @@ export function createInsights({ api, get }) {
   }
   function draw() {
     if (!host || !context) return;
-    host.replaceChildren(...(message && !preview.isOpen() ? [el('p', { role: 'status' }, message)] : []), ...overview(), historyPanel());
+    host.replaceChildren(...(message && !preview.isOpen() ? [el('p', { role: 'status' }, message)] : []), ...overview());
   }
   return {
     render(node, next) { if (scope !== next.scope) { reset(); scope = next.scope; } host = node; context = next; draw(); },

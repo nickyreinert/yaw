@@ -25,11 +25,11 @@ import { remoteSettings, saveRemoteSettings } from '../lib/remote-settings.js';
 
 // Project setup problems (bad answers, missing manifest) are the user's to fix: report them, never as a 500.
 import { loadSetupDefaults, saveSetupDefaults } from '../lib/setup-defaults.js';
-import { improveHistory, savedImprovement, saveImprovement, importImprovement, deleteImprovement, retainImprovements, previewImprovement, applyImprovement } from '../lib/improve-store.js';
+import { previewImprovement, applyImprovement } from '../lib/improve-store.js';
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
-  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'sync-cancel', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open', 'features-save'];
+  'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'sync-cancel', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open', 'features-save'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -68,7 +68,6 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       '/api/global/features': (params) => {
         return { remoteControl: remoteSettings(env), features: webPreferences(env).features, hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf(params?.get('workspace')) };
       },
-      '/api/improve/history': () => improveHistory({ env }),
       '/api/improve/settings': () => improveSettings(env),
       '/api/improve/job': () => reviewer.read(),
       '/api/global/session-sources': () => sourcesView(env),
@@ -126,16 +125,6 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
           const ctx = { root: rootOf(input.workspace), kitRoot, env, input };
           if (name === 'planning-preview') return previewPlanning(ctx);
           if (name === 'planning-apply') return await applyPlanning(ctx);
-        } catch (e) { throw new FormError(e.message, e.status ?? 400); }
-      }
-      if (name.startsWith('improve-history-')) {
-        try {
-          const ctx = { env, kitRoot, input };
-          if (name === 'improve-history-read') return savedImprovement({ env, id: input.id });
-          if (name === 'improve-history-save') return saveImprovement(ctx);
-          if (name === 'improve-history-import') return importImprovement(ctx);
-          if (name === 'improve-history-delete') return deleteImprovement(ctx);
-          if (name === 'improve-history-retention') return retainImprovements(ctx);
         } catch (e) { throw new FormError(e.message, e.status ?? 400); }
       }
       if (name === 'setup-defaults-save') {

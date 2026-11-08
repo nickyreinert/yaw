@@ -1,6 +1,6 @@
 # Global Insights: outcomes, collaboration and practical improvements
 
-**Status: Global → Improve implemented (ADR-0065, superseding ADR-0064).** The revised UI starts from saved classified projects and sessions, shares Sessions filters and sorting, opens actual conversations with highlighted phrase clues, and automatically prepares a compact review prompt. Users can copy it into a browser chat or explicitly run a configured installed CLI reviewer. The existing CLI diagnosis is extended with optional saved/imported verdicts and reviewed instruction additions; automatic recommendation quality still needs empirical validation.
+**Status: Global → Improve implemented (ADR-0065, superseding ADR-0064).** The revised UI starts from saved classified projects and sessions, shares Sessions filters and sorting, opens actual conversations with highlighted phrase clues, and automatically prepares a compact review prompt. Users can copy it into a browser chat or explicitly run a configured installed CLI reviewer. The existing CLI diagnosis is extended with reviewed instruction additions (verdicts are never stored); automatic recommendation quality still needs empirical validation.
 
 ## The user problem
 
@@ -64,7 +64,7 @@ Illustrative output, using fictional examples:
 > - **Shared instructions:** E2 shows the agent assumed an unstated requirement. Consider: “Ask one focused question when ambiguity would change the implementation.”
 > - **Session habits:** E4 followed several unrelated tasks. Try a fresh session at the next task boundary and compare correction frequency.
 
-The review package may contain enough evidence for analysis; its requested answer must remain short. Verdict import is optional. Suggestions become changes only after a separate instruction preview and Apply.
+The review package may contain enough evidence for analysis; its requested answer must remain short. Verdicts are not stored. Suggestions become changes only after a separate instruction preview and Apply.
 
 ## Feasible first scope and validation
 
@@ -88,7 +88,7 @@ These constraints preserve ADR-0018's content-free registry and ADR-0050's expli
 
 ## Open design choices
 
-Before implementation, settle the candidate-selection method and its scan limits, the context and export size limits, and the comparison/coverage rules required before quantitative advice. Saved verdicts and JSON import/export now use a separate explicit-consent store. Retention defaults to 30 days, selectable as 7/30/90/365 days, with deletion and expiry on access. Prompt text is omitted unless explicitly included; no persistent per-turn store or automatic rule application is introduced.
+Before implementation, settle the candidate-selection method and its scan limits, the context and export size limits, and the comparison/coverage rules required before quantitative advice. No persistent verdict or per-turn store and no automatic rule application is introduced; the former saved-verdicts history was removed by decision (read-only).
 
 ### Current implementation limits
 
@@ -98,7 +98,7 @@ Read conversation is the explicit read action for that named session. The reader
 
 Review this conversation automatically selects relevant bounded context without turn-count controls or example checklists. Users inspect/edit/redact the exact prompt before copying or deliberately sending it to a configured installed CLI. The package is limited to 24,000 characters; the requested verdict stays within 150 words and at most three action bullets. Browser links reuse interview destinations and carry no prompt text. Settings enables installed Claude Code/Codex reviewers and a default destination. Fresh restricted CLI sessions use existing sign-in, may contact paid hosted providers, have a three-minute timeout and Stop, and apply no changes. Codex user config is intentionally excluded. Provider-side retention is separate from YAW storage.
 
-Saved aggregate coverage remains separate from conversation evidence and retains outcome and collaboration counts, unknowns, skipped turns and unclassified sessions. No automatic quantitative advice or causal diagnosis is introduced. Conversations and unsaved prompts/verdicts stay temporary and never enter YAW analytics, registry, sync or logs. Navigation, filters and refresh clear the browser review; server verdicts expire after 15 minutes. Saved verdicts and JSON import/export are explicit actions in a separate private store, limited to 100 records and 32,000 characters per verdict. Saving the edited review prompt requires separate consent. Structured verdicts can contain up to ten evidence references and a candidate instruction addition. Users edit the addition, choose project AGENTS.md, project review rules or personal review rules, preview its exact append-only diff, and apply it separately. Stale previews, secret-like text, symlinks and the AGENTS.md 80-line limit are checked. Deleting a saved verdict also deletes its retained prompt; already-applied instructions remain in their target files.
+Saved aggregate coverage remains separate from conversation evidence and retains outcome and collaboration counts, unknowns, skipped turns and unclassified sessions. No automatic quantitative advice or causal diagnosis is introduced. Conversations and unsaved prompts/verdicts stay temporary and never enter YAW analytics, registry, sync or logs. Navigation, filters and refresh clear the browser review; server verdicts expire after 15 minutes. Verdicts are not saved. Structured verdicts can contain up to ten evidence references and a candidate instruction addition. Users edit the addition, choose project AGENTS.md, project review rules or personal review rules, preview its exact append-only diff, and apply it separately. Stale previews, secret-like text, symlinks and the AGENTS.md 80-line limit are checked. Already-applied instructions remain in their target files.
 
 ## Project setup, ground truth and generic agent practices
 
@@ -137,7 +137,7 @@ Each policy also offers Decide later (discussion needed) and Doesn’t matter (`
 
 The setup/foundation workflow has automated integration coverage for tiny CLI, static-site, data-backed and existing-repository examples. Real project/user walkthroughs are still needed to validate whether mockup review and constraint wording reduce rework and produce useful designs. Each project's actual vendor choices, network boundaries, cost caps and mockup approval remain project decisions rather than generic kit defaults.
 
-For Global → Improve, the remaining concept work is empirical validation of friction clues and outcome/collaboration judgments across agents and languages, sufficient comparison/coverage rules before quantitative recommendations, and evidence that the compact verdict leads to useful changes. Task-adherence estimates require user-supplied context and review; they are not verified scores. Optional verdict saving/import, retention/deletion and previewed instruction additions are implemented. Autonomous instruction changes and validated quantitative or causal recommendations remain outside this workflow.
+For Global → Improve, the remaining concept work is empirical validation of friction clues and outcome/collaboration judgments across agents and languages, sufficient comparison/coverage rules before quantitative recommendations, and evidence that the compact verdict leads to useful changes. Task-adherence estimates require user-supplied context and review; they are not verified scores. Previewed instruction additions are implemented; verdict saving was removed. Autonomous instruction changes and validated quantitative or causal recommendations remain outside this workflow.
 
 ### Interview depths and reusable setup UI
 
