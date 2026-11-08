@@ -90,3 +90,7 @@ After setup, run `yaw status` to inspect managed files, `yaw apply` to reconcile
 - [Getting started](docs/getting-started.md) — installation, Quick, Basic and All, maintenance and safety details.
 - [Workspace dashboard](docs/workspace-dashboard.md) — workspace and global views, session profiling, knowledge and settings.
 - [Project concept](KICK-OFF.md) — design goals and technical background.
+
+## Third-party notices
+
+**rtk.** YAW's planned compact tool output ([concept](kickoff/16-compact-output.md)) is our own implementation of techniques that [rtk](https://github.com/rtk-ai/rtk) describes: command-output filtering, a recall store for cut output, and savings measurement. YAW contains no code, filter files or text from rtk. rtk's CLI is licensed under Apache-2.0; its engine and proxy are licensed under BUSL-1.1. YAW is not affiliated with or endorsed by rtk-ai.

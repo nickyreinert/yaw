@@ -1,6 +1,6 @@
 # 16 — Compact Tool Output (token saving)
 
-**Status: concept, not decided.** Working module name: `compact`. Implementing it needs an amendment to ADR-0007 and BUILD.md rule 5, because it adds a new hook kind. Source studied: [rtk-ai/rtk](https://github.com/rtk-ai/rtk) at `bd7f87e` (2026-11-07).
+**Status: concept; decisions 1–4 taken on 2026-11-08 (section 7).** Working module name: `compact`. Implementing it needs an amendment to ADR-0007 and BUILD.md rule 5, because it adds a new hook kind. Source studied: [rtk-ai/rtk](https://github.com/rtk-ai/rtk) at `bd7f87e` (2026-11-07).
 
 ## 1. What rtk does to save tokens
 
@@ -39,6 +39,7 @@ rtk reduces one thing: the bytes of **tool output** the agent reads. It does not
 - The `rtk` CLI (`src/`, `hooks/`, `src/filters/*.toml`) is Apache-2.0. Copying code or filter files from it requires the licence text and attribution.
 - `engine/` (the pipeline, methods and directive texts) and `proxy/` are BUSL-1.1. Using them inside another product is not allowed until 2030-09-09.
 - A rebuild therefore means our own implementation of the techniques described here. Do not copy code, method implementations or directive wording from `engine/` or `proxy/`. This is not legal advice.
+- The README carries a third-party notice: YAW contains no rtk code, filter files or text, and is not affiliated with rtk-ai.
 
 ## 3. What YAW already has
 
@@ -55,14 +56,22 @@ rtk reduces one thing: the bytes of **tool output** the agent reads. It does not
 
 ## 4. Concept: module `compact`
 
-Opt-in per project and removable: `yaw add compact`, `yaw remove compact`, or Workspace / Settings. Asked in Basic and All, default off. One multi-choice question, `compact.levers`, selects the levers below. Committed project setting, because every agent in the project should read the same output. `YAW_COMPACT=0` turns it off for one shell.
+Opt-in per project and removable: `yaw add compact`, `yaw remove compact`, or Workspace / Settings. Off in Basic. Quick reuses saved personal defaults and is otherwise off. One multi-choice question, `compact.levers`, selects the levers below.
+
+The user chooses the scope per project:
+
+- **Committed:** the project answer is in `.yaw/answers.yaml` and the hooks are in `.claude/settings.json`. Every agent and teammate reads the same output.
+- **Personal:** the setting is in `~/.yaw` and the hooks are in `.claude/settings.local.json`, the same route the comfort status line takes in team repositories (ADR-0013). Teammates keep raw output.
+
+The L1 wrapper is in the committed recipes either way and decides at run time. Precedence: `YAW_COMPACT=0|1` in the environment, then the personal setting, then the project answer.
 
 ### L1. Compact project recipes (all agents, no hook)
 
 The generated recipes run each step through a wrapper, working name `yaw run --compact -- <cmd>`:
 
-- **Exit 0:** one line, `ok <step> (<n> lines, <s>s)`. The output itself is dropped.
-- **Exit not 0:** output with ANSI codes removed, `\r` progress collapsed to its last frame, three or more identical adjacent lines collapsed, and a head-and-tail cap with a recall hint (L6). The exit code is kept.
+- **Exit 0, no warnings:** one line, `ok <step> (<n> lines, <s>s)`. The output itself is dropped.
+- **Exit 0 with warnings:** handled the way rtk does it for `cargo build` (`src/cmds/rust/cargo_cmd.rs`). A header line with the count (`<step>: <m> warnings`) is followed by the first 10 warning lines and `… +<k> more warnings`. Detecting warnings needs a pattern per profile; there is no generic one.
+- **Exit not 0:** output with ANSI codes removed, `\r` progress collapsed to its last frame, three or more identical adjacent lines collapsed, and a head-and-tail cap with the recovery hint from L6. The exit code is kept.
 - Where a tool has a quieter reporter (for example the `node --test` reporter or `pytest -q`), each profile chooses it, and the profile smoke test verifies it.
 - `YAW_VERBOSE=1 just test` prints the raw output.
 
@@ -103,15 +112,15 @@ Measurement is part of the module, and its first part also works before the modu
 - **After enabling:** `yaw run` and the compress hook write `{tool, method, rawBytes, outBytes}` to `hooks.jsonl`. Tokens are estimated as `bytes / 4` and labelled as estimates.
 - **Validation:** compare the same kind of task with the module on and off, using per-session `tokensIn` (already imported) and the number of `YAW_VERBOSE=1` re-runs, which counts filter misses. Byte ratios alone do not prove savings: a lossy cut that causes a re-run costs more than it saved.
 
-### L6. Recall store
+### L6. Recall store (optional)
 
-Raw output goes to `~/.yaw/recall/<hash>.gz`:
+A separate choice, off by default. When it is off, a cut output ends with a hint to re-run with `YAW_VERBOSE=1`, and nothing is stored. When it is on, raw output goes to `~/.yaw/recall/<hash>.gz`:
 
 - File mode 0600; at most 200 entries, 30 days and 10 MB per entry.
 - Never synced: excluded from data sync.
 - Read back with `yaw recall <hash>`.
 
-This would be the first place YAW stores tool-output content, so it needs an ADR and a privacy NOTICE. The alternative is no storage: the cut output ends with a hint to re-run with `YAW_VERBOSE=1`. That stores nothing, but re-runs cost time and are not always repeatable (flaky tests, side effects).
+This would be the first place YAW stores tool-output content, so turning it on needs an ADR and a privacy NOTICE. Without it, re-runs cost time and are not always repeatable (flaky tests, side effects).
 
 ## 5. Changes to existing rules and code
 
@@ -119,19 +128,45 @@ This would be the first place YAW stores tool-output content, so it needs an ADR
 - **`core/schema/module.schema.json`:** add `compress` to the hook `kind` enum.
 - **`core/hooks/adapters.js`:** keep `tool_response` in memory for `compress` handlers only, never in the log. Add a PostToolUse branch to `renderOutput` for each agent.
 - **`core/schema/hook-event.schema.json`:** optional `rawBytes`, `outBytes`, `method`.
-- **Latency:** measured in this container with Node 22.23.4, averaged over 10 runs: bare `node -e ''` takes 30 ms; `yaw hook PostToolUse --module comfort` takes 116–127 ms per call. A compress hook runs on every matching tool call, and each module adds one process per event. It needs a lean entry point that does not load the whole kit. Measure the budget before setting it.
+- **Latency:** a compress hook runs on every matching tool call, and each module adds one process per event. Measured in a cloud container with Node 22.23.4, averaged over 20 runs:
+
+  | Path | ms per call |
+  |---|---|
+  | bare `node -e ''` | 33 |
+  | `yaw hook PostToolUse` today | 117–120 |
+  | same, with commands in `core/cli/main.js` loaded on demand | 67 |
+  | `core/hooks/dispatch.js` called directly (without `main.js`) | 58 |
+  | lean entry: adapters and policy only | 34 |
+  | lean entry plus ANSI, dedup and cap on a 445 KB Bash payload (output 5.6 KB) | 41 |
+  | size gate in the shell shim, payload under 1 KB, Node not started | 3 |
+  | today's path with `NODE_COMPILE_CACHE` | 101 |
+
+  Plan, in this order:
+
+  1. Load the 25 command modules in `main.js` on demand; `host` already loads this way. This speeds up every existing hook (the `security` guards run on every Bash call) and every CLI command (`yaw --version` drops from 114 to 61 ms). It is a separate change. A prototype passed the same tests as the current code: 1050 passed, 85 skipped, and the same 9 failures, which come from running a copy without `.git`.
+  2. Give the compress hook its own lean entry that does not load the kit or the schemas.
+  3. Add a size gate to the shim for compress entries: below a payload threshold, exit without starting Node. The payload includes tool input and metadata, so the threshold applies to the whole payload, not to the output alone.
+  4. Leave out `NODE_COMPILE_CACHE`: it saves 19 ms on today's path and nothing on the lean one.
+
+  L1 has no per-call cost; the wrapper runs once per recipe step.
 
 ## 6. Out of scope
 
 The proxy daemon (API traffic, cache alignment, model routing), delegation to cheaper models, the 100+ per-tool parsers, a user-editable filter DSL, stripping code bodies from Read, and hook integrity hashes (manifest hashes and `sync-check` already exist).
 
-## 7. Open decisions
+## 7. Decisions
 
-1. **Recall store or re-run hint** (L6): privacy against cost.
-2. **L1 on success:** drop all output, or keep a warning count or the warning lines?
-3. **Default in Basic/All:** off (recommended), or on for L1 only?
-4. **Committed or personal:** committed (recommended, so every agent sees the same output), with `YAW_COMPACT=0` as the per-shell opt-out.
-5. **L3:** build it at all, and when?
+Taken on 2026-11-08:
+
+1. **Recall store:** optional, a separate choice (L6). Off by default; that default is an assumption and was not discussed.
+2. **L1 on success:** count plus capped warning lines, as rtk does it (L1).
+3. **Default:** off in Basic. Quick asks no module questions; like other optional tools, it reuses saved personal defaults and is otherwise off.
+4. **Scope:** the user chooses committed or personal per project (section 4).
+
+Still open:
+
+5. **L3 (command rewrite):** build it at all, and when?
+6. **Default in All:** not stated; this concept assumes off.
 
 ## 8. Verify before implementing
 
