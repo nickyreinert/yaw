@@ -39,6 +39,9 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Backlog
 
+- T-012 [P2] Fix Markdown deletion in sync — `core/lib/data-sync.js:applyPortableRecords` parses deleted knowledge files as YAML; normal front matter throws and prevents deletion. Parse answers only for settings/preset records.
+  model: low tier (Luna/Haiku) · effort: medium
+
 - T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
   model: middle tier (Sonnet) · effort: medium
 
@@ -53,6 +56,9 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
 ## Backlog
+
+- T-012 [P2] Fix Markdown deletion in sync — `core/lib/data-sync.js:applyPortableRecords` parses deleted knowledge files as YAML; normal front matter throws and prevents deletion. Parse answers only for settings/preset records.
+  model: low tier (Luna/Haiku) · effort: medium
 
 - T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
   model: middle tier (Sonnet) · effort: medium
@@ -71,9 +77,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
   model: low tier (Luna/Haiku) · effort: medium
-
-- T-026 [P2] Simplify Communication Style — keep Language. Relabel "Frequency: How often should the agent ask before acting?", "Depth: How long should answers be?" (Brief & on point → generated rule "Prefer bullet points, key points and direct answers. Avoid unnecessary explanations."), "Response: Should the agent explain its actions?" (short confirmation vs. detailed change report). Remove "technical wording" and "examples and analogies"; move "Your experience with software development" here and derive technical level/analogies from it. Keep its effect on question coverage and tool permissions. Check which rules the removed questions generated and carry them over.
-  model: middle tier (Sonnet) · effort: high
 
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high

@@ -504,7 +504,7 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
       const variant = Object.entries(profile.options ?? {}).find(([, def]) => def.scaffold);
       const sources = [join(dir, 'scaffold'), ...(variant ? [join(dir, 'variants', picked[variant[0]])] : [])];
       const fromDir = new Map();
-      for (const source of sources) for (const rel of walk(source)) {
+      for (const source of sources) for (const rel of walk(source).filter((r) => !GENERATED.test(r))) {
         if (fromDir.has(rel)) throw new KitError(`profiles/${name}: ${rel} is in both scaffold/ and the variant`);
         fromDir.set(rel, source);
       }
@@ -521,6 +521,9 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
   }
   return { parts, files, missing };
 }
+
+// Gradle writes its caches (.gradle/) and reports (build/) into the project; they are never scaffold files.
+const GENERATED = /(?:^|\/)(?:\.gradle|build)\//;
 
 function walk(dir, prefix = '') {
   if (!existsSync(dir)) return [];

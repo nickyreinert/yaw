@@ -1,5 +1,9 @@
 # Archive
 
+- T-025 Remove generated artifacts from scaffolds — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: low
+  done: removed the tracked `.gradle/` caches of `profiles/android-kotlin/scaffold` and `profiles/java-basic/scaffold` and the Android `build/reports/` file; the Gradle wrapper stays. `renderProfiles` in core/render/kit.js skips `.gradle/` and `build/` paths when it copies scaffold sources, so generated projects never receive Gradle output. Regression test: `Gradle output never reaches a generated project` in test/basic-profiles.test.js (failed before the fix). Suite without test/server-mode.test.js (it stalls in a PTY launcher test in this environment): 1075 passed / 9 failed / 85 skipped; the failures are manifest/.gitignore conflict markers (T-009), levers, web normalization and JSON fixtures, none in scaffolds.
+
 - T-006 Stop sync exclusions deleting files — done 2026-11-08
   model: opus · effort: high
   done: `localKnowledge` in core/lib/data-sync.js reports Markdown files that exist but cannot be synced (over 128 KiB, unreadable, linked, non-regular, empty, secret-looking or past the 1000-file cap) as `excluded`; `mergeRecords` skips those keys, so they are never published as tombstones, never deleted or overwritten locally and keep their merge base. Folder sync (`runSync`) and the hub client (`syncHub`) both return `excluded`. Once a file is portable again, concurrent edits surface as a conflict. Tests in test/data-sync.test.js and test/remote-control.test.js. The data-sync.js and data-sync.test.js part landed in commit 8971c64 (committed together with T-017). Suite: 1075 passed / 9 failed / 85 skipped (none in sync or remote tests).
@@ -69,10 +73,6 @@
   model: sonnet · effort: medium
   acceptance: The UI card says TypeScript but the stored id is javascript. Rename the id in interview/base.yaml, every profile.yaml, examples, tests and docs; keep reading old answers files and saved presets that say javascript (map to typescript). Do before more TypeScript profiles are added.
   done: ADR-0103; id is typescript everywhere, core/interview/legacy.js reads old javascript answers, presets, API input and plan replies.
-
-- T-012 Fix Markdown deletion in sync — done 2026-11-08
-  model: low tier (Luna/Haiku) · effort: medium
-  done: `applyPortableRecords` in core/lib/data-sync.js parses the local file for path answers only for settings and preset records; deleted knowledge Markdown with front matter is removed and the deletion propagates. Regression test in test/data-sync.test.js (front-matter deletion).
 
 - T-017 Keep Git sync off the HTTP event loop — done 2026-11-08
   model: sonnet · effort: high
