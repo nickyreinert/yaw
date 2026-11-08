@@ -72,8 +72,10 @@ export function matcherAccepts(agent, matcher, toolNames) {
 // The command an agent runs for one module's hooks on one event. The shim path is found from the
 // project root: Claude sets CLAUDE_PROJECT_DIR; Codex runs commands in the session cwd and Copilot
 // sets no project variable, so git (or the cwd) gives the root. A missing shim is skipped silently.
-export function hookCommand(agent, event, module) {
-  return `f="\${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/${HOOK_SHIM}"; [ ! -f "$f" ] || sh "$f" ${event} --agent ${agent} --module ${module}`;
+// `compress` marks an entry whose hooks are all of kind compress: the shim then applies its size gate and starts
+// the lean entry (core/hooks/compress.js) instead of `yaw hook` (T-053).
+export function hookCommand(agent, event, module, compress = false) {
+  return `f="\${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/${HOOK_SHIM}"; [ ! -f "$f" ] || sh "$f" ${event} --agent ${agent} --module ${module}${compress ? ' --compress' : ''}`;
 }
 
 // The label of one module's hooks on one event, e.g. "YAW security: guard-secret-read, guard-destructive".
@@ -81,6 +83,8 @@ export function hookLabel(module, names = []) {
   const unique = [...new Set(names)];
   return unique.length > 0 ? `YAW ${module}: ${unique.join(', ')}` : `YAW ${module}`;
 }
+
+const compressOnly = (hooks, event) => hooks.filter((h) => h.event === event).every((h) => h.kind === 'compress');
 
 // Hook registrations of the enabled modules, as JSON parts of the agents' settings files (ADR-0004
 // composition: lists concatenate, so every module adds its own entries and removing it removes them).
@@ -110,7 +114,7 @@ export function hookParts({ definitions, modules, agents }) {
       for (const [event, matchers] of byEvent) {
         const entry = {};
         if (!matchers.includes(null)) entry.matcher = [...new Set(matchers.flatMap((m) => m.split('|')))].join('|');
-        const hook = { type: 'command', command: hookCommand(agent, event, name), timeout: HOOK_TIMEOUT_SECONDS };
+        const hook = { type: 'command', command: hookCommand(agent, event, name, compressOnly(hooks, event)), timeout: HOOK_TIMEOUT_SECONDS };
         // #176: every entry runs the same shim, so Codex's /hooks review needs a readable label.
         if (agent === 'codex') hook.statusMessage = hookLabel(name, names.get(event));
         entry.hooks = [hook];

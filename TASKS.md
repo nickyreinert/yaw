@@ -100,11 +100,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   acceptance: each profile's smoke test verifies its compact output
   model: middle tier (Sonnet) · effort: high
 
-- T-053 [P2] Lean compress entry and shim size gate — a compress entry point that loads neither the kit nor the schemas (prototype: 34 ms against 67 ms through `yaw hook`). The shim exits without starting Node below a payload threshold (prototype: 3 ms); the threshold applies to the whole payload, not to the output alone. Depends on T-052.
-  spec: kickoff/16-compact-output.md §5 (latency plan, steps 2 and 3)
-  acceptance: a timing check that does not depend on the machine
-  model: middle tier (Sonnet) · effort: medium
-
 - T-054 [P2] L2 compress methods and guards (Claude Code) — methods: `ansi`, `progress`, `dedup`, `cap` (recall or re-run hint), grep grouping by file, lockfile summary. Skips output under 512 bytes, commands with detail flags (`-v`, `--verbose`, `--nocapture`), `git diff|show`, `yaw run` output and every Read except lockfiles. Fails open. Depends on T-047, T-052 and T-053.
   spec: kickoff/16-compact-output.md §4 L2
   acceptance: tests run on the T-047 fixtures

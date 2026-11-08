@@ -1,5 +1,9 @@
 # Archive
 
+- T-053 Lean compress entry and shim size gate — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: core/hooks/compress.js is the lean entry (adapters, policy, agents.js and the YAML parser only; manifest read as JSON, module.yaml unvalidated, no schemas, no CLI); helpers shared with dispatch.js moved to core/hooks/common.js. `hookCommand`/`hookParts` add `--compress` when every hook of a module on the event is kind compress; the shim then reads the payload and exits without starting Node below 1024 bytes (whole payload, counted in bytes), else runs the lean entry. test/compress-lean.test.js checks module loads (loader trace) and Node starts (fake `node` on PATH), no millisecond comparison. Setup-depth fixture shim hash updated.
+
 - T-022 Invalidate obsolete review approvals — done 2026-11-08
   model: middle tier (Sonnet) · effort: high
   done: modules/review/lib/cli.js caches `{ commit: { reviewer: sha256 of the full prompt } }` in .git/yaw/reviews.json. The prompt is what the reviewer receives (effective kind prompt and rules, foundation context with the setup constraints incl. quality.unit-tests, TASKS.md for feature, reviewed range label and diff), so a changed prompt, rule, relevant configuration or range makes the stored PASS stale; old list-format entries never match. The gate now builds the diff and prompts before the cache check. Tests in modules/review/tests/review.test.js (prompt/rules change; configuration and range change) fail on the old code and pass now; review tests 16/16.
