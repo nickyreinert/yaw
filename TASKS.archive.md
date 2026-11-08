@@ -1,5 +1,9 @@
 # Archive
 
+- T-010 Harden hook logs — done 2026-11-08
+  model: sonnet · effort: high
+  done: `appendLog` in core/hooks/dispatch.js keeps `~/.yaw/logs` a real 0700 directory and opens log files with O_NOFOLLOW|O_NONBLOCK as 0600 regular files of the current user (symlinks, FIFOs and foreign owners are skipped, logging stays fail-open); loose modes left by older versions are tightened; rotation renames the verified file to `<file>.1` and reopens a new 0600 file. Tests in test/hook-logs.test.js. Offline suite: 9 failed, none from this change (2 hook tests, test/hooks.test.js and test/silent-hooks.test.js, also fail on HEAD).
+
 - T-014 Reject malformed LAN responses safely — done 2026-11-08
   model: sonnet · effort: medium
   done: `core/remote/lan.js:lanFetch` builds bodyless statuses (1xx/204/205/304) without a body and rejects through the promise on response-construction errors, interrupted or aborted responses. Regression: `test/lan-fetch.test.js`.

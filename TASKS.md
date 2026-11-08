@@ -28,10 +28,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-011 [P2] Preserve permissions during atomic replacement — `core/render/files.js:writeAtomic` changes an existing 0600 file to 0644 under umask 022 and drops executable bits. Preserve existing modes unless an explicit override is supplied; check callers too. — in progress; fix + test in core/render/files.js, test/render.test.js; next: npm test, archive.
   model: middle tier (Sonnet) · effort: medium
 
-- T-010 [P2] Harden hook logs — `core/hooks/dispatch.js:appendLog` follows symlinks and creates 0644 logs containing session IDs/workspace paths. Require private directories/files, reject non-regular targets and preserve those protections during rotation.
-  model: middle tier (Sonnet) · effort: high
-  status: in progress — resume: write failing test in test/ for appendLog (symlink, modes, rotation), then fix core/hooks/dispatch.js
-
 - T-025 [P2] Remove generated artifacts from scaffolds — tracked `.gradle/` caches in `profiles/android-kotlin/scaffold` and `profiles/java-basic/scaffold`, plus Android `build/reports/`, pollute generated projects. Remove them and enforce scaffold exclusions while retaining the Gradle wrapper.
   model: low tier (Luna/Haiku) · effort: low
   status: in progress · resume: write scaffold-artifact regression test, then remove tracked .gradle/build reports and add exclusions
