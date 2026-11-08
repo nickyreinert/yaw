@@ -135,7 +135,7 @@ export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules, ans
   const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
   // Profile files belong to core: they go away with it (the scaffold is user code and stays).
-  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles }) : undefined;
+  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles, modules: available }) : undefined;
   const desired = renderModules({ kitRoot, modules: available, context, definitions, profileOutput, root });
   return { desired, missing, profileOutput };
 }
@@ -207,7 +207,7 @@ export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   const profiles = answersDoc.proposal.profiles;
   const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules, definitions });
-  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null, answers: answersDoc.answers });
+  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null, answers: answersDoc.answers, modules });
   const desired = renderModules({ kitRoot, modules, context, definitions, profileOutput, root });
   return { desired, definitions, missingProfiles: profileOutput.missing };
 }

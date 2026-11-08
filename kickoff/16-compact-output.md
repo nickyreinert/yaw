@@ -109,7 +109,7 @@ Two or three lines in AGENTS.md (`tokenCost: low`), rendered only when L1 or L2 
 Measurement is part of the module, and its first part also works before the module is enabled.
 
 - **Before enabling:** a transcript scan reports tool-result sizes by tool and by the command's first word (git, npm, pytest, Read). It stores sizes and first words only, no content (metadata only, as in ADR-0052). It answers whether compaction is worth enabling for a project. It is shown in Analytics; the CLI name is not decided.
-- **After enabling:** `yaw run` and the compress hook write `{tool, method, rawBytes, outBytes}` to `hooks.jsonl`. Tokens are estimated as `bytes / 4` and labelled as estimates.
+- **After enabling:** the compress hook writes `{tool, method, rawBytes, outBytes}` to `hooks.jsonl`; `yaw run` writes `{step, method, exitCode, rawBytes, outBytes, ms}` to `run.jsonl` beside it, since a recipe step has no agent session (ADR-0132). Tokens are estimated as `bytes / 4` and labelled as estimates.
 - **Validation:** compare the same kind of task with the module on and off, using per-session `tokensIn` (already imported) and the number of `YAW_VERBOSE=1` re-runs, which counts filter misses. Byte ratios alone do not prove savings: a lossy cut that causes a re-run costs more than it saved.
 
 ### L6. Recall store (optional)

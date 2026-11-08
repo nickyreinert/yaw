@@ -471,6 +471,23 @@ function composedJust(name, text) {
   return `# Composed (ADR-0041): runs in ${name}/.\nset working-directory := '../${name}'\n${text.replace(gate, '$1')}`;
 }
 
+// compact module (T-050, kickoff/16 §4 L1): the check steps run each body line through `yaw run --compact`,
+// which decides at run time (YAW_COMPACT, personal setting, project answer). Without the kit the line runs
+// as before. Plain echo lines and lines with just interpolation ({{) stay as they are.
+const COMPACT_VERBS = ['lint', 'typecheck', 'test', 'build', 'audit'];
+const shellQuote = (s) => `'${s.replaceAll("'", `'\\''`)}'`;
+export function compactJust(text, { warnings } = {}) {
+  let recipe = null;
+  return text.split('\n').map((line) => {
+    if (/^\S/.test(line) && !line.startsWith('#')) recipe = line.match(/^([a-z][a-z0-9-]*)\b[^:]*:(?!=)/)?.[1] ?? null;
+    const body = line.match(/^ {4}@?(.*)$/)?.[1];
+    if (!COMPACT_VERBS.includes(recipe) || !body || /^echo\b/.test(body) || body.includes('{{')) return line;
+    const args = `run --compact --step ${recipe}${warnings ? ' --warn "$w"' : ''} -- sh -cu "$c"`;
+    const kit = '"${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw"';
+    return `    @c=${shellQuote(body)};${warnings ? ` w=${shellQuote(warnings)};` : ''} if command -v yaw >/dev/null 2>&1; then yaw ${args}; elif [ -f ${kit} ]; then node ${kit} ${args}; else sh -cu "$c"; fi`;
+  }).join('\n');
+}
+
 // Files of the given profiles (ADR-0004: owned by core; profiles are not modules).
 //   just/<p>.just   <- profiles/<p>/just/<p>.just          (plus `import` in the justfile)
 // With several profiles (ADR-0041) the plus is `mod <p> 'just/<p>.just'` and the scaffold goes to <p>/.
@@ -481,7 +498,8 @@ function composedJust(name, text) {
 // Profiles missing from the kit are reported, not rendered.
 // -> { parts: [{ path, module, kind, content }], files: Map<path, { module, content, fragments, managed }>, missing }
 // A profile option with scaffold: true adds profiles/<p>/variants/<choice>/ to the scaffold (ADR-0105); `answers` picks the choice.
-export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {} }) {
+// With the compact module in `modules`, the check steps run through `yaw run --compact` (compactJust).
+export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {}, modules = [] }) {
   const parts = [];
   const files = new Map();
   const missing = [];
@@ -494,7 +512,8 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
     const dir = profileDir(kitRoot, name);
     const justFile = join(dir, 'just', `${name}.just`);
     if (existsSync(justFile)) {
-      const text = readFileSync(justFile, 'utf8');
+      const source = readFileSync(justFile, 'utf8');
+      const text = modules.includes('compact') ? compactJust(source, loadProfile(kitRoot, name).compact) : source;
       files.set(`just/${name}.just`, { module: 'core', content: composed ? Buffer.from(composedJust(name, text), 'utf8') : Buffer.from(text, 'utf8'), fragments: [], managed: true });
       parts.push({ path: 'justfile', module: name, kind: 'part', content: `${composed ? 'mod' : 'import'} ${composed ? `${name} ` : ''}'just/${name}.just'\n` });
     }

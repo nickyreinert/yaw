@@ -42,6 +42,7 @@ export const COMMANDS = [
   { name: 'notify', args: '[status|test|send] [--status done|input|failed] [--minutes N] [--summary text]', summary: 'notifications after long runs: show the channels, send a test or a message (comfort module)', options: { status: { type: 'string' }, minutes: { type: 'string' }, summary: { type: 'string' } }, run: async (args) => (await import('./comfort.js')).notify(args) },
   { name: 'statusline', args: '[--snippet]', summary: 'status line for Claude Code (reads its JSON on stdin; comfort module)', options: { snippet: { type: 'boolean' } }, run: async (args) => (await import('./comfort.js')).statusline(args) },
   { name: 'presets', args: 'list | show <name> | delete <name> [--yes]', summary: 'list, show and delete saved setups in ~/.yaw/presets/', options: { ...yes }, run: async (args) => (await import('./presets.js')).presets(args) },
+  { name: 'run', args: '[--compact] [--step <name>] [--warn <regex>] -- <command> [args...]', summary: 'run one recipe step; with --compact a passing step prints one line (compact module; the project recipes call this)', options: { compact: { type: 'boolean' }, step: { type: 'string' }, warn: { type: 'string' } }, run: async (args) => (await import('../../modules/compact/lib/run.js')).run(args) },
 ];
 
 export const HELP_GROUPS = [
@@ -49,7 +50,7 @@ export const HELP_GROUPS = [
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'review', 'sessions'] },
   { title: 'Monitoring and collaboration', names: ['web', 'host', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
-  { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline'] },
+  { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline', 'run'] },
 ];
 
 export function usage(env = process.env) {

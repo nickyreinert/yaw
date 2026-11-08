@@ -27,11 +27,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
-- T-050 [P2] L1 wrapper `yaw run --compact` with the node-cli recipes — exit 0: one line `ok <step> (<n> lines, <s>s)`. Exit 0 with warnings: count line, first 10 warnings and `… +<k> more warnings`, as rtk does for `cargo build`. Exit not 0: ANSI, progress and dedup stripping plus a head/tail cap with a recovery hint; the exit code is kept. `YAW_VERBOSE=1` prints raw output; `rawBytes`/`outBytes` are recorded per step. This repo's recipes come first. Depends on T-049.
-  spec: kickoff/16-compact-output.md §4 L1
-  model: top tier (Astra/Opus) · effort: high
-  status: in progress · resume: write failing tests (modules/compact/tests/run.test.js) for `yaw run --compact` and the wrapped node-cli recipes, then modules/compact/lib/run.js, the `run` command and the recipe transform in renderProfiles
-
 ## Backlog
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
