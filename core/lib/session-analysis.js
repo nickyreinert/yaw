@@ -398,7 +398,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   const found = new Set(rows.map((r) => r.id));
   const missing = classify ? 0 : old.rows.filter((r) => r.source !== 'synced' && !found.has(r.id) && (all || r.project === project) && Date.parse(r.started) >= since).length;
   for (const row of rows) {
-    const previous = old.rows.find((r) => r.id === row.id);
+    const previous = byId.get(row.id);
     if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
     merged.set(row.id, row);
   }
