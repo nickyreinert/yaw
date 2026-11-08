@@ -11,9 +11,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-- T-041 [P2] Rework Code Map view — table as the primary view with pagination (T-038); raw YAML moved into a collapsed "Show raw data / Hide raw data" section below, formatted and complete.
-  model: low tier (Luna/Haiku) · effort: medium
-  status: in progress · resume: code and test/code-map-view.test.js done and passing; npm test has only known failures. Not committed: index.html, dashboard.html and workspace.js also hold T-040 uncommitted hunks, so the coordinator must commit them with the T-041 hunks (details#map-raw markup, toggle listener) and test/code-map-view.test.js, then push.
 
 - T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
   model: low tier (Luna/Haiku) · effort: medium

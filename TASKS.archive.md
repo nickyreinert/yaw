@@ -1,5 +1,6 @@
 # Archive
 
+- T-041 Rework Code Map view — done 2026-11-08 (table first with the shared pager; raw data collapsed as "Show raw data"; test/code-map-view.test.js)
 - T-038 Shared pagination component — done 2026-11-08
   model: middle tier (Sonnet) · effort: high
   done: core/web/assets/pagination.js is the one pager (page sizes 5/10/25/50, default 5, Rows per page select, Previous, page numbers, Next; `paginate`, `renderPager`, `paged`, `resizePage`), served by dashboard.js and form-server.js. Used by Workspace Overview Sessions and Tasks, Workspace Tasks, Code Map areas (client paging with per-view state in workspace.js `pagedTable`), every Analytics table (`dataTable` in global-view.js, page size in the URL as `size.<table>`) and Knowledge (server paging: `knowledgeData` takes `pageSize`, default 5, was 50). Knowledge keeps its selected record across page and size changes (the preview is fetched by key, independent of the page). The old per-table size of 15/20 and the separate Knowledge pager were removed. Tests: test/pagination.test.js.
