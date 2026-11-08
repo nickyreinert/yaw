@@ -25,6 +25,7 @@ const assets = new Map([
   ['/ui-state.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/ui-state.js', import.meta.url))]],
   ['/setup-cards.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/setup-cards.js', import.meta.url))]],
   ['/search.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/search.js', import.meta.url))]],
+  ['/pagination.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/pagination.js', import.meta.url))]],
   ['/folder-picker.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/folder-picker.js', import.meta.url))]],
   ['/chat-services.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/chat-services.js', import.meta.url))]],
   ['/planning-handoff.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/planning-handoff.js', import.meta.url))]],

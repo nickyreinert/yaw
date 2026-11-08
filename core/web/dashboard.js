@@ -46,6 +46,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('ui-state.js', 'text/javascript; charset=utf-8'),
   asset('setup-cards.js', 'text/javascript; charset=utf-8'),
   asset('search.js', 'text/javascript; charset=utf-8'),
+  asset('pagination.js', 'text/javascript; charset=utf-8'),
   asset('folder-picker.js', 'text/javascript; charset=utf-8'),
   asset('review-step.js', 'text/javascript; charset=utf-8'),
   asset('project-tree.js', 'text/javascript; charset=utf-8'),

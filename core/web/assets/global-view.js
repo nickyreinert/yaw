@@ -7,6 +7,8 @@ import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser,
 import { createInsights } from './insights-view.js';
 import { toolOutputTable } from './tool-output.js';
 import { abTable, savingsTable } from './savings.js';
+import { DEFAULT_PAGE_SIZE, paginate, renderPager, resizePage } from './pagination.js';
+import { featureOn } from './ui-state.js';
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
@@ -45,7 +47,7 @@ const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveF
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
-const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes'], ['tooloutput', 'Tool output'], ['savings', 'Savings'], ['savingsab', 'Savings on/off']];
+const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Classification'], ['tooloutput', 'Tool output'], ['savings', 'Savings'], ['savingsab', 'Savings on/off']];
 const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
@@ -99,9 +101,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     Object.assign(state, readFacets(p, locked() ? 'workspace' : 'global'));
     for (const k of Object.keys(tables)) delete tables[k];
     for (const [k, v] of p) {
-      const m = /^(q|sort|page)\.([\w-]+)$/.exec(k); if (!m) continue;
+      const m = /^(q|sort|page|size)\.([\w-]+)$/.exec(k); if (!m) continue;
       const t = tables[m[2]] ??= {};
-      if (m[1] === 'sort') { [t.sort, t.dir] = v.split('.'); t.sortSet = true; } else t[m[1]] = m[1] === 'page' ? Number(v) || 1 : v;
+      if (m[1] === 'sort') { [t.sort, t.dir] = v.split('.'); t.sortSet = true; } else t[m[1]] = m[1] === 'q' ? v : Number(v) || 1;
     }
     if (!['7', '30', '90', 'all'].includes(state.period)) state.period = DEFAULTS.period;
     if (!DIMS.some(([d]) => d === state.split) || (locked() && ['folder', 'project'].includes(state.split))) state.split = DEFAULTS.split;
@@ -119,6 +121,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (t.q) p.set(`q.${id}`, t.q);
       if (t.sort && t.sortSet) p.set(`sort.${id}`, `${t.sort}.${t.dir}`);
       if (t.page > 1) p.set(`page.${id}`, t.page);
+      if (t.size && t.size !== DEFAULT_PAGE_SIZE) p.set(`size.${id}`, t.size);
     }
     const url = `#${route}${p.size ? `?${p.toString().replaceAll('%2F', '/')}` : ''}`;
     replace(url);
@@ -249,12 +252,12 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const chart = (title, sub, body, wide = false) => h('article', { class: `card${wide ? ' wide' : ''}` }, h('div', { class: 'chart-head' }, h('h2', {}, title), sub ? h('span', { class: 'small muted' }, sub) : null), body);
 
   // ---------- tables: filter, sort, page ----------
-  function dataTable(id, cols, rows, { pageSize = 20, sort, dir = 'desc', note } = {}) {
+  function dataTable(id, cols, rows, { sort, dir = 'desc', note } = {}) {
     const t = tables[id] ??= {};
     if (t.sort && !cols.some((c) => c.key === t.sort && c.sortable !== false)) { t.sort = undefined; t.sortSet = false; }
     t.sort ??= sort; t.dir = t.dir === 'asc' || t.dir === 'desc' ? t.dir : dir; t.page ??= 1;
     const input = h('input', { type: 'search', placeholder: 'Filter rows…', value: t.q ?? '', 'aria-label': 'Filter table rows' });
-    const info = h('span', { class: 'small muted' }), body = h('div'), pager = h('div', { class: 'pager' });
+    const info = h('span', { class: 'small muted' }), body = h('div'), pager = h('div');
     const text = (c, r) => c.text ? c.text(r) : String(c.value(r) ?? '');
     const draw = () => {
       const q = (t.q ?? '').toLowerCase();
@@ -267,8 +270,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         const d = typeof x === 'number' ? x - y : String(x).localeCompare(String(y));
         return t.dir === 'asc' ? d : -d;
       });
-      const pages = Math.max(1, Math.ceil(list.length / pageSize)); t.page = Math.min(Math.max(1, t.page), pages);
-      const slice = list.slice((t.page - 1) * pageSize, t.page * pageSize);
+      const w = paginate(list.length, t.page, t.size); t.page = w.page; t.size = w.size;
+      const slice = list.slice(w.start, w.end);
       fill(body, h('div', { class: 'table-scroll' }, h('table', { class: 'dt' },
         h('thead', {}, h('tr', {}, cols.map((x) => h('th', { scope: 'col', 'aria-sort': t.sort === x.key ? (t.dir === 'asc' ? 'ascending' : 'descending') : null, class: x.num ? 'num' : '' },
           x.sortable === false ? x.label : h('button', { type: 'button', class: 'sort', on: { click: () => { t.dir = t.sort === x.key && t.dir === 'desc' ? 'asc' : 'desc'; t.sort = x.key; t.sortSet = true; t.page = 1; writeUrl(); draw(); } } },
@@ -276,9 +279,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         h('tbody', {}, slice.length ? slice.map((r) => h('tr', {}, cols.map((x) => h('td', { class: x.num ? 'num' : '' }, x.show ? x.show(r) : text(x, r)))))
           : h('tr', {}, h('td', { colspan: cols.length, class: 'muted' }, 'No matching rows.'))))));
       info.textContent = `${list.length === rows.length ? fmt(rows.length) : `${fmt(list.length)} of ${fmt(rows.length)}`} rows`;
-      fill(pager, h('span', { class: 'small muted' }, `Page ${t.page}/${pages}`),
-        h('button', { type: 'button', disabled: t.page <= 1, on: { click: () => { t.page--; writeUrl(); draw(); } } }, '← Previous'),
-        h('button', { type: 'button', disabled: t.page >= pages, on: { click: () => { t.page++; writeUrl(); draw(); } } }, 'Next →'));
+      fill(pager, renderPager({ ...w,
+        onPage: (n) => { t.page = n; writeUrl(); draw(); },
+        onSize: (n) => { t.page = resizePage(w.page, w.size, n); t.size = n; writeUrl(); draw(); } }));
     };
     input.addEventListener('input', () => { t.q = input.value; t.page = 1; writeUrl(); draw(); });
     draw();
@@ -370,9 +373,10 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
       h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when Analytics opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Analytics' : 'all workspaces here, only the open one on Workspace → Analytics'}). A personal setting; it never classifies.` },
         h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
-      h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
+      // Classify is part of Profiling (Global → Settings → Features).
+      featureOn('profiling') ? h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
         title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
-      job.busy === 'classify' ? 'Classifying…' : 'Classify'));
+      job.busy === 'classify' ? 'Classifying…' : 'Classify') : null);
   }
   function collectStatus() {
     const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
@@ -522,7 +526,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       str('last', 'Last active', last, (k) => last(k) ? day(last(k)) : '—'),
       { key: 'share', label: `Sessions by ${state.split === 'none' ? 'total' : state.split}`, sortable: false, value: () => null, text: () => '', show: (k) => h('div', { class: 'bar' }, S.keys.map((key) => { const v = k.rows.filter((r) => S.keyOf(r) === key).length; return v ? h('span', { style: { width: `${v / max * 100}%`, background: S.color(key) }, title: `${key}: ${v}` }) : null; })) },
       { key: 'open', label: '', sortable: false, value: () => null, text: () => '', show: (k) => k.project ? openButton(k.full, 'overview') : null },
-    ], list, { sort: 'sessions', pageSize: 15 }));
+    ], list, { sort: 'sessions' }));
     const t = timeBuckets(rows);
     fill($('ov-charts'),
       chart(`Sessions per ${t.unit}`, 'UTC', [legend(), columns(t.buckets, undefined, { wide: true })], true),
@@ -570,8 +574,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       chart('Prompt length × answer length', 'do longer prompts get longer answers?', scatter(m, (r) => r.promptChars / r.prompts, (r) => r.answerChars / r.answers, 'chars/prompt', 'chars/answer')),
       chart('Response time', 'median seconds to first answer, per session', columns(bins(m, (r) => r.medianResp, [5, 10, 20, 30, Infinity]))),
       chart('Tokens by model', 'Only agents that report usage', bars(bySize(groupBy(rows, (r) => r.model)), tokens)),
-      chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))));
-    const tabs = locked() ? TABLES.filter(([k]) => !['folders', 'projects'].includes(k)) : TABLES;
+      featureOn('profiling') ? chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))) : null);
+    // Profiling off hides the Classification block: its chart, its table and Classify.
+    const tabs = TABLES.filter(([k]) => !(locked() && ['folders', 'projects'].includes(k)) && (k !== 'outcomes' || featureOn('profiling')));
     if (!tabs.some(([k]) => k === state.table)) state.table = 'sessions';
     const sub = h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Tables' }, tabs.map(([k, l]) =>
       h('button', { type: 'button', 'aria-pressed': String(state.table === k), on: { click: () => { state.table = k; writeUrl(); sessions(); } } }, l)));

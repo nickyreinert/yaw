@@ -50,9 +50,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-037 [P2] Replace Settings/Interview buttons with a segmented switch — keep behavior; review its interplay with the Focus switch so the two switches have a clear hierarchy and do not change views ambiguously.
   model: middle tier (Sonnet) · effort: medium
 
-- T-038 [P2] Shared pagination component — one component with page sizes 5/10/25/50 (default 5), Previous/Next/page numbers; reuse existing pagination. Apply to Workspace Overview (Sessions, Tasks), Analytics tables, Knowledge, Workspace Tasks and Code Map. Knowledge selection and preview must stay correct across pages. Do this before T-039–T-041.
-  model: middle tier (Sonnet) · effort: high
-
 - T-039 [P2] Compact Analytics — evaluate merging Session Length and Session Timings into one table without losing data; keep the other Analytics sections (Agents & Models, collapsible layout). Depends on T-036 for the Classification block.
   model: low tier (Luna/Haiku) · effort: medium
 
