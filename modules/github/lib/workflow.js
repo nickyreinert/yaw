@@ -1,6 +1,9 @@
 // Read-only planning first; callers obtain confirmation before applying any shared-state changes.
 import { GhError } from '../../../core/lib/gh.js';
 
+// One line of text from GitHub for display: no control characters.
+const oneLine = (text) => String(text ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/\s+/g, ' ').trim();
+
 function json(text, what) {
   try {
     return JSON.parse(text);
@@ -23,6 +26,21 @@ export function repository(gh) {
     throw new GhError('gh returned an unexpected repository name');
   }
   return { slug: info.nameWithOwner, owner: info.nameWithOwner.split('/')[0] };
+}
+
+// Open milestones and epics (native Epic type or type:epic) with their counts: one read, nothing is changed.
+// -> { milestones: [{ title, closed, total, due }], epics: [{ number, title, done, total, milestone }] }
+export function readProgress({ gh, repo }) {
+  const milestones = pages(gh, `repos/${repo.slug}/milestones?state=open&per_page=100`).map((m) => ({
+    title: oneLine(m.title), closed: m.closed_issues, total: m.open_issues + m.closed_issues, due: typeof m.due_on === 'string' ? m.due_on.slice(0, 10) : undefined,
+  }));
+  const epics = pages(gh, `repos/${repo.slug}/issues?state=open&per_page=100`)
+    .filter((i) => !i.pull_request && (i.type?.name?.toLowerCase() === 'epic' || i.labels?.some((l) => (typeof l === 'string' ? l : l.name) === 'type:epic')))
+    .map((i) => ({
+      number: i.number, title: oneLine(i.title), done: i.sub_issues_summary?.completed ?? 0, total: i.sub_issues_summary?.total ?? 0,
+      milestone: i.milestone?.title ? oneLine(i.milestone.title) : undefined,
+    }));
+  return { milestones, epics };
 }
 
 export function planProjectStatus({ gh, repo, project, issue, status }) {

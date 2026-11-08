@@ -400,6 +400,8 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], team),
     // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
     teamModule: modules.includes('team'),
+    // Approvals need other people: the workflow rules of a solo project ask for none (a ruleset without bypass would lock the author out).
+    teamPeople: deriveFacts(flat).team === true,
     // ADR-0033: git-hooks adds the code-map pre-commit job when the code-map module is installed.
     codeMapModule: modules.includes('code-map'),
     gitHooksModule: modules.includes('git-hooks'),

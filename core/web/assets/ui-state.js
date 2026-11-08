@@ -136,7 +136,7 @@ export function interviewDetailText(id) {
       'Solo: project instructions include your personal communication and autonomy preferences.',
       'Team: shared instructions use English for code and documentation; chat language and autonomy are agreed per contributor.',
       'External reviewers: the same shared rules as Team, for occasional contributors and reviewers.',
-      'GitHub, task tracking and review gates remain separate choices. The optional Team rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
+      'GitHub, task tracking and review gates remain separate choices. The optional Workflow rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
     ],
   })[id] ?? null;
 }

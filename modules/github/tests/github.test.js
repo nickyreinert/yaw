@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { main } from '../../../core/cli/main.js';
 import { parse } from '../../../core/lib/yaml.js';
-import { schemas } from '../../../core/render/kit.js';
+import { loadModule, schemas } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, readAnswers, removeModule, updateProject } from '../../../core/render/project.js';
 import { KIT_ROOT, capture, cleanEnv, hasTool, pathWithout, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
@@ -54,7 +54,7 @@ async function repo(options = {}) {
 }
 
 // gh stand-in: records every call, answers the reads, and keeps what the tests need to see.
-function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['quality-gate', 'secret-scan', 'pr-policy', 'lint'], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false } = {}) {
+function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['quality-gate', 'secret-scan', 'pr-policy', 'lint'], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false, milestones = [], issues = [] } = {}) {
   const calls = [];
   const state = { rulesets: [...rulesets] };
   const gh = (args, opts = {}) => {
@@ -70,6 +70,8 @@ function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['
     if (args[0] === 'api') {
       const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
       const path = args.find((a) => a.startsWith('repos/'));
+      if (path.startsWith('repos/octo/demo/milestones?')) return JSON.stringify([milestones]);
+      if (path.startsWith('repos/octo/demo/issues?')) return JSON.stringify([issues]);
       if (path.endsWith('/check-runs')) return checks.join('\n');
       if (path.endsWith('/statuses')) return '';
       if (path.endsWith('/rulesets') && method === 'GET') return JSON.stringify(state.rulesets);
@@ -160,7 +162,7 @@ test('renders the recipes, the PR template, github.yaml and the ask rules; manif
   const root = await project();
   const tree = readTree(root);
   for (const f of ['just/github.just', '.github/pull_request_template.md', '.yaw/github.yaml']) assert.ok(Object.hasOwn(tree, f), f);
-  for (const recipe of ['gh-init', 'gh-labels', 'gh-protect', 'gh-issue', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add']) {
+  for (const recipe of ['gh-init', 'gh-labels', 'gh-protect', 'gh-issue', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add', 'progress']) {
     assert.match(tree['just/github.just'], new RegExp(`^${recipe} \\*args:`, 'm'), recipe);
   }
   assert.match(tree.justfile, /# yaw:github\nimport 'just\/github.just'\n# \/yaw:github/);
@@ -657,6 +659,40 @@ test('pr-status prints the review state and the checks', async () => {
   assert.match(r.out, /#5 T \[OPEN, draft\] review: APPROVED/);
   assert.match(r.out, /quality-gate: SUCCESS/);
   assert.match(r.out, /legacy: PENDING/);
+});
+
+test('the card presents project-management support: forms, epics, milestones, planning skills and progress', () => {
+  const def = loadModule(KIT_ROOT, 'github');
+  const text = [def.what, ...def.details, ...def.adds].join('\n');
+  assert.match(def.what, /project[- ]management/i);
+  for (const word of [/Epics?/, /sub-issues/, /milestone/i, /priority/i, /estimate/i, /issue-triage/, /epic-plan/, /just progress/]) assert.match(text, word);
+});
+
+test('progress: open milestones and epics with sub-issue counts, read only', async () => {
+  const { root, env } = await repo();
+  const gh = fakeGh({
+    milestones: [
+      { title: 'v0.2.0', open_issues: 5, closed_issues: 3, due_on: '2026-12-01T00:00:00Z' },
+      { title: 'Later', open_issues: 0, closed_issues: 0, due_on: null },
+    ],
+    issues: [
+      { number: 42, title: 'Invite flow', labels: [{ name: 'type:epic' }], milestone: { title: 'v0.2.0' }, sub_issues_summary: { total: 5, completed: 2, percent_completed: 40 } },
+      { number: 43, title: 'Native epic', type: { name: 'Epic' }, labels: [], sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 } },
+      { number: 44, title: 'Plain issue', labels: [], sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 } },
+      { number: 45, title: 'A pull request', labels: [{ name: 'type:epic' }], pull_request: {} },
+    ],
+  });
+  const r = await yaw(root, ['progress'], { gh, env });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /v0\.2\.0: 3 of 8 issues closed \(38%\), due 2026-12-01/);
+  assert.match(r.out, /Later: no issues yet/);
+  assert.match(r.out, /#42 Invite flow: 2 of 5 sub-issues done \(40%\), milestone v0\.2\.0/);
+  assert.match(r.out, /#43 Native epic: no sub-issues yet/);
+  assert.doesNotMatch(r.out, /#44|#45/);
+  assert.deepEqual(gh.writes(), [], 'nothing is changed');
+  const empty = await yaw(root, ['progress'], { gh: fakeGh(), env });
+  assert.match(empty.out, /no open milestones/);
+  assert.match(empty.out, /no open epics/);
 });
 
 // ----------------------------------------------------------------------------------- release

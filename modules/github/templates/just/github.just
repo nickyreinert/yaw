@@ -43,6 +43,11 @@ pr *args:
 pr-status *args:
     @set -- gh pr-status "$@"; {{yaw_gh}}
 
+# Open milestones and epics: closed vs open issues, finished sub-issues. Read only.
+[positional-arguments]
+progress *args:
+    @set -- gh progress "$@"; {{yaw_gh}}
+
 # GUARDED. Tag and publish a GitHub release from the default branch. just release 0.1.0
 [positional-arguments]
 release *args:

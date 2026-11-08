@@ -3,11 +3,20 @@
 # github module). There is no agent-side command guard: the AGENTS.md rules are guidance (ADR-0031). The session
 # start talks to the user (systemMessage); the only model-visible output is the active issue (BUILD.md rule 5).
 name: team
-description: "Team mode: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests)."
-title: Team rules
+description: "Workflow rules: no change without an issue (lefthook commit-msg and pre-push, the pr-policy check: the PR links an open issue, rules for the agent in AGENTS.md) and a session-start sync (fetch, safe fast-forward, my issues and pull requests). For solo projects and teams on GitHub."
+title: Workflow rules
 group: github
 short: "No change without an issue"
-what: "No change without an issue; the agent is told your open issues and pull requests at session start."
+what: "Every change starts from a GitHub issue, whether you work solo or in a team. At session start you see your open issues and pull requests; the agent gets the active issue."
+details:
+  - "Commits must name an issue (Refs #12); `just commit` adds it, and the git hook rejects a commit without one"
+  - "Pushing to the default branch is blocked; push an issue branch and open a pull request with `just pr`"
+  - "Pull requests must link an open issue (Closes #12), checked by the pr-policy workflow"
+  - "Session start fetches, fast-forwards when safe and lists your issues and pull requests; it creates nothing"
+  - "The agent is told the active issue (number and title) from the branch name; the question below switches it off"
+  - "`just pr` pushes the branch and opens a draft pull request that closes the issue; `just start` repeats the session-start overview"
+  - "Tasks are tracked as GitHub issues; TASKS.md becomes a generated read-only view"
+  - "Preselected for teams, available to solo projects; `just gh-protect` asks teams for one approval, solo for none"
 adds:
   - "Rule: no change without an issue"
   - "Open issues and pull requests shown at session start"
@@ -47,7 +56,7 @@ agents:
   codex:   { support: native, via: "SessionStart sync + active issue; git hooks and CI check apply; hooks must be trusted via /hooks" }
   copilot: { support: partial, via: "SessionStart active issue (additionalContext); git hooks and CI check apply", note: "no session-start message; `just start` is the fallback" }
 agentsMd: |
-  - Team mode: no change without an issue. Work on an issue branch (`just task start <#>`), never on the default branch or a branch without an issue number.
+  - Workflow rules: no change without an issue. Work on an issue branch (`just task start <#>`), never on the default branch or a branch without an issue number.
   - Commit messages name the issue (`Refs #<n>`, `just commit` adds it); never push to the default branch, never force-push, never skip hooks (`--no-verify`); every PR links an open issue (`Closes #<n>`, `just pr` adds it). Git hooks, the pr-policy check and the branch ruleset enforce this.
   - Without session-start hooks, run `just start` first: it fetches, fast-forwards when safe and lists your issues and pull requests.
 tokenCost: low
