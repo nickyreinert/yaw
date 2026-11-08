@@ -1,7 +1,7 @@
 // Global Settings: Defaults (your defaults for new projects or one preset, in sub-tabs), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { about, button, el, grid, hint, link, press, source, tabs } from './settings-view.js';
-import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
+import { asksIn, available, choiceLabel, choiceValue, routeHidden, setFeatures, settingsRoute } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { GROUPS, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
@@ -39,15 +39,18 @@ function formView(value, depth = 0) {
   return grid(['Key', 'Value'], keys.map((k) => [code(k), formView(value[k], depth + 1)]));
 }
 
-export function createGlobalSettings({ api, get, report, notifications, onFile }) {
+export function createGlobalSettings({ api, get, report, notifications, onFile, onFeatures = () => {} }) {
   let tab = 'interview', classifier = null, classifierSamples = null, profile = null, answers = null, presets = null, files = null, comfort = null, selected = null;
   const drawer = $('global-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
+  // Tabs of a feature that is off (Global → Settings → Features) are hidden and open Defaults instead.
+  const tabHidden = (id) => routeHidden(settingsRoute('global-settings', id));
+  const drawTabs = () => document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => { b.hidden = tabHidden(b.dataset.tab); b.setAttribute('aria-pressed', String(b.dataset.tab === tab)); });
   function show(sub, query = '') {
-    tab = TABS.includes(sub) ? sub : 'interview';
-    document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    tab = TABS.includes(sub) && !tabHidden(sub) ? sub : 'interview';
+    drawTabs();
     for (const id of TABS) $(`gs-${id}`).hidden = id !== tab;
     for (const id of ['sync', 'sessions']) $(`gs-${id}`).classList.add('card', 'settings-panel');
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
@@ -84,9 +87,18 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const update = () => { details.hidden = !enabled.checked; client.hidden = role.value !== 'client'; host.hidden = role.value !== 'host'; };
     enabled.addEventListener('change', update); role.addEventListener('change', update); update();
     details.append(role, client, host);
-    const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), label, details);
+    const toggle = (text, on, help) => {
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = on !== false;
+      const box = el('label', ` ${text}`, 'setting-toggle'); box.prepend(input);
+      return [input, box, el('p', help, 'small muted')];
+    };
+    const [sync, syncLabel, syncHelp] = toggle('Settings Sync', data.features?.sync, 'Share defaults, presets and statistics between your devices through a folder or a private GitHub repository. Off hides the Sync tab; saved sync settings are kept.');
+    const [profiling, profilingLabel, profilingHelp] = toggle('Profiling', data.features?.profiling, 'Classification labels saved sessions with your local Laya service; Learn reviews the sessions that need attention. Off hides Learn, the Classification and Learn settings and the Classification parts of Analytics; saved results are kept.');
+    const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), syncLabel, syncHelp, profilingLabel, profilingHelp, label, details);
     card.append(button('Save features', async () => {
       try {
+        const saved = await api('features-save', { sync: sync.checked, profiling: profiling.checked });
+        setFeatures(saved.features); drawTabs(); onFeatures(saved.features);
         const input = { enabled: enabled.checked, port: Number(port.value) };
         const migration = enabled.checked && data.folderSync && !data.hubMigrated;
         if (migration) {

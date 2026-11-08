@@ -1,4 +1,4 @@
-import { settingsPresentation } from './ui-state.js';
+import { routeHidden, settingsPresentation } from './ui-state.js';
 import { mountInterview } from './interview-view.js';
 // Settings (Project | Files | Review prompts | Kickoff) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
@@ -12,8 +12,8 @@ export function el(tag, text, cls) {
   if (cls) node.className = cls;
   return node;
 }
-// Hints that name another section link to it.
-export function link(label, route) { const a = el('a', label); a.href = `#${route}`; return a; }
+// Hints that name another section link to it; a link to a feature that is off is not shown.
+export function link(label, route) { const a = el('a', label); a.href = `#${route}`; a.hidden = routeHidden(route); return a; }
 export function hint(cls, ...parts) { const p = el('p', null, cls); p.append(...parts); return p; }
 // A file description with links to where that file is edited (`links`: [[label, route]]).
 export const about = (f, cls = 'small muted') => hint(cls, f.about ?? '', ...(f.links ?? []).flatMap(([label, route]) => [' ', link(`${label} →`, route)]));

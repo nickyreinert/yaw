@@ -47,9 +47,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
   model: middle tier (Sonnet) · effort: medium
 
-- T-036 [P2] Feature toggles: Settings Sync and Profiling — add a "Settings Sync" checkbox under Features (off → hide its tab and entry points; Server Mode unchanged). Merge Classification and Learning into one optional "Profiling" feature (name supersedes "Session Intelligence"; see T-042) with one checkbox; off → hide their Settings tabs, the sidebar Profiling section, workspace Profiling and the Analytics Classification block. Rename "Outcomes" in Analytics to "Classification". Check whether Classification and Learning are technically one function or two steps before merging internally. Hidden features must not be reachable via other navigation.
-  model: top tier (Astra/Opus) · effort: high
-
 - T-037 [P2] Replace Settings/Interview buttons with a segmented switch — keep behavior; review its interplay with the Focus switch so the two switches have a clear hierarchy and do not change views ambiguously.
   model: middle tier (Sonnet) · effort: medium
 

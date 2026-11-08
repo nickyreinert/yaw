@@ -88,7 +88,14 @@ and applies to all visible metrics, charts and tables.
   projects have the comfort module; **Classification** holds the Laya settings
   and setup steps (see below); **Review prompts** edits your blueprint
   (`~/.yaw/review/<kind>.md`), which every project without its own prompt
-  uses, and **Reset to kit default** removes it.
+  uses, and **Reset to kit default** removes it. **Features** switches the
+  optional features, each on by default: **Server mode**, **Settings Sync**
+  (off hides the **Sync** tab) and **Profiling**, which covers Classification
+  and Learn, two steps of one feature (Classification labels sessions, Learn
+  reviews the ones that need attention). Profiling off hides **Learn**, the
+  **Classification** and **Learn** settings tabs, **Classify** and the
+  Analytics **Classification** table and chart; links, the sidebar search and
+  typed addresses no longer reach them. Saved settings and results are kept.
 
 Every table can be filtered and sorted and is paged. Filters, splits, tabs,
 table searches, sorting, pages and the open file are kept in the address

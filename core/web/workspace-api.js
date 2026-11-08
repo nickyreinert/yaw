@@ -29,14 +29,16 @@ import { improveHistory, savedImprovement, saveImprovement, importImprovement, d
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
-  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'sync-cancel', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
+  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'sync-cancel', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open', 'features-save'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
   let classifier;
   try { classifier = classifierSettings(doc.classifier ?? {}); } catch { classifier = { ...CLASSIFIER_DEFAULTS }; }
-  return { autoRefresh: doc.autoRefresh === true, classifier, defaults: CLASSIFIER_DEFAULTS, limits: CLASSIFIER_LIMITS };
+  return { autoRefresh: doc.autoRefresh === true, classifier, defaults: CLASSIFIER_DEFAULTS, limits: CLASSIFIER_LIMITS, features: featureToggles(doc) };
 }
+// Optional features (Global → Settings → Features): on unless switched off. The web pages hide what is off.
+const featureToggles = (doc) => ({ sync: doc.features?.sync !== false, profiling: doc.features?.profiling !== false });
 const savePreferences = (env, change) => writeUserData(env, 'web-preferences.json', { ...(readUserData(env, 'web-preferences.json') ?? {}), ...change });
 // `projects` (the dashboard's project switcher) resolves the `workspace` each request names; without it the API is
 // bound to `root`. Every action and read runs against that one resolved project.
@@ -64,7 +66,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); syncJob?.controller.abort(); resume(); },
     get: {
       '/api/global/features': (params) => {
-        return { remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf(params?.get('workspace')) };
+        return { remoteControl: remoteSettings(env), features: webPreferences(env).features, hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf(params?.get('workspace')) };
       },
       '/api/improve/history': () => improveHistory({ env }),
       '/api/improve/settings': () => improveSettings(env),
@@ -233,6 +235,12 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         try { return await userError(() => interviewApply({ root, kitRoot, env, input })); } finally { running = false; }
       }
       if (name === 'knowledge-remove') return removeKnowledge({ root, kitRoot, env, input: input.record });
+      if (name === 'features-save') {
+        if (typeof input.sync !== 'boolean' || typeof input.profiling !== 'boolean') throw new FormError('Choose on or off for Settings Sync and Profiling');
+        const features = { sync: input.sync, profiling: input.profiling };
+        savePreferences(env, { features });
+        return { features, message: 'Features saved.' };
+      }
       if (name === 'preferences') {
         if (typeof input.autoRefresh !== 'boolean') throw new FormError('Choose whether to refresh automatically');
         savePreferences(env, { autoRefresh: input.autoRefresh });
