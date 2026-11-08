@@ -24,6 +24,11 @@
   model: sonnet · effort: medium
   done: `pathWithout()` in test/helpers/fixtures.js gives code-map, GitHub and composition tests the host PATH minus `yaw` (and `gh`), so kit-absent cases cannot run an installed CLI; `just` recipes were not run here (just not installed), github-status tests already used explicit stubs.
 
+- T-035 Fix Classification opening error — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: medium
+  acceptance: opening Classification in Global Settings does not throw "Cannot access 'link' before initialization"; regression test opens the view.
+  done: in `core/web/assets/global-settings-view.js`, the Laya setup card declared `const link` for the GitHub anchor in the same function scope as the imported `link()` helper used by step 4, so the call ran in the temporal dead zone. Renamed the anchor to `docs`. Regression test `test/global-classification-view.test.js` renders the tab with a minimal DOM stub; it failed with the reported error before the fix and passes after. Code fix landed in 8971c64 (staged with another agent's T-017 commit); this commit adds the test and the TASKS entries.
+
 - T-046 Load CLI command modules on demand (compact output, latency plan step 1) — done 2026-11-08
   model: sonnet · effort: low
   acceptance: `core/cli/main.js` loads command handlers and the hook dispatcher with `import()` when used, so a hook call does not load every command first. The full offline test suite shows the same failures before and after.

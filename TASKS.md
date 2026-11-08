@@ -16,10 +16,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
 
-- T-035 [P1] Fix Classification opening error (in progress) — resume point: TDZ in `core/web/assets/global-settings-view.js` renderClassifier/setupCard: `const link` shadows imported `link()`; add regression test in test/global-classification-view.test.js.
-  model: low tier (Luna/Haiku) · effort: medium
-
-
 - T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
   in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
   model: middle tier (Sonnet) · effort: medium
