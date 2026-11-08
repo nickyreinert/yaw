@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { chooseInitModules } from '../core/cli/init-modules.js';
 import { main } from '../core/cli/main.js';
@@ -92,4 +92,21 @@ test('All browser handoff retains numbered module choices and their dependencies
     process.emit('SIGINT');
     await running;
   }
+});
+
+test('Task List sits directly below Collaboration (Git & GitHub), outside Advanced Coding Rules, marked Local only (T-029)', async () => {
+  const { GROUPS } = await import('../core/interview/module-groups.js');
+  const ids = GROUPS.map(([id]) => id);
+  assert.equal(ids[ids.indexOf('github') + 1], 'tasks');
+  assert.equal(GROUPS.find(([id]) => id === 'tasks')[1], 'Task List');
+  const tasks = loadModule(KIT_ROOT, 'tasks');
+  assert.equal(tasks.group, 'tasks');
+  assert.equal(tasks.title, 'Task List');
+  assert.match(tasks.what, /backlog[\s\S]*in progress[\s\S]*done/i);
+  assert.match(tasks.what, /priorit/i);
+  assert.doesNotMatch(GROUPS.find(([id]) => id === 'memory')[2], /tasks/i);
+  const cards = readFileSync(join(KIT_ROOT, 'core/web/assets/setup-cards.js'), 'utf8');
+  assert.match(cards, /GROUP_ICONS = \{[^}]*tasks: /);
+  assert.match(cards, /'Local only'/);
+  assert.ok(JSON.parse(readFileSync(join(KIT_ROOT, 'core/schema/module.schema.json'), 'utf8')).properties.group.enum.includes('tasks'));
 });

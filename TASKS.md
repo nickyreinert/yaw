@@ -43,9 +43,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
 
-- T-029 [P2] Move Task List and add model recommendations — move Task List out of Advanced Coding Rules to directly below Collaboration; mark "Local only"; describe it as backlog/in-progress/done management with priorities for coding agents. Every task and GitHub issue (local list, issue templates, generated tasks, planning-skill issues) must carry priority, status, recommended model and reasoning effort; audit existing support and make it consistent.
-  model: middle tier (Sonnet) · effort: high
-
 - T-030 [P2] Consolidate Coding Rules cards — clarify Unit Tests wording (part of `just check`, no overlap with other test/standards settings). Remove Docker from Local Settings and Secrets if it has no independent function. Audit Coding Standards / Git Style / Rules of your Stack against stack, Coding Rules and other cards; remove or merge the card and move missing rules into generated agent instructions.
   model: middle tier (Sonnet) · effort: high
 

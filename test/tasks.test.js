@@ -126,3 +126,13 @@ test('rules and model lines: errors name the line', () => {
     assert.throws(() => parseTasks(text, { file: 'TASKS.md' }), (e) => e instanceof TasksError && e.line === line && reason.test(e.reason), name);
   }
 });
+
+test('priority (T-029): a backlog "priority:" line and an active "Priority" field round-trip; only P0 to P3 parse', () => {
+  const text = '# Tasks\n\n## Active\n### T-001 A — in progress\n- **Priority:** P0\n- **Model / effort:** opus · effort: high\n\n## Backlog\n- T-002 B\n  priority: P3\n  model: haiku · effort: low\n';
+  const ledger = parseTasks(text);
+  assert.equal(ledger.active[0].priority, 'P0');
+  assert.deepEqual(ledger.backlog[0], { id: 'T-002', title: 'B', priority: 'P3', model: 'haiku', effort: 'low' });
+  assert.equal(renderTasks(ledger), text);
+  assert.throws(() => parseTasks('# Tasks\n\n## Active\n\n## Backlog\n- T-001 A\n  priority: urgent\n'), (e) => e instanceof TasksError && e.line === 7 && /priority must be one of P0, P1, P2, P3/.test(e.reason));
+  assert.throws(() => parseTasks('# Tasks\n\n## Active\n\n## Backlog\n- T-001 A\n  priority: P1\n  priority: P2\n'), (e) => e instanceof TasksError && /duplicate priority line for T-001/.test(e.reason));
+});

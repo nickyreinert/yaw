@@ -14,7 +14,7 @@ import { basename } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { GhError, defaultGh } from '../../../core/lib/gh.js';
 import { parseDocument } from '../../../core/lib/yaml.js';
-import { parseTasks } from '../../../core/lib/tasks.js';
+import { EFFORTS, modelEffort, parseTasks } from '../../../core/lib/tasks.js';
 import { formatError } from '../../../core/lib/schema.js';
 import { readProjectFile, resolveInside } from '../../../core/render/files.js';
 import { schemas } from '../../../core/render/kit.js';
@@ -54,7 +54,7 @@ export const USAGE = [
   '       yaw gh progress                                               open milestones and epics: how much is done',
   '       yaw gh release <version>                              tag and GitHub release',
   '       yaw gh project-add <issue#> [--status "In progress"]  add an issue to the project board',
-  '       yaw gh issue <feature|bug|chore|spike|epic> "title" [--body text] [--priority P1] [--estimate S]',
+  '       yaw gh issue <feature|bug|chore|spike|epic> "title" [--body text] [--priority P1] [--estimate S] [--model tier] [--effort level]',
   'Guarded actions (init, labels, protect, release, project-add, the first push of pr) print their plan and run only when a person types y in a terminal; --yes does not exist.',
 ].join('\n');
 
@@ -576,7 +576,12 @@ function issue(c) {
   if (!ISSUE_TYPES.includes(type)) throw new GhUsageError(`unknown issue type "${args[0]}" (${ISSUE_TYPES.join(', ')})`);
   const title = args.slice(1).join(' ').replace(/\s+/g, ' ').trim();
   if (title === '') throw new GhUsageError('an issue needs a title');
-  const body = values.body ?? '';
+  const model = values.model === undefined ? undefined : values.model.replace(/\s+/g, ' ').trim();
+  if (model === '' || model?.includes('·')) throw new GhUsageError('--model needs a tier name, for example sonnet');
+  if (values.effort !== undefined && !EFFORTS.includes(values.effort)) throw new GhUsageError(`--effort is ${EFFORTS.join(', ')}`);
+  if (values.effort !== undefined && model === undefined) throw new GhUsageError('--effort needs --model');
+  // The recommended model and effort travel in the body line that `yaw task` reads; a new issue is todo.
+  const body = [values.body ?? '', model === undefined ? '' : `**Model / effort:** ${modelEffort(model, values.effort)}`].filter(Boolean).join('\n\n');
   const extra = [];
   if (values.priority !== undefined) {
     if (!/^P[0-3]$/.test(values.priority)) throw new GhUsageError('--priority is P0, P1, P2 or P3');
@@ -586,6 +591,7 @@ function issue(c) {
     if (!/^(XS|S|M|L|XL)$/.test(values.estimate)) throw new GhUsageError('--estimate is XS, S, M, L or XL');
     extra.push(`estimate:${values.estimate}`);
   }
+  extra.push('status:todo');
   const { slug } = repoInfo(gh);
   const native = nativeIssueTypes(gh, slug).has(type);
   let out;

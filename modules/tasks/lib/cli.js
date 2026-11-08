@@ -6,7 +6,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { modelEffort, parseTasks, renderTasks } from '../../../core/lib/tasks.js';
-import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, modelOption, newTask, oneLine, startTask } from './ledger.js';
+import { ARCHIVE, LedgerError, archiveText, doneTask, formatLedger, formatNext, issueNumber, logTask, modelOption, newTask, oneLine, priorityOption, startTask } from './ledger.js';
 import { createIssue, defaultGh, fetchView, journalComment, syncBoth } from './github.js';
 
 export const TASKS_FILE = 'TASKS.md';
@@ -16,7 +16,7 @@ export const USAGE = [
   '       yaw task start <id>',
   '       yaw task log <id> "text" [--resume "next step"] [--progress 0-100]',
   '       yaw task done <id>',
-  '       yaw task new "title" [--model <tier>] [--effort low|medium|high|xhigh|max]',
+  '       yaw task new "title" [--priority P0|P1|P2|P3] [--model <tier>] [--effort low|medium|high|xhigh|max]',
   'ids: T-012 (local, both) or #41 (github)',
   'Configured Project Status (github start/done) and epic milestones (sync) require user-terminal confirmation.',
 ].join('\n');
@@ -151,7 +151,7 @@ export async function runTask({ verb, args = [], values = {}, mode = 'local', io
         const title = oneLine(args[0]);
         if (title === '') throw new LedgerError('a task needs a title');
         const hint = modelOption(values);
-        const fields = [hint.model ? `**Model / effort:** ${modelEffort(hint.model, hint.effort)}` : '',
+        const fields = [`**Priority:** ${priorityOption(values.priority)}`, '**Status:** todo', hint.model ? `**Model / effort:** ${modelEffort(hint.model, hint.effort)}` : '',
           ...['spec', 'acceptance'].filter((k) => values[k] !== undefined).map((k) => {
             const text = oneLine(values[k]);
             if (!text) throw new LedgerError(`--${k} must not be empty`);

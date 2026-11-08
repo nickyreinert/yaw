@@ -1,6 +1,6 @@
 name: Epic
 description: Describe a larger outcome delivered through linked sub-issues.
-labels: ["type:epic"]
+labels: ["type:epic", "status:todo"]
 body:
   - type: textarea
     id: outcome
@@ -30,6 +30,22 @@ body:
       label: Estimate
       description: Initial relative size; refine using the linked sub-issues.
       options: [XS, S, M, L, XL]
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Recommended model
+      description: The cheapest tier that fits the work; a small model can take routine edits, the top tier architecture and hard problems.
+      options: [low tier (Haiku), middle tier (Sonnet), top tier (Opus)]
+    validations:
+      required: true
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Reasoning effort
+      description: How much reasoning the work needs; low for routine edits, max for the hardest problems.
+      options: [low, medium, high, xhigh, max]
     validations:
       required: true
   - type: input

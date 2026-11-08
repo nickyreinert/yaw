@@ -6,8 +6,8 @@ group: github
 short: "Project management: issue forms, epics, milestones, progress"
 what: "Project-management support on GitHub: structured issues, epics with sub-issues and milestones, a pull-request template, and agent skills that turn a plan into issues."
 details:
-  - "Issue forms for feature, bug, chore, spike and epic ask for acceptance criteria, priority P0-P3, estimate XS-XL and a milestone"
-  - "Form answers stay in the issue text; `just gh-issue --priority P1 --estimate S` also sets the labels the session overview reads"
+  - "Issue forms ask for acceptance criteria, priority, estimate, recommended model, reasoning effort and milestone; status starts as todo"
+  - "Form answers stay in the issue text; `just gh-issue --priority P1 --model sonnet --effort medium` also sets labels the task view reads"
   - "Epics: epic form plus native sub-issues; map an epic to a milestone in .yaw/github.yaml, `just task sync` applies it after you confirm"
   - "Skills: issue-create (interview), issue-triage (find missing fields), epic-plan (split an epic, compare with milestone capacity)"
   - "`just progress` shows closed vs open issues per milestone and finished sub-issues per epic; read only"

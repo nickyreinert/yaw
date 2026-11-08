@@ -97,7 +97,7 @@ export function languageIcon(language) {
 export function moduleIcon(name) {
   return decisionIcon(({ core: 'book', standards: 'ruler', security: 'shield', devenv: 'terminal', github: 'branch', 'git-hooks': 'branch', ci: 'shuffle', 'code-map': 'map', decisions: 'book', communication: 'message', tasks: 'list', review: 'shield', comfort: 'bell', sessions: 'chart', team: 'users', backup: 'memory' })[name] ?? 'box');
 }
-const GROUP_ICONS = { github: 'branch', basics: 'box', memory: 'memory', quality: 'shield', comfort: 'bell' };
+const GROUP_ICONS = { github: 'branch', tasks: 'list', basics: 'box', memory: 'memory', quality: 'shield', comfort: 'bell' };
 const ARCH_DECISIONS = {
   'arch.hosting-control': { 'on-premises': 'building', 'self-hosted': 'server', managed: 'cloud' },
   'arch.libraries': { 'standard-only': 'box', 'open-source': 'open', 'commercial-allowed': 'briefcase' },
@@ -249,6 +249,13 @@ export function renderModuleGroups(root, ctx) {
   root.replaceChildren(groups);
 }
 
+// The Task List keeps TASKS.md on this machine unless GitHub issues are used (alone or with the local list).
+function localOnly(m, ctx) {
+  if (m.name !== 'tasks') return false;
+  if (!ctx.usesGitHub) return true;
+  return (ctx.answers?.['idea.team'] ?? 'solo') === 'solo' && (ctx.answers?.['tasks.mode'] ?? 'local') === 'local';
+}
+
 function moduleCard(m, ctx, selected, hasGit) {
   const on = selected.has(m.name);
   const required = m.name === 'core';
@@ -259,7 +266,7 @@ function moduleCard(m, ctx, selected, hasGit) {
     onchange: (e) => ctx.onToggle(m.name, e.target.checked) });
   const questions = ctx.questionNodes?.(m.name, on) ?? [];
   const card = el('article', { class: `module-card${on ? ' on' : ' off'}` },
-    el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null,
+    el('label', { class: 'module-head' }, input, moduleIcon(m.name), el('strong', { text: m.title ?? m.name }), required ? el('span', { class: 'pill', text: 'required' }) : null, localOnly(m, ctx) ? el('span', { class: 'pill', text: 'Local only' }) : null,
       el('span', { class: 'switch-state small muted', text: on ? 'Active' : 'Off' }),
       el('code', { class: 'small muted', text: m.name, title: m.name })));
 

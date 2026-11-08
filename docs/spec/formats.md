@@ -42,11 +42,13 @@ active      = "## Active" { task }
 task        = "### " id [" (#" number ")"] " " title " — " status [" (" percent " %)"]
               { "- **" field ":** " text }
               [ "- **Journal:**" { "  - " YYYY-MM-DD " " text } ]
-field       = "Brief" | "Model / effort" | "Spec" | "Resume point"
+field       = "Brief" | "Priority" | "Model / effort" | "Spec" | "Resume point"
 status      = "todo" | "in progress" | "blocked" | "in review"
 backlog     = "## Backlog" { "- " id [" (#" number ")"] " " title [" — " note]
+                             [ "  priority: " priority ]
                              [ "  model: " tier [" · effort: " effort] ]
                              [ "  spec: " reference ] [ "  acceptance: " outcome ] }
+priority    = "P0" | "P1" | "P2" | "P3"                  ; P0 blocks the release, P1 needed, P2 desirable, P3 may wait
 effort      = "low" | "medium" | "high" | "xhigh" | "max"
 done        = "## Done → " path                          ; one-line archive entries live in that file
 ```
@@ -58,6 +60,8 @@ done        = "## Done → " path                          ; one-line archive en
 | GitHub only / team | `#123` | – (the ID is the issue) | generated, read-only, starts with the notice |
 
 Model tier and effort (#175): a backlog item carries them on its indented `model:` line (`just task new "title" --model sonnet --effort medium`); `just task start` copies them into the "Model / effort" field as `sonnet · effort: medium`. On GitHub they are the labels `model:<tier>` and `effort:<level>`, or the body line `**Model / effort:** sonnet · effort: medium` (`just task new` writes it); both-mode sync writes that body line. The rules section is written by `yaw init` (local and GitHub wording) and is kept when the GitHub view is regenerated.
+
+Priority and status (T-029): every task carries both. A backlog item is `todo` and has a `priority:` line (`just task new "title" --priority P1`, P2 when omitted); `just task start` copies it into the "Priority" field of the active task, whose status is in the heading. On GitHub the priority is the label `priority:P<n>`, the body line `**Priority:** P1` or the issue-form answer; the status is the label `status:todo|in-progress|in-review|blocked` or the body line `**Status:** todo`. Both-mode sync and `just task new` (GitHub) write the body lines, the issue forms ask for priority, recommended model and reasoning effort and label new issues `status:todo`, and `just gh-issue` accepts `--model` and `--effort`.
 
 The parsed form (`tasks.schema.json`) is `{ readOnly, active[], backlog[], archive?, rules? }`; `renderTasks(parseTasks(text))` gives the canonical text back (`core/lib/tasks.js`).
 
@@ -106,6 +110,8 @@ Mapping per agent (ADR-0021). Checked on 2026-10-20 against the vendor docs and 
 Optional on `PostToolUse` when a compress hook replaced the output (ADR-0007): `rawBytes` and `outBytes` (sizes of the tool's output and of the replacement as JSON) and `method` (a short identifier such as `cap`). The output itself is never stored.
 
 Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against the schema).
+
+`yaw run --compact` (compact module, ADR-0132) appends one line per recipe step to `~/.yaw/logs/run.jsonl`, with the same file rules: `{ v: 1, ts, step, method: ok|warnings|failed, exitCode, rawBytes, outBytes, ms }`. `rawBytes` is the step's combined stdout and stderr, `outBytes` what it printed instead. The output itself is never stored.
 
 ## Session registry (`~/.yaw/yaw.db`)
 

@@ -118,7 +118,7 @@ test('install: local and both start with the canonical empty ledger; github with
     assert.equal(renderTasks(ledger), text, `canonical: ${JSON.stringify(options)}`);
     assert.deepEqual({ readOnly: ledger.readOnly, active: ledger.active, backlog: ledger.backlog, archive: ledger.archive },
       { readOnly, active: [], backlog: [], archive: readOnly ? undefined : 'TASKS.archive.md' }, JSON.stringify(options));
-    assert.deepEqual(ledger.rules.map((r) => /^\d\. \*\*(.+?):\*\*/.exec(r)[1]), ['Track', 'Finish', 'Model and effort', 'Specs and plans']);
+    assert.deepEqual(ledger.rules.map((r) => /^\d\. \*\*(.+?):\*\*/.exec(r)[1]), ['Track', 'Finish', 'Model and effort', 'Priority and status', 'Specs and plans']);
     assert.match(text, readOnly ? /`just task start #<n>` assigns the issue/ : /`just task start <id>` moves an item to Active as "in progress"/);
     assert.match(text, readOnly ? /labels `model:<tier>` and `effort:/ : /`  model: sonnet · effort: medium` under a backlog item/);
     assert.match(text, /`docs\/plan\/` holds temporary plans; delete a plan file and its link here/);
@@ -167,7 +167,7 @@ test('ledger: new, start, log, done on the doc 10 example', () => {
   const ledger = parseTasks(LOCAL_LEDGER);
   assert.equal(nextLocalId(ledger, '- T-020 Old — done 2026-10-01\n'), 'T-021');
   const created = newTask(ledger, 'Dark mode — maybe', '');
-  assert.deepEqual(created, { id: 'T-015', title: 'Dark mode - maybe' });
+  assert.deepEqual(created, { id: 'T-015', title: 'Dark mode - maybe', priority: 'P2' });
 
   const started = startTask(ledger, 't-13');
   assert.deepEqual(ledger.backlog.map((b) => b.id), ['T-014', 'T-015']);
@@ -209,7 +209,7 @@ test('yaw task: a local working day end to end, ledger stays parseable and TASKS
   const log = await task(root, ['log', 'T-001', 'token generation done, tests green', '--resume', 'next: guest join screen', '--progress', '60']);
   assert.equal(log.code, 0, log.err);
   const listing = (await task(root, ['list'])).out;
-  assert.match(listing, /T-001 Online invite flow — in progress \(60 %\)\n {4}resume: next: guest join screen/);
+  assert.match(listing, /T-001 Online invite flow — in progress \(60 %\)\n {4}priority: P2\n {4}resume: next: guest join screen/);
   const ledger = parseTasks(read(root, 'TASKS.md'));
   assert.deepEqual(ledger.active[0].journal, [{ date: '2026-10-21', text: 'token generation done, tests green' }]);
   const done = await task(root, ['done', 'T-001']);
@@ -329,7 +329,7 @@ test('sync (both): creates, links, updates, closes; recorded gh output; the seco
   assert.deepEqual([ledger.active[0].issue, ledger.backlog[0].issue, ledger.backlog[1].issue], [34, 50, 51]);
   assert.match(read(root, 'TASKS.md'), /- T-013 \(#50\) Prop mode: book → shield — small \/ cheap/);
   const created = g.issues.find((i) => i.number === 50);
-  assert.match(created.body, /^<!-- yaw:task T-013 -->\n\n\*\*Note:\*\* small \/ cheap · docs\/plan\/props\.md/);
+  assert.match(created.body, /^<!-- yaw:task T-013 -->\n\n\*\*Status:\*\* todo\n\n\*\*Note:\*\* small \/ cheap · docs\/plan\/props\.md/);
   assert.equal(g.issues.find((i) => i.number === 34).title, 'Online invite flow');
   assert.equal(g.issues.find((i) => i.number === 40).state, 'CLOSED');
   assert.equal(g.issues.find((i) => i.number === 30).state, 'CLOSED', 'already closed stays closed');
@@ -356,7 +356,7 @@ test('sync (both): a closed issue of an open task is reopened; a lost number is 
   const ledger = parseTasks('# Tasks\n\n## Active\n\n## Backlog\n- T-009 Lobby screen\n- T-020 (#99) Ghost\n');
   const g = fakeGh();
   const result = syncBoth({ ledger, gh: g.gh });
-  assert.deepEqual(result.actions.map((a) => `${a.kind} ${a.id} #${a.issue}`), ['linked T-009 #30', 'reopened T-009 #30']);
+  assert.deepEqual(result.actions.map((a) => `${a.kind} ${a.id} #${a.issue}`), ['linked T-009 #30', 'updated T-009 #30', 'reopened T-009 #30']);
   assert.deepEqual(result.warnings, ['T-020: issue #99 was not found; not recreated']);
   assert.equal(ledger.backlog[0].issue, 30);
   assert.equal(g.calls.filter((c) => c[1] === 'create').length, 0);
@@ -400,8 +400,8 @@ test('github view: my issues are Active (status label, journal comments), others
   });
   assert.deepEqual(view.active[1], { id: '#45', title: 'Invite expiry', status: 'in progress' });
   assert.deepEqual(view.backlog, [
-    { id: '#43', title: 'Prop mode: book → shield', note: 'P2 · S' },
-    { id: '#44', title: 'Sound effects', note: 'P3' },
+    { id: '#43', title: 'Prop mode: book → shield', priority: 'P2', note: 'S' },
+    { id: '#44', title: 'Sound effects', priority: 'P3' },
     { id: '#46', title: 'Unlabelled idea' },
   ]);
   assert.equal(view.readOnly, true);
@@ -417,7 +417,7 @@ test('yaw task (github): sync writes the view; list and next read GitHub; start,
   assert.equal(ledger.readOnly, true);
   assert.equal(ledger.active[0].id, '#41');
 
-  assert.match((await task(root, ['next'], { gh: g.gh })).out, /^#43 Prop mode: book → shield — P2 · S/);
+  assert.match((await task(root, ['next'], { gh: g.gh })).out, /^#43 Prop mode: book → shield — S\n {2}priority: P2 · status: todo\n/);
   assert.match((await task(root, ['list'], { gh: g.gh })).out, /#41 Guest join screen — in review/);
 
   g.calls.length = 0;
@@ -435,7 +435,7 @@ test('yaw task (github): sync writes the view; list and next read GitHub; start,
 
   g.calls.length = 0;
   assert.match((await task(root, ['new', 'Lobby chat'], { gh: g.gh })).out, /^#50 Lobby chat/);
-  assert.deepEqual(g.calls[0], ['issue', 'create', '--title', 'Lobby chat', '--body', '']);
+  assert.deepEqual(g.calls[0], ['issue', 'create', '--title', 'Lobby chat', '--body', '**Priority:** P2\n\n**Status:** todo']);
 });
 
 test('yaw task (github): offline list falls back to the last view; a failed refresh after a change is a warning', async () => {
@@ -613,13 +613,13 @@ test('model and effort (#175): new records them, start carries them over, list a
   await task(root, ['new', 'Sound', '--model', 'haiku']);
   await task(root, ['new', 'Plain']);
   let text = read(root, 'TASKS.md');
-  assert.match(text, /^- T-001 Lobby chat\n {2}model: sonnet · effort: medium\n- T-002 Sound\n {2}model: haiku\n- T-003 Plain\n/m);
+  assert.match(text, /^- T-001 Lobby chat\n {2}priority: P2\n {2}model: sonnet · effort: medium\n- T-002 Sound\n {2}priority: P2\n {2}model: haiku\n- T-003 Plain\n/m);
   assert.match(text, /^## How to work with this file$/m, 'the rules survive every rewrite');
-  assert.match((await task(root, ['next'])).out, /^T-001 Lobby chat\n {2}model: sonnet · effort: medium\n$/);
+  assert.match((await task(root, ['next'])).out, /^T-001 Lobby chat\n {2}priority: P2 · status: todo\n {2}model: sonnet · effort: medium\n$/);
   await task(root, ['start', 'T-001']);
   text = read(root, 'TASKS.md');
-  assert.match(text, /### T-001 Lobby chat — in progress \(0 %\)\n- \*\*Model \/ effort:\*\* sonnet · effort: medium\n/);
-  assert.match((await task(root, ['list'])).out, /T-001 Lobby chat — in progress \(0 %\)\n {4}model: sonnet · effort: medium\n/);
+  assert.match(text, /### T-001 Lobby chat — in progress \(0 %\)\n- \*\*Priority:\*\* P2\n- \*\*Model \/ effort:\*\* sonnet · effort: medium\n/);
+  assert.match((await task(root, ['list'])).out, /T-001 Lobby chat — in progress \(0 %\)\n {4}priority: P2\n {4}model: sonnet · effort: medium\n/);
   for (const [args, message] of [
     [['--model', 'sonnet', '--effort', 'huge'], /--effort must be one of low, medium, high, xhigh, max/],
     [['--effort', 'low'], /--effort needs --model/],
@@ -651,9 +651,65 @@ test('model and effort on GitHub (#175): labels or the body line; new writes the
   const g = fakeGh();
   await task(root, ['sync'], { gh: g.gh });
   const ledger = parseTasks(read(root, 'TASKS.md'));
-  assert.equal(ledger.rules.length, 4, 'the generated view keeps the rules of the file');
+  assert.equal(ledger.rules.length, 5, 'the generated view keeps the rules of the file');
   assert.match(ledger.rules[0], /`just task start #<n>`/);
   g.calls.length = 0;
   await task(root, ['new', 'Lobby chat', '--model', 'sonnet', '--effort', 'high'], { gh: g.gh });
-  assert.deepEqual(g.calls[0], ['issue', 'create', '--title', 'Lobby chat', '--body', '**Model / effort:** sonnet · effort: high']);
+  assert.deepEqual(g.calls[0], ['issue', 'create', '--title', 'Lobby chat', '--body', '**Priority:** P2\n\n**Status:** todo\n\n**Model / effort:** sonnet · effort: high']);
+});
+
+// ---------------------------------------------------------------- priority and status (T-029)
+
+test('priority and status (T-029): new defaults to P2, start carries it over, list and next show priority, status and model', async () => {
+  const root = await project({ mode: 'local' });
+  await task(root, ['new', 'Lobby chat', '--priority', 'P1', '--model', 'sonnet', '--effort', 'medium']);
+  await task(root, ['new', 'Plain']);
+  assert.match(read(root, 'TASKS.md'), /^- T-001 Lobby chat\n {2}priority: P1\n {2}model: sonnet · effort: medium\n- T-002 Plain\n {2}priority: P2\n/m);
+  assert.match((await task(root, ['next'])).out, /^T-001 Lobby chat\n {2}priority: P1 · status: todo\n {2}model: sonnet · effort: medium\n$/);
+  await task(root, ['start', 'T-001']);
+  assert.match(read(root, 'TASKS.md'), /### T-001 Lobby chat — in progress \(0 %\)\n- \*\*Priority:\*\* P1\n- \*\*Model \/ effort:\*\* sonnet · effort: medium\n/);
+  const listing = (await task(root, ['list'])).out;
+  assert.match(listing, /T-001 Lobby chat — in progress \(0 %\)\n {4}priority: P1\n {4}model: sonnet · effort: medium\n/);
+  assert.match(listing, /T-002 Plain\n {4}priority: P2 · status: todo\n/);
+  const bad = await task(root, ['new', 'X', '--priority', 'P9']);
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /--priority must be one of P0, P1, P2, P3/);
+  assert.equal(parseTasks(read(root, 'TASKS.md')).backlog.length, 1);
+});
+
+test('priority, status, model and effort reach GitHub issues (T-029): sync bodies, created issues, view from labels or issue forms', async () => {
+  const backlog = issueBody({ id: 'T-002', title: 'S', priority: 'P1', model: 'haiku', effort: 'low' });
+  for (const line of ['**Priority:** P1', '**Status:** todo', '**Model / effort:** haiku · effort: low']) assert.ok(backlog.includes(line), line);
+  const active = issueBody({ id: 'T-003', title: 'A', status: 'blocked', priority: 'P0', model: 'opus · effort: high' });
+  for (const line of ['**Priority:** P0', '**Status:** blocked', '**Model / effort:** opus · effort: high']) assert.ok(active.includes(line), line);
+
+  // Issue forms render dropdown answers as "### Label" sections; labels win when both exist.
+  const form = (extra) => `### User story\n\nAs a host\n\n### Priority\n\nP1\n\n### Recommended model\n\nmiddle tier (Sonnet)\n\n### Reasoning effort\n\nmedium\n${extra ?? ''}`;
+  assert.deepEqual(issueModel({ labels: [], body: form() }), { model: 'middle tier (Sonnet)', effort: 'medium' });
+  const view = viewFromIssues({
+    mine: [{ number: 7, title: 'Mine', labels: [{ name: 'priority:P0' }, { name: 'status:blocked' }], body: form(), comments: [] }],
+    open: [{ number: 8, title: 'Next', labels: [], body: form() }, { number: 9, title: 'Body line', labels: [{ name: 'estimate:S' }], body: '**Priority:** P2' }],
+    owner: 'demo-dev',
+  });
+  assert.equal(view.active[0].priority, 'P0');
+  assert.equal(view.active[0].status, 'blocked');
+  assert.equal(view.active[0].model, 'middle tier (Sonnet) · effort: medium');
+  assert.deepEqual(view.backlog[0], { id: '#8', title: 'Next', priority: 'P1', model: 'middle tier (Sonnet)', effort: 'medium' });
+  assert.equal(view.backlog[1].priority, 'P2', 'the body line is read when no label exists');
+  assert.deepEqual(parseTasks(renderTasks(view)), view);
+
+  const root = await project({ mode: 'github' });
+  const g = fakeGh();
+  await task(root, ['new', 'Lobby chat', '--priority', 'P1', '--model', 'sonnet', '--effort', 'high'], { gh: g.gh });
+  assert.deepEqual(g.calls.find((c) => c[1] === 'create'), ['issue', 'create', '--title', 'Lobby chat', '--body',
+    '**Priority:** P1\n\n**Status:** todo\n\n**Model / effort:** sonnet · effort: high']);
+});
+
+test('the working rules name priority, status, model and effort for every task (T-029)', async () => {
+  for (const options of [{ mode: 'local' }, { mode: 'github' }]) {
+    const root = await project(options);
+    const text = read(root, 'TASKS.md');
+    assert.match(text, /Priority and status:/, JSON.stringify(options));
+    assert.match(read(root, 'AGENTS.md'), /priority, status, model tier and reasoning effort/, JSON.stringify(options));
+  }
 });

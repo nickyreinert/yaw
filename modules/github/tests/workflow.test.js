@@ -73,7 +73,7 @@ test('issue forms and skills are valid, installed for each adapter and tracked f
   for (const type of ['feature', 'bug', 'chore', 'spike', 'epic']) {
     const path = `.github/ISSUE_TEMPLATE/${type}.yml`;
     const form = parse(read(root, path));
-    assert.deepEqual(form.labels, [`type:${type}`]);
+    assert.deepEqual(form.labels, [`type:${type}`, 'status:todo']);
     for (const id of ['priority', 'estimate', 'acceptance', 'milestone']) {
       const field = form.body.find((f) => f.id === id);
       assert.equal(field.validations.required, true, `${type}/${id}`);

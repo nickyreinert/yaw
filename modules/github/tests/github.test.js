@@ -407,7 +407,7 @@ test('issue: native issue type when the repository has it, otherwise the type:* 
   const b = await yaw(root, ['issue', 'feature', 'Add login'], { gh: fallback, env });
   assert.match(b.out, /issues\/8 \(label type:feature\)/);
   const create = fallback.calls.find((c) => c.args[1] === 'create');
-  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', '', '--label', 'type:feature']);
+  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', '', '--label', 'type:feature', '--label', 'status:todo']);
 
   assert.match((await yaw(root, ['issue', 'story', 'x'], { gh: fakeGh(), env })).err, /unknown issue type/);
   assert.match((await yaw(root, ['issue', 'bug', 'x', '--priority', 'P9'], { gh: fakeGh(), env })).err, /--priority/);
@@ -892,4 +892,36 @@ test('guarded GitHub verbs and the configured task workflow all require authoris
   const code = readFileSync(join(KIT_ROOT, 'modules', 'github', 'lib', 'cli.js'), 'utf8');
   assert.equal((code.match(/await authorise\(/g) ?? []).length, GUARDED.length + 1, 'one additional call site guards configured task workflows');
   for (const verb of GUARDED) assert.ok(VERBS.includes(verb), verb);
+});
+
+// ----------------------------------------------------------------------------- task fields (T-029)
+
+test('issue forms and planning skills carry priority, status, recommended model and reasoning effort (T-029)', () => {
+  const dir = join(KIT_ROOT, 'modules', 'github', 'templates', '.github', 'ISSUE_TEMPLATE');
+  for (const name of ['bug', 'chore', 'epic', 'feature', 'spike']) {
+    const form = parse(readFileSync(join(dir, `${name}.yml`), 'utf8'));
+    const field = (id) => form.body.find((b) => b.id === id);
+    assert.ok(form.labels.includes('status:todo'), `${name}: status`);
+    assert.deepEqual(field('priority').attributes.options, ['P0', 'P1', 'P2', 'P3'], name);
+    assert.equal(field('model').attributes.label, 'Recommended model', name);
+    assert.ok(field('model').attributes.options.length >= 3 && field('model').validations.required, name);
+    assert.deepEqual(field('effort').attributes.options, ['low', 'medium', 'high', 'xhigh', 'max'], name);
+    assert.equal(field('effort').attributes.label, 'Reasoning effort', name);
+  }
+  for (const skill of ['issue-create', 'epic-plan', 'issue-triage']) {
+    const text = readFileSync(join(KIT_ROOT, 'modules', 'github', 'skills', skill, 'SKILL.md'), 'utf8');
+    for (const word of [/priority/i, /status/i, /model/i, /effort/i]) assert.match(text, word, `${skill} ${word}`);
+  }
+});
+
+test('issue: model, effort and the todo status are written for new issues (T-029)', async () => {
+  const { root, env } = await repo();
+  const gh = fakeGh({ native: [] });
+  const r = await yaw(root, ['issue', 'feature', 'Add login', '--priority', 'P1', '--model', 'sonnet', '--effort', 'medium', '--body', 'why'], { gh, env });
+  assert.equal(r.code, 0, r.err);
+  const create = gh.calls.find((c) => c.args[1] === 'create');
+  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', 'why\n\n**Model / effort:** sonnet · effort: medium',
+    '--label', 'type:feature', '--label', 'priority:P1', '--label', 'status:todo']);
+  assert.match((await yaw(root, ['issue', 'bug', 'x', '--effort', 'high'], { gh: fakeGh(), env })).err, /--effort needs --model/);
+  assert.match((await yaw(root, ['issue', 'bug', 'x', '--model', 's', '--effort', 'huge'], { gh: fakeGh(), env })).err, /--effort/);
 });
