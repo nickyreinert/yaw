@@ -56,8 +56,6 @@ const SOLO_FULL = {
   ...CONSTRAINTS,
   'user.comfort': [],
   'user.length': 'balanced',
-  'user.register': 'professional',
-  'user.examples': 'when-helpful',
   'user.explain': 'short-paragraph',
   'quality.review-quality': 'off',
   'quality.review-logic': 'off',
@@ -73,7 +71,7 @@ const QUICK = {
   'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
   'arch.language': 'typescript', 'arch.runs-on': 'local', ...CONSTRAINTS,
 };
-Object.assign(QUICK, { 'user.length': 'balanced', 'user.register': 'professional', 'user.examples': 'when-helpful', 'user.explain': 'short-paragraph' });
+Object.assign(QUICK, { 'user.length': 'balanced', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];
 const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
 
@@ -155,7 +153,7 @@ test('agents: Gemini is selectable in Quick without an obsolete phase gate', asy
 });
 
 test('expertise: a layperson is still asked the Q and S questions', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Your experience with software': 'layperson', 'Answer length': '', 'Language for chat': 'en', 'Register': 'plain-words' });
+  const r = await init({ depth: 'full', ...IDEA, 'Your experience with software': 'layperson', 'Depth: How long': '', 'Language for chat': 'en' });
   assert.equal(r.code, 0, r.err);
   assert.equal(r.doc.answers['user.language'], 'en', 'Q question answered');
   const shown = r.prompter.shown.join('');

@@ -1,6 +1,6 @@
 // Pure interview rules shared by the terminal, server and browser (ADR-0072).
 import { asksAtDepth, RETIRED_ARCHITECTURE } from './depth.js';
-export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.register', 'user.examples', 'user.explain'];
+export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.explain'];
 export const isPreference = (q) => PERSONAL_PREFERENCES.includes(typeof q === 'string' ? q : q.id);
 export function orderSetupQuestions(questions) {
   const rank = (q) => q.id.startsWith('user.') && (isPreference(q) || q.id === 'user.agents') ? 0 : q.id.startsWith('idea.') ? 1 : q.id.startsWith('arch.') ? 2 : 3;

@@ -36,7 +36,7 @@ questions:
     scope: user
     mode: Q
     type: choice
-    label: How often should the agent ask before acting?
+    label: "Frequency: How often should the agent ask before acting?"
     help: autonomy
     choices:
       - { value: ask-often, label: Ask often }

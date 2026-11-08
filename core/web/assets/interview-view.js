@@ -66,7 +66,7 @@ let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
 const sectionOf = (question) => {
   const id = typeof question === 'string' ? question : question.id;
-  if (id.startsWith('user.') && !['user.agents', 'user.expertise'].includes(id)) return 'communication';
+  if (id.startsWith('user.') && id !== 'user.agents') return 'communication';
   if (['quality.error-detail', 'quality.log-output', 'quality.documentation'].includes(id)) return 'practices';
   return id.split('.')[0];
 };
@@ -405,8 +405,8 @@ function renderCommunication() {
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderCommunicationCard(section.node.querySelector('.communication-card-holder'), {
     modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
-    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onExplain: () => explain('Communication style', [helpText('Answer length, wording, examples and decision explanations.')], { module: 'communication' }),
-    questionNodes: (name, on) => [...controls.values()].filter((c) => isPreference(c.q) && c.q.id !== 'user.expertise' && !c.node.hidden)
+    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onExplain: () => explain('Communication style', [helpText('Language, experience, how often the agent asks, answer depth and responses.')], { module: 'communication' }),
+    questionNodes: (name, on) => [...controls.values()].filter((c) => isPreference(c.q) && !c.node.hidden)
       .map((c) => { c.inputs.forEach((input) => { input.disabled = sectionEditing(); }); return c.node; }),
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $('module-communication')?.focus(); },
   });

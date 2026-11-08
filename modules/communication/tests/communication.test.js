@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { readManifest } from '../../../core/render/manifest.js';
 import { initProject, readAnswers, removeModule, addModule } from '../../../core/render/project.js';
 import { OVERLAY_MAX_LINES } from '../../../core/render/kit.js';
+import { collectQuestions } from '../../../core/render/kit.js';
 import { KIT_ROOT, read, readJson, readTree, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 
 const MODULES = ['core', 'communication', 'standards'];
@@ -41,25 +42,47 @@ test('default profile: four lines in AGENTS.md, no output style, no settings ent
 
 test('non-default length or register: Claude output style and outputStyle setting', async () => {
   const root = await project({ extra: { 'user.length': 'brief', 'user.expertise': 'expert' } });
-  assert.match(read(root, 'AGENTS.md'), /Keep answers short/);
+  assert.match(read(root, 'AGENTS.md'), /Prefer bullet points, key points and direct answers\. Avoid unnecessary explanations\./);
   assert.match(read(root, 'AGENTS.md'), /user is an expert/);
   const style = read(root, '.claude/output-styles/yaw.md');
   assert.match(style, /^---\nname: YAW\n/);
-  assert.match(style, /Keep answers short/);
+  assert.match(style, /Prefer bullet points/);
   assert.deepEqual(readJson(root, '.claude/settings.json'), { outputStyle: 'YAW' });
-  const reg = await project({ extra: { 'user.register': 'technical' } });
+  const reg = await project({ extra: { 'user.expertise': 'expert' } });
   assert.match(read(reg, '.claude/output-styles/yaw.md'), /precise technical terms/);
 });
 
-test('other answers (examples, explain) alone do not create an output style', async () => {
-  const root = await project({ extra: { 'user.examples': 'never', 'user.explain': 'on-request' } });
-  assert.match(read(root, 'AGENTS.md'), /Do not use examples/);
+test('wording and examples follow the experience level; no separate questions remain', async () => {
+  const ids = collectQuestions(KIT_ROOT, ['core', 'communication']).map((q) => q.id);
+  assert.equal(ids.includes('user.register'), false);
+  assert.equal(ids.includes('user.examples'), false);
+  const lay = read(await project({ extra: { 'user.expertise': 'layperson' } }), 'AGENTS.md');
+  assert.match(lay, /plain words/);
+  assert.match(lay, /Illustrate every explanation/);
+  const mid = read(await project({ extra: { 'user.expertise': 'intermediate' } }), 'AGENTS.md');
+  assert.match(mid, /professional tone/);
+  assert.match(mid, /examples or analogies when they help/);
+  const expert = read(await project({ extra: { 'user.expertise': 'expert' } }), 'AGENTS.md');
+  assert.match(expert, /precise technical terms/);
+  assert.match(expert, /Do not use examples or analogies unless asked/);
+});
+
+test('Communication Style questions are labelled by topic', () => {
+  const labels = Object.fromEntries(collectQuestions(KIT_ROOT, ['core', 'communication']).map((q) => [q.id, q.label]));
+  assert.equal(labels['user.autonomy'], 'Frequency: How often should the agent ask before acting?');
+  assert.equal(labels['user.length'], 'Depth: How long should answers be?');
+  assert.equal(labels['user.explain'], 'Response: Should the agent explain its actions?');
+});
+
+test('the response answer alone does not create an output style', async () => {
+  const root = await project({ extra: { 'user.explain': 'on-request' } });
+  assert.match(read(root, 'AGENTS.md'), /only when asked/);
   assert.equal(existsSync(join(root, '.claude/output-styles/yaw.md')), false);
 });
 
 test('without Claude there is no output style, even when non-default', async () => {
   const root = await project({ agents: ['codex'], extra: { 'user.length': 'brief' } });
-  assert.match(read(root, 'AGENTS.md'), /Keep answers short/);
+  assert.match(read(root, 'AGENTS.md'), /Prefer bullet points/);
   assert.equal(existsSync(join(root, '.claude')), false);
 });
 
@@ -68,7 +91,7 @@ test('team mode (ADR-0013): the personal profile is not committed', async () => 
     const root = await project({ extra: { 'idea.team': team, 'user.length': 'brief' } });
     const agentsMd = read(root, 'AGENTS.md');
     assert.equal(section(agentsMd, 'communication'), undefined);
-    assert.doesNotMatch(agentsMd, /Keep answers short/);
+    assert.doesNotMatch(agentsMd, /Prefer bullet points/);
     assert.equal(existsSync(join(root, '.claude')), false);
     assert.doesNotMatch(agentsMd, /Chat in "de"|Ask before risky/);
     assert.match(agentsMd, /agree on chat language and autonomy per contributor/);
@@ -118,7 +141,7 @@ test('removing communication removes optional artifacts, keeps core preferences 
     assert.equal(Object.hasOwn(left, gone), false, gone);
   }
   assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication|yaw:standards/);
-  assert.match(read(root, 'AGENTS.md'), /Keep answers short/, 'core still applies personal preferences without an optional output style');
+  assert.match(read(root, 'AGENTS.md'), /Prefer bullet points/, 'core still applies personal preferences without an optional output style');
   assert.equal(readAnswers(root).answers['user.length'], 'brief'); // user answers kept
   assert.equal(existsSync(join(root, '.yaw/base/docs/standards.md')), false);
   assert.equal(existsSync(join(root, '.yaw/base/docs/engineering.md')), true, 'core engineering baseline survives removing optional modules');

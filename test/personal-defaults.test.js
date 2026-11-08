@@ -15,7 +15,7 @@ import { createStyle } from '../core/cli/style.js';
 import { KIT_ROOT, capture, cleanEnv, scripted, tmp } from './helpers/fixtures.js';
 
 const BASE = { 'idea.text': 'A local note organizer.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
-const PERSONAL = { 'user.expertise': 'layperson', 'user.language': 'en', 'user.autonomy': 'ask-often', 'user.length': 'brief', 'user.register': 'plain', 'user.examples': 'always', 'user.explain': 'one-line' };
+const PERSONAL = { 'user.expertise': 'layperson', 'user.language': 'en', 'user.autonomy': 'ask-often', 'user.length': 'brief', 'user.explain': 'one-line' };
 const fixture = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: cleanEnv(tmp()) });
 const profile = (f) => join(f.env.HOME, '.yaw/user-profile.yaml');
 function prompts({ mode = 'basic', answers = PERSONAL, apply = true, offer = true, save = true } = {}) {
@@ -68,7 +68,7 @@ test('Quick uses factory or saved preferences without personal prompts or implic
     assert.equal(answers['user.expertise'], saved ? 'layperson' : 'intermediate');
     assert.equal(answers['user.length'], saved ? 'brief' : 'balanced');
     const instructions = readFileSync(join(f.root, 'AGENTS.md'), 'utf8');
-    assert.match(instructions, saved ? /Keep answers short and to the point/ : /Give balanced answers/);
+    assert.match(instructions, saved ? /Prefer bullet points, key points and direct answers/ : /Give balanced answers/);
     assert.equal(existsSync(profile(f)), saved);
     if (saved) assert.equal(readFileSync(profile(f), 'utf8'), before);
     else assert.match(result.out, /No personal defaults set/);

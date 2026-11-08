@@ -17,7 +17,7 @@ import { kickoffPrompt } from '../core/lib/kickoff.js';
 import { foundationContext } from '../core/lib/foundations.js';
 
 const BASE = { 'idea.text': 'Rename photos safely for a local photographer.', 'arch.language': 'python', 'arch.runs-on': 'local' };
-const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief', 'user.register': 'technical' };
+const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief' };
 const fixture = () => ({ root: tmp('yaw-quick-'), kitRoot: KIT_ROOT, env: { HOME: tmp('yaw-quick-home-'), PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':') } });
 function save(f, answers = PERSONAL) {
   saveSetup({ ...f, answers, mode: 'quick', projectRoot: f.root, kit: '0.1.0', preset: false, profile: true });
@@ -102,7 +102,7 @@ test('Quick CLI and browser reuse the same saved personal values without asking 
   const p = prompts(), r = await cli(f, p);
   assert.equal(r.code, 0, r.err);
   const doc = readAnswers(f.root);
-  for (const [id, value] of Object.entries(PERSONAL).filter(([id]) => !['user.length', 'user.register'].includes(id))) assert.deepEqual(doc.answers[id], value);
+  for (const [id, value] of Object.entries(PERSONAL).filter(([id]) => id !== 'user.length')) assert.deepEqual(doc.answers[id], value);
   const shown = p.shown.join('');
   for (const label of ['Your experience with software', 'Language for chat', 'How often should the agent ask', 'How long should answers be']) assert.ok(!shown.includes(label));
   assert.match(shown, /What language do you want to use/);

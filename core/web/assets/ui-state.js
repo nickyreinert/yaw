@@ -111,25 +111,14 @@ export function focusStepStart(start, heading) {
 export function interviewDetailText(id) {
   return ({
     'user.length': [
-      'Brief: key points and direct answers.',
+      'Brief: bullet points, key points and direct answers; no unnecessary explanations.',
       'Balanced: the result first, with enough context to understand it.',
       'Extensive: fuller reasoning and supporting detail.',
     ],
-    'user.register': [
-      'Plain words: everyday language; avoid jargon.',
-      'Professional: neutral workplace language.',
-      'Technical: precise technical terms.',
-      'Scientific: rigorous wording; state the basis for claims.',
-    ],
-    'user.examples': [
-      'Only when useful: add an example when it helps explain the point.',
-      'Always: illustrate each explanation with an example or analogy.',
-      'Never: include examples only when you explicitly ask for them.',
-    ],
     'user.explain': [
-      'In one line: give the reason briefly.',
-      'In a short paragraph: explain the choice with a little context.',
-      'Only on request: give the reason when you ask.',
+      'Short confirmation: say briefly what was done.',
+      'Detailed change report: say what changed and why.',
+      'Only on request: explain actions when you ask.',
     ],
     'user.autonomy': [
       'Ask often: check before every non-trivial change.',
@@ -138,9 +127,9 @@ export function interviewDetailText(id) {
     ],
     'user.language': ['Sets the language used in chat. Code, comments and project documentation remain in English.'],
     'user.expertise': [
-      'Layperson: plain language, explained terms and step-by-step guidance.',
-      'Intermediate: concise explanations with context for less familiar decisions.',
-      'Expert: precise technical language; skip introductory explanations.',
+      'Layperson: plain words, examples and analogies, explained terms and step-by-step guidance.',
+      'Intermediate: professional wording with context for less familiar decisions; examples when they help.',
+      'Expert: precise technical language, no examples unless asked; skip introductory explanations.',
       'This changes the agent’s explanation style in `AGENTS.md`. Question coverage and tool permissions stay the same.',
     ],
     'idea.team': [

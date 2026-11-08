@@ -1,12 +1,12 @@
 # modules/communication/module.yaml (Y-5.1, ADR-0013, ADR-0024): speaking style from the user profile.
 name: communication
-description: Renders the user profile (length, register, examples, explanation, experience) into AGENTS.md and, when it is not the default, a Claude output style.
+description: Renders the user profile (depth, response, experience) into AGENTS.md and, when it is not the default, a Claude output style.
 title: How the agent talks to you
 group: basics
-short: "How long, how technical, how explained"
-what: "Answer length, tone, examples and explanations, taken from your personal profile."
+short: "How long and how explained"
+what: "Answer depth and responses, with wording and examples following your experience, taken from your personal profile."
 adds:
-  - "Notes in AGENTS.md: answer length, wording, examples, explanations"
+  - "Notes in AGENTS.md: answer depth, wording and examples for your experience, responses"
   - "A Claude output style when you leave the defaults"
 example: { when: "Profile: short, in German, explain choices", then: "\"Ich nehme SQLite, weil die Daten lokal bleiben.\"" }
 depends: [core]
@@ -17,45 +17,21 @@ questions:
     scope: user
     mode: Q
     type: choice
-    label: How long should answers be?
+    label: "Depth: How long should answers be?"
     choices:
-      - { value: brief, label: Brief and on point }
+      - { value: brief, label: Brief & on point }
       - { value: balanced, label: Balanced }
       - { value: extensive, label: Extensive }
     default: balanced
-  - id: user.register
-    ref: "0.4"
-    scope: user
-    mode: S
-    type: choice
-    label: How technical should the agent's wording be?
-    choices:
-      - { value: plain, label: Plain words }
-      - { value: professional, label: Professional }
-      - { value: technical, label: Technical }
-      - { value: scientific, label: Scientific }
-    default: professional
-  - id: user.examples
-    ref: "0.5"
-    scope: user
-    mode: S
-    type: choice
-    label: Should the agent use examples and analogies?
-    hint: "Examples and analogies in agent explanations."
-    choices:
-      - { value: when-helpful, label: Only when useful }
-      - { value: always, label: Always }
-      - { value: never, label: Never }
-    default: when-helpful
   - id: user.explain
     ref: "0.6"
     scope: user
     mode: S
     type: choice
-    label: Should the agent explain why it chose something?
+    label: "Response: Should the agent explain its actions?"
     choices:
-      - { value: one-line, label: In one line }
-      - { value: short-paragraph, label: In a short paragraph }
+      - { value: one-line, label: Short confirmation }
+      - { value: short-paragraph, label: Detailed change report }
       - { value: on-request, label: Only on request }
     default: short-paragraph
 outputs:

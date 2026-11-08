@@ -182,28 +182,28 @@ const AUTONOMY = {
   'act-and-report': 'Act, then report what you did and why.',
 };
 
-// Communication style lines, rendered from the user profile (answers user.length ... user.expertise).
+// Communication style lines, rendered from the user profile (answers user.length, user.explain, user.expertise).
+// Wording and examples follow the experience level.
 const STYLE = {
   length: {
-    brief: 'Keep answers short and to the point.',
+    brief: 'Prefer bullet points, key points and direct answers. Avoid unnecessary explanations.',
     balanced: 'Give balanced answers: the result first, then the reasoning that matters.',
     extensive: 'Give thorough answers with full detail.',
   },
   register: {
-    plain: 'Use plain words; avoid jargon.',
-    professional: 'Use a professional tone.',
-    technical: 'Use precise technical terms.',
-    scientific: 'Use scientific precision and name the basis for claims.',
+    layperson: 'Use plain words; avoid jargon.',
+    intermediate: 'Use a professional tone.',
+    expert: 'Use precise technical terms.',
   },
   examples: {
-    'when-helpful': 'Use examples or analogies when they help.',
-    always: 'Illustrate every explanation with an example or analogy.',
-    never: 'Do not use examples or analogies unless asked.',
+    layperson: 'Illustrate every explanation with an example or analogy.',
+    intermediate: 'Use examples or analogies when they help.',
+    expert: 'Do not use examples or analogies unless asked.',
   },
   explain: {
-    'one-line': 'Explain why you chose something in one line.',
-    'short-paragraph': 'Explain why you chose something in a short paragraph.',
-    'on-request': 'Explain your reasoning only when asked.',
+    'one-line': 'After a change, confirm briefly what was done.',
+    'short-paragraph': 'After a change, report in detail what changed and why.',
+    'on-request': 'Explain your actions only when asked.',
   },
   expertise: {
     layperson: 'The user is new to software development: explain terms and steps.',
@@ -211,7 +211,7 @@ const STYLE = {
     expert: 'The user is an expert: skip the basics.',
   },
 };
-const STYLE_DEFAULTS = { length: 'balanced', register: 'professional' };
+const STYLE_DEFAULTS = { length: 'balanced', expertise: 'intermediate' };
 
 // ADR-0024: the stack overlay of the standards module (profiles/<p>/standards.md) has at most 20 lines.
 export const OVERLAY_MAX_LINES = 20;
@@ -372,18 +372,18 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     rules: {
       autonomy: AUTONOMY[flat['user.autonomy']] ?? '',
       length: STYLE.length[flat['user.length']] ?? '',
-      register: STYLE.register[flat['user.register']] ?? '',
-      examples: STYLE.examples[flat['user.examples']] ?? '',
+      register: STYLE.register[flat['user.expertise'] ?? STYLE_DEFAULTS.expertise] ?? '',
+      examples: STYLE.examples[flat['user.expertise'] ?? STYLE_DEFAULTS.expertise] ?? '',
       explain: STYLE.explain[flat['user.explain']] ?? '',
       expertise: STYLE.expertise[flat['user.expertise']] ?? '',
     },
     // ADR-0013: the user profile is personal; a team repository does not commit it.
     team,
     coreCommunication: !team && !modules.includes('communication'),
-    // Output style: Claude only, and only when length or register differ from the default (doc 04).
+    // Output style: Claude only, and only when length or experience (wording) differ from the default (doc 04).
     outputStyle: !team && (flat['user.agents'] ?? []).includes('claude')
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
-        || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
+        || (flat['user.expertise'] ?? STYLE_DEFAULTS.expertise) !== STYLE_DEFAULTS.expertise),
     profileStandards: profileOverlay(kitRoot, profiles),
     devenv: profileDevenv(kitRoot, profiles),
     // ADR-0027: toolchain steps for the ci module.

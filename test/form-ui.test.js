@@ -82,9 +82,9 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
   assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
-  assert.match(communication, /label: Should the agent use examples and analogies\?/);
-  assert.match(communication, /Only when useful/);
-  assert.match(communication, /Examples and analogies in agent explanations/);
+  assert.match(communication, /label: "Depth: How long should answers be\?"/);
+  assert.match(communication, /label: "Response: Should the agent explain its actions\?"/);
+  assert.doesNotMatch(communication, /user\.register|user\.examples/);
 });
 async function serverFixture(t, extra = {}) {
   const f = fixture();

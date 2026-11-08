@@ -285,7 +285,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   // Defaults ---------------------------------------------------------------------------------------------
   // One editor for your defaults (profile + tool defaults) or one preset (answers only), chosen at the top.
   const SUBTABS = [['about', 'About you'], ['communication', 'Communication'], ['tools', 'Tools'], ['workflow', 'Workflow']];
-  const subOf = (id) => ['user.agents', 'user.expertise'].includes(id) ? 'about' : 'communication';
+  const subOf = (id) => id === 'user.agents' ? 'about' : 'communication';
   let setupPolicy = null, target = '', preset = null, policy = {}, tools = new Set(), touched = new Set(), dirty = { profile: false, tools: false }, sub = 'about', note = '';
   async function loadInterview() {
     [setupPolicy, profile, presets] = await Promise.all([get('global/setup-defaults'), get('global/profile'), get('global/presets')]);

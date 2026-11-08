@@ -5,8 +5,8 @@ import { fileTreeEntries } from './project-tree.js';
 export { filePurpose } from './project-tree.js';
 
 const SHORT = {
-  'user.agents': 'Agents', 'user.expertise': 'Experience', 'user.language': 'Chat language', 'user.autonomy': 'Autonomy',
-  'user.length': 'Answer length', 'user.register': 'Wording', 'user.examples': 'Examples', 'user.explain': 'Explanations',
+  'user.agents': 'Agents', 'user.expertise': 'Experience', 'user.language': 'Chat language', 'user.autonomy': 'Frequency',
+  'user.length': 'Depth', 'user.explain': 'Response',
   'user.comfort': 'Comfort helpers', 'idea.text': 'Purpose', 'idea.team': 'Team', 'tasks.use-github': 'GitHub', 'tasks.mode': 'Task tracking',
   'team.session-context': 'Session context', 'arch.language': 'Language', 'arch.runs-on': 'Runtime', 'arch.framework': 'Framework',
   'arch.library-strategy': 'Build or reuse', 'arch.docker': 'Docker support', 'arch.wrapper': 'Wrapper', 'quality.error-detail': 'User-facing errors', 'quality.log-output': 'Diagnostic logs', 'quality.documentation': 'Internal documentation',
