@@ -6,8 +6,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { main } from '../../../core/cli/main.js';
 import { KIT_ROOT, capture, cleanEnv, tmp } from '../../../test/helpers/fixtures.js';
-import { claudeFolder, findSessions, inProject, workspaceFields } from '../lib/import.js';
+import { boundedLines, claudeFolder, findSessions, inProject, workspaceFields } from '../lib/import.js';
 import { realRoot, registryFile, withRegistry } from '../lib/registry.js';
+import { longLineFile, peakDuring } from '../../../test/helpers/long-line.js';
 
 const SECRET = 'PROMPT-CANARY-7f3a';
 const jsonl = (rows) => `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`;
@@ -130,4 +131,21 @@ test('global history discovery spans all agents and projects without importing o
   assert.equal(existsSync(registryFile(env)), false);
   assert.ok(inProject('/absolute/project', null));
   assert.ok(!inProject('relative', null));
+});
+
+test('history import skips an oversized line without buffering it (T-016)', () => {
+  const native = 'aaaa1111-0000-4000-8000-000000000001';
+  const line = (time, content) => ({ type: 'user', sessionId: native, cwd: '/p', timestamp: time, message: { role: 'user', content } });
+  const file = longLineFile(tmp(), line('2026-10-20T09:00:00.000Z', 'a'), line('2026-10-20T09:30:00.000Z', 'PAD'), line('2026-10-20T10:00:00.000Z', 'b'));
+  const { grewMiB, result } = peakDuring(join(KIT_ROOT, 'modules/sessions/lib/import.js'), 'mod.readClaude(file, null)', file);
+  assert.equal(result.native, native); assert.equal(result.started, '2026-10-20T09:00:00.000Z'); assert.equal(result.ended, '2026-10-20T10:00:00.000Z');
+  assert.ok(grewMiB < 48, `peak RSS grew ${grewMiB.toFixed(1)} MiB while skipping a 64 MiB line`);
+});
+
+test('bounded lines: CRLF, characters split across chunks, a last line without newline, an over-limit line', async () => {
+  const bytes = Buffer.from('a\r\nü€\n0123456789\n\nend');
+  const chunks = [bytes.subarray(0, 4), bytes.subarray(4, 6), bytes.subarray(6, 12), bytes.subarray(12)];
+  const out = [];
+  for await (const line of boundedLines(chunks, 8)) out.push(line);
+  assert.deepEqual(out, ['a', 'ü€', null, '', 'end']);
 });

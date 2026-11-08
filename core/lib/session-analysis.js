@@ -1,8 +1,6 @@
 import { createReadStream, constants, openSync, closeSync, fstatSync, readFileSync } from 'node:fs';
-import { createInterface } from 'node:readline';
-import { once } from 'node:events';
 import { createHash } from 'node:crypto';
-import { findSessions, transcriptFiles } from '../../modules/sessions/lib/import.js';
+import { boundedLines, findSessions, transcriptFiles } from '../../modules/sessions/lib/import.js';
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
 import { effectiveSources } from './session-sources.js';
@@ -13,7 +11,7 @@ export const LABELS = {
   behaviour: ['admits_error', 'apology_loop', 'sycophantic_admission', 'none'],
   failure: ['misunderstood_intent', 'wrong_scope', 'broke_something', 'ignored_rule_or_adr', 'hallucinated_api', 'too_slow', 'tooling_error', 'none'],
 };
-// Transcripts are streamed in full; only single lines over MAX_LINE (usually huge tool output) are skipped.
+// Transcripts are streamed in full; only single lines over MAX_LINE bytes (usually huge tool output) are skipped unbuffered.
 // READER marks rows read this way, so rows from the older capped reader are read once more.
 const MAX_LINE = 4 * 1024 * 1024, READER = 2;
 const textOf = (content) => typeof content === 'string' ? content : Array.isArray(content)
@@ -68,33 +66,31 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
     limited = st.size > maxBytes;
-    input = createReadStream(file, { fd, encoding: 'utf8', ...(maxBytes === Infinity ? {} : { end: maxBytes - 1 }) });
-    const lines = createInterface({ input, crlfDelay: Infinity });
-    try {
-      for await (const line of lines) {
-        if (!line) continue;
-        if (line.length > MAX_LINE) { limited = true; continue; }
-        let o;
-        try { o = JSON.parse(line); } catch { limited = true; continue; }
-        const m = messageOf(agent, o);
-        if (!m?.text) continue;
-        const key = m.id ? `${m.role}:${m.id}` : null;
-        const existing = key && seen.get(key);
-        if (existing) {
-          if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
-          continue;
-        }
-        if (messages.length >= maxMessages) { limited = true; break; }
-        const message = { role: m.role, text: m.text, time: m.time };
-        if (key) seen.set(key, message);
-        messages.push(message);
-        if (m.role === 'user' && ++userTurns > maxUserTurns) break;
+    input = createReadStream(file, { fd, ...(maxBytes === Infinity ? {} : { end: maxBytes - 1 }) });
+    for await (const line of boundedLines(input, MAX_LINE)) {
+      if (line === null) { limited = true; continue; }
+      if (!line) continue;
+      let o;
+      try { o = JSON.parse(line); } catch { limited = true; continue; }
+      const m = messageOf(agent, o);
+      if (!m?.text) continue;
+      const key = m.id ? `${m.role}:${m.id}` : null;
+      const existing = key && seen.get(key);
+      if (existing) {
+        if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
+        continue;
       }
-    } finally { lines.close(); }
+      if (messages.length >= maxMessages) { limited = true; break; }
+      const message = { role: m.role, text: m.text, time: m.time };
+      if (key) seen.set(key, message);
+      messages.push(message);
+      if (m.role === 'user' && ++userTurns > maxUserTurns) break;
+    }
   } finally {
     if (!input) closeSync(fd);
     else if (!input.closed) {
-      const closed = once(input, 'close');
+      // Leaving the loop early destroys the stream with an AbortError; wait for the file to close, not for that error.
+      const closed = new Promise((resolve) => input.on('error', () => {}).once('close', resolve));
       input.destroy();
       await closed;
     }

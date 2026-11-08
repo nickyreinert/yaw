@@ -13,7 +13,6 @@
 import { createReadStream, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join, sep } from 'node:path';
-import { createInterface } from 'node:readline';
 import { NATIVE_ID, clean, realRoot, resumeCommand, sessionId } from './registry.js';
 
 const MAX_LINE = 4 * 1024 * 1024; // longer lines (pasted files, images) are skipped without parsing
@@ -72,21 +71,48 @@ const iso = (v) => {
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 };
 
-async function eachJson(file, fn) {
-  const rl = createInterface({ input: createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
-  try {
-    for await (const line of rl) {
-      if (line.length === 0 || line.length > MAX_LINE) continue;
-      let o;
-      try {
-        o = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (o && typeof o === 'object' && fn(o) === false) break;
+// The lines of a byte stream, split at "\n" (a trailing "\r" is dropped). A line over `max` bytes is discarded while it
+// is read and yields null, so it is never held whole; readline buffers it first (a 64 MiB line cost about 160 MiB RSS).
+export async function* boundedLines(input, max = MAX_LINE) {
+  let parts = [];
+  let size = 0;
+  let over = false;
+  const take = (piece) => {
+    if (over) return;
+    size += piece.length;
+    if (size > max) {
+      over = true;
+      parts = [];
+    } else parts.push(piece);
+  };
+  const line = () => {
+    const out = over ? null : Buffer.concat(parts, size).toString('utf8').replace(/\r$/, '');
+    parts = [];
+    size = 0;
+    over = false;
+    return out;
+  };
+  for await (const chunk of input) {
+    let start = 0;
+    for (let end; (end = chunk.indexOf(10, start)) !== -1; start = end + 1) {
+      take(chunk.subarray(start, end));
+      yield line();
     }
-  } finally {
-    rl.close();
+    if (start < chunk.length) take(chunk.subarray(start));
+  }
+  if (size || over) yield line();
+}
+
+async function eachJson(file, fn) {
+  for await (const line of boundedLines(createReadStream(file))) {
+    if (!line) continue;
+    let o;
+    try {
+      o = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (o && typeof o === 'object' && fn(o) === false) break;
   }
 }
 

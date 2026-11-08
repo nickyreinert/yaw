@@ -14,6 +14,7 @@ import { realRoot } from '../modules/sessions/lib/registry.js';
 import { saveSources } from '../core/lib/session-sources.js';
 import { KIT_ROOT, capture, tmp, writeTree } from './helpers/fixtures.js';
 import { makeProject } from './helpers/hooks.js';
+import { longLineFile, peakDuring } from './helpers/long-line.js';
 
 const environment = () => { const home = tmp('yaw-analysis-home-'); return { HOME: home, CODEX_HOME: join(home, '.codex'), CLAUDE_CONFIG_DIR: join(home, '.claude') }; };
 const messages = [
@@ -126,6 +127,14 @@ test('transcript reader refuses symlinks and records malformed-line coverage', a
   const data = await readTurns(file, 'copilot'); assert.equal(data.limited, true); assert.equal(data.messages.length, 1);
   symlinkSync(file, join(dir, 'link.jsonl'));
   await assert.rejects(readTurns(join(dir, 'link.jsonl'), 'copilot'), /ELOOP|symbolic/);
+});
+
+test('transcript reader skips an oversized line without buffering it (T-016)', () => {
+  const line = (text) => ({ type: 'user', timestamp: messages[0].time, message: { role: 'user', content: text } });
+  const file = longLineFile(tmp(), line('before'), line('PAD'), line('after'));
+  const { grewMiB, result } = peakDuring(join(KIT_ROOT, 'core/lib/session-analysis.js'), "mod.readTurns(file, 'claude')", file);
+  assert.deepEqual(result.messages.map((m) => m.text), ['before', 'after']); assert.equal(result.limited, true);
+  assert.ok(grewMiB < 48, `peak RSS grew ${grewMiB.toFixed(1)} MiB while skipping a 64 MiB line`);
 });
 
 test('Laya classification uses verified local protocol and strict probabilities, rejects truncation and hosted URLs', async () => {
