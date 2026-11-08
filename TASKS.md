@@ -11,6 +11,10 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
+- T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
+  model: middle tier (Sonnet) · effort: medium
+  status: needs decision: which tests count as "isolated core tests" (test/*.test.js only, excluding server-mode/install/profile tests? or modules/*/tests too?) and which Node/OS for the PR job (ubuntu, Node 22.13 only?) · resume: nothing edited yet; plan = pull_request trigger + cheap `gate` job (validate, shellcheck, selected tests), existing test/profile/install jobs stay workflow_dispatch-only; regression test first.
+
 
 
 
@@ -21,9 +25,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
 ## Backlog
-
-- T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
-  model: middle tier (Sonnet) · effort: medium
 
   model: middle tier (Sonnet) · effort: medium
 
