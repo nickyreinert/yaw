@@ -249,6 +249,18 @@ test('task snapshots sync as folder name plus items, appear on the other device 
   assert.equal((await sessionsData({ root: a.HOME, kitRoot, env: a })).tasks.length, 0);
 });
 
+test('deleting a synced knowledge file with front matter propagates instead of failing to parse it as YAML', () => {
+  const { target, a, b, run } = pair(['knowledge']);
+  const dir = (env) => join(env.HOME, '.yaw/knowledge');
+  mkdirSync(dir(a), { recursive: true });
+  writeFileSync(join(dir(a), 'front.md'), '---\ntitle: Style\ntags: [team]\n---\n# Style\nShort sentences.\n');
+  run(a); run(b);
+  assert.equal(readFileSync(join(dir(b), 'front.md'), 'utf8'), '---\ntitle: Style\ntags: [team]\n---\n# Style\nShort sentences.\n');
+  unlinkSync(join(dir(b), 'front.md')); run(b);
+  assert.doesNotThrow(() => run(a));
+  assert.throws(() => readFileSync(join(dir(a), 'front.md')), /ENOENT/);
+});
+
 test('tasks and knowledge are opt-in', () => {
   const root = realpathSync(makeTmp('yaw-sync-')), target = join(root, 'NAS'); mkdirSync(target);
   assert.deepEqual(configureSync({ env: { HOME: root }, target }).config.scopes, ['settings', 'presets', 'statistics']);

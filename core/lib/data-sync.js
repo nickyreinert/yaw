@@ -392,7 +392,7 @@ export function applyPortableRecords({ env, records }) {
       }
       const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : key.startsWith('knowledge/') ? join(...key.split('/')) : `${key}.yaml`);
       if (value === null) {
-        const previous = read(path);
+        const previous = key.startsWith('knowledge/') ? null : read(path);
         const paths = Object.fromEntries(Object.entries(previous ? parse(previous)?.answers ?? {} : {}).filter(([k]) => /(path|folder|directory|endpoint|host|url|root)$/i.test(k)));
         if (key === 'settings/profile' && Object.keys(paths).length) write(path, stringify({ answers: paths }));
         else { safe(path); try { unlinkSync(path); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
