@@ -3,70 +3,187 @@
 
   # YAW
 
-  **Give your coding agents a project they can pick up and understand.**
+  Since agentic coding is a thing, I am struggeling with keeping my coding agent instructions organized and consistent across many different projects, coding agents and even development systems.
 
-  YAW sets up shared instructions, repeatable project commands, tasks and optional project memory for Claude Code, Codex and Copilot CLI. It writes ordinary files you can review and edit, then gives you a local dashboard to see the work across sessions.
+  This is not only about one file of pre-prompt instructions containing coding style and communication preferences. It's about different languages, frameworks and architectures, skills, hooks and worflows, simple pet projects and complex production setups. And on top I regularly switch between Claude, Codex and Copilot CLI, working on MacOs on weekdays, Linux on weekends and having a coding assistant on a headless server at times. It grew out of hand.
+
+  So I built YAW. The idea behind YAW: It's agent agnostic, customizable and nimble.
+
+  YAW comes with a default set of instructions, skills and workflows. Everything I believe you need for simple pet projects, where velocity matters, and complex production setups, where scrutiny and reliability are crucial.
 
   [Set up a project](#set-up-once) · [See what it does](#what-you-get) · [Website](website/) · [Full guide](docs/getting-started.md)
 </div>
 
 ## Why use YAW?
 
-A new agent session should not have to rediscover how to run your project, which tasks matter, or why a decision was made. YAW puts that context in the repository and connects it to the tools you already use. You can start with a small setup and add workflows only when they help.
+It does not matter if you are a layperson or an experienced developer. If you 
 
-- **Less repeated setup:** one interview creates shared `AGENTS.md` instructions, selected agent adapters and project-specific `just` commands.
-- **A clear next step:** plan an idea with `yaw kickoff`, turn the plan into tasks, and resume from local tasks or GitHub issues.
-- **Decisions that survive sessions:** record and retrieve decisions, risks and knowledge instead of relying on a past chat.
-- **Visibility across workspaces:** the local dashboard shows projects, sessions, tasks and knowledge, with filters and session profiling when you explicitly collect it.
-- **Control of your files:** preview changes before applying them. YAW keeps your edits to managed files during later updates unless you choose otherwise.
+- tend to work on multiple projects,
+- want to prevent coding-agent lock-in or
+- work with different languages, frameworks and architectures,
 
-YAW is a zero-runtime-dependency Node.js CLI. It runs locally on macOS and Linux, or on Windows through WSL.
+you may find **YAW** helpful. 
 
-## Set up once
+## How does YAW work?
 
-Requires **Node.js 22.13+** and **Git**. [`just`](https://just.systems) is recommended for generated project commands.
+- **init** YAW guides you through an interview, on the command line or in the browser. It creates one global entry point that most common coding agents understands: `AGENTS.md`. You select your preferred adapters and project-specific settings.
+
+- **kick-off** The init process ends with an optional kick-off prompt for an agent of your choice. It turns your loose idea into milestones, steps and groundwork for the project.
+
+- **knowledge** Important decisions and vital knowledge are recorded and made accessible across sessions, ensuring continuity and context for your projects.
+
+- **supervising** YAW offers a dashboard with a lot of information to discover about your current project but also across all projects and coding agent sessions. 
+
+## Installation
+
+YAW is a near-zero-runtime-dependency. It requires **Node.js**, **git** and **just** for running commands. YAW runs locally on **macOS** and **Linux**, or on **Windows** through WSL.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nickyreinert/yaw/main/install.sh | bash -s -- --channel main
-cd your-project
-yaw init
 ```
 
-This installs the current `main` channel, which includes the features described here. The [full guide](docs/getting-started.md) has the pinned v0.1.0 release install if you prefer a fixed version.
+Why **Node.js**? For ...
 
-`yaw init` asks which language you want to use and where the project will run; that pair picks a tailored stack (for example a Node CLI or a Cloudflare Worker) or a basic one for the language. Choose **Quick**, **Basic** or **All** interview depth first. Review the proposed files before YAW writes them. Prefer a browser form? Run `yaw init --web`, or switch to it during the terminal interview. Setup normally runs the generated `just setup` and `just check` afterward.
+Why **git**? For installation...
 
-Quick asks agents, purpose, language, runtime and GitHub. Basic adds personal preferences, collaboration and review gates; All asks every applicable question. Optional tools reuse your saved defaults and otherwise start off. Select tasks, guards, sessions, decisions, hooks and other modules explicitly when needed. A fresh interactive installation offers personal defaults, and `yaw defaults` edits them later. Quick reuses saved or factory preferences; Basic/All can override them per project. Without defaults, init shows a notice and saves the first confirmed Basic/All personal answers as defaults after Apply. You can change project choices later with `yaw edit` or the dashboard's **Workspace / Settings / Interview**, preview the diff, and apply it. `yaw add <module>` and `yaw remove <module>` adjust modules without starting over.
+Why **just**? As a simple wrapper for commands and a more comfortable alternative to bash scripts.
 
-To inspect the installer or follow platform-specific steps, use the [full getting started guide](docs/getting-started.md).
+## Most important Commands
 
-## What you get
+### `yaw init`
 
-| When you need to… | Use… |
-| --- | --- |
-| Start a project or revise its setup | `yaw init`, `yaw edit`, `yaw status` and `yaw apply`. The dashboard's Settings view also previews and applies interview changes and lets you inspect YAW-written files. |
-| Turn an idea into work | `yaw kickoff` drafts architecture/domain, data model and UI/UX foundations before tasks. `yaw kickoff concept` has another chat adapt a concept you already have for your coding agent. Preview with `yaw kickoff import <plan.md> --dry-run`, then import reviewed foundations with `--reviewed`. Legacy task plans still work. |
-| Apply project rules | `yaw kickoff context` (or `--json`) shows project ground truth and generic YAW practices separately; `yaw kickoff ux` offers an optional design walkthrough prompt. |
-| Get a second opinion on a change | The optional review module adds four read-only reviewers (quality, business logic, UI/UX, feature fit). Run them with `just review <kind>`, get a hint when work is done, or make them a pre-push gate that warns or blocks `git push`. Edit their prompts in `yaw web`, per project or as your blueprint for all projects. |
-| Track the next task | `TASKS.md`, GitHub issues or both; `yaw task next` finds the next local task. Optional team mode adds issue-linked commit and PR checks. |
-| Keep useful context | Decision records, risk notices and Markdown knowledge can be searched and edited with `yaw knowledge` or in the dashboard. Decision retrieval helps agents find relevant records at task start. |
-| Understand past sessions | `yaw sessions scan` explicitly analyzes local Claude Code, Codex and Copilot CLI histories. `yaw sessions analytics` and the dashboard show saved counts, lengths, timing and usage where available. Optional local Laya classification is experimental and separate. |
-| Work across projects | `yaw web --background` runs one local dashboard server. Switch YAW workspaces in the sidebar and use global views for projects, sessions and task snapshots. |
-| Sync devices | `yaw sync setup`, `yaw sync run` and **Global / Settings / Sync** exchange presets and personal defaults through a folder/NAS or private GitHub repository, and merge numerical statistics by named device. See [scope and conflict handling](docs/workspace-dashboard.md#sync-between-devices). |
-| Get notified after a long run | The optional comfort module can send Telegram notifications. Preferences are personal; credentials stay in environment variables. |
-| Optionally create projects on a LAN host | Enable **Global / Settings / Features / Server mode**, then choose Host or Client. `yaw host` opens the persistent host; `yaw init-local` and `yaw init-remote` create workspace projects and launch native Claude Remote Control. Telegram interviews belong only to the host. See [server mode](docs/server-mode.md). |
+- initialises a new project by asking a couple of questions about language, framework and more
+- guides you through setting up project defaults and modules
+- the setup process differentiates between three levels of depth: **quick**, **basic**, and **all**, which determine how detailed the interview and configuration steps are
+ - **quick** takes your configured personal defaults and just ask for project specific details (language, framework, ...)
+ - **basic** same as quick plus collaboration options and review gates
+ - **all** the whole package (see ## Core Features)
+- you can switch to the web-based interface anytime
+- will not write anything until you review and confirm 
+- you can run the web interface right away with `yaw init --web`
 
-Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.
+#TODO: default and presets are mixed and hard to understand in the webui and probably busines logic - needs to be fixed: we need to find a proper combination of the depht (quick, basic, all) and presets/default
 
-The programming-language filter uses YAW configuration or detects the language from local project filenames. Projects with no recognizable evidence and unavailable or synced projects remain **Unknown**.
 
-### Learn from your sessions
 
-Open **Global → Learn** in `yaw web`. Start from a project you remember or sessions with saved friction labels, using the same filters and sorting as Sessions. Read a conversation with highlighted corrections, apologies and recovery, then choose **Review this conversation**. YAW prepares a compact review prompt automatically; inspect/redact it and copy it into a browser chat, or use an installed Claude Code/Codex reviewer enabled in **Global → Settings → Learn**. CLI reviews are explicit and may use paid hosted providers. Evidence stays temporary and suggestions are never applied automatically. See [Learn workflow](docs/workspace-dashboard.md#global--learn).
+### associated just commands
 
-### Optional: classify sessions with Laya
+- `just setup` to configure the project after initialization
+- `just check` to verify the project setup
+- `just apply` to apply the configuration and changes 
 
-Classification uses [Laya](https://github.com/NandhaKishorM/laya), a local Python model service you install yourself (Python 3.10+; the multilingual checkpoint downloads on first use). YAW never installs or starts it.
+
+### `yaw kickoff`
+
+#TODO: the CLI command returns 6 steps - drop them, too much prose. add arguments to store the kick off prompt in docs/plan/kickoff.md right away, which is default behavior, or print the prompt to stdout, lets rething step 4 (yaw kcikf import?) what does it evne mean? how does it work? meaningless? what happens there? 
+
+- the finished init-process provides you a kick-off prompt, if you missed it, this commands prints the prompt again
+- this prompt tells a coding agent to create the following grounding truth documents: 
+ - `docs/spec/architecture.md` 
+ - `docs/spec/data-model.md`#
+ - `docs/spec/ui-ux.md`
+
+- this is optional, you may not need it for you small click-mockup, but it may come in handy for larger projects or more complex setups
+
+### associated just commands
+
+- `just kickoff` to generate the kick-off prompt and grounding truth documents
+- `just plan` to view or edit the kick-off plan stored in `docs/plan/kickoff.md`
+#TODO: again: i dont understand why we import a kick off plan? its the other way around usually
+- `just import` to import an existing kick-off plan into the project
+
+### `yaw add`
+
+- if you later decide that you need more functionality, you can add modules with this command
+
+#TODO add list-modules argument, allow to filter for all modules, installed modules, and not-installed modules
+- undecided what modules exists? Run `yaw list-modules` to see available options 
+- also supports the web interface with `yaw add --web`
+
+### associated just commands
+
+- `just add <module>` to add a new module to the project
+- `just list-modules` to see available modules and their status
+
+### `yaw remove`
+
+- the opposite of `yaw add`, this command removes modules from the project
+- also supports the web interface with `yaw remove --web`
+
+### associated just commands
+
+- `just remove <module>` to remove a module from the project
+- `just list-modules` to see available modules and their status
+
+## `yaw task``
+
+- this is an optional module, that helps you keep track of tasks and issues
+- you may not need to run it manually and just trust your coding agent to add tasks and issues to the project
+- tasks and issues are tracked in `TASKS.md` and optionally in GitHub issues
+
+### associated just commands
+
+- `just task` to manage tasks and issues in the project
+- `just task next` to find the next local task
+- `just task list` to list all tasks and issues in the project
+- `just task add <task>` to add a new task to the project
+- `just task done <task>` to mark a task as completed
+- `just task remove <task>` to remove a task from the project
+- `just task edit <task>` to edit an existing task in the project
+
+## Core Features
+
+The setup process allows you to choose between quick, basic an all. Each level allows you to choose from the core features listed below. 
+
+_**Level** indicates the setup depth at which the feature is available for configuration: quick, basic, or all_
+
+#### Supported Coding Agents
+**Level** quick, basic, all
+
+[...]
+
+#### Conversation Styles
+**Level** all
+
+#### Collaboration and Task Management
+**Level** basic, all
+
+#### Languages, Frameworks and Architecture
+**Level** quick, basic, all
+
+#### Coding Practices
+**Level** basic, all
+
+#### Quality Assurance
+**Level** basic, all
+
+- contains sub agents, that will be triggered on specific events. They will review changes and warn or block them based on different criteria:
+
+- Quality Gate
+- Business Logic
+- UI/UX
+- Security
+
+#### Comfort and Hygiene
+**Level** all
+
+- session hygiene
+- status updates
+
+## Meta Features
+
+The following features are not necessarily required for coding and therefore not part of the init process. They can enhance your workflow and project management.
+
+### Analytics
+
+### Supervision
+
+You can tell YAW to scan your previous coding agent sessions and classify them. This follows two purposes: You measure the agents and models performance and you can learn how to better prompt them in the future.
+
+This feature requires the classification model **Laya**. It runs locally only and does not require much computational resources. It classifies conversations into success and failure categories. 
+#### Install Laya
+
+**Laya** requires Python 3.10 or higher and the necessary Python packages specified in its installation instructions.
 
 ```sh
 python3 -m venv ~/.laya
@@ -76,17 +193,15 @@ LAYA_HOST=127.0.0.1 LAYA_PORT=8000 LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=m
 
 Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **Global → Settings → Classification** in `yaw web` to test the connection and adjust settings, and press **Classify** in Global → Learn or on a Sessions page (or run `yaw sessions evaluate --days 30`). See [Local Laya classification](docs/workspace-dashboard.md#local-laya-classification-experimental).
 
+### Server-Mode
+
+### Notifications
+
+### Learn from your sessions
+
 ## See the setup
 
 <img src="docs/assets/setup-screenshot.png" alt="Current YAW browser setup form with six steps, Quick, Basic and All choices, and a file plan" width="800">
 
 *The local `yaw init --web` form previews the files before you apply them.*
 
-## Keep working
-
-After setup, run `yaw status` to inspect managed files, `yaw apply` to reconcile them with the installed kit, and `yaw web` to open the local dashboard. For day-to-day work, try `yaw kickoff`, `yaw task next` and `yaw sessions analytics`.
-
-- [Website](website/) — standalone static page.
-- [Getting started](docs/getting-started.md) — installation, Quick, Basic and All, maintenance and safety details.
-- [Workspace dashboard](docs/workspace-dashboard.md) — workspace and global views, session profiling, knowledge and settings.
-- [Project concept](KICK-OFF.md) — design goals and technical background.
