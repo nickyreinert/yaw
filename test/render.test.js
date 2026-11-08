@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from '../core/render/template.js';
 import { PathError, checkRelPath, hashContent, resolveInside, writeAtomic } from '../core/render/files.js';
@@ -94,6 +94,25 @@ test('atomic write creates folders and leaves no temp files', () => {
   assert.equal(read(root, 'a/b/c.txt'), 'two');
   assert.deepEqual(readdirSync(join(root, 'a/b')), ['c.txt']);
   assert.equal(resolveInside(root, 'a/b/c.txt').endsWith('/a/b/c.txt'), true);
+});
+
+test('atomic write preserves an existing file mode unless overridden', () => {
+  const root = tmp();
+  const old = process.umask(0o022);
+  try {
+    writeFileSync(join(root, 'secret.txt'), 'a');
+    chmodSync(join(root, 'secret.txt'), 0o600);
+    writeFileSync(join(root, 'run.sh'), 'a');
+    chmodSync(join(root, 'run.sh'), 0o755);
+    writeAtomic(root, 'secret.txt', 'b');
+    writeAtomic(root, 'run.sh', 'b');
+    assert.equal(statSync(join(root, 'secret.txt')).mode & 0o7777, 0o600);
+    assert.equal(statSync(join(root, 'run.sh')).mode & 0o7777, 0o755);
+    writeAtomic(root, 'run.sh', 'c', { mode: 0o600 });
+    assert.equal(statSync(join(root, 'run.sh')).mode & 0o7777, 0o600);
+  } finally {
+    process.umask(old);
+  }
 });
 
 test('hash is sha256 over LF-normalised content', () => {
