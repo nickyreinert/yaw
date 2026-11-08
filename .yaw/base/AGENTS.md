@@ -1,7 +1,5 @@
 # AGENTS.md
 
-Rules for coding agents in this project, written by YAW (quick setup). Edit freely: `yaw update` keeps your edits and `yaw status` shows them.
-
 ## Project
 
 - Purpose: YAW (Yet Another Wrapper), a project setup kit for coding agents; zero-dependency Node CLI.
@@ -10,11 +8,14 @@ Rules for coding agents in this project, written by YAW (quick setup). Edit free
 ## Working agreement
 
 - Chat in "en"; write code, comments, commit messages and docs in English.
-- Ask before risky or ambiguous steps; otherwise act.
-- Keep changes small and focused; do what was asked, no more.
+- Ask before risky steps; otherwise act.
+- Give balanced answers: the result first, then the reasoning that matters. Use precise technical terms. The user is an expert: skip the basics.
+- Do not use examples or analogies unless asked. After a change, report in detail what changed and why.
+- Keep changes small; do what was asked, no more. Follow `docs/engineering.md`.
 
 <!-- yaw:core -->
-- Start every task by reading `TASKS.md` (if present) and running decision retrieval (if enabled).
+- Start every task with `yaw kickoff context`, `TASKS.md` (if present) and decision retrieval (if enabled); apply kit practices within project ground truth, flag conflicts and update affected sources with agreed behavior changes.
+- Do not assume. If a request is vague or has several reasonable readings, ask the user before acting.
 - Run `just check` before you report a task as done; `just --list` shows all recipes.
 - Never read, print or commit secrets (`.env*`, keys, tokens); ask the user to enter them.
 <!-- /yaw:core -->

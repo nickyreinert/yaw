@@ -13,7 +13,7 @@ test('this repo has a valid YAW manifest for node-cli with core, security and de
   const m = readManifest(KIT_ROOT);
   assert.ok(m, '.yaw/manifest.json exists');
   assert.deepEqual(m.profiles, ['node-cli']);
-  assert.deepEqual(Object.keys(m.modules).sort(), ['core', 'decisions', 'security']);
+  assert.deepEqual(Object.keys(m.modules).sort(), ['code-map', 'core', 'decisions', 'security']);
   for (const f of ['AGENTS.md', 'CLAUDE.md', 'justfile', 'just/node-cli.just', '.yaw/answers.yaml']) {
     assert.ok(m.files.some((x) => x.path === f), f);
   }

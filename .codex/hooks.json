@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook\"; [ ! -f \"$f\" ] || sh \"$f\" UserPromptSubmit --agent codex --module decisions",
+            "timeout": 10,
+            "statusMessage": "YAW decisions: recall"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook\"; [ ! -f \"$f\" ] || sh \"$f\" SessionStart --agent codex --module decisions",
+            "timeout": 10,
+            "statusMessage": "YAW decisions: session-start-critical"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}/.yaw/bin/yaw-hook\"; [ ! -f \"$f\" ] || sh \"$f\" PreToolUse --agent codex --module security",
+            "timeout": 10,
+            "statusMessage": "YAW security: guard-secret-read, guard-destructive"
+          }
+        ]
+      }
+    ]
+  }
+}

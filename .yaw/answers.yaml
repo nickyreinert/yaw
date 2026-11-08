@@ -7,7 +7,7 @@ answers:
   user.autonomy: ask-risky
   idea.text: YAW (Yet Another Wrapper), a project setup kit for coding agents; zero-dependency Node CLI.
   idea.team: solo
-  arch.language: javascript
+  arch.language: typescript
   arch.runs-on: local
 proposal:
   status: confirmed

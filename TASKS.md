@@ -16,9 +16,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
   resume: diagnosed: JDK 21 at JAVA_HOME is valid; `gradlew` exits at its JAVA_HOME check when JAVA_HOME is invalid even with `java` on PATH (reproduced). Gates `kotlinSkip`, `javaSkip` and the Android gate check only `hasTool('java')`. Smoke tests currently skip with "just is not installed". Next after the decision: regression test for the JAVA_HOME gate, then run the smoke tests.
 
-- T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
-  in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
-  model: middle tier (Sonnet) · effort: medium
 
 
 - T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.

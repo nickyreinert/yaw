@@ -28,30 +28,6 @@ check: lint typecheck test audit sync-check
 build:
     @echo "build: not applicable for node-cli (no build step; a release is a git tag)"
 
-screenshot:
-    @echo "screenshot: not applicable for node-cli"
-
-preview:
-    @echo "preview: not applicable for node-cli"
-
-preview-share:
-    @echo "preview-share: not applicable for node-cli"
-
 # npm audit only when there are dependencies (needs network then).
 audit:
     @if [ "$(node -p 'const p = require("./package.json"); Object.keys({ ...p.dependencies, ...p.devDependencies }).length')" != "0" ]; then npm audit; else echo "audit: no dependencies, nothing to audit"; fi
-
-db-migrate:
-    @echo "db-migrate: not applicable for node-cli"
-
-db-reset:
-    @echo "db-reset: not applicable for node-cli"
-
-backup:
-    @echo "backup: not applicable for node-cli"
-
-restore:
-    @echo "restore: not applicable for node-cli"
-
-deploy env='':
-    @echo "deploy: not applicable for node-cli (a release is a git tag, pushed only with your approval)"
