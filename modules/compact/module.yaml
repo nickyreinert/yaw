@@ -38,6 +38,19 @@ questions:
 outputs:
   # Renders to nothing for a personal setting or when no lever is chosen (ADR-0024).
   templates: [AGENTS.md]
+  hooks:
+    # L2 (T-054): registered with the module; like the recipes wrapper it decides at run time whether the `hook`
+    # lever is on. Read is matched for lockfiles only (the handler leaves every other Read alone). WebFetch waits
+    # for a recorded successful payload (T-047).
+    - name: compress
+      event: PostToolUse
+      matcher: Bash|Grep|Read
+      kind: compress
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "PostToolUse updatedToolOutput" }
+        codex: { support: none, note: "no output replacement" }
+        copilot: { support: none, note: "modifiedResult not verified" }
 agents:
   claude:  { support: native, via: "recipes wrapper; PostToolUse output hook" }
   codex:   { support: partial, via: "recipes wrapper", note: "no output hook" }

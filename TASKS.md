@@ -85,11 +85,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   acceptance: each profile's smoke test verifies its compact output
   model: middle tier (Sonnet) · effort: high
 
-- T-054 [P2] L2 compress methods and guards (Claude Code) — methods: `ansi`, `progress`, `dedup`, `cap` (recall or re-run hint), grep grouping by file, lockfile summary. Skips output under 512 bytes, commands with detail flags (`-v`, `--verbose`, `--nocapture`), `git diff|show`, `yaw run` output and every Read except lockfiles. Fails open. Depends on T-047, T-052 and T-053.
-  spec: kickoff/16-compact-output.md §4 L2
-  acceptance: tests run on the T-047 fixtures
-  model: top tier (Astra/Opus) · effort: high
-
 - T-055 [P2] L6 optional recall store — `~/.yaw/recall/<hash>.gz` in a private directory: mode 0600, no symlinks (see T-010). At most 200 entries, 30 days and 10 MB per entry; excluded from sync; read back with `yaw recall <hash>`. Off by default; when off, cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Needs an ADR and a privacy NOTICE, since this is the first stored tool-output content. Depends on T-049.
   spec: kickoff/16-compact-output.md §4 L6
   model: middle tier (Sonnet) · effort: high
