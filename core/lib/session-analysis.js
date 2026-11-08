@@ -392,8 +392,11 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
   if (classify && !rows.length) return { sessions: 0, reused, skipped, unavailable, limited, collected: old.collected, classified: true };
   const project = realRoot(root);
-  // Classification updates readable sessions only; a missing/unreadable transcript must never erase saved results.
-  const merged = new Map(old.rows.filter((r) => classify || (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
+  // A scan updates only the sessions it found. Saved rows whose history is missing, disabled, unreadable or past a discovery
+  // limit are kept with their metrics and classifications, and counted so the summary can say the scan was incomplete.
+  const merged = new Map(old.rows.map((r) => [r.id, r]));
+  const found = new Set(rows.map((r) => r.id));
+  const missing = classify ? 0 : old.rows.filter((r) => r.source !== 'synced' && !found.has(r.id) && (all || r.project === project) && Date.parse(r.started) >= since).length;
   for (const row of rows) {
     const previous = old.rows.find((r) => r.id === row.id);
     if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
@@ -406,11 +409,12 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   ] : old.tasks;
   const data = { version: 1, rows: [...merged.values()], tasks, collected: new Date().toISOString() };
   writeUserData(env, 'session-analysis.json', data);
-  return { sessions: rows.length, reused, skipped, unavailable, limited, collected: data.collected, classified: classify };
+  return { sessions: rows.length, reused, skipped, unavailable, missing, limited, collected: data.collected, classified: classify };
 }
 
 export const scanSummary = (r) => [`Saved ${r.sessions} session(s)`, r.reused ? `${r.reused} unchanged and reused` : '',
   r.limited ? `${r.limited} partial (oversized or broken lines skipped)` : '',
   r.unavailable ? `${r.unavailable} local transcripts unavailable and skipped` : '',
+  r.missing ? `${r.missing} saved session(s) not found in the configured folders (kept; check Global Settings → Sessions for disabled or missing history folders)` : '',
   r.skipped > (r.unavailable ?? 0) ? `${r.skipped - (r.unavailable ?? 0)} unreadable and skipped` : '',
   r.classified && r.skipped ? 'existing results kept for skipped sessions; check Global Settings → Sessions for history folders' : ''].filter(Boolean).join('; ') + '.';

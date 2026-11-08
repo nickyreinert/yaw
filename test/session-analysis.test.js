@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
+import { lstatSync, readFileSync, renameSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary, userOutcome } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
@@ -11,6 +11,7 @@ import { buildPayload } from '../modules/comfort/lib/notify.js';
 import { readPersonal, resolveFeatures } from '../modules/comfort/lib/config.js';
 import { readUserData, writeUserData } from '../core/lib/user-store.js';
 import { realRoot } from '../modules/sessions/lib/registry.js';
+import { saveSources } from '../core/lib/session-sources.js';
 import { KIT_ROOT, capture, tmp, writeTree } from './helpers/fixtures.js';
 import { makeProject } from './helpers/hooks.js';
 
@@ -445,4 +446,33 @@ test('private JSON state honors YAW_HOME, replaces atomically and rejects linked
   symlinkSync(outside, join(env.YAW_HOME, 'linked-state.json'));
   assert.throws(() => writeUserData(env, 'linked-state.json', {}), /regular file/);
   assert.equal(readFileSync(outside, 'utf8'), '{"untouched":true}');
+});
+
+test('rescans keep saved rows and classifications when a history file or folder is unavailable, and report them', async () => {
+  const env = environment(), root = tmp(), file = fixture(env, root);
+  await collectAnalysis({ root, env });
+  const saved = readAnalysis(env);
+  saved.rows[0].evaluation = { classified: 1, skipped: 0, counts: { outcome: { fulfilled: 1 } } };
+  writeUserData(env, 'session-analysis.json', saved);
+  renameSync(file, join(tmp(), 'moved.jsonl'));
+  let result = await collectAnalysis({ root, env });
+  assert.deepEqual(readAnalysis(env).rows, saved.rows);
+  assert.deepEqual([result.sessions, result.missing], [0, 1]);
+  assert.match(scanSummary(result), /1 saved session\(s\) not found.*kept/);
+  renameSync(env.CODEX_HOME, join(tmp(), 'moved-home'));
+  result = await collectAnalysis({ root, env, all: true });
+  assert.deepEqual(readAnalysis(env).rows, saved.rows);
+  assert.equal(result.missing, 1);
+});
+
+test('rescans keep saved rows when their history source is disabled', async () => {
+  const env = environment(), root = tmp();
+  fixture(env, root);
+  await collectAnalysis({ root, env });
+  const before = readAnalysis(env).rows;
+  saveSources(env, [{ agent: 'codex', path: env.CODEX_HOME, enabled: false }]);
+  const result = await collectAnalysis({ root, env });
+  assert.deepEqual(readAnalysis(env).rows, before);
+  assert.equal(result.missing, 1);
+  assert.doesNotMatch(scanSummary({ sessions: 1, missing: 0 }), /not found/);
 });

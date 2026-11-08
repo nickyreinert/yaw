@@ -17,10 +17,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: top tier (Astra/Opus) · effort: high
   status: in progress · resume: regression test in test/data-sync.test.js (folder + hub), then exclude present-but-unportable knowledge keys from merge/apply
 
-- T-007 [P1] Preserve analytics when history is unavailable — `core/lib/session-analysis.js:collectAnalysis` replaces saved rows with an empty scan when a source disappears. Keep prior metrics/classifications and report incomplete discovery; cover disabled sources and discovery limits too.
-  model: middle tier (Sonnet) · effort: high
-  in progress — resume: regression tests in test/session-analysis.test.js, then keep unrediscovered rows in collectAnalysis merge and report `missing` in scanSummary.
-
 - T-035 [P1] Fix Classification opening error (in progress) — resume point: TDZ in `core/web/assets/global-settings-view.js` renderClassifier/setupCard: `const link` shadows imported `link()`; add regression test in test/global-classification-view.test.js.
   model: low tier (Luna/Haiku) · effort: medium
 
