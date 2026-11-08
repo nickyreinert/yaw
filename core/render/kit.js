@@ -229,33 +229,18 @@ export function profileOverlay(kitRoot, profiles) {
   return parts.join('\n');
 }
 
-// ADR-0025: files a profile ships for the devenv module. env.example (variable names, comments) is joined over
-// all profiles; the container files are profiles/<p>/devenv/{Dockerfile,compose.yaml,devcontainer.json} and
-// a file that two profiles ship is an error (a container setup cannot be concatenated).
-export const DEVENV_FILES = { dockerfile: 'Dockerfile', compose: 'compose.yaml', devcontainer: 'devcontainer.json' };
-
+// ADR-0025: variable names a profile ships for the devenv module. env.example (variable names, comments) is joined
+// over all profiles. Docker is the Architecture switch and the profile scaffold, not part of devenv.
 export function profileDevenv(kitRoot, profiles) {
-  const out = { env: '', dockerfile: '', compose: '', devcontainer: '' };
   const env = [];
-  const from = {};
   for (const p of profiles) {
     if (!hasProfile(kitRoot, p)) continue;
-    const dir = profileDir(kitRoot, p);
-    const envFile = join(dir, 'env.example');
-    if (existsSync(envFile)) {
-      const text = readFileSync(envFile, 'utf8').trim();
-      if (text !== '') env.push(text);
-    }
-    for (const [key, name] of Object.entries(DEVENV_FILES)) {
-      const file = join(dir, 'devenv', name);
-      if (!existsSync(file)) continue;
-      if (from[key]) throw new KitError(`profiles "${from[key]}" and "${p}" both ship devenv/${name}; keep one of them`);
-      from[key] = p;
-      out[key] = readFileSync(file, 'utf8').trim();
-    }
+    const envFile = join(profileDir(kitRoot, p), 'env.example');
+    if (!existsSync(envFile)) continue;
+    const text = readFileSync(envFile, 'utf8').trim();
+    if (text !== '') env.push(text);
   }
-  out.env = env.join('\n\n');
-  return out;
+  return { env: env.join('\n\n') };
 }
 
 // ADR-0027: the toolchain steps of the profiles' ci/check.yml fragments for the ci module's workflow.

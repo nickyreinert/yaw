@@ -11,7 +11,7 @@ Phase 1 (ADR-0009, amended by ADR-0032 and ADR-0047): two setup choices. **Quick
 | `core` | `AGENTS.md`, `CLAUDE.md`, `justfile`, manifest | ✔ (always) | ✔ | – |
 | `communication` | Speaking style from user profile into `AGENTS.md`; Claude output style | ✔ | ✔ | core |
 | `standards` | Baseline coding + review standards, stack overlay from profile | ✔ | ✔ | core |
-| `devenv` | `just setup/dev`, `.env.example`, Docker/devcontainer when the profile advises it | ✔ | ✔ | core |
+| `devenv` | `just setup/dev`, `.env.example`; Docker is the Architecture switch, not part of devenv | ✔ | ✔ | core |
 | `tasks` | Task ledger (local / GitHub / both) | ✔ | ✔ | core |
 | `security` | Phase 1: `.env*`/secret read deny and destructive-command guard (`security-reviewer`, `just audit`, secret scan later) | ✔ (minimal) | ✔ (minimal) | standards |
 | `git-hooks` | `lefthook`/`pre-commit`: format, lint-staged, `gitleaks` | – | ✔ | core |

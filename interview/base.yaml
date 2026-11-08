@@ -142,7 +142,7 @@ questions:
     mode: S
     type: boolean
     label: Unit Tests
-    hint: Require a non-empty unit-test suite in just check and Quality reviews.
+    hint: "Part of `just check`: it needs a non-empty, passing unit-test suite. Off: unit tests stay optional."
     default: false
   - id: quality.error-detail
     mode: S

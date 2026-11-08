@@ -27,6 +27,9 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 - Optional, guarded Project Status updates on GitHub task start/done and explicit epic-to-milestone mappings synchronized by task sync. Existing local-only workflows stay offline.
 - Profile-aware Dependabot ecosystems, including namespaced composed profiles; dependency-free profiles retain only action updates.
 
+### Changed
+- Coding Style cards (T-030): Unit Tests now says it is part of `just check` (non-empty, passing suite; off keeps tests optional). Local settings & secrets no longer lists or generates Dockerfile, compose.yaml or devcontainer.json; no profile shipped them, and Docker stays the Architecture switch (the agent rule) plus the stack scaffold.
+
 ### Fixed
 
 - "Use GitHub for the repo?" shows a GitHub check in the terminal and the form (gh not installed, not logged in or unreachable, no GitHub remote). After "no", the task-mode question no longer offers GitHub choices that would be ignored; init says tasks are local because GitHub is off (#166).

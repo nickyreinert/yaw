@@ -27,6 +27,11 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
+- T-030 [P2] Consolidate Coding Rules cards — clarify Unit Tests wording (part of `just check`, no overlap with other test/standards settings). Remove Docker from Local Settings and Secrets if it has no independent function. Audit Coding Standards / Git Style / Rules of your Stack against stack, Coding Rules and other cards; remove or merge the card and move missing rules into generated agent instructions.
+  model: middle tier (Sonnet) · effort: high
+  status: in progress · needs decision: should the Coding standards card (module `standards`: docs/standards.md = clean code, security, performance, testing, review, git style + the profile's stack rules) be merged into Project rules (docs/engineering.md, always on, so the toggle disappears), or kept as is with only the duplicated Testing/Security lines trimmed? It has unique content (clean code, performance, Conventional Commits, stack rules), and `security` depends on it, so merging means removing a module and regenerating the manifests/fixtures.
+  done: Unit Tests wording ("Part of `just check`: ..."), Docker removed from Local settings & secrets (card text, Dockerfile/compose/devcontainer templates, profileDevenv container support; tests in test/coding-rules-cards.test.js, modules/devenv/tests). resume: after the decision, merge or trim `standards`, then archive.
+
 - T-055 [P2] L6 optional recall store — `~/.yaw/recall/<hash>.gz` in a private directory: mode 0600, no symlinks (see T-010). At most 200 entries, 30 days and 10 MB per entry; excluded from sync; read back with `yaw recall <hash>`. Off by default; when off, cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Needs an ADR and a privacy NOTICE, since this is the first stored tool-output content. Depends on T-049.
   spec: kickoff/16-compact-output.md §4 L6
   model: middle tier (Sonnet) · effort: high
@@ -39,9 +44,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
-
-- T-030 [P2] Consolidate Coding Rules cards — clarify Unit Tests wording (part of `just check`, no overlap with other test/standards settings). Remove Docker from Local Settings and Secrets if it has no independent function. Audit Coding Standards / Git Style / Rules of your Stack against stack, Coding Rules and other cards; remove or merge the card and move missing rules into generated agent instructions.
-  model: middle tier (Sonnet) · effort: high
 
 - T-031 [P2] Dissolve Coding Practices — remove user-facing errors, diagnostic logs and internal documentation as user options. Generate equivalent rules automatically from language/framework/destination/architecture/tools (e.g. no logging infrastructure for a plain HTML page; docs rules coordinated with Code Map). Remove the section if no real decision remains.
   model: middle tier (Sonnet) · effort: high

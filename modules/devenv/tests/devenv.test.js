@@ -1,11 +1,10 @@
-// devenv (Y-5.2, ADR-0025): .env.example, git-ignored .env files, setup creating .env, container files only
-// when the profile ships them, removal with zero residue.
+// devenv (Y-5.2, ADR-0025): .env.example, git-ignored .env files, setup creating .env, removal with zero residue.
+// Docker is not part of devenv (T-030).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { profileDevenv } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { initProject, readAnswers, removeModule, addModule } from '../../../core/render/project.js';
 import { KIT_ROOT, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
@@ -22,29 +21,20 @@ async function project({ kitRoot = KIT_ROOT, profile } = {}) {
   return root;
 }
 
-// A kit copy with a profile "container-demo" that ships env.example and a devenv/ folder (no existing profile does yet).
-function kitWithContainerProfile({ twice = false } = {}) {
+// A kit copy with a profile "env-demo" that ships env.example.
+function kitWithEnvProfile() {
   const kit = tmp('yaw-kit-');
   for (const dir of ['core', 'modules', 'profiles', 'interview', 'adapters']) if (existsSync(join(KIT_ROOT, dir))) cpSync(join(KIT_ROOT, dir), join(kit, dir), { recursive: true });
   cpSync(join(KIT_ROOT, 'package.json'), join(kit, 'package.json'));
   const from = join(kit, 'profiles', 'node-cli');
-  const dir = join(kit, 'profiles', 'container-demo');
+  const dir = join(kit, 'profiles', 'env-demo');
   cpSync(from, dir, { recursive: true });
-  writeFileSync(join(dir, 'profile.yaml'), 'name: container-demo\ntitle: Container demo\nsummary: Container demo.\nstack:\n  language: [html]\n  runsOn: [local]\n');
+  writeFileSync(join(dir, 'profile.yaml'), 'name: env-demo\ntitle: Env demo\nsummary: Env demo.\nstack:\n  language: [html]\n  runsOn: [local]\n');
   writeFileSync(join(dir, 'env.example'), '# Database\nDATABASE_URL=postgres://app@db/app\nAPI_KEY=\n');
-  mkdirSync(join(dir, 'devenv'));
-  writeFileSync(join(dir, 'devenv', 'Dockerfile'), 'FROM node:22-slim\nWORKDIR /app\n');
-  writeFileSync(join(dir, 'devenv', 'compose.yaml'), 'services:\n  app:\n    build: .\n    env_file: .env\n');
-  writeFileSync(join(dir, 'devenv', 'devcontainer.json'), '{ "name": "demo", "dockerComposeFile": "../compose.yaml" }\n');
-  if (twice) {
-    const other = join(kit, 'profiles', 'other-demo');
-    cpSync(dir, other, { recursive: true });
-    writeFileSync(join(other, 'profile.yaml'), 'name: other-demo\ntitle: Other demo\nsummary: Other.\nstack:\n  language: [html]\n  runsOn: [self-hosted]\n');
-  }
   return kit;
 }
 
-test('profile without devenv/: .env.example and .gitignore entries, no container files', async () => {
+test('.env.example and .gitignore entries, no container files', async () => {
   const root = await project();
   const tree = readTree(root);
   assert.match(tree['.env.example'], /Copy to \.env/);
@@ -55,20 +45,12 @@ test('profile without devenv/: .env.example and .gitignore entries, no container
   assert.match(tree['AGENTS.md'], /<!-- yaw:devenv -->\n- Set up with `just setup`/);
 });
 
-test('profile with env.example and devenv/: container files and variables are rendered', async () => {
-  const root = await project({ kitRoot: kitWithContainerProfile(), profile: 'container-demo' });
+test('profile with env.example: variables are rendered', async () => {
+  const root = await project({ kitRoot: kitWithEnvProfile(), profile: 'env-demo' });
   assert.match(read(root, '.env.example'), /DATABASE_URL=postgres:\/\/app@db\/app\nAPI_KEY=\n/);
-  assert.match(read(root, 'Dockerfile'), /^FROM node:22-slim/);
-  assert.match(read(root, 'compose.yaml'), /env_file: \.env/);
-  assert.match(read(root, '.devcontainer/devcontainer.json'), /"dockerComposeFile"/);
   const byPath = Object.fromEntries(readManifest(root).files.map((f) => [f.path, f]));
-  for (const f of ['.env.example', 'Dockerfile', 'compose.yaml', '.devcontainer/devcontainer.json']) assert.equal(byPath[f].module, 'devenv', f);
-  assert.deepEqual(byPath['.gitignore'].fragments.map((f) => f.module), ['container-demo', 'devenv']);
-});
-
-test('two profiles shipping the same container file are an error', async () => {
-  const kit = kitWithContainerProfile({ twice: true });
-  assert.throws(() => profileDevenv(kit, ['container-demo', 'other-demo']), /both ship devenv\/Dockerfile/);
+  assert.equal(byPath['.env.example'].module, 'devenv');
+  assert.deepEqual(byPath['.gitignore'].fragments.map((f) => f.module), ['devenv', 'env-demo']);
 });
 
 test('git ignores .env and .env.local but not .env.example', { skip: !hasTool('git') && 'git is not installed' }, async () => {
@@ -96,16 +78,15 @@ test('just setup creates .env from .env.example once and never overwrites it', {
 });
 
 test('remove leaves zero residue; answers stay; re-add restores the same files', async () => {
-  const kitRoot = kitWithContainerProfile();
-  for (const profile of ['node-cli', 'container-demo']) {
+  const kitRoot = kitWithEnvProfile();
+  for (const profile of ['node-cli', 'env-demo']) {
     const root = await project({ kitRoot, profile });
     const before = readTree(root);
     await removeModule({ root, kitRoot, module: 'devenv' });
     const left = readTree(root);
-    for (const gone of ['.env.example', 'Dockerfile', 'compose.yaml', '.devcontainer/devcontainer.json']) assert.equal(Object.hasOwn(left, gone), false, gone);
+    assert.equal(Object.hasOwn(left, '.env.example'), false);
     assert.doesNotMatch(left['.gitignore'] ?? '', /yaw:devenv|\.env/);
     assert.doesNotMatch(left['AGENTS.md'], /yaw:devenv/);
-    assert.equal(existsSync(join(root, '.devcontainer')), false);
     assert.equal(readAnswers(root).proposal.profiles[0], profile); // answers.yaml kept
     assert.equal(readManifest(root).modules.devenv, undefined);
     await addModule({ root, kitRoot, module: 'devenv' });
