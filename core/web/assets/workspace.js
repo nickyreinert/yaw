@@ -103,14 +103,14 @@ export function showView(hash, focus = true) {
   else if (!interviewView) setInterviewFocus(false);
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (params.has('q') && pageSearch[name]) pageSearch[name].set(params.get('q'), { scroll: true });
-  if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
+  if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && !['decisions', 'categories'].includes(sub)) sub = undefined;
   if (GLOBAL_VIEWS.includes(name)) globalView.show(name, query);
   else {
     globalView?.hide();
     replace(`#${['settings', 'global-settings'].includes(name) ? settingsRoute(name, sub, query) : sub ? `${name}/${sub}` : name}`);
   }
   if (focus && changed) { document.querySelector(`[data-view="${section}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
-  if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null);
+  if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null, sub === 'categories');
   if (name === 'code-map') loadMap().catch(reportError);
 }
 // Nav clicks add a history entry; filter changes replace it. Back/forward fire popstate and hashchange: render once.
@@ -126,12 +126,19 @@ function applyFeatures(next) {
 }
 function onHistory() { if (location.hash !== shown) showView(location.hash.slice(1), false); }
 function openProject(root, target) { sessionStorage.setItem('yaw-workspace', root); location.hash = `#${target}`; location.reload(); }
-function openKnowledge(scope, type) {
+// Knowledge | Decision Categories: two panels of one page; the category editor is project-only.
+function showKnowledgeTab(categories) {
+  $('knowledge-records').hidden = categories; $('knowledge-category-panel').hidden = !categories;
+  document.querySelectorAll('#knowledge-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(categories === (b.dataset.tab === 'categories'))));
+  if (categories) { knowledgeKey = ''; taxonomyEditor($('knowledge-category-panel'), { api, get }).catch((e) => $('knowledge-category-panel').replaceChildren(el('p', e.message, 'warn'))); }
+}
+function openKnowledge(scope, type, categories = false) {
   const changed = scope !== knowledgeScope || type;
   knowledgeScope = scope;
   $('knowledge-title').textContent = scope === 'project' ? 'Knowledge' : 'Global knowledge';
   $('knowledge-intro').textContent = scope === 'project' ? 'This workspace · Knowledge records and decisions' : 'Your personal records in ~/.yaw/knowledge · shared by all projects';
-  $('knowledge-categories').hidden = scope !== 'project';
+  $('knowledge-tabs').hidden = scope !== 'project';
+  showKnowledgeTab(scope === 'project' && categories);
   if (changed) { knowledgePage = 1; knowledgeKey = ''; $('knowledge-namespace').value = ''; $('knowledge-type').value = ''; pendingType = type; loadKnowledge(); }
   else if (!knowledgeLoaded) loadKnowledge();
 }
@@ -344,7 +351,7 @@ export function startWorkspace() {
   });
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
-  $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
+  document.querySelectorAll('#knowledge-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.tab === 'categories' ? 'knowledge/categories' : 'knowledge')));
   settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(settingsRoute('settings', tab)), openSetup: setup ? () => navigate('setup') : null });
   globalView = createGlobal({ get, api, report: reportError, openProject, replace, afterCollect: () => load() });
   globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications, onFeatures: applyFeatures,

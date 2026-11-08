@@ -692,3 +692,21 @@ test('review cards: the push gate is a full-width card before the agent cards; F
   assert.ok(!/\.module-card\.push-gate[^{]*\{[^}]*grid-column: auto/.test(css), 'css does not undo the full width');
   assert.deepEqual(cards.match(/\['(quality|logic|ux|security|feature)', '/g).map((s) => s.slice(2, -4)), ['quality', 'logic', 'ux', 'security', 'feature']);
 });
+
+test('knowledge UI: Knowledge and Decision Categories tabs, sticky filter bar that stays under the sidebar', () => {
+  const dir = join(KIT_ROOT, 'core/web/assets');
+  for (const name of ['index.html', 'dashboard.html']) {
+    const page = readFileSync(join(dir, name), 'utf8');
+    assert.match(page, /id="knowledge-tabs"[^>]*>.*data-tab="records">Knowledge<.*data-tab="categories">Decision Categories</s, `${name}: tabs`);
+    assert.match(page, /id="knowledge-records"/);
+    assert.match(page, /id="knowledge-category-panel"/);
+    assert.ok(!page.includes('id="knowledge-categories"'), `${name}: no separate categories button`);
+  }
+  const css = readFileSync(join(dir, 'app.css'), 'utf8');
+  const rule = css.match(/^\.knowledge-filters\s*\{[^}]*position:\s*sticky[^}]*\}/m);
+  assert.ok(rule, 'filter bar is sticky');
+  assert.match(rule[0], /top:\s*0/);
+  const z = Number(rule[0].match(/z-index:\s*(\d+)/)?.[1]), sidebarZ = Number(css.match(/^\.sidebar \{[^}]*z-index:\s*(\d+)/m)[1]);
+  assert.ok(z > 0 && z < sidebarZ, 'filter bar sits below the sidebar navigation');
+  assert.match(readFileSync(join(dir, 'workspace.js'), 'utf8'), /knowledge-tabs/);
+});

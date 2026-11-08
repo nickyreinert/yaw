@@ -69,11 +69,15 @@
         <details class="data-notes"><summary>Data sources &amp; coverage</summary><p>Pages read saved results only; <strong>Refresh</strong> (or <strong>Auto</strong>) reads Claude Code, Codex and Copilot CLI local history, and <strong>Classify</strong> runs local Laya. Scan limit: 20,000 files per agent. Transcripts of any size are read completely; single lines over 4 MiB and broken lines are skipped and the session is marked partial. Unchanged transcripts are reused from the last scan, so rescans only read new or changed files. Missing usage/cost is shown as —. Duration is elapsed time, not active work. Response time is prompt-to-first-recorded-answer, not network latency. Charts use UTC days. Classification is experimental, can be wrong, and never runs automatically. Turns above the configured size are skipped rather than truncated.</p></details>
       </section>
       <section data-view="knowledge" class="view" hidden>
-        <div class="page-heading"><h1 id="knowledge-title" tabindex="-1">Knowledge</h1><span id="knowledge-intro" class="small muted">This workspace · Knowledge records and decisions</span><div class="page-actions"><button type="button" id="knowledge-categories">Decision categories</button><button type="button" id="knowledge-new" class="primary">+ New record</button></div></div>
+        <div class="page-heading"><h1 id="knowledge-title" tabindex="-1">Knowledge</h1><span id="knowledge-intro" class="small muted">This workspace · Knowledge records and decisions</span><div class="page-actions"><button type="button" id="knowledge-new" class="primary">+ New record</button></div></div>
+        <nav id="knowledge-tabs" class="editor-tabs" aria-label="Knowledge views"><button type="button" data-tab="records">Knowledge</button><button type="button" data-tab="categories">Decision Categories</button></nav>
+        <div id="knowledge-records">
         <div class="filters knowledge-filters card"><label class="knowledge-search">Search<input id="knowledge-search" type="search" placeholder="Title, content, tags…" maxlength="200"></label><label>Namespace<select id="knowledge-namespace"><option value="">All namespaces</option></select></label><label>Type<select id="knowledge-type"><option value="">All types</option></select></label></div>
         <p id="knowledge-status" class="small muted" role="status"></p><p id="knowledge-error" class="warn" role="alert" hidden></p>
         <div class="knowledge-layout"><div id="knowledge-list" class="card"></div><article id="knowledge-detail" class="card"><p class="muted">Select a record.</p></article></div>
         <details class="data-notes"><summary>Sources</summary><div id="knowledge-sources"></div></details>
+        </div>
+        <article id="knowledge-category-panel" class="card" hidden></article>
       </section>
       <section data-view="global-improve" class="view improve-view" hidden>
         <div class="page-heading"><h1 tabindex="-1">Learn</h1><span class="small muted">Find a difficult session. Make the next one better.</span></div>

@@ -186,3 +186,7 @@
 - T-011 Preserve permissions during atomic replacement — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: `writeAtomic` in core/render/files.js keeps an existing regular file's mode (chmod after write, so umask cannot widen 0600 or drop +x) unless `options.mode` is given; callers pass explicit modes already. Regression test in test/render.test.js.
+
+- T-040 Workspace Knowledge tabs and sticky filter — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: Knowledge page has "Knowledge" and "Decision Categories" tabs (route `knowledge/categories`, project scope only; the category editor opens in its own panel instead of the preview pane); the filter bar is sticky below the sidebar (z-index under it, static on phones) and the preview pane offsets below it; list/preview layout unchanged. Test in test/form-ui.test.js.
