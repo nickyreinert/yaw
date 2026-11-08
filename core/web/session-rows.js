@@ -27,6 +27,7 @@ function compact(r) {
     prompts: m ? m.prompts : null, answers: m ? m.answers : null, promptChars: m ? m.promptChars ?? null : null, answerChars: m ? m.answerChars : null,
     medianAnswer: m?.medianAnswerChars ?? null, p95Answer: m?.p95AnswerChars ?? null,
     medianResp: seconds(m?.medianResponseMs), p95Resp: seconds(m?.p95ResponseMs), partial: Boolean(m?.limited),
+    toolOutput: r.toolOutput ?? null,
     outcome: e ? outcomeOf(e.counts?.outcome) : null,
     evaluation: e ? { classified: e.classified, skipped: e.skipped, counts: e.counts, outcomeUnknown: e.outcomeUnknown, outcomeFeedback: e.outcomeFeedback, evaluated: e.evaluated } : null,
   };

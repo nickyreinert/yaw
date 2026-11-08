@@ -36,6 +36,7 @@ const assets = new Map([
   ['/settings-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/settings-view.js', import.meta.url))]],
   ['/overview-metrics.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/overview-metrics.js', import.meta.url))]],
   ['/analytics-filters.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/analytics-filters.js', import.meta.url))]],
+  ['/tool-output.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/tool-output.js', import.meta.url))]],
   ['/global-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-view.js', import.meta.url))]],
   ['/insights-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-view.js', import.meta.url))]],
   ['/insights-model.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-model.js', import.meta.url))]],

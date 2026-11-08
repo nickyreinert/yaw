@@ -35,6 +35,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('settings-view.js', 'text/javascript; charset=utf-8'),
   asset('overview-metrics.js', 'text/javascript; charset=utf-8'),
   asset('analytics-filters.js', 'text/javascript; charset=utf-8'),
+  asset('tool-output.js', 'text/javascript; charset=utf-8'),
   asset('global-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-model.js', 'text/javascript; charset=utf-8'),

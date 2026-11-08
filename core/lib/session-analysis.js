@@ -13,9 +13,48 @@ export const LABELS = {
 };
 // Transcripts are streamed in full; only single lines over MAX_LINE bytes (usually huge tool output) are skipped unbuffered.
 // READER marks rows read this way, so rows from the older capped reader are read once more.
-const MAX_LINE = 4 * 1024 * 1024, READER = 2;
+const MAX_LINE = 4 * 1024 * 1024, READER = 3;
 const textOf = (content) => typeof content === 'string' ? content : Array.isArray(content)
   ? content.filter((p) => ['text', 'input_text', 'output_text'].includes(p?.type) && typeof p.text === 'string').map((p) => p.text).join('\n') : '';
+
+// Tool-result sizes by tool and by the command's first word (T-048, L5). Only counts and byte sizes are kept, no output and
+// no command text: names must look like a plain word, and a leading NAME=value is skipped because it may hold a secret.
+const WORD = /^[\w.+-]{1,40}$/, MAX_KEYS = 40, MAX_PENDING = 10000;
+const word = (name) => WORD.test(name ?? '') ? name : 'other';
+function firstWord(command) {
+  if (typeof command !== 'string') return null;
+  for (const token of command.trim().split(/\s+/, 16)) if (!/^[A-Za-z_]\w*=/.test(token)) return word(token.split('/').pop());
+  return null;
+}
+const outputBytes = (content) => typeof content === 'string' ? Buffer.byteLength(content) : Array.isArray(content)
+  ? content.reduce((n, p) => n + (p?.type === 'text' && typeof p.text === 'string' ? Buffer.byteLength(p.text) : 0), 0) : 0;
+function toolScan() {
+  const pending = new Map(), tools = new Map(), commands = new Map();
+  const add = (table, key, size) => {
+    if (!table.has(key) && table.size >= MAX_KEYS) key = 'other';
+    const t = table.get(key) ?? { calls: 0, bytes: 0, max: 0 };
+    t.calls++; t.bytes += size; t.max = Math.max(t.max, size);
+    table.set(key, t);
+  };
+  return {
+    // Claude Code: a tool_use block in an assistant line, its tool_result block in a later user line.
+    line(o) {
+      const blocks = o?.message?.content;
+      if (!Array.isArray(blocks)) return;
+      for (const b of blocks) {
+        if (b?.type === 'tool_use' && typeof b.id === 'string' && pending.size < MAX_PENDING) {
+          pending.set(b.id, { tool: word(b.name), command: b.name === 'Bash' ? firstWord(b.input?.command) : null });
+        } else if (b?.type === 'tool_result') {
+          const call = pending.get(b.tool_use_id) ?? { tool: 'other', command: null }, size = outputBytes(b.content);
+          pending.delete(b.tool_use_id);
+          add(tools, call.tool, size);
+          if (call.command) add(commands, call.command, size);
+        }
+      }
+    },
+    result: () => ({ tools: Object.fromEntries(tools), commands: Object.fromEntries(commands) }),
+  };
+}
 
 export function messageOf(agent, o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -62,6 +101,7 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
   const messages = [], seen = new Map();
   let input;
   let limited = false, userTurns = 0;
+  const scan = agent === 'claude' ? toolScan() : null;
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
@@ -72,6 +112,7 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
       if (!line) continue;
       let o;
       try { o = JSON.parse(line); } catch { limited = true; continue; }
+      scan?.line(o);
       const m = messageOf(agent, o);
       if (!m?.text) continue;
       const key = m.id ? `${m.role}:${m.id}` : null;
@@ -95,7 +136,7 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
       await closed;
     }
   }
-  return { messages, limited };
+  return { messages, limited, ...(scan ? { tools: scan.result() } : {}) };
 }
 
 export function messageMetrics(messages, limited = false) {
@@ -373,6 +414,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
       id: sessionId(s.agent, s.native), project: realRoot(s.cwd), agent: s.agent, title: '', started: s.started, ended: s.ended,
       model: s.model, branch: s.branch, tokens_in: s.tokensIn, tokens_out: s.tokensOut, cost_usd: s.costUsd, source: 'local', reader: READER,
       metrics: messageMetrics(turns.messages, turns.limited), fingerprint: hash.digest('hex'),
+      ...(turns.tools ? { toolOutput: turns.tools } : {}),
     };
     if (!row.id) continue;
     if (s.transcript && s.stamp) Object.assign(row, { file_key: sourceKey(s.transcript), stamp: s.stamp });

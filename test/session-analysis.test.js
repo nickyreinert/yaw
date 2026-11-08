@@ -110,7 +110,7 @@ test('long transcripts are read in full; rows from the older capped reader are r
   const data = readAnalysis(env); delete data.rows[0].reader; data.rows[0].metrics.limited = true; writeUserData(env, 'session-analysis.json', data);
   result = await collectAnalysis({ root, env });
   assert.equal(result.reused, 0); row = readAnalysis(env).rows[0];
-  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 2);
+  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 3);
 });
 
 test('message extraction ignores tools and non-text blocks; Unicode lengths and response timing are measured', () => {

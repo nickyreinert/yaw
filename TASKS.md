@@ -80,10 +80,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-045 [P2] Investigate Safe Verdicts before changing it — explain what it stores, how verdicts arise, what "No Important Verdict", "Set Retention" and "Import a Verdict" do, why it is separate from Analytics and Sync, and its user benefit. Report to the user first; then decide keep/rename/move/remove. Do not alter or delete data or the UI before that decision.
   model: middle tier (Sonnet) · effort: medium
 
-- T-048 [P2] Measure tool-output share before building (L5, part 1) — transcript scan of tool-result sizes by tool and by the command's first word, shown in Analytics. Store sizes and first words only, no content (ADR-0052). Reuse the streaming reader in `core/lib/session-analysis.js` and respect T-016's line limits. First step, with T-047.
-  spec: kickoff/16-compact-output.md §4 L5
-  model: middle tier (Sonnet) · effort: high
-
 - T-051 [P2] L1 for the remaining profiles — per profile: a warning pattern and quieter reporter flags (for example `pytest -q`). Depends on T-050.
   spec: kickoff/16-compact-output.md §4 L1
   acceptance: each profile's smoke test verifies its compact output

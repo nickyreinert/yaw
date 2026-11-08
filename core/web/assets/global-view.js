@@ -5,6 +5,7 @@ import { renderOverviewMetrics, summarizeOverview } from './overview-metrics.js'
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
 import { createInsights } from './insights-view.js';
+import { toolOutputTable } from './tool-output.js';
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
@@ -43,7 +44,7 @@ const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveF
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
-const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes']];
+const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes'], ['tooloutput', 'Tool output']];
 const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
@@ -596,6 +597,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]), str('language', 'Language', (r) => r.language),
         str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
         num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),
+      tooloutput: () => toolOutputTable(rows, { table: dataTable, num, str, short }),
     }[state.table]();
     fill($('ss-browse'), sub, h('article', { class: 'card' }, body), data.limited ? h('p', { class: 'small muted' }, `Showing the newest ${fmt(data.rows.length)} of ${fmt(data.total)} sessions.`) : null,
       data.undated ? h('p', { class: 'small muted' }, `${fmt(data.undated)} session${data.undated === 1 ? ' has' : 's have'} no start time and cannot be charted. For synced sessions, update YAW on the other device and sync there again.`) : null);
