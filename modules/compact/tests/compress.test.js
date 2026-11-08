@@ -1,5 +1,5 @@
 // compact L2 (T-054, kickoff/16-compact-output.md §4 L2): the Claude Code compress hook. Methods `ansi`,
-// `progress`, `dedup`, `cap` (with the re-run hint; recall is T-055), grep grouping by file and the lockfile
+// `progress`, `dedup`, `cap` (with the re-run hint), grep grouping by file and the lockfile
 // summary; guards: output under 512 bytes, detail flags, git diff|show, `yaw run` output, every Read except a
 // whole lockfile, levers off, failures. Payloads: the recorded T-047 fixtures (test/fixtures/claude/).
 

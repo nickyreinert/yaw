@@ -48,10 +48,18 @@ test('definition: off at every depth, one levers question, low token cost', () =
   assert.deepEqual(def.depends, ['core']);
   const levers = def.questions.find((q) => q.id === 'compact.levers');
   assert.equal(levers.type, 'multi');
-  assert.deepEqual(levers.choices.map((c) => c.value), ['recipes', 'hook', 'recall']);
+  assert.deepEqual(levers.choices.map((c) => c.value), ['recipes', 'hook']);
   assert.deepEqual(levers.default, ['recipes']);
   assert.ok(def.questions.some((q) => q.id === 'compact.personal' && q.type === 'boolean' && q.default === false));
   assert.equal(def.questions.some((q) => /recall/.test(q.id)), false);
+});
+
+test('no recall store: no recall lever, no yaw recall command, no recall module file (T-055 dropped)', async () => {
+  const { LEVERS } = await import('../lib/levers.js');
+  assert.deepEqual(LEVERS, ['recipes', 'hook']);
+  const { COMMANDS } = await import('../../../core/cli/main.js');
+  assert.equal(COMMANDS.some((c) => c.name === 'recall'), false);
+  assert.equal(existsSync(new URL('../lib/recall.js', import.meta.url)), false);
 });
 
 test('add --yes (committed): answers in answers.yaml, the L4 fragment in AGENTS.md, nothing personal', async () => {

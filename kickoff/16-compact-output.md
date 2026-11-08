@@ -20,7 +20,7 @@ rtk reduces one thing: the bytes of **tool output** the agent reads. It does not
 
 **Filter strategies** (rtk ARCHITECTURE.md): stats extraction (git log becomes counts), failure focus (tests show failures only, passing tests become a count), grouping (lint by rule, grep by file), deduplication (repeated lines become `[xN]`), structure only (JSON becomes keys and types), code filtering (strip comments or bodies), tree compression (ls), progress filtering (keep the last `\r` frame), JSON-mode injection (add `--format json`, then parse), state-machine parsing (pytest) and NDJSON streams (go test).
 
-**Generic methods:** `ansi`, `progress`, `dedup`, `base64-elide`, `cap` (over 300 lines keep the first 50 and last 200, raw copy to recall), `lockfile` (to a `name@version` list), `grep-group`, `web-md` (HTML to Markdown), `minify-json` / TOON.
+**Generic methods:** `ansi`, `progress`, `dedup`, `base64-elide`, `cap` (over 300 lines keep the first 50 and last 200, re-run hint), `lockfile` (to a `name@version` list), `grep-group`, `web-md` (HTML to Markdown), `minify-json` / TOON.
 
 **Safety rules rtk follows.** These are rules to adopt, not code to copy:
 
@@ -81,7 +81,7 @@ This works for Gemini too and does not touch permissions: the agent still runs `
 
 A new hook kind, `compress`, on PostToolUse with matcher `Bash|Grep|WebFetch`; for Read, it applies to lockfiles only. It returns `updatedToolOutput` in the tool's own output shape. Claude Code ignores a value whose shape does not match for built-in tools (hooks reference, read on 2026-11-07 through a summary, not word for word). Recorded fixtures for each tool are therefore a precondition (BUILD.md rule 7).
 
-- **Methods in v1:** `ansi`, `progress`, `dedup`, `cap` with recall, grep grouping by file, lockfile summary. No per-command parsers.
+- **Methods in v1:** `ansi`, `progress`, `dedup`, `cap`, grep grouping by file, lockfile summary. No per-command parsers.
 - **Guards:** the dispatcher enforces "never worse". Output under 512 bytes is skipped, as are commands with detail flags, `git diff|show`, output that already went through `yaw run`, and every Read except lockfiles. The hook fails open.
 - **Limit:** PostToolUse fires on success only. Failed tool calls trigger PostToolUseFailure, and its output cannot be replaced, as far as we have read. Whether a Bash command that exits with a non-zero code counts as a failed call is not verified. If it does, L2 never sees failing test output, which is the largest output; L1 covers that case for recipes.
 
@@ -112,19 +112,13 @@ Measurement is part of the module, and its first part also works before the modu
 - **After enabling:** the compress hook writes `{tool, method, rawBytes, outBytes}` to `hooks.jsonl`; `yaw run` writes `{step, method, exitCode, rawBytes, outBytes, ms}` to `run.jsonl` beside it, since a recipe step has no agent session (ADR-0132). Tokens are estimated as `bytes / 4` and labelled as estimates.
 - **Validation:** compare the same kind of task with the module on and off, using per-session `tokensIn` (already imported) and the number of `YAW_VERBOSE=1` re-runs, which counts filter misses. Byte ratios alone do not prove savings: a lossy cut that causes a re-run costs more than it saved.
 
-### L6. Recall store (optional)
+### L6. Recall store (dropped)
 
-A separate choice, off by default. When it is off, a cut output ends with a hint to re-run with `YAW_VERBOSE=1`, and nothing is stored. When it is on, raw output goes to `~/.yaw/recall/<hash>.gz`:
-
-- File mode 0600; at most 200 entries, 30 days and 10 MB per entry.
-- Never synced: excluded from data sync.
-- Read back with `yaw recall <hash>`.
-
-This would be the first place YAW stores tool-output content, so turning it on needs an ADR and a privacy NOTICE. Without it, re-runs cost time and are not always repeatable (flaky tests, side effects).
+Dropped by decision on 2026-11-08 (T-055, ADR-0133 rejected). Nothing is stored: a cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Re-runs cost time and are not always repeatable (flaky tests, side effects); that cost is accepted.
 
 ## 5. Changes to existing rules and code
 
-- **ADR-0007 amendment and BUILD.md rule 5:** kind `compress`, PostToolUse only. It may return only `updatedToolOutput`. The dispatcher drops any result that is not smaller than the original; the result may end with one recall line. `tokenCost: none`.
+- **ADR-0007 amendment and BUILD.md rule 5:** kind `compress`, PostToolUse only. It may return only `updatedToolOutput`. The dispatcher drops any result that is not smaller than the original; the result may end with one re-run hint line. `tokenCost: none`.
 - **`core/schema/module.schema.json`:** add `compress` to the hook `kind` enum.
 - **`core/hooks/adapters.js`:** keep `tool_response` in memory for `compress` handlers only, never in the log. Add a PostToolUse branch to `renderOutput` for each agent.
 - **`core/schema/hook-event.schema.json`:** optional `rawBytes`, `outBytes`, `method`.
@@ -158,7 +152,7 @@ The proxy daemon (API traffic, cache alignment, model routing), delegation to ch
 
 Taken on 2026-11-08:
 
-1. **Recall store:** optional, a separate choice (L6). Off by default; that default is an assumption and was not discussed.
+1. **Recall store:** dropped (L6, T-055). Decided later on 2026-11-08: no output is stored; ADR-0133 is rejected.
 2. **L1 on success:** count plus capped warning lines, as rtk does it (L1).
 3. **Default:** off in Basic. Quick asks no module questions; like other optional tools, it reuses saved personal defaults and is otherwise off.
 4. **Scope:** the user chooses committed or personal per project (section 4).

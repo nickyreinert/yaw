@@ -9,7 +9,7 @@ export const MODEL = 'local-hash-ngram-v2';
 export const DIMENSIONS = 384;
 export const THRESHOLD = 0.12;
 export const IMPORTANCE_WEIGHT = { critical: 1.5, high: 1.2, normal: 1.0, low: 0.8 };
-export const RETIRED = ['superseded', 'deprecated'];
+export const RETIRED = ['superseded', 'deprecated', 'rejected'];
 
 const TOKEN = /[\p{L}\p{N}]+/gu;
 

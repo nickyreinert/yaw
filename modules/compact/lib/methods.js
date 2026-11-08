@@ -1,7 +1,7 @@
 // Output methods of the compress hook (T-054, kickoff/16-compact-output.md §4 L2): `ansi`, `progress`, `dedup`,
 // `cap`, grep grouping by file and the lockfile summary. Pure functions without imports, so the lean hook entry
-// (T-053) stays lean. Each returns a shorter version of the real output; nothing is stored (the recall store is
-// T-055), so a cut ends with the re-run hint.
+// (T-053) stays lean. Each returns a shorter version of the real output; nothing is stored, so a cut ends with
+// the re-run hint.
 
 export const CAP_LINES = 300;
 const CAP_HEAD = 50;

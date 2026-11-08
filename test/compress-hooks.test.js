@@ -101,7 +101,7 @@ test('Bash, Grep and Read fixtures: the shorter output goes back as hookSpecific
 });
 
 test('never worse: a result that is not smaller is dropped', async () => {
-  const grow = await squeeze('export default (ev, { toolResponse: r }) => ({ updatedToolOutput: { ...r, stdout: r.stdout + "\\n[full output: yaw recall 0123456789abcdef]" } });\n');
+  const grow = await squeeze('export default (ev, { toolResponse: r }) => ({ updatedToolOutput: { ...r, stdout: r.stdout + "\\n[padding line that makes the output longer]" } });\n');
   const same = await squeeze('export default (ev, { toolResponse: r }) => ({ updatedToolOutput: { ...r } });\n');
   for (const p of [grow, same]) assert.deepEqual([(await run(p, 'PostToolUse-Bash')).stdout], ['']);
 });

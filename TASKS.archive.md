@@ -1,5 +1,8 @@
 # Archive
 
+- T-055 L6 optional recall store — dropped 2026-11-08
+  model: middle tier (Sonnet) · effort: high
+  done: dropped 2026-11-08: recall store removed by decision
 - T-024 Validate the actual Gradle JDK prerequisite — done 2026-11-08
   model: low tier (Luna/Haiku) · effort: medium
   done: decision: an invalid JAVA_HOME fails, not skips. `gradleJdkProblem()` (test/helpers/fixtures.js) names JAVA_HOME when java is on PATH but JAVA_HOME has no bin/java; two tests in test/profiles.test.js assert it. `just` not installed (not approved), so the Java/Kotlin/Android smoke tests still skip on "just is not installed" and were not run.

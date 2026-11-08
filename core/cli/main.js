@@ -43,7 +43,6 @@ export const COMMANDS = [
   { name: 'statusline', args: '[--snippet]', summary: 'status line for Claude Code (reads its JSON on stdin; comfort module)', options: { snippet: { type: 'boolean' } }, run: async (args) => (await import('./comfort.js')).statusline(args) },
   { name: 'presets', args: 'list | show <name> | delete <name> [--yes]', summary: 'list, show and delete saved setups in ~/.yaw/presets/', options: { ...yes }, run: async (args) => (await import('./presets.js')).presets(args) },
   { name: 'run', args: '[--compact] [--step <name>] [--warn <regex>] -- <command> [args...]', summary: 'run one recipe step; with --compact a passing step prints one line (compact module; the project recipes call this)', options: { compact: { type: 'boolean' }, step: { type: 'string' }, warn: { type: 'string' } }, run: async (args) => (await import('../../modules/compact/lib/run.js')).run(args) },
-  { name: 'recall', args: '<hash>', summary: 'print the full output stored for a shortened tool result (compact module, recall lever; ~/.yaw/recall)', options: {}, run: async (args) => (await import('../../modules/compact/lib/recall.js')).recall(args) },
 ];
 
 export const HELP_GROUPS = [
@@ -51,7 +50,7 @@ export const HELP_GROUPS = [
   { title: 'Planning and project work (after init)', names: ['kickoff', 'task', 'decisions', 'knowledge', 'map', 'review', 'sessions'] },
   { title: 'Monitoring and collaboration', names: ['web', 'host', 'remote', 'session-start', 'gh', 'hygiene', 'notify'] },
   { title: 'YAW internal commands', names: ['doctor', 'self-update', 'self-uninstall', 'help'] },
-  { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline', 'run', 'recall'] },
+  { title: 'Agent integration helpers', names: ['hook', 'sync', 'statusline', 'run'] },
 ];
 
 export function usage(env = process.env) {
