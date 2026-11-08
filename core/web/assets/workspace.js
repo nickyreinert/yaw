@@ -350,6 +350,7 @@ export function startWorkspace() {
     if (active === 'global-settings') { globalSettings.reset(); showView(location.hash.slice(1), false); }
   });
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
+  $('map-raw').addEventListener('toggle', (event) => { event.target.querySelector('summary').textContent = event.target.open ? 'Hide raw data' : 'Show raw data'; });
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
   document.querySelectorAll('#knowledge-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.tab === 'categories' ? 'knowledge/categories' : 'knowledge')));
   settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(settingsRoute('settings', tab)), openSetup: setup ? () => navigate('setup') : null });

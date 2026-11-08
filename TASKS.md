@@ -11,6 +11,10 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
+- T-041 [P2] Rework Code Map view — table as the primary view with pagination (T-038); raw YAML moved into a collapsed "Show raw data / Hide raw data" section below, formatted and complete.
+  model: low tier (Luna/Haiku) · effort: medium
+  status: in progress · resume: code and test/code-map-view.test.js done and passing; npm test has only known failures. Not committed: index.html, dashboard.html and workspace.js also hold T-040 uncommitted hunks, so the coordinator must commit them with the T-041 hunks (details#map-raw markup, toggle listener) and test/code-map-view.test.js, then push.
+
 - T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
   model: low tier (Luna/Haiku) · effort: medium
   needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
@@ -51,12 +55,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
 
 - T-039 [P2] Compact Analytics — evaluate merging Session Length and Session Timings into one table without losing data; keep the other Analytics sections (Agents & Models, collapsible layout). Depends on T-036 for the Classification block.
-  model: low tier (Luna/Haiku) · effort: medium
-
-- T-040 [P2] Workspace Knowledge tabs and sticky filter — tabs "Knowledge" and "Decision Categories" (category management integrated properly); sticky search/filter bar that doesn't cover other navigation; keep the list/preview layout. Depends on T-038.
-  model: middle tier (Sonnet) · effort: medium
-
-- T-041 [P2] Rework Code Map view — table as the primary view with pagination (T-038); raw YAML moved into a collapsed "Show raw data / Hide raw data" section below, formatted and complete.
   model: low tier (Luna/Haiku) · effort: medium
 
 - T-042 [P2] Rename Learning to Profiling and add workspace scope — rename everywhere (menu, icon, labels, settings; "Learning" disappears as a feature name; Classification stays as the process, "Profiling Settings" as config). Add a Profiling menu entry inside a workspace limited to that workspace's sessions. Global and workspace views use the same components, configured by scope; no second system. Toggle lives in global Features (T-036).
