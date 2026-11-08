@@ -18,11 +18,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
 
-- T-008 [P1] Fail the push review gate on Git errors — `modules/review/lib/cli.js:pushedCommits` turns an unknown remote SHA into zero commits, bypassing review; failed diffs also become empty text. Propagate failures and require an exact final verdict line.
-  model: middle tier (Sonnet) · effort: high
-  status: in progress
-  resume: uncommitted fix in modules/review/lib/cli.js and modules/review/tests/review.test.js; continue from there
-
 - T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
   in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
   model: middle tier (Sonnet) · effort: medium
