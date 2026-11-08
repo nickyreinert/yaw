@@ -189,7 +189,7 @@ function stepHelp() {
   if (stepIndex === 2) return [helpText('Describe what your app does, its target users and its constraints.'), helpText('Will be stored as a global entry in `AGENTS.md`.')];
   if (stepIndex === STACK) {
     const tools = element('ul'); for (const tool of activeProfile?.requires ?? []) { const item = element('li'); item.append(element('code', tool)); tools.append(item); }
-    return [element('p', activeProfile ? 'Environment tools' : 'Choose a language and destination.'), tools, helpText('Agent instructions: `AGENTS.md` and `docs/engineering.md`.')];
+    return [...(activeProfile ? [element('p', 'Environment tools')] : []), tools, helpText('Agent instructions: `AGENTS.md` and `docs/engineering.md`.')];
   }
   if (stepIndex === REVIEW) return [helpText('Save draft: Continue later.'), helpText('Save preset: Save for future use.')];
   return [];

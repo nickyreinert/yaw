@@ -19,7 +19,7 @@ questions:
     ref: "10.1"
     mode: Q
     type: choice
-    label: Task tracking
+    label: "Task tracking: Where do tasks live?"
     hint: Where tasks live; local works without GitHub.
     help: task-modes
     when: { idea.team: solo, tasks.use-github: true }

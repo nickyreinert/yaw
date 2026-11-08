@@ -7,7 +7,7 @@ questions:
     scope: user
     mode: Q
     type: multi
-    label: Which coding agents should this setup support? (comma-separated)
+    label: "Agents: Which coding agents should this setup support? (comma-separated)"
     help: agents
     choices:
       - { value: claude, label: Claude Code }
@@ -20,7 +20,7 @@ questions:
     scope: user
     mode: Q
     type: choice
-    label: Your experience with software development?
+    label: "Experience: Your experience with software development?"
     help: expertise
     choices: [layperson, intermediate, expert]
     default: intermediate
@@ -29,7 +29,7 @@ questions:
     scope: user
     mode: Q
     type: text
-    label: Language for chat with the agent?
+    label: "Chat: Language for chat with the agent?"
     default: de
   - id: user.autonomy
     ref: "0.7"
@@ -51,7 +51,7 @@ questions:
     ref: "1.1"
     mode: Q
     type: text
-    label: Purpose/Idea
+    label: "Purpose/Idea: What should the project do?"
     maxWords: 500
     help: idea
     hint: Include the intended users, their main task, and important data or interface constraints.
@@ -61,7 +61,7 @@ questions:
     ref: "1.5"
     mode: Q
     type: choice
-    label: Who works on this project?
+    label: "Team: Who works on this project?"
     hint: Shared rules for collaborators. GitHub remains optional.
     choices:
       - { value: solo, label: Solo }
@@ -72,7 +72,7 @@ questions:
     ref: "10.2"
     mode: Q
     type: boolean
-    label: Use GitHub for the repo?
+    label: "GitHub: Use GitHub for the repo?"
     hint: "GitHub is optional; off keeps development local. This does not create a remote repository."
     default: false
   # The stack is language x runs-on (ADR-0054): together they pick exactly one profile, tailored or basic.
@@ -81,7 +81,7 @@ questions:
     ref: "3.1"
     mode: Q
     type: choice
-    label: What language do you want to use?
+    label: "Language: What language do you want to use?"
     help: stack
     required: true
     choices:
@@ -99,7 +99,7 @@ questions:
     ref: "3.2"
     mode: Q
     type: choice
-    label: Where will it run?
+    label: "Destination: Where will it run?"
     help: stack
     required: true
     choices:
@@ -115,7 +115,7 @@ questions:
   - id: arch.library-strategy
     mode: S
     type: choice
-    label: Build or reuse?
+    label: "Libraries: Build or reuse?"
     hint: Prefer built-in tools and your own code, or suitable external libraries.
     choices:
       - { value: prefer-built-in, label: Prefer built-in and own code }
@@ -124,7 +124,7 @@ questions:
   - id: arch.wrapper
     mode: S
     type: choice
-    label: Wrapper
+    label: "Wrapper: How should common commands run?"
     hint: Common project commands.
     choices:
       - { value: off, label: Off }

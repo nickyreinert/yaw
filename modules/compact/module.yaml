@@ -23,7 +23,7 @@ questions:
     ref: "16.1"
     mode: Q
     type: multi
-    label: Which parts of compact output do you want?
+    label: "Compact: Which parts of compact output do you want?"
     hint: "Output of failing steps is shortened, never dropped."
     choices:
       - { value: recipes, label: "Project recipes: passing steps print one line (all agents)" }
@@ -34,7 +34,7 @@ questions:
     ref: "16.2"
     mode: Q
     type: boolean
-    label: Keep this setting to yourself?
+    label: "Privacy: Keep this setting to yourself?"
     hint: "Yes: only your machine uses it (kept in ~/.yaw, nothing committed); teammates keep raw output. No: the project answer is committed for everyone."
     default: false
 outputs:

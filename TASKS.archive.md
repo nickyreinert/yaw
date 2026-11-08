@@ -1,5 +1,10 @@
 # Archive
 
+- T-034 Unify card layout and order — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: Coding Style cards now share one grid in the order Project rules, Coding standards, Unit Tests, Local settings & secrets, Safety guard (`CARD_ORDER`/`orderCards` in core/interview/module-groups.js; Unit Tests no longer sits in a separate container). Labels read "Category: question" for every asked question in interview/base.yaml and the module questions (wording after the prefix unchanged; Docker and Unit Tests stay switch titles). Stack step: language and destination are asked once (CARD_QUESTIONS hides them from the generic list, the CLI re-asks only for an unsupported pair); the duplicate "Choose a language and destination." help line was removed, the stack card keeps the message. No question was removed, so no rule changed. Coding Practices frame confirmed gone (T-031). Test: test/card-layout.test.js.
+  open question: retired F-mode architecture questions and profile-option labels (profiles/*/profile.yaml, in-flight T-051 files) were not relabelled.
+
 - T-033 Rewrite Coding Assistance help texts — done 2026-11-08
   model: low tier (Luna/Haiku) · effort: medium
   done: `interview/help/comfort.md` (the help file of the Coding Assistance group, shown by the web interview and `?` in the CLI) now states for each feature what it does, the benefit and the technical change, checked against modules/comfort/lib/hygiene.js (thresholds from lib/config.js DEFAULTS), statusline.js, notify.js (duration gate, closed payload, detached ntfy/Telegram send) and cache.js (no keep-alive; timer for remote channels only; Claude only). Task Context is the active-task segment of the status line. Regression test: test/form-ui.test.js "comfort help" (fails on the old text).

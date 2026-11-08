@@ -4,7 +4,7 @@
 
 import { profileForStack } from '../../interview/suggest.js';
 
-import { GROUPS } from '../../interview/module-groups.js';
+import { GROUPS, orderCards } from '../../interview/module-groups.js';
 export { GROUPS };
 export const REVIEWERS = [
   ['quality', 'Quality', 'Readability, naming, duplication, missing tests and error handling: what a linter cannot judge.', '"parseDate swallows errors; add a test for an empty string."'],
@@ -233,13 +233,17 @@ export function renderModuleGroups(root, ctx) {
     const mods = ctx.modules.filter((m) => (m.group ?? 'basics') === id);
     const intro = ctx.groupNodes?.(id) ?? [];
     if (!mods.length && !intro.length) continue;
+    // One grid per group: a group-intro card (Unit Tests) is a card like the others, placed by CARD_ORDER.
+    const cardOf = new Map(mods.map((m) => [m.name, m]));
+    const introCards = id === 'basics' ? intro.map((node) => ['unit-tests', el('article', { class: 'module-card option-card' }, node)]) : [];
+    const cards = new Map([...mods.filter((m) => m.name !== 'review').map((m) => [m.name, () => [moduleCard(m, ctx, selected, hasGit)]]),
+      ...(cardOf.has('review') ? [['review', () => reviewerCards(ctx, selected.has('review'), hasGit)]] : []),
+      ...introCards.map(([name, node]) => [name, () => [node]])]);
     const grid = el('div', { class: 'module-grid' });
-    for (const m of mods) {
-      if (m.name !== 'review') grid.append(moduleCard(m, ctx, selected, hasGit));
-      if (m.name === 'review') grid.append(...reviewerCards(ctx, selected.has('review'), hasGit));
-    }
+    for (const name of orderCards(id, [...cards.keys()])) grid.append(...cards.get(name)());
+    const groupIntro = id === 'basics' ? [] : intro;
     groups.append(el('section', { class: 'module-group', 'aria-label': title }, el('h2', { class: 'module-group-title' }, decisionIcon(GROUP_ICONS[id]), el('span', { text: title })),
-      ...(intro.length ? [el('div', { class: id === 'basics' ? 'module-grid' : 'group-intro' }, ...intro.map((node) => id === 'basics' ? el('article', { class: 'module-card option-card' }, node) : node))] : []),
+      ...(groupIntro.length ? [el('div', { class: 'group-intro' }, ...groupIntro)] : []),
       ...(mods.some((m) => m.name === 'review') ? [el('label', { class: 'review-toggle' }, el('input', { type: 'checkbox', role: 'switch', class: 'module-switch', id: 'module-review', checked: selected.has('review'), disabled: ctx.readOnly, onchange: (event) => ctx.onToggle('review', event.target.checked) }), ' Review agents')] : []), grid));
     const after = ctx.afterGroup?.(id);
     if (after) groups.append(after);
