@@ -17,7 +17,12 @@ import { saveSetup } from '../core/lib/user-store.js';
 const NODE_ONLY = [dirname(process.execPath), '/usr/bin', '/bin'].join(':');
 const MODULES = readdirSync(join(KIT_ROOT, 'modules')).filter((n) => hasModule(KIT_ROOT, n));
 const QUESTIONS = collectQuestions(KIT_ROOT, MODULES);
-const BY_LABEL = new Map(QUESTIONS.map((q) => [q.label, q]));
+// The CLI prints a label, not an ID. Some labels are shared by questions that only apply to different
+// answers (e.g. the serverless flavor of Go, Java and Kotlin), so the question is picked by its condition.
+const BY_LABEL = new Map();
+for (const q of QUESTIONS) BY_LABEL.set(q.label, [...(BY_LABEL.get(q.label) ?? []), q]);
+const applies = (q, answers) => Object.entries(q.when ?? {}).every(([id, values]) => [values].flat().includes(answers[id]));
+const questionFor = (label, answers) => BY_LABEL.get(label)?.find((q) => applies(q, answers));
 const available = (c) => !(typeof c === 'object' && c.phase > 1);
 const valueOf = (c) => typeof c === 'object' ? c.value : c;
 const reply = (v) => Array.isArray(v) ? v.join(',') : String(v);
@@ -68,7 +73,7 @@ async function viaCli({ mode, answers, modules }) {
     if (/Save /.test(question)) return 'n';
     if (/Kick off the project documents/.test(question)) return 'n';
     const line = [...p.shown].reverse().join('').split('\n').find((l) => /^ {2}\d+\/\d+ /.test(l));
-    const q = line && BY_LABEL.get(line.replace(/^ {2}\d+\/\d+ /, ''));
+    const q = line && questionFor(line.replace(/^ {2}\d+\/\d+ /, ''), answers);
     if (!q || !/\] > $/.test(question)) throw new Error(`unexpected prompt: ${question}`);
     return Object.hasOwn(answers, q.id) ? reply(answers[q.id]) : '';
   };
@@ -104,8 +109,11 @@ async function viaForm({ mode, answers, modules }) {
   return root;
 }
 
-test('labels are unique, so the CLI side can find each question by its prompt', () => {
-  assert.equal(BY_LABEL.size, QUESTIONS.length);
+test('question IDs are unique, and a label shared by several questions is told apart by their conditions', () => {
+  assert.equal(new Set(QUESTIONS.map((q) => q.id)).size, QUESTIONS.length);
+  for (const [label, shared] of BY_LABEL) {
+    if (shared.length > 1) assert.ok(shared.every((q) => q.when), `"${label}" is shared by ${shared.map((q) => q.id).join(', ')}; each needs a condition`);
+  }
 });
 
 for (const scenario of SCENARIOS) {
