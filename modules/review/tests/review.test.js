@@ -76,6 +76,12 @@ test('without push reviewers or git-hooks: no gate in lefthook, review-install i
 test('verdict reads the last VERDICT line; the prompt carries the diff and the task list for feature fit', () => {
   assert.equal(verdict('a\nVERDICT: findings\nVERDICT: PASS\n'), 'PASS');
   assert.equal(verdict('no verdict'), null);
+  // only an exact final line counts: no trailing text, other case, markup or a later line
+  assert.equal(verdict('VERDICT: PASS\n\n'), 'PASS');
+  assert.equal(verdict('VERDICT: PASS because nothing changed'), null);
+  assert.equal(verdict('verdict: pass'), null);
+  assert.equal(verdict('**VERDICT: PASS**'), null);
+  assert.equal(verdict('VERDICT: PASS\nOne more thing: a.js:1 is broken'), null);
   const root = tmp('yaw-review-p-');
   writeFileSync(join(root, 'TASKS.md'), '# Tasks\n\n## Active\n\n- [ ] T-001 CSV export\n');
   const prompt = buildPrompt({ root, kind: 'feature', range: 'a..b', diff: '+x', env: { HOME: tmp('yaw-home-') } });
@@ -124,6 +130,36 @@ test('pushedCommits skips deletions and only lists commits the remote does not h
   const second = git(root, 'rev-parse', 'HEAD');
   const { commits } = pushedCommits(root, `refs/heads/main ${second} refs/heads/main ${first}\nrefs/heads/old ${'0'.repeat(40)} refs/heads/old ${first}\n`);
   assert.deepEqual(commits, [second]);
+});
+
+test('pushedCommits throws when git cannot list the commits (unknown remote sha)', async () => {
+  const root = await project(['core', 'review']);
+  const stdin = committed(root);
+  const local = git(root, 'rev-parse', 'HEAD');
+  assert.throws(() => pushedCommits(root, `refs/heads/main ${local} refs/heads/main ${'1'.repeat(40)}\n`), /git rev-list/);
+});
+
+test('gate: a git error stops the push without running the reviewers; YAW_REVIEW=skip still lets it through', async () => {
+  const root = await project(['core', 'review']);
+  const stdin = committed(root);
+  const local = git(root, 'rev-parse', 'HEAD');
+  const unknown = `refs/heads/main ${local} refs/heads/main ${'1'.repeat(40)}\n`;
+  const marker = join(root, 'agent-ran');
+  const cmd = `cat >/dev/null; touch ${marker}; echo "VERDICT: PASS"`;
+  const bad = io(root, { YAW_REVIEW_CMD: cmd });
+  assert.equal(runReview({ verb: 'gate', io: bad.io, stdin: unknown }), 2);
+  assert.match(bad.out.stderr, /review gate: git failed/);
+  assert.equal(existsSync(marker), false);
+
+  const skip = io(root, { YAW_REVIEW: 'skip', YAW_REVIEW_CMD: cmd });
+  assert.equal(runReview({ verb: 'gate', io: skip.io, stdin: unknown }), 0);
+
+  // a diff that git cannot produce is not an empty diff
+  git(root, 'config', 'diff.external', 'false');
+  const diff = io(root, { YAW_REVIEW_CMD: cmd });
+  assert.equal(runReview({ verb: 'gate', io: diff.io, stdin }), 2);
+  assert.match(diff.out.stderr, /review gate: git failed/);
+  assert.equal(existsSync(marker), false);
 });
 
 test('install writes an executable pre-push hook and refuses to overwrite a foreign one', async () => {
