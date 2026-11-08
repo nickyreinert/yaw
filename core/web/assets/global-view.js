@@ -48,7 +48,7 @@ const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveA
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
-const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Classification'], ['tooloutput', 'Tool output'], ['savings', 'Savings'], ['savingsab', 'Savings on/off']];
+const TABLES = [['sessions', 'Sessions'],['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Classification'], ['tooloutput', 'Tool output'], ['savings', 'Savings'], ['savingsab', 'Savings on/off']];
 const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
@@ -603,11 +603,14 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       sessions: () => dataTable('sessions', [str('title', 'Session', (r) => r.title || r.id), str('started', 'Started', (r) => r.started, (r) => new Date(r.started).toLocaleString()), str('agent', 'Agent', (r) => r.agent),
         ...(locked() ? [] : [project, str('device', 'Device', (r) => deviceLabel(r.deviceId))]), str('language', 'Language', (r) => r.language), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
         num('tin', 'Tokens in', (r) => r.tokensIn), num('tout', 'Tokens out', (r) => r.tokensOut), num('minutes', 'Elapsed', (r) => r.minutes, (r) => dur(r.minutes)),
-        num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`)], rows, { sort: 'started' }),
-      lengths: () => dataTable('lengths', [str('title', 'Session', (r) => r.title || r.id), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
-        num('cpp', 'Chars / prompt', (r) => r.prompts ? Math.round(r.promptChars / r.prompts) : null), num('med', 'Answer chars median', (r) => r.medianAnswer), num('p95', 'Answer chars p95', (r) => r.p95Answer),
-        num('rmed', 'Response s median', (r) => r.medianResp), num('rp95', 'Response s p95', (r) => r.p95Resp), num('total', 'Answer chars total', (r) => r.answerChars),
-        str('partial', 'Coverage', (r) => r.partial ? 'partial' : 'complete')], m, { sort: 'total', note: 'Transcripts of any size are read completely; oversized single lines are skipped and marked partial.' }),
+        num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`),
+        // Lengths & timing columns, merged in. Sessions without a scanned transcript stay listed and are marked, not dropped.
+        num('cpp', 'Chars / prompt', (r) => measured(r) && r.prompts ? Math.round(r.promptChars / r.prompts) : null),
+        num('med', 'Answer chars median', (r) => measured(r) ? r.medianAnswer : null), num('p95', 'Answer chars p95', (r) => measured(r) ? r.p95Answer : null),
+        num('rmed', 'Response s median', (r) => measured(r) ? r.medianResp : null), num('rp95', 'Response s p95', (r) => measured(r) ? r.p95Resp : null),
+        num('total', 'Answer chars total', (r) => measured(r) ? r.answerChars : null),
+        str('partial', 'Coverage', (r) => !measured(r) ? 'not measured' : r.partial ? 'partial' : 'complete')], rows,
+      { sort: 'started', note: 'Lengths and timing come from scanned transcripts; sessions not scanned show not measured. Oversized single lines are skipped and marked partial.' }),
       agents: () => dataTable('agents', groupCols('Agent'), groupBy(rows, (r) => r.agent), { sort: 'sessions' }),
       models: () => dataTable('models', groupCols('Model'), groupBy(rows, (r) => r.model), { sort: 'sessions' }),
       folders: () => dataTable('folders-s', groupCols('Folder'), groupBy(rows, folderOf), { sort: 'sessions' }),

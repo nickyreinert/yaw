@@ -34,11 +34,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: high
   status: in progress · needs decision: accept ADR-0133 and NOTICE-0002 (both Proposed; the NOTICE wording is a privacy decision), and whether `recall` may be set by a committed project answer or only personally. Resume: implemented and tested (modules/compact/lib/recall.js, `yaw recall`, run.js); after the decision set both records to accepted and archive
 
-- T-039 [P2] Compact Analytics — evaluate merging Session Length and Session Timings into one table without losing data; keep the other Analytics sections (Agents & Models, collapsible layout). Depends on T-036 for the Classification block (done).
-  model: low tier (Luna/Haiku) · effort: medium
-  status: in progress · needs decision: the named tables do not exist. Analytics has no "Session Length" or "Session Timings" label; the only timing table is "Lengths & timing" (core/web/assets/global-view.js:50, 595), and Elapsed sits in the "Sessions" table (:591). Which two tables should be merged, and do the Agents & Models sections need to become collapsible (the Analytics tables are subtabs today, not collapsible)?
-  resume: no code changed. Candidate: fold the Lengths & timing columns (response time, answer chars, coverage) into the Sessions table; the merge would change the row set, since Lengths shows only measured sessions (`measured`, :41, :595). After the decision: regression test, implement, npm test, archive.
-
 ## Backlog
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.

@@ -203,3 +203,7 @@
 - T-040 Workspace Knowledge tabs and sticky filter — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: Knowledge page has "Knowledge" and "Decision Categories" tabs (route `knowledge/categories`, project scope only; the category editor opens in its own panel instead of the preview pane); the filter bar is sticky below the sidebar (z-index under it, static on phones) and the preview pane offsets below it; list/preview layout unchanged. Test in test/form-ui.test.js.
+
+- T-039 Compact Analytics — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: medium
+  done: user decided to merge "Lengths & timing" into "Sessions" (the spec's "Session Length"/"Session Timings" do not exist). One Sessions table in core/web/assets/global-view.js now carries every column of both; sessions without a scanned transcript stay listed with Coverage "not measured" instead of being dropped; table=lengths URLs fall back to Sessions; Agents & Models unchanged. Test in test/analytics-merged-table.test.js.

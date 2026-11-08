@@ -71,7 +71,7 @@ and applies to all visible metrics, charts and tables.
   parent folder (such as your home folder) is listed as `./` or by full path.
 - **Sessions**: usage and message-insight cards, then charts (sessions per
   week, duration, prompt and answer length, response time, tokens by model,
-  outcomes), then the tables (sessions, lengths and timing, agents, models,
+  outcomes), then the tables (sessions with lengths and timing, agents, models,
   folders, projects, outcomes). The sessions table distinguishes project from
   device. The sticky filter bar also holds **Refresh** and **Auto**, described
   below; classification starts from the controller on **Profiling**.
