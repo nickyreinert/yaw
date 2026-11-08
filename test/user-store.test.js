@@ -32,7 +32,7 @@ function tree(root, prefix = '') {
   });
 }
 
-test('opt-in: the default is no; declining and non-interactive runs write nothing to ~/.yaw', async () => {
+test('opt-in: the default is no; declining and non-interactive runs write only the personal settings to ~/.yaw', async () => {
   const home = tmp('yaw-home-');
   const declinedP = scripted([...INTERVIEW, 'y', '', '', '']);
   const declined = await yaw(['init', '--skip-verify'], { home, prompter: declinedP });
@@ -40,12 +40,13 @@ test('opt-in: the default is no; declining and non-interactive runs write nothin
   assert.match(declinedP.asked.join('\n'), /Save this setup as a preset in .*\.yaw\/presets\/ and add a line \(project path, date, kit version\) to .*history\.jsonl\?/);
   assert.match(declined.out, /personal defaults are managed separately/);
   assert.match(declined.out, /Preset not saved; no preset or history entry was written/);
-  assert.deepEqual(readdirSync(home), []);
-  // --answers (no interview) never asks and never writes
+  // T-027: personal answers live only in ~/.yaw/user-profile.yaml; no preset or history without consent.
+  assert.deepEqual(tree(home), ['.yaw', '.yaw/user-profile.yaml']);
+  // --answers (no interview) never asks and saves no preset
   const answers = join(KIT_ROOT, 'examples', 'node-cli', 'answers.yaml');
   const file = await yaw(['init', '--answers', answers, '--yes', '--skip-verify'], { home });
   assert.equal(file.code, 0, file.err);
-  assert.deepEqual(readdirSync(home), []);
+  assert.deepEqual(tree(home), ['.yaw', '.yaw/user-profile.yaml']);
 });
 
 test('presets remain opt-in; personal defaults are saved separately and unchanged by Quick', async () => {
@@ -244,7 +245,7 @@ test('secrets: a secret-type key or a secret-looking value refuses the save; the
   assert.match(r.out, /The value is already in this project: \.yaw\/answers\.yaml, AGENTS\.md and \.yaw\/base\/AGENTS\.md/);
   for (const f of ['.yaw/answers.yaml', 'AGENTS.md', '.yaw/base/AGENTS.md']) assert.match(readFileSync(join(r.cwd, f), 'utf8'), new RegExp(CANARY.slice(0, 20)), f);
   assert.match(r.out, /idea\.text +\(hidden: looks like a secret\)/);
-  assert.equal(existsSync(join(home, '.yaw')), false);
+  assert.deepEqual(tree(home), ['.yaw', '.yaw/user-profile.yaml'], 'only the personal settings, without the team answer');
 });
 
 test('secret rules: no ReDoS on 100k-character values, and flags cannot be duplicated', () => {

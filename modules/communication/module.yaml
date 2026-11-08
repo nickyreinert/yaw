@@ -1,13 +1,13 @@
 # modules/communication/module.yaml (Y-5.1, ADR-0013, ADR-0024): speaking style from the user profile.
 name: communication
-description: Renders the user profile (depth, response, experience) into AGENTS.md and, when it is not the default, a Claude output style.
+description: The answer style (depth, response, experience). Personal by default (T-027), kept in ~/.yaw/user-profile.yaml and never committed; switched to team, it is rendered into AGENTS.md and, when it is not the default, a Claude output style.
 title: How the agent talks to you
 group: basics
 short: "How long and how explained"
 what: "Answer depth and responses, with wording and examples following your experience, taken from your personal profile."
 adds:
-  - "Notes in AGENTS.md: answer depth, wording and examples for your experience, responses"
-  - "A Claude output style when you leave the defaults"
+  - "Personal: your answer style stays in ~/.yaw/user-profile.yaml, nothing is committed"
+  - "Switched to team: notes in AGENTS.md and a Claude output style when you leave the defaults"
 example: { when: "Profile: short, in German, explain choices", then: "\"Ich nehme SQLite, weil die Daten lokal bleiben.\"" }
 depends: [core]
 default: { quick: true, standard: true, full: true }
@@ -35,7 +35,7 @@ questions:
       - { value: on-request, label: Only on request }
     default: short-paragraph
 outputs:
-  # Each template renders to nothing (no file) in a team repository or, for the Claude ones, with default style (ADR-0013, ADR-0024).
+  # Each template renders to nothing (no file) while the style is personal (T-027) or, for the Claude ones, with default style (ADR-0013, ADR-0024).
   templates: [AGENTS.md, .claude/output-styles/yaw.md, .claude/settings.json]
 agents:
   claude:  { support: native, via: "AGENTS.md section + .claude/output-styles/yaw.md selected by outputStyle" }

@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
@@ -36,9 +36,14 @@ async function init(replies) {
   const prompter = byLabel(replies);
   const stdout = capture();
   const stderr = capture();
-  const code = await main(['init', '--skip-verify'], { stdout, stderr, cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter });
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
+  const code = await main(['init', '--skip-verify'], { stdout, stderr, cwd, env, kitRoot: KIT_ROOT, prompter });
   const text = code === 0 ? readFileSync(join(cwd, '.yaw/answers.yaml'), 'utf8') : '';
-  return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, doc: text ? parseDocument(text).value : null, text };
+  // T-027: personal answers are saved only to ~/.yaw/user-profile.yaml; `doc` is the repository file read over it.
+  const profileFile = join(env.HOME, '.yaw/user-profile.yaml');
+  const profile = existsSync(profileFile) ? parseDocument(readFileSync(profileFile, 'utf8')).value.answers : {};
+  const repo = text ? parseDocument(text).value : null;
+  return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, repo, profile, doc: repo ? { ...repo, answers: { ...repo.answers, ...profile } } : null, text };
 }
 
 const IDEA = { 'Purpose/Idea': 'A small tool.', 'What language do you want': 'typescript', 'Where will it run': 'local' };
@@ -56,7 +61,6 @@ const SOLO_FULL = {
   ...CONSTRAINTS,
   'user.comfort': [],
   'compact.levers': [],
-  'compact.personal': false,
   'user.length': 'balanced',
   'user.explain': 'short-paragraph',
   'quality.review-quality': 'off',
@@ -83,6 +87,8 @@ test('Quick: depth is the first question; answers.yaml holds the Q answers and t
   assert.match(r.prompter.shown.join(''), /^\nSetup depth\n/);
   assert.deepEqual(r.doc.mode, 'quick');
   assert.deepEqual(r.doc.answers, QUICK);
+  assert.equal(Object.keys(r.repo.answers).some((id) => id.startsWith('user.')), false, 'personal answers stay out of answers.yaml (T-027)');
+  assert.deepEqual(r.profile['user.agents'], ['claude']);
   assert.deepEqual(r.doc.proposal.modules, QUICK_MODULES);
   assert.equal(r.doc.proposal.profiles[0], 'node-cli');
 });
@@ -193,8 +199,8 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
-  assert.match(shown('intermediate'), /Shared rules for collaborators/);
-  assert.doesNotMatch(shown('expert'), /Shared rules for collaborators/);
+  assert.match(shown('intermediate'), /Team settings are committed for everyone/);
+  assert.doesNotMatch(shown('expert'), /Team settings are committed for everyone/);
   // the summary lists the layperson default
   assert.doesNotMatch(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);

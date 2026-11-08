@@ -77,7 +77,9 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     const result = await f.request(route + '/apply', input); assert.equal(result.status, 200); assert.equal(result.body.ok, true);
     assert.equal(existsSync(join(preview.body.destination, '.yaw/manifest.json')), true);
     const saved = readFileSync(join(preview.body.destination, '.yaw/answers.yaml'), 'utf8');
-    assert.match(saved, new RegExp(`user.language: ${languageDefault}`));
+    // T-027: the hosted interview's personal answers are not committed; they are saved to the host's ~/.yaw/user-profile.yaml.
+    assert.doesNotMatch(saved, /user\.language/);
+    assert.match(readFileSync(join(f.env.HOME, '.yaw/user-profile.yaml'), 'utf8'), new RegExp(`user.language: ${languageDefault}`));
     assert.equal(f.spawned.plans.length, 1); assert.ok(['python3', '/usr/bin/script'].includes(f.spawned.plans[0].command));
     assert.match(f.spawned.plans[0].args.join(' '), /remote-control.*--spawn=session/);
     assert.equal(f.spawned.plans[0].options.env.YAW_REMOTE_TELEGRAM_TOKEN, undefined);

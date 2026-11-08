@@ -6,7 +6,7 @@ import { defaultQuestion } from '../interview/depth.js';
 import { validAnswer } from '../interview/engine.js';
 
 const FILE = 'setup-defaults.json';
-const allowed = (q) => q.id.startsWith('quality.review-') || ['tasks.use-github', 'tasks.mode', 'idea.team', 'compact.levers', 'compact.personal'].includes(q.id);
+const allowed = (q) => q.id.startsWith('quality.review-') || ['tasks.use-github', 'tasks.mode', 'idea.team', 'compact.levers'].includes(q.id);
 export function setupDefaults({ env, kitRoot }, input = readUserData(env, FILE) ?? {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || (input.version !== undefined && input.version !== 1)) throw new Error('Invalid setup defaults');
   const names = readdirSync(join(kitRoot, 'modules')).filter((name) => hasModule(kitRoot, name));

@@ -58,12 +58,9 @@ rtk reduces one thing: the bytes of **tool output** the agent reads. It does not
 
 Opt-in per project and removable: `yaw add compact`, `yaw remove compact`, or Workspace / Settings. Off in Basic. Quick reuses saved personal defaults and is otherwise off. One multi-choice question, `compact.levers`, selects the levers below.
 
-The user chooses the scope per project:
+The levers are a team setting (T-027, ADR-0134): the project answer is in `.yaw/answers.yaml` and the hooks are in `.claude/settings.json`. Every agent and teammate reads the same output. There is no personal scope and no `~/.yaw/compact.json`.
 
-- **Committed:** the project answer is in `.yaw/answers.yaml` and the hooks are in `.claude/settings.json`. Every agent and teammate reads the same output.
-- **Personal:** the setting is in `~/.yaw` and the hooks are in `.claude/settings.local.json`, the same route the comfort status line takes in team repositories (ADR-0013). Teammates keep raw output.
-
-The L1 wrapper is in the committed recipes either way and decides at run time. Precedence: `YAW_COMPACT=0|1` in the environment, then the personal setting, then the project answer.
+The L1 wrapper is in the committed recipes and decides at run time. Precedence: `YAW_COMPACT=0|1` in the environment, then the project answer.
 
 ### L1. Compact project recipes (all agents, no hook)
 
@@ -155,7 +152,7 @@ Taken on 2026-11-08:
 1. **Recall store:** dropped (L6, T-055). Decided later on 2026-11-08: no output is stored; ADR-0133 is rejected.
 2. **L1 on success:** count plus capped warning lines, as rtk does it (L1).
 3. **Default:** off in Basic. Quick asks no module questions; like other optional tools, it reuses saved personal defaults and is otherwise off.
-4. **Scope:** the user chooses committed or personal per project (section 4).
+4. **Scope:** a team setting, committed (section 4; T-027 removed the personal scope).
 
 Still open:
 

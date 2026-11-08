@@ -15,7 +15,7 @@ import { loadSetupDefaults } from '../lib/setup-defaults.js';
 import { DEPTHS, depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
-import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
+import { missingAnswers, isPersonal, isPreference, migrateAnswers, questionApplies } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles, loadModule, profileTools } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -334,7 +334,7 @@ export async function init({ values, positionals, io }) {
       if (previous === WEB) return handOff({ io, values, mode: 'quick' });
       if (!previous) continue;
       mode = previous.mode;
-      defaults = { ...preferences.answers, ...previous.answers };
+      defaults = { ...preferences.answers, ...migrateAnswers(previous.answers) };
       defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, isPersonal({ id, scope: 'user' }) ? 'saved personal setting' : 'proposed — needs confirmation']));
       break;
     }
@@ -447,12 +447,13 @@ export async function init({ values, positionals, io }) {
       io.stdout.write(git.created ? 'created a git repository (git init)\n' : `git init failed: ${git.error}; run git init yourself\n`);
     } else io.stdout.write('no git repository: run git init (or yaw edit) later for commit checks and the push gate\n');
   }
-  const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules });
+  const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules, env: io.env });
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);
   printToolHints(io.stdout, modules);
   printProfileTools(io.stdout, profileTools(profile, answersDoc.answers));
-  io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
+  io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST} (team settings); personal settings stay in ~/.yaw/user-profile.yaml\n`);
+  if (result.personalWarning) io.stderr.write(`${result.personalWarning}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 
   const secretNames = envNames(readProjectFile(root, '.env.example')?.toString('utf8') ?? '');

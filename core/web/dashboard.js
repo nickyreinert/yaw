@@ -88,7 +88,7 @@ function projectSection(root) {
     kit: manifest.kit,
     mode: doc.mode ?? null,
     idea: typeof answers['idea.text'] === 'string' ? answers['idea.text'] : '',
-    agents: answers['user.agents'] ?? [],
+    agents: answers['user.agents'] ?? manifest.agents ?? [],
     profiles: doc.proposal?.profiles ?? [],
     modules,
     tasks: modules.includes('tasks') ? tasksMode(answers, { teamModule: modules.includes('team') }) : null,

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "user-profile.schema.json",
   "title": "~/.yaw/user-profile.yaml",
-  "description": "Global answers to interview section 0 (doc 02 §5, doc 03 §0), keyed by question id. Written only after the user opts in.",
+  "description": "Personal settings (T-027), keyed by question id: interview section 0 (doc 02 §5, doc 03 §0) and any task, team or review setting a project switched to personal. Never committed; read over the project answers.",
   "type": "object",
   "required": ["answers"],
   "properties": {
@@ -32,6 +32,9 @@
         },
         "user.dashboard": { "type": "boolean" },
         "user.remote": { "enum": ["none", "yaw-tg", "yaw-tg-remote-control"] }
+      },
+      "patternProperties": {
+        "^(tasks|team|quality)\\.[a-z][a-z0-9-]*$": { "$ref": "common.schema.json#/$defs/answerValue" }
       },
       "additionalProperties": false
     }

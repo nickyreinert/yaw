@@ -10,7 +10,8 @@ import { KIT_ROOT, makeKit, readTree, run, tmp, writeAnswers, cleanEnv } from '.
 import { saveRemoteSettings } from '../core/lib/remote-settings.js';
 
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
-const yaw = (args, options = {}) => run(process.execPath, [YAW, ...args], options);
+// A temporary HOME: init and update save personal answers to ~/.yaw/user-profile.yaml (T-027).
+const yaw = (args, options = {}) => run(process.execPath, [YAW, ...args], { env: { ...process.env, HOME: tmp('yaw-home-') }, ...options });
 const VERSION = JSON.parse(readFileSync(join(KIT_ROOT, 'package.json'), 'utf8')).version;
 
 test('--version prints the kit version', () => {
@@ -114,7 +115,8 @@ test('init --answers --yes renders core and the profile; a second init is refuse
   assert.deepEqual(Object.keys(readTree(dir)).filter((p) => !p.startsWith('.yaw/base/')), [
     '.gitignore', '.yaw/answers.yaml', '.yaw/manifest.json', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'docs/engineering.md', 'just/node-cli.just', 'justfile', 'package.json', 'src/index.js', 'test/index.test.js',
   ]);
-  assert.equal(readTree(dir)['.yaw/answers.yaml'], readFileSync(answers, 'utf8'));
+  // copied byte for byte without the personal answers, which go to ~/.yaw/user-profile.yaml (T-027)
+  assert.equal(readTree(dir)['.yaw/answers.yaml'], readFileSync(answers, 'utf8').replace(/^ {2}user\.[a-z-]+: .*\n/gm, ''));
   const again = yaw(['init', '--answers', answers, '--yes', '--skip-verify'], { cwd: dir });
   assert.equal(again.status, 1);
   assert.match(again.stderr, /already exists; use yaw update/);

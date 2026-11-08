@@ -113,10 +113,13 @@ test('expanding a real Quick project preserves its mode, answers and edited inst
   const edited = `${read(root, 'AGENTS.md')}\nMy own rule: preserve this text.\n`;
   writeFileSync(join(root, 'AGENTS.md'), edited);
   const stderr = capture();
-  const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, env: cleanEnv(tmp('yaw-home-')), stdout: capture(), stderr, prompter: { ...scripted(), interactive: false } });
+  const env = cleanEnv(tmp('yaw-home-'));
+  const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, env, stdout: capture(), stderr, prompter: { ...scripted(), interactive: false } });
   assert.equal(code, 0, stderr.text());
   assert.equal(readAnswers(root).mode, 'quick');
-  assert.deepEqual(readAnswers(root).answers, doc.answers);
+  // T-027: yaw add moves the personal answers to ~/.yaw/user-profile.yaml; read over it they are unchanged.
+  assert.equal(Object.keys(readAnswers(root).answers).some((id) => id.startsWith('user.')), false);
+  assert.deepEqual(readAnswers(root, { env }).answers, doc.answers);
   assert.deepEqual(readAnswers(root).proposal.modules, [...modules, 'git-hooks']);
   assert.equal(read(root, 'AGENTS.md'), edited);
 });
@@ -177,12 +180,13 @@ test('yaw add keeps the answers of earlier modules and takes the old answer as t
   const question = { id: 'quality.level', mode: 'Q', type: 'choice', label: 'Level?', choices: ['low', 'high'], default: 'low' };
   const kitRoot = makeKit(tmp('yaw-kit-'), { modules: { core: { templates: { 'AGENTS.md.tmpl': '# A\n' } }, extra: { depends: ['core'], questions: [question] } } });
   const root = tmp('yaw-proj-');
-  const yaw = async (args) => main(args, { cwd: root, env: { HOME: tmp('yaw-home-') }, kitRoot, stdout: capture(), stderr: capture(), prompter: { ...scripted(), interactive: false } });
+  const env = { HOME: tmp('yaw-home-') };
+  const yaw = async (args) => main(args, { cwd: root, env, kitRoot, stdout: capture(), stderr: capture(), prompter: { ...scripted(), interactive: false } });
   const answers = writeAnswers(tmp('yaw-ans-'), 'mode: quick\nanswers:\n  user.agents: [claude]\n  quality.level: high\nproposal:\n  status: confirmed\n  summary: s\n  profiles: [node-cli]\n  modules: [core]\n');
   await initProject({ root, kitRoot, answersFile: answers });
   assert.equal(await yaw(['add', 'extra', '--yes']), 0);
-  const doc = readAnswers(root);
+  const doc = readAnswers(root, { env, kitRoot });
   assert.equal(doc.mode, 'quick');
   assert.equal(doc.answers['quality.level'], 'high');
-  assert.deepEqual(doc.answers['user.agents'], ['claude']);
+  assert.deepEqual(doc.answers['user.agents'], ['claude'], 'kept, in ~/.yaw/user-profile.yaml (T-027)');
 });

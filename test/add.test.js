@@ -41,7 +41,8 @@ async function setup(kitRoot) {
 const yaw = (args, root, kitRoot, prompter = scripted([])) => {
   const stdout = capture();
   const stderr = capture();
-  return main(args, { cwd: root, kitRoot, stdout, stderr, prompter }).then((code) => ({ code, stdout: stdout.text(), stderr: stderr.text(), prompter }));
+  // T-027: yaw add saves personal answers to ~/.yaw/user-profile.yaml; keep them out of the real home.
+  return main(args, { cwd: root, kitRoot, env: { ...process.env, HOME: tmp('yaw-home-') }, stdout, stderr, prompter }).then((code) => ({ code, stdout: stdout.text(), stderr: stderr.text(), prompter }));
 };
 
 test('asks only the new module questions, writes answers, files and manifest entries', async () => {
@@ -131,15 +132,16 @@ test('add then remove leaves only the (kept) answers behind; re-adding asks agai
   assert.equal(read(root, '.yaw/answers.yaml'), kept); // unchanged answers: file untouched
 });
 
-test('no new answers: only proposal.modules changes and comments survive', async () => {
+test('no new answers: only proposal.modules changes, personal answers move out, comments survive', async () => {
   const kitRoot = fixtureKit();
   const root = tmp('yaw-proj-');
-  const text = `# my notes\nmode: quick\nanswers:\n  user.agents: [claude] # keep me\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: Node CLI, local tasks.\n  profiles: [node-cli]\n  modules: [core]\n`;
+  const text = `# my notes\nmode: quick\nanswers:\n  user.agents: [claude]\n  idea.text: A tiny command-line tool. # keep me\nproposal:\n  status: confirmed\n  summary: Node CLI, local tasks.\n  profiles: [node-cli]\n  modules: [core]\n`;
   await initProject({ root, kitRoot, answersFile: writeAnswers(tmp('yaw-ans-'), text) });
   const before = read(root, '.yaw/answers.yaml');
   const r = await yaw(['add', 'plain', '--yes'], root, kitRoot);
   assert.equal(r.code, 0, r.stderr);
-  assert.equal(read(root, '.yaw/answers.yaml'), before.replace('modules: [core]', 'modules: [core, plain]'));
+  // T-027: user.agents is personal, so it moves to ~/.yaw/user-profile.yaml; every other line stays.
+  assert.equal(read(root, '.yaw/answers.yaml'), before.replace('  user.agents: [claude]\n', '').replace('modules: [core]', 'modules: [core, plain]'));
   assert.deepEqual(readAnswers(root).proposal.modules, ['core', 'plain']);
   assert.match(before, /# keep me/);
   assert.equal(read(root, 'plain.txt'), 'plain\n');

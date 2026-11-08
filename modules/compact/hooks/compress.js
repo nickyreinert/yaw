@@ -1,17 +1,16 @@
 // Compress hook (T-054, kickoff/16-compact-output.md §4 L2, ADR-0007 kind compress): Claude Code PostToolUse on
 // Bash, Grep and Read. Bash output loses ANSI codes, `\r` progress frames and repeated lines and is capped with
 // the re-run hint; Grep content is grouped by file; a whole lockfile Read becomes a name@version list.
-// Left alone: the `hook` lever off (YAW_COMPACT, personal setting, project answer, as for the recipes), output
+// Left alone: the `hook` lever off (YAW_COMPACT, then the project answer, as for the recipes), output
 // under 512 bytes, commands asking for detail (-v, --verbose, --nocapture, YAW_VERBOSE=1), git diff|show, output
 // that went through `yaw run`, images, every other Read and partial lockfile reads. Failed calls fire
 // PostToolUseFailure, which is not registered. The dispatcher keeps only a smaller result (never worse) and
 // fails open on any error; loaded by the lean entry (core/hooks/compress.js), so no kit, schema or user store.
 
-import { lstatSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseDocument } from '../../../core/lib/yaml.js';
-import { yawHome } from '../../../core/hooks/common.js';
-import { personalLevers, resolveLevers } from '../lib/levers.js';
+import { resolveLevers } from '../lib/levers.js';
 import { condense, groupGrep, isLockfile, lockfile } from '../lib/methods.js';
 
 export const MIN_BYTES = 512;
@@ -26,21 +25,13 @@ function missing(e) {
   if (e?.code !== 'ENOENT') throw e;
 }
 
-// The levers, read without the user store: ~/.yaw/compact.json must be a regular file (no symlink).
+// The levers, a team setting (T-027): YAW_COMPACT, then the project answer.
 function levers(env, root) {
-  const file = join(yawHome(env), 'compact.json');
-  let personal = null;
-  let st = null;
-  try { st = lstatSync(file); } catch (e) { missing(e); }
-  if (st) {
-    if (!st.isFile()) throw new Error('compact.json is not a regular file');
-    personal = personalLevers(JSON.parse(readFileSync(file, 'utf8')), root);
-  }
   let answers = {};
   try {
     answers = parseDocument(readFileSync(join(root, '.yaw', 'answers.yaml'), 'utf8')).value?.answers ?? {};
   } catch (e) { missing(e); }
-  return resolveLevers({ env, answers, personal }).levers;
+  return resolveLevers({ env, answers }).levers;
 }
 
 function bash(command, r, on) {

@@ -43,7 +43,7 @@ Project-level overrides (S): language of code identifiers, comments, commit mess
 | 1.2 | Who uses it? (me only / a known group / the public) | Q | privacy, security, scale |
 | 1.3 | Prototype, MVP, or long-lived product? | Q | mode (`quick`, `basic`, `pro`; the interview depth is independent of product lifetime). The CLI asks it as the first question, the setup depth, before the interview; the answer is `answers.yaml#mode`, not a question key (Y-7.1), gate strictness |
 | 1.4 | What does success look like in 3 and 12 months? What is out of scope? | F | ADRs, tasks |
-| 1.5 | Solo or team? Who approves changes? (solo / team / external reviewers) | Q | **team mode (doc 14)**, review policy, branch protection |
+| 1.5 | Solo or team? Who approves changes? (solo / team; T-027 dropped external reviewers) | Q | **team mode (doc 14)**, review policy, branch protection |
 | 1.6 | Budget envelope is collected with architecture cost policy (3.10–3.11), covering hosting, libraries, services, AI and tools | Q | one shared project constraint |
 | 1.7 | Biggest risk you can imagine? | F | notices |
 

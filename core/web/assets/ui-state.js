@@ -74,7 +74,7 @@ export function visibleQuestions(questions, given, mode, modules) {
 export function defaultModules(definitions, questions, given, mode) {
   const a = effectiveAnswers(questions, given, mode);
   if (['quick', 'basic', 'pro', 'all'].includes(mode)) return selectedByPolicy(definitions, { answers: a, modules: definitions.filter((d) => d.savedDefault).map((d) => d.name) });
-  const facts = { team: ['team', 'external-reviewers'].includes(a['idea.team']), usesGitHub: a['tasks.use-github'] !== false };
+  const facts = { team: a['idea.team'] === 'team', usesGitHub: a['tasks.use-github'] !== false };
   if (a['arch.language'] && a['arch.language'] !== 'auto') facts.language = a['arch.language'];
   if (a['arch.runs-on'] && a['arch.runs-on'] !== 'auto') {
     facts.runsOn = a['arch.runs-on'];
@@ -152,9 +152,10 @@ export function interviewDetailText(id) {
       'This changes the agent’s explanation style in `AGENTS.md`. Question coverage and tool permissions stay the same.',
     ],
     'idea.team': [
-      'Solo: project instructions include your personal communication and autonomy preferences.',
-      'Team: shared instructions use English for code and documentation; chat language and autonomy are agreed per contributor.',
-      'External reviewers: the same shared rules as Team, for occasional contributors and reviewers.',
+      'Solo or Team, personal settings stay personal: your answer style, chat language, autonomy, agents and comfort helpers live in ~/.yaw/user-profile.yaml on your machine and never go into a committed file.',
+      'Team settings are committed with the repository and apply to everyone: hooks, skills, tools, shared instructions and project rules.',
+      'Solo: you are the only contributor; workflow rules ask for no approvals. Team: several people work on the repository; workflow rules can require reviews and pull requests.',
+      'Each setting has a Personal / Team switch. Hooks, the security module and project rules are always team settings.',
       'GitHub, task tracking and review gates remain separate choices. The optional Workflow rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
     ],
   })[id] ?? null;

@@ -1,4 +1,4 @@
-import { runtimeContext } from './policy.js';
+import { migrateAnswers, runtimeContext } from './policy.js';
 // Derived facts (ADR-0017 §3) and the rule that matches a facts condition.
 // Used for module selection (appliesTo, default); the stack itself is picked from arch.language and arch.runs-on.
 
@@ -14,7 +14,7 @@ export function deriveFacts(answers = {}) {
     facts.hosted = runtimeContext(answers).hosting;
   }
   if (typeof answers['idea.audience'] === 'string') facts.public = answers['idea.audience'] === 'public';
-  if (typeof answers['idea.team'] === 'string') facts.team = ['team', 'external-reviewers'].includes(answers['idea.team']);
+  if (typeof answers['idea.team'] === 'string') facts.team = migrateAnswers(answers)['idea.team'] === 'team';
   if (typeof answers['tasks.use-github'] === 'boolean') facts.usesGitHub = answers['tasks.use-github'];
   else if (facts.team === true) facts.usesGitHub = true;
   return facts;

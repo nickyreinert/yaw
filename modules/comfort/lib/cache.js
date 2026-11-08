@@ -29,7 +29,7 @@ export const kTokens = (n) => `${Math.max(1, Math.round(n / 1000))}k`;
 // Stop: remember when the turn ended and, with a remote channel, start the timer. Prints nothing.
 export function onStop({ event, root, env, transcript, spawnFn }) {
   const personal = readPersonal(env).config;
-  if (event.agent !== 'claude' || !resolveFeatures({ root, personal }).features.includes('cache-reminder')) return;
+  if (event.agent !== 'claude' || !resolveFeatures({ root, personal, env }).features.includes('cache-reminder')) return;
   const state = readSession(env, event.agent, event.sessionId);
   if (!usable(state)) return;
   const cfg = settings(personal).cache;

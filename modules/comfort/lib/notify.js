@@ -132,7 +132,7 @@ export function spawnDetached(script, args, env, spawnFn = spawn) {
 // Shared by the Stop, Notification and StopFailure hooks. -> { systemMessage?, terminalSequence? } | null
 export function notifyTurn({ event, root, env, status, now = new Date(event.ts), spawnFn }) {
   const personal = readPersonal(env).config;
-  const { features } = resolveFeatures({ root, personal });
+  const { features } = resolveFeatures({ root, personal, env });
   if (!features.includes('notifications')) return null;
   const cfg = settings(personal).notify;
 

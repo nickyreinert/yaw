@@ -74,8 +74,9 @@ export async function edit({ values, positionals: sections, io }) {
     const git = gitInit(io.cwd);
     io.stdout.write(git.created ? 'created a git repository (git init)\n' : `git init failed: ${git.error}; run git init yourself\n`);
   }
-  const applied = await editProject({ root: io.cwd, kitRoot: io.kitRoot, answers: prepared });
+  const applied = await editProject({ root: io.cwd, kitRoot: io.kitRoot, answers: prepared, env: io.env });
   printReport(io.stdout, applied);
+  if (applied.personalWarning) io.stderr.write(`${applied.personalWarning}\n`);
   if (values['skip-verify']) {
     io.stdout.write('verification skipped (--skip-verify); run: just setup && just check\n');
     return 0;

@@ -9,7 +9,7 @@ import { PERSONAL_PREFERENCES } from '../interview/policy.js';
 import { depthOf } from '../interview/depth.js';
 import { parse, stringify, YamlError } from './yaml.js';
 import { formatError } from './schema.js';
-import { schemas } from '../render/kit.js';
+import { schemas, KIT_ROOT } from '../render/kit.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 
 export const PRESET_NAME = /^[a-z0-9][a-z0-9-]*$/;
@@ -272,6 +272,12 @@ export function writePresetAnswers(env, name, answers) {
   write(file, stringify(doc));
 }
 
+// Keys the user profile holds: the section-0 answers of its schema and any setting a project switched to personal (T-027).
+function profileKey(k) {
+  const answers = schemas().schemas.get('user-profile.schema.json').properties.answers;
+  return Object.hasOwn(answers.properties, k) || Object.keys(answers.patternProperties ?? {}).some((re) => new RegExp(re).test(k));
+}
+
 // -> { before: text | null, after: text } for the given personal answers; nothing is written.
 export function nextUserProfile(env, answers) {
   directory(userDir(env));
@@ -281,11 +287,29 @@ export function nextUserProfile(env, answers) {
   if (before !== null) {
     try { profile = parse(before)?.answers ?? {}; } catch { throw new Error(`${file} cannot be read; fix or remove the file (it was left untouched)`); }
   }
-  const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
-  for (const k of known) if (Object.hasOwn(answers, k)) profile[k] = answers[k];
+  for (const k of Object.keys(answers)) if (profileKey(k)) profile[k] = answers[k];
   const doc = { answers: profile };
   check('user-profile.yaml', 'user-profile.schema.json', doc);
   return { before, after: stringify(doc) };
+}
+
+// The personal answers of a project (T-027) go only to ~/.yaw/user-profile.yaml, merged into it; never into the
+// repository. An unreadable or invalid profile, or a value that looks like a secret, is left untouched. The profile
+// is YAW's own file: its schema and secret rules are those of the installed kit, whatever kit renders the project.
+// -> { saved: boolean, warning: string | null }
+export function savePersonalAnswers({ env, answers }) {
+  if (!Object.keys(answers).length) return { saved: false, warning: null };
+  const warning = (why) => ({ saved: false, warning: `Personal settings were not saved to ${profileFile(env)}: ${why}` });
+  if (secretFindings({ answers, kitRoot: KIT_ROOT }).length) return warning('an answer looks like a secret.');
+  try {
+    // An invalid profile (unknown key, wrong value) is never repaired by overwriting it (ADR-0043).
+    try { readUserProfile(env); } catch { return warning('the file is unreadable or invalid; fix or remove it (it was left untouched).'); }
+    const { before, after } = nextUserProfile(env, answers);
+    if (before !== after) writeUserProfile(env, after);
+    return { saved: true, warning: null };
+  } catch (e) {
+    return warning(e.message);
+  }
 }
 
 export function writeUserProfile(env, text) {

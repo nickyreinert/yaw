@@ -57,7 +57,7 @@ function gitStrict(root, args) {
 
 export function triggers(root) {
   try {
-    return reviewTriggers(readAnswers(root).answers ?? {});
+    return reviewTriggers(readAnswers(root, { env: process.env }).answers ?? {});
   } catch {
     return reviewTriggers({});
   }
@@ -65,7 +65,7 @@ export function triggers(root) {
 
 function gateMode(root) {
   try {
-    return readAnswers(root).answers?.['quality.review-gate'] === 'block' ? 'block' : 'warn';
+    return readAnswers(root, { env: process.env }).answers?.['quality.review-gate'] === 'block' ? 'block' : 'warn';
   } catch {
     return 'warn';
   }

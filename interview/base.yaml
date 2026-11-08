@@ -49,6 +49,7 @@ questions:
       copilot: { support: fallback, via: AGENTS.md rule }
   - id: idea.text
     ref: "1.1"
+    scope: team
     mode: Q
     type: text
     label: "Purpose/Idea: What should the project do?"
@@ -59,14 +60,14 @@ questions:
     default: ""
   - id: idea.team
     ref: "1.5"
+    scope: team
     mode: Q
     type: choice
     label: "Team: Who works on this project?"
-    hint: Shared rules for collaborators. GitHub remains optional.
+    hint: "Team settings are committed for everyone; personal settings stay in ~/.yaw on your machine. GitHub remains optional."
     choices:
       - { value: solo, label: Solo }
       - { value: team, label: Team }
-      - { value: external-reviewers, label: External reviewers }
     default: solo
   - id: tasks.use-github
     ref: "10.2"
@@ -79,6 +80,7 @@ questions:
   # A pair no profile covers is rejected with the hosting targets covered by this kit.
   - id: arch.language
     ref: "3.1"
+    scope: team
     mode: Q
     type: choice
     label: "Language: What language do you want to use?"
@@ -97,6 +99,7 @@ questions:
     default: ""
   - id: arch.runs-on
     ref: "3.2"
+    scope: team
     mode: Q
     type: choice
     label: "Destination: Where will it run?"
@@ -113,6 +116,7 @@ questions:
       - { value: browser-extension, label: "browser extension: Chrome, Edge, Firefox" }
     default: ""
   - id: arch.library-strategy
+    scope: team
     mode: S
     type: choice
     label: "Libraries: Build or reuse?"
@@ -122,6 +126,7 @@ questions:
       - { value: prefer-libraries, label: Use suitable libraries }
     default: prefer-built-in
   - id: arch.wrapper
+    scope: team
     mode: S
     type: choice
     label: "Wrapper: How should common commands run?"
@@ -133,12 +138,14 @@ questions:
       - { value: make, label: Make }
     default: just
   - id: arch.docker
+    scope: team
     mode: S
     type: boolean
     label: Support Docker
     hint: Tells the agent to set up Docker support.
     default: false
   - id: quality.unit-tests
+    scope: team
     mode: S
     type: boolean
     label: Unit Tests
@@ -147,6 +154,7 @@ questions:
   # Legacy project answers remain readable; these questions are no longer asked.
   # Error, log and documentation rules are generated from language, destination and modules (T-031).
   - id: quality.error-detail
+    scope: team
     mode: F
     type: choice
     label: User-facing errors
@@ -156,6 +164,7 @@ questions:
       - { value: detailed, label: Detailed guidance }
     default: concise
   - id: quality.log-output
+    scope: team
     mode: F
     type: choice
     label: Diagnostic logs
@@ -166,6 +175,7 @@ questions:
       - { value: both, label: Console and files }
     default: console
   - id: quality.documentation
+    scope: team
     mode: F
     type: choice
     label: Internal documentation
@@ -176,6 +186,7 @@ questions:
     default: essential
   - id: arch.framework
     ref: "3.12"
+    scope: team
     mode: F
     type: text
     label: Required framework (optional)
@@ -183,6 +194,7 @@ questions:
     default: ""
   - id: arch.hosting-control
     ref: "3.7"
+    scope: team
     mode: F
     type: choice
     label: Who manages hosting?
@@ -196,6 +208,7 @@ questions:
     default: undecided
   - id: arch.libraries
     ref: "3.8"
+    scope: team
     mode: F
     type: choice
     label: Libraries
@@ -209,6 +222,7 @@ questions:
     default: undecided
   - id: arch.services
     ref: "3.9"
+    scope: team
     mode: F
     type: choice
     label: External services
@@ -222,6 +236,7 @@ questions:
     default: undecided
   - id: arch.cost
     ref: "3.10"
+    scope: team
     mode: F
     type: choice
     label: Budget
@@ -235,6 +250,7 @@ questions:
     default: undecided
   - id: arch.cost-limit
     ref: "3.11"
+    scope: team
     mode: F
     type: text
     label: Budget cap (amount, currency, period)

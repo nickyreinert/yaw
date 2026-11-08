@@ -9,6 +9,7 @@ import { defaultQuestion } from '../interview/depth.js';
 import { tasksMode } from '../lib/tasks.js';
 import { validAnswer } from '../interview/engine.js';
 import { deriveFacts } from '../interview/facts.js';
+import { settingClass } from '../interview/policy.js';
 import { formatError } from '../lib/schema.js';
 import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
@@ -121,6 +122,7 @@ export function profileOptionQuestions(kitRoot) {
     default: def.default,
     when: { 'arch.language': p.stack.language, 'arch.runs-on': p.stack.runsOn },
     profileOption: p.name,
+    scope: 'team',
   })));
 }
 
@@ -298,12 +300,12 @@ function taskFlags(mode) {
 
 export const COMFORT_DEFAULT = ['hygiene', 'status-line'];
 
-function comfortFlags(picked, agents, team) {
+function comfortFlags(picked, agents, shared) {
   const list = Array.isArray(picked) ? picked : COMFORT_DEFAULT;
   return {
     hygiene: list.includes('hygiene'),
     notifications: list.includes('notifications'),
-    statusLine: list.includes('status-line') && agents.includes('claude') && !team,
+    statusLine: list.includes('status-line') && agents.includes('claude') && shared,
   };
 }
 
@@ -312,7 +314,8 @@ function comfortFlags(picked, agents, team) {
 // answer take their default, so a template never sees a missing answer.
 export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   const flat = {};
-  for (const q of collectQuestions(kitRoot, [...modules, ...(!modules.includes('communication') && hasModule(kitRoot, 'communication') ? ['communication'] : [])], definitions)) {
+  const questions = collectQuestions(kitRoot, [...modules, ...(!modules.includes('communication') && hasModule(kitRoot, 'communication') ? ['communication'] : [])], definitions);
+  for (const q of questions) {
     if (Object.hasOwn(answersDoc.answers ?? {}, q.id) && !validAnswer(q, answersDoc.answers[q.id])) {
       throw new KitError(`invalid answer for ${q.id}: expected ${q.type}${q.choices ? ' from the available choices' : ''}`);
     }
@@ -321,8 +324,13 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   Object.assign(flat, answersDoc.answers ?? {});
   // Preserve explicit GitHub task/module choices in older files without the newer on/off field.
   if (!Object.hasOwn(answersDoc.answers ?? {}, 'tasks.use-github') &&
-      (['team', 'external-reviewers'].includes(answersDoc.answers?.['idea.team']) || ['github', 'both'].includes(flat['tasks.mode']) || modules.some((name) => ['github', 'team'].includes(name)))) flat['tasks.use-github'] = true;
+      (answersDoc.answers?.['idea.team'] === 'team' || ['github', 'both'].includes(flat['tasks.mode']) || modules.some((name) => ['github', 'team'].includes(name)))) flat['tasks.use-github'] = true;
   const team = modules.includes('team') || deriveFacts(flat).team === true;
+  // T-027: a personal setting never reaches a committed file, solo or team; only a setting switched to team does.
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const shared = (id) => settingClass(byId.get(id) ?? id, answersDoc.scopes) === 'team';
+  const share = { language: shared('user.language'), autonomy: shared('user.autonomy'),
+    style: ['user.length', 'user.explain', 'user.expertise'].every(shared), comfort: shared('user.comfort') };
   const answers = {};
   for (const [id, value] of Object.entries(flat)) {
     const [group, name] = id.split('.');
@@ -362,11 +370,12 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
       explain: STYLE.explain[flat['user.explain']] ?? '',
       expertise: STYLE.expertise[flat['user.expertise']] ?? '',
     },
-    // ADR-0013: the user profile is personal; a team repository does not commit it.
+    // ADR-0013, T-027: personal settings are not committed; `share` names the ones this project switched to team.
     team,
-    coreCommunication: !team && !modules.includes('communication'),
+    share,
+    coreCommunication: share.style && !modules.includes('communication'),
     // Output style: Claude only, and only when length or experience (wording) differ from the default (doc 04).
-    outputStyle: !team && (flat['user.agents'] ?? []).includes('claude')
+    outputStyle: share.style && (flat['user.agents'] ?? []).includes('claude')
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
         || (flat['user.expertise'] ?? STYLE_DEFAULTS.expertise) !== STYLE_DEFAULTS.expertise),
     profileStandards: profileOverlay(kitRoot, profiles),
@@ -380,9 +389,9 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     // Explicit GitHub team enforcement also overrides a solo project's local task default.
     tasks: taskFlags(tasksMode(flat, { teamModule: modules.includes('team') })),
     // ADR-0030: the comfort features the user picked. Only the status line is a committed setting, and it is
-    // personal, so a team repository never gets it (ADR-0013); hooks are registered for everyone and decide at
-    // run time, from the user's own configuration, what to do.
-    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], team),
+    // personal, so it is committed only when the project switched user.comfort to team (ADR-0013, T-027); hooks
+    // are registered for everyone and decide at run time, from the user's own configuration, what to do.
+    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], share.comfort),
     // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
     teamModule: modules.includes('team'),
     // Approvals need other people: the workflow rules of a solo project ask for none (a ruleset without bypass would lock the author out).
@@ -457,7 +466,7 @@ function composedJust(name, text) {
 }
 
 // compact module (T-050, kickoff/16 §4 L1): the check steps run each body line through `yaw run --compact`,
-// which decides at run time (YAW_COMPACT, personal setting, project answer). Without the kit the line runs
+// which decides at run time (YAW_COMPACT, then the project answer). Without the kit the line runs
 // as before. Plain echo lines and lines with just interpolation ({{) stay as they are.
 const COMPACT_VERBS = ['lint', 'typecheck', 'test', 'build', 'audit'];
 const shellQuote = (s) => `'${s.replaceAll("'", `'\\''`)}'`;

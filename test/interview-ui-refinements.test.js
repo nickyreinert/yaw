@@ -120,7 +120,8 @@ test('step navigation focuses the heading then explicitly returns to the start o
   const experience = interviewDetailText('user.expertise').join(' ');
   for (const value of ['Layperson', 'Intermediate', 'Expert', 'permissions']) assert.ok(experience.includes(value));
   const team = interviewDetailText('idea.team').join(' ');
-  for (const value of ['Solo', 'Team', 'External reviewers', 'separate choices']) assert.ok(team.includes(value));
+  for (const value of ['Solo', 'Team', 'user-profile.yaml', 'Personal / Team switch', 'separate choices']) assert.ok(team.includes(value), value);
+  assert.doesNotMatch(team, /External reviewers/, 'Solo or Team only (T-027)');
 });
 
 

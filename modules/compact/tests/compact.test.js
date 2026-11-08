@@ -1,5 +1,5 @@
 // compact (T-049, kickoff/16-compact-output.md §4, §7): definition, interview, scope. `yaw add compact` /
-// `yaw remove compact`, committed vs personal scope, precedence YAW_COMPACT > personal > project, the L4 fragment.
+// `yaw remove compact`, a team setting (T-027), precedence YAW_COMPACT > project, the L4 fragment.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ import { readManifest } from '../../../core/render/manifest.js';
 import { initProject, readAnswers } from '../../../core/render/project.js';
 import { loadSetupDefaults, saveSetupDefaults } from '../../../core/lib/setup-defaults.js';
 import { KIT_ROOT, capture, cleanEnv, readTree, scripted, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
-import { readPersonal, resolveCompact } from '../lib/settings.js';
+import { resolveCompact } from '../lib/settings.js';
 
 const ANSWERS = `mode: standard
 answers:
@@ -50,7 +50,8 @@ test('definition: off at every depth, one levers question, low token cost', () =
   assert.equal(levers.type, 'multi');
   assert.deepEqual(levers.choices.map((c) => c.value), ['recipes', 'hook']);
   assert.deepEqual(levers.default, ['recipes']);
-  assert.ok(def.questions.some((q) => q.id === 'compact.personal' && q.type === 'boolean' && q.default === false));
+  assert.equal(levers.scope, 'team', 'a team setting without a personal switch (T-027)');
+  assert.equal(def.questions.some((q) => q.id === 'compact.personal'), false);
   assert.equal(def.questions.some((q) => /recall/.test(q.id)), false);
 });
 
@@ -67,7 +68,7 @@ test('add --yes (committed): answers in answers.yaml, the L4 fragment in AGENTS.
   const r = await yaw(root, ['add', 'compact', '--yes']);
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(readAnswers(root).answers['compact.levers'], ['recipes']);
-  assert.equal(readAnswers(root).answers['compact.personal'], false);
+  assert.equal(Object.hasOwn(readAnswers(root).answers, 'compact.personal'), false);
   assert.equal(readManifest(root).modules.compact.enabled, true);
   const agents = readFileSync(join(root, 'AGENTS.md'), 'utf8');
   assert.match(agents, FRAGMENT);
@@ -101,45 +102,33 @@ test('no lever chosen (edited answers): the module is installed but AGENTS.md ca
 
 test('the hook lever alone also renders the fragment', async () => {
   const root = await project();
-  const r = await yaw(root, ['add', 'compact'], { prompter: scripted(['hook', 'n', 'y']) });
+  const r = await yaw(root, ['add', 'compact'], { prompter: scripted(['hook', 'y']) });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(readAnswers(root).answers['compact.levers'], ['hook']);
   assert.match(readFileSync(join(root, 'AGENTS.md'), 'utf8'), FRAGMENT);
 });
 
-test('personal scope: levers go to ~/.yaw, answers.yaml and AGENTS.md carry none; remove clears the entry', async () => {
+test('a team setting (T-027): the interview asks only for the levers, they are committed, ~/.yaw/compact.json is not written', async () => {
   const root = await project();
   const env = cleanEnv(tmp('yaw-home-'));
-  const r = await yaw(root, ['add', 'compact'], { env, prompter: scripted(['recipes, hook', 'y', 'y']) });
+  const r = await yaw(root, ['add', 'compact'], { env, prompter: scripted(['recipes, hook', 'y']) });
   assert.equal(r.code, 0, r.err);
-  const answers = readAnswers(root).answers;
-  assert.equal(answers['compact.personal'], true);
-  assert.equal(Object.hasOwn(answers, 'compact.levers'), false);
-  assert.doesNotMatch(readFileSync(join(root, 'AGENTS.md'), 'utf8'), FRAGMENT);
-  assert.deepEqual(readPersonal(env, root), ['recipes', 'hook']);
-  assert.doesNotMatch(JSON.stringify(readTree(root)), /"hook"/);
-
-  const gone = await yaw(root, ['remove', 'compact', '--yes'], { env });
-  assert.equal(gone.code, 0, gone.err);
-  assert.equal(readPersonal(env, root), null);
+  assert.deepEqual(readAnswers(root).answers['compact.levers'], ['recipes', 'hook']);
+  assert.match(readFileSync(join(root, 'AGENTS.md'), 'utf8'), FRAGMENT);
+  assert.equal(existsSync(join(env.HOME, '.yaw', 'compact.json')), false);
 });
 
-test('precedence: YAW_COMPACT, then the personal setting, then the project answer', () => {
+test('precedence: YAW_COMPACT, then the project answer', () => {
   const env = cleanEnv(tmp('yaw-home-'));
-  const root = tmp('yaw-proj-');
-  const project = { 'compact.levers': ['recipes'], 'compact.personal': false };
-  assert.deepEqual(resolveCompact({ env, root, answers: project }), { levers: ['recipes'], source: 'project' });
-  assert.deepEqual(resolveCompact({ env, root, answers: {} }), { levers: [], source: 'default' });
+  const project = { 'compact.levers': ['recipes'] };
+  assert.deepEqual(resolveCompact({ env, answers: project }), { levers: ['recipes'], source: 'project' });
+  assert.deepEqual(resolveCompact({ env, answers: {} }), { levers: [], source: 'default' });
+  assert.deepEqual(resolveCompact({ env, answers: { 'compact.levers': [] } }), { levers: [], source: 'project' });
 
-  // personal: a personal setting beats the project answer, even when it turns everything off
-  const withPersonal = (levers) => resolveCompact({ env, root, answers: project, personal: levers });
-  assert.deepEqual(withPersonal(['hook']), { levers: ['hook'], source: 'personal' });
-  assert.deepEqual(withPersonal([]), { levers: [], source: 'personal' });
-
-  // YAW_COMPACT beats both; 1 keeps the configured levers, or takes all when none is configured
-  const forced = (value, extra) => resolveCompact({ env: { ...env, YAW_COMPACT: value }, root, ...extra });
-  assert.deepEqual(forced('0', { answers: project, personal: ['hook'] }), { levers: [], source: 'env' });
-  assert.deepEqual(forced('1', { answers: project, personal: ['hook'] }), { levers: ['hook'], source: 'env' });
+  // YAW_COMPACT beats the answer; 1 keeps the configured levers, or takes all when none is configured
+  const forced = (value, extra) => resolveCompact({ env: { ...env, YAW_COMPACT: value }, ...extra });
+  assert.deepEqual(forced('0', { answers: project }), { levers: [], source: 'env' });
+  assert.deepEqual(forced('1', { answers: project }), { levers: ['recipes'], source: 'env' });
   assert.deepEqual(forced('1', { answers: {} }), { levers: ['recipes', 'hook'], source: 'env' });
   assert.deepEqual(forced('maybe', { answers: project }), { levers: ['recipes'], source: 'project' });
 });
@@ -149,7 +138,7 @@ test('Quick reuses saved personal defaults for the module and its answers', () =
   const ctx = { env, kitRoot: KIT_ROOT };
   assert.equal(loadSetupDefaults(ctx).warning, null);
   assert.ok(loadSetupDefaults(ctx).catalog.some((m) => m.name === 'compact'));
-  saveSetupDefaults(ctx, { modules: ['compact'], answers: { 'compact.levers': ['hook'], 'compact.personal': true } });
+  saveSetupDefaults(ctx, { modules: ['compact'], answers: { 'compact.levers': ['hook'] } });
   const saved = loadSetupDefaults(ctx);
   assert.equal(saved.warning, null);
   assert.deepEqual(saved.modules, ['compact']);

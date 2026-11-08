@@ -55,7 +55,9 @@ test('init: p loads a saved setup as editable defaults, asks before writing and 
   const doc = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
   assert.equal(doc.mode, 'quick');
   assert.equal(doc.answers['idea.text'], 'A new project idea.');
-  assert.deepEqual(doc.answers['user.agents'], ['codex']);
+  // T-027: the agents are personal; they are saved in ~/.yaw/user-profile.yaml, not in the repository.
+  assert.equal(Object.hasOwn(doc.answers, 'user.agents'), false);
+  assert.deepEqual(parseDocument(readFileSync(join(env.HOME, '.yaw/user-profile.yaml'), 'utf8')).value.answers['user.agents'], ['codex']);
   assert.equal(readFileSync(file, 'utf8'), source);
   assert.match(prompter.shown.join(''), /p\) Load a previous setup/);
   assert.match(prompter.shown.join(''), /Saved answers are defaults/);
@@ -138,7 +140,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     if (/Write these files/.test(question)) seen.push(readdirSync(dir));
     return ask(question);
   };
-  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter, env });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
   assert.match(r.out, /profile: node-cli \(typescript on local\)/);
@@ -146,7 +149,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.match(r.out, /user\.language +de +\(documented default\)/);
   assert.match(r.out, /verification skipped/);
   const answers = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
-  assert.deepEqual(answers.answers['user.agents'], ['claude']);
+  assert.equal(Object.keys(answers.answers).some((id) => id.startsWith('user.')), false, 'personal answers stay out of the repository (T-027)');
+  assert.deepEqual(parseDocument(readFileSync(join(env.HOME, '.yaw/user-profile.yaml'), 'utf8')).value.answers['user.agents'], ['claude']);
   assert.equal(answers.answers['idea.text'], 'Rename photos by EXIF date.');
   assert.deepEqual(answers.proposal, {
     status: 'confirmed',
@@ -204,8 +208,8 @@ test('non-interactive: the same answers give identical files and hashes', async 
   assert.deepEqual(readTree(a.cwd), readTree(b.cwd));
   assert.deepEqual(readManifest(a.cwd), readManifest(b.cwd));
   assert.equal(a.out, b.out.replace(b.cwd, a.cwd));
-  // the answers file is copied byte for byte (comments kept)
-  assert.equal(readFileSync(join(a.cwd, '.yaw/answers.yaml'), 'utf8'), readFileSync(EXAMPLE, 'utf8'));
+  // the answers file is copied byte for byte (comments kept), without the personal answers (T-027)
+  assert.equal(readFileSync(join(a.cwd, '.yaw/answers.yaml'), 'utf8'), readFileSync(EXAMPLE, 'utf8').replace(/^ {2}user\.[a-z-]+: .*\n/gm, ''));
 });
 
 test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
@@ -240,7 +244,7 @@ test('answers without a proposal: the stack picks the profile and it is written 
   assert.match(r.out, /user\.language +de +\(documented default\)/, 'questions missing from the file are listed as default');
   const doc = parseDocument(readFileSync(join(r.cwd, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(doc.proposal.profiles, ['python-cli']);
-  assert.match(readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8'), /Chat in "de"/);
+  assert.doesNotMatch(readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8'), /Chat in "de"/, 'the chat language is personal (T-027)');
   assert.deepEqual(readManifest(r.cwd).agents, ['codex']);
 });
 

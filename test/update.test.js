@@ -137,7 +137,7 @@ test('row 5: the CLI exits 1 when update leaves conflicts', async () => {
   writeFileSync(join(root, 'notes.md'), 'line one\nline two\nline three (mine)\n');
   const out = [];
   const code = await main(['update', '--strategy', 'merge'], {
-    cwd: root, kitRoot: kit('1.1.0', V2), stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: scripted([]),
+    cwd: root, kitRoot: kit('1.1.0', V2), env: { HOME: tmp('yaw-home-') }, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: scripted([]),
   });
   assert.equal(code, 1);
   assert.match(out.join(''), /CONFLICT: notes\.md \(1 conflict; resolve the markers/);
@@ -161,7 +161,7 @@ test('row 6: non-interactive (--yes) keeps edited files and reports them; --stra
   const out = [];
   const r = await project(kit('1.0.0', V1));
   writeFileSync(join(r, 'notes.md'), mine);
-  const code = await main(['update', '--yes'], { cwd: r, kitRoot: kit('1.1.0', V2), stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: scripted([]) });
+  const code = await main(['update', '--yes'], { cwd: r, kitRoot: kit('1.1.0', V2), env: { HOME: tmp('yaw-home-') }, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: scripted([]) });
   assert.equal(code, 0);
   assert.match(out.join(''), /kept your version: notes\.md \(edited\)/);
 });

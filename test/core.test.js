@@ -20,7 +20,8 @@ async function init(text = ANSWERS_YAML) {
 }
 
 test('AGENTS.md is assembled from the core frame and agentsMd, well below the budget', async () => {
-  const root = await init(answers('  user.language: en\n  user.autonomy: act-and-report\n'));
+  // T-027: chat language and autonomy reach AGENTS.md only when the project switches them to team.
+  const root = await init(`${answers('  user.language: en\n  user.autonomy: act-and-report\n')}scopes:\n  user.language: team\n  user.autonomy: team\n`);
   const md = read(root, 'AGENTS.md');
   assert.ok(lines(md) <= 30, `${lines(md)} lines`);
   assert.match(md, /^# AGENTS\.md\n/);
@@ -34,7 +35,7 @@ test('AGENTS.md is assembled from the core frame and agentsMd, well below the bu
 });
 
 test('questions the answers file does not hold take their defaults', async () => {
-  const md = read(await init(), 'AGENTS.md');
+  const md = read(await init(`${ANSWERS_YAML}scopes:\n  user.language: team\n  user.autonomy: team\n`), 'AGENTS.md');
   assert.match(md, /Chat in "de"/);
   assert.match(md, /Ask before risky steps; otherwise act\./);
 });

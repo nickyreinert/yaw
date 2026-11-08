@@ -135,7 +135,6 @@ answers:
   idea.team: solo
   tasks.mode: local
   compact.levers: LEVERS
-  compact.personal: false
 proposal:
   status: confirmed
   summary: test project

@@ -10,7 +10,7 @@ import { formatError } from '../../../core/lib/schema.js';
 import { schemas } from '../../../core/render/kit.js';
 import { readAnswers } from '../../../core/render/project.js';
 import { yawHome } from '../../../core/hooks/dispatch.js';
-import { readUserData } from '../../../core/lib/user-store.js';
+import { readUserData, readUserProfile } from '../../../core/lib/user-store.js';
 import { validateNotifications } from './settings.js';
 
 export const FEATURES = ['hygiene', 'status-line', 'notifications', 'cache-reminder'];
@@ -86,18 +86,25 @@ export function settings(personal) {
   };
 }
 
-// The features on for this user in this project. Order: the personal file; then, in a solo project, the project's
-// user.comfort answer; then the defaults. A team project's answers are somebody else's choices (ADR-0013).
+// The features on for this user in this project. Order: the personal file; then the user.comfort answer: the
+// project's when it switched the setting to team, else yours from ~/.yaw/user-profile.yaml (T-027), else an older
+// solo answers.yaml's; then the defaults. An older team answers.yaml holds somebody else's choices (ADR-0013).
 // -> { features: [...], source: 'personal' | 'project' | 'default', team: boolean }
-export function resolveFeatures({ root, personal }) {
-  let answers = {};
+export function resolveFeatures({ root, personal, env }) {
+  let doc = {};
   try {
-    answers = readAnswers(root).answers ?? {};
+    doc = readAnswers(root);
   } catch { /* no answers file: defaults */ }
+  const answers = doc.answers ?? {};
   const team = (answers['idea.team'] ?? 'solo') !== 'solo';
   const valid = (list) => Array.isArray(list) && list.every((f) => FEATURES.includes(f));
+  let mine;
+  try { mine = env ? readUserProfile(env)?.answers?.['user.comfort'] : undefined; } catch { /* unreadable profile */ }
+  const shared = doc.scopes?.['user.comfort'] === 'team';
+  const project = shared || !team ? answers['user.comfort'] : undefined;
+  const answer = shared ? project : valid(mine) ? mine : project;
   const selected = valid(personal.features) ? { features: personal.features, source: 'personal', team }
-    : !team && valid(answers['user.comfort']) ? { features: answers['user.comfort'], source: 'project', team }
+    : valid(answer) ? { features: answer, source: 'project', team }
       : { features: DEFAULT_FEATURES, source: 'default', team };
   if (typeof personal.notificationEnabled !== 'boolean') return selected;
   const features = selected.features.filter((f) => f !== 'notifications');

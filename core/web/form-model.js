@@ -2,14 +2,14 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseReply, validAnswer } from '../interview/engine.js';
-import { asksIn as asksQuestion, isPersonal, isPreference, missingAnswers, sourceOf, questionApplies, applicableArchitectureAnswers } from '../interview/policy.js';
+import { asksIn as asksQuestion, isPersonal, isPreference, migrateAnswers, missingAnswers, sourceOf, switchable, questionApplies, applicableArchitectureAnswers } from '../interview/policy.js';
 import { readRegular, MAX_BYTES } from './knowledge.js';
 import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { deriveFacts } from '../interview/facts.js';
 import { stackProfile } from '../interview/suggest.js';
 import { collectQuestions, listProfiles, loadModule, hasModule, kitVersion, profileTools, schemas } from '../render/kit.js';
-import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, ANSWERS, ProjectError } from '../render/project.js';
+import { checkDependencies, enabledModules, parseAnswers, readAnswers, renderInit, renderProject, requireManifest, selectModules, splitAnswers, ANSWERS, ProjectError } from '../render/project.js';
 import { MANIFEST, hashContent, readProjectFile, resolveInside } from '../render/files.js';
 import { parse, stringify } from '../lib/yaml.js';
 import { secretFindings, listPresets, loadPreferences, readPreset, readUserProfile, userDir, PRESET_NAME } from '../lib/user-store.js';
@@ -36,7 +36,7 @@ export function assertSafe(answers, kitRoot) {
 
 export function createFormModel({ root, kitRoot, env, edit = false, sections = [] }) {
   const manifest = edit ? requireManifest(root) : null;
-  const original = edit ? readAnswers(root) : null;
+  const original = edit ? readAnswers(root, { env, kitRoot }) : null;
   const originalText = edit ? readProjectFile(root, ANSWERS).toString('utf8') : null;
   const definitions = readdirSync(join(kitRoot, 'modules')).filter((n) => hasModule(kitRoot, n)).sort()
     .map((n) => loadModule(kitRoot, n));
@@ -62,7 +62,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   }
   const editable = (q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`));
   const initial = edit ? {
-    mode: original.mode, answers: original.answers, modules: enabledModules(manifest),
+    mode: original.mode, answers: original.answers, modules: enabledModules(manifest), scopes: original.scopes ?? {},
   } : null;
 
   function assertUnchanged() {
@@ -90,10 +90,15 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
 
   function normalize(input, { allowIncomplete = false } = {}) {
     assertUnchanged();
-    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'modules', 'consent', 'saveProfile', 'gitInit', 'proposed'].includes(k))) {
+    if (!object(input) || Object.keys(input).some((k) => !['mode', 'answers', 'modules', 'scopes', 'consent', 'saveProfile', 'gitInit', 'proposed'].includes(k))) {
       throw new FormError('Expected a setup object with mode, answers and optional modules');
     }
     if (input.gitInit !== undefined && typeof input.gitInit !== 'boolean') throw new FormError('gitInit must be true or false');
+    // The Personal / Team switch of each setting (T-027); hooks and project rules have none.
+    const scopes = input.scopes ?? original?.scopes ?? {};
+    if (!object(scopes) || Object.entries(scopes).some(([id, scope]) => !byId.has(id) || !switchable(byId.get(id)) || !['personal', 'team'].includes(scope))) {
+      throw new FormError('Invalid personal or team setting');
+    }
     if (!validDepth(input.mode)) throw new FormError('Choose Quick, Basic or All');
     const proposed = input.proposed ?? [];
     if (!Array.isArray(proposed) || proposed.some((id) => !byId.get(id)?.required)) throw new FormError('Invalid proposed project answers');
@@ -163,6 +168,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const p = profiles.find((p) => p.name === profile);
     const chosenProfiles = edit && manifest.profiles.includes(profile) ? manifest.profiles : [profile];
     const doc = { ...(original ?? {}), mode: input.mode, answers };
+    if (Object.keys(scopes).length) doc.scopes = scopes; else delete doc.scopes;
     if (p && !unresolved.length) doc.proposal = { ...(original?.proposal ?? {}), status: 'confirmed', summary: `${p.name} - ${p.summary}`, profiles: chosenProfiles, modules };
     else delete doc.proposal;
     const text = stringify(doc);
@@ -180,9 +186,12 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     return { names: envNames(example?.toString('utf8') ?? ''), existingFile: envFileExists(root) };
   }
 
+  // What .yaw/answers.yaml will hold: the team answers only; personal ones go to ~/.yaw/user-profile.yaml (T-027).
+  const committedAnswers = (result) => splitAnswers({ text: result.text, doc: result.doc, kitRoot }).text;
+
   function render(result) {
     return edit
-      ? renderProject({ root, kitRoot, manifest: { ...manifest, profiles: result.doc.proposal.profiles }, answersDoc: result.doc, modules: result.modules })
+      ? renderProject({ root, kitRoot, manifest: { ...manifest, profiles: result.doc.proposal.profiles, agents: result.doc.answers['user.agents'] ?? manifest.agents }, answersDoc: result.doc, modules: result.modules })
       : renderInit({ root, kitRoot, answersDoc: result.doc, modules: result.modules });
   }
 
@@ -212,7 +221,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       files.push({ path: entry.path, module: entry.module ?? 'core', bytes: null, managed: entry.managed,
         action: entry.managed && current !== null && hashContent(current) === entry.hash ? 'delete' : 'kept' });
     }
-    files.push({ path: ANSWERS, module: 'core', bytes: Buffer.byteLength(result.text), managed: true, action: 'write', excerpt: excerpt(ANSWERS, result.text) });
+    const committed = committedAnswers(result);
+    files.push({ path: ANSWERS, module: 'core', bytes: Buffer.byteLength(committed), managed: true, action: 'write', excerpt: excerpt(ANSWERS, committed) });
     files.push({ path: MANIFEST, module: 'core', bytes: null, managed: true, action: 'write' });
     files.sort((a, b) => a.path.localeCompare(b.path));
     const expertise = result.doc.answers['user.expertise'];
@@ -234,7 +244,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     };
     if (diff) {
       const changes = [...desired].map(([path, d]) => [path, d.content]);
-      changes.push([ANSWERS, result.text]);
+      changes.push([ANSWERS, committed]);
       output.diff = changes.map(([path, next]) => {
         if (path !== ANSWERS && ['kept', 'missing'].includes(files.find((f) => f.path === path).action)) {
           return `Kept unchanged: ${path} (${edit ? 'user-owned, edited, unchanged or missing file' : 'existing file; init does not overwrite it'}).\n`;
@@ -269,7 +279,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     try { if (existsSync(resolveInside(root, path))) current = readRegular(root, path); }
     catch { throw new FormError('File is unavailable, too large or not a regular file.', 403); }
     const kept = current !== null && (path === MANIFEST || !edit || generated?.managed === false || entry?.managed === false || !entry || hashContent(current) !== entry.hash);
-    const content = path === ANSWERS ? result.text : kept || !generated ? current : String(generated.content);
+    const content = path === ANSWERS ? committedAnswers(result) : kept || !generated ? current : String(generated.content);
     if (content === null) return { path, content: null, message: 'Generated when Apply writes the project.' };
     if (Buffer.byteLength(content) > MAX_BYTES) return { path, content: null, message: 'File exceeds the 128 KiB preview limit.' };
     if (content.includes('\0')) return { path, content: null, message: 'Binary file; no text preview.' };
@@ -302,6 +312,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       }
       if (schemas().validate('preset.schema.json', doc).length) throw new FormError('Saved preset is invalid; it was not loaded');
     } else throw new FormError('Choose a saved profile or preset');
+    doc = { ...doc, answers: migrateAnswers(doc.answers) };
     validateGiven(doc.answers);
     return { mode: doc.mode ?? 'quick', answers: doc.answers, modules: doc.proposal?.modules ?? null,
       ...(kind !== 'profile' ? { proposed: questions.filter((q) => q.required && Object.hasOwn(doc.answers, q.id)).map((q) => q.id) } : {}) };

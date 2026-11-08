@@ -13,9 +13,12 @@ import { KIT_ROOT, read, readJson, readTree, tmp, writeAnswers } from '../../../
 
 const MODULES = ['core', 'communication', 'standards'];
 
-function answers({ agents = ['claude', 'codex', 'copilot'], extra = {}, profile = 'node-cli' } = {}) {
+// T-027: the style is personal unless the project switches it to team; most tests render a shared style.
+const STYLE = ['user.length', 'user.explain', 'user.expertise', 'user.language', 'user.autonomy'];
+function answers({ agents = ['claude', 'codex', 'copilot'], extra = {}, profile = 'node-cli', shared = true } = {}) {
   const lines = ['mode: quick', 'answers:', `  user.agents: [${agents.join(', ')}]`, '  idea.text: A tiny command-line tool.'];
   for (const [k, v] of Object.entries(extra)) lines.push(`  ${k}: ${v}`);
+  if (shared) lines.push('scopes:', ...STYLE.map((id) => `  ${id}: team`));
   lines.push('proposal:', '  status: confirmed', '  summary: test project', `  profiles: [${profile}]`, `  modules: [${MODULES.join(', ')}]`);
   return `${lines.join('\n')}\n`;
 }
@@ -86,15 +89,15 @@ test('without Claude there is no output style, even when non-default', async () 
   assert.equal(existsSync(join(root, '.claude')), false);
 });
 
-test('team mode (ADR-0013): the personal profile is not committed', async () => {
-  for (const team of ['team', 'external-reviewers']) {
-    const root = await project({ extra: { 'idea.team': team, 'user.length': 'brief' } });
+test('personal by default (ADR-0013, T-027): the style is not committed, solo or team', async () => {
+  for (const team of ['solo', 'team']) {
+    const root = await project({ shared: false, extra: { 'idea.team': team, 'user.length': 'brief' } });
     const agentsMd = read(root, 'AGENTS.md');
     assert.equal(section(agentsMd, 'communication'), undefined);
     assert.doesNotMatch(agentsMd, /Prefer bullet points/);
     assert.equal(existsSync(join(root, '.claude')), false);
     assert.doesNotMatch(agentsMd, /Chat in "de"|Ask before risky/);
-    assert.match(agentsMd, /agree on chat language and autonomy per contributor/);
+    assert.match(agentsMd, /chat language, autonomy and answer style are each person's own settings/);
     const files = readdirSync(root, { recursive: true }).join('\n');
     assert.doesNotMatch(files, /output-styles/);
     assert.equal(readManifest(root).modules.communication.enabled, true);

@@ -517,6 +517,8 @@ fieldset.question > legend, fieldset.interview-question > legend { padding: 0; }
 .module-switch:checked { background: #2d7777; }
 .module-switch:checked::after { transform: translateX(13px); }
 .module-switch:disabled { opacity: .55; cursor: default; }
+.scope-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin-top: 6px; font-size: .85em; }
+.scope-toggle .scope-note { flex-basis: 100%; margin: 2px 0 0; }
 .module-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch-state { margin-left: 2px; }
 .module-card.on .switch-state { color: #2d7777; font-weight: 600; }

@@ -52,8 +52,7 @@ const SCENARIOS = [
   { name: 'Full team', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'team.session-context': false } },
   { name: 'Full team with local Git', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'tasks.use-github': false } },
   { name: 'Basic team with local Git', mode: 'basic', answers: { ...BASE, 'idea.team': 'team', 'tasks.use-github': false } },
-  { name: 'Full external reviewers', mode: 'full', answers: { ...BASE, 'idea.team': 'external-reviewers' } },
-  { name: 'Full external reviewers with local Git', mode: 'full', answers: { ...BASE, 'idea.team': 'external-reviewers', 'tasks.use-github': false } },
+  // T-027: "Who works on this project?" is Solo or Team; the former External reviewers choice is gone.
   { name: 'Basic team', mode: 'basic', answers: { ...BASE, 'idea.team': 'team' } },
   { name: 'Full, all agents, expert, both task stores', mode: 'full', answers: { ...BASE, 'user.agents': ['claude', 'codex', 'copilot'], 'user.expertise': 'expert', 'user.language': 'en', 'tasks.mode': 'both' } },
   { name: 'Full, every answer non-default (layperson)', mode: 'full', answers: nonDefaults({ ...BASE, 'user.language': 'en', 'user.expertise': 'layperson' }) },

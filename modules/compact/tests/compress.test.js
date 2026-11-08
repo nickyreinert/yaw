@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Readable } from 'node:stream';
@@ -16,16 +16,16 @@ import { loadModule } from '../../../core/render/kit.js';
 import { fixture, hook, makeProject } from '../../../test/helpers/hooks.js';
 import { KIT_ROOT, capture, tmp } from '../../../test/helpers/fixtures.js';
 import { ansi, cap, condense, dedup, groupGrep, lockfile, progress } from '../lib/methods.js';
-import { writePersonal } from '../lib/settings.js';
 
 const HINT = 're-run with YAW_VERBOSE=1 for the full output';
 const lines = (n, f) => Array.from({ length: n }, (_, i) => f(i + 1));
 
-// A project with compact enabled; the personal setting turns the levers on (default: the hook lever only).
+// A project with compact enabled; the project answer (a team setting, T-027) turns the levers on (default: the hook lever only).
 async function setup(levers = ['hook']) {
   const root = await makeProject({ modules: ['core', 'compact'] });
   const home = tmp('yaw-home-');
-  if (levers) writePersonal({ HOME: home }, root, levers);
+  const file = join(root, '.yaw', 'answers.yaml');
+  if (levers) writeFileSync(file, readFileSync(file, 'utf8').replace('answers:\n', `answers:\n  compact.levers: [${levers.join(', ')}]\n`));
   return { root, home };
 }
 
@@ -163,7 +163,7 @@ test('guards: these calls keep their output', async () => {
   assert.equal((await run(p, bash(big), { YAW_VERBOSE: '1' })).stdout, '');
 });
 
-test('levers: no hook lever, no compression; YAW_COMPACT=0 wins over the personal setting', async () => {
+test('levers: no hook lever, no compression; YAW_COMPACT=0 wins over the project answer', async () => {
   const big = bash(`${'\x1b[31mFAIL\x1b[0m\n'.repeat(400)}`);
   const none = await setup(null);
   assert.equal((await run(none, big)).stdout, '');
@@ -183,11 +183,9 @@ test('never worse: a grouping that would grow the output is dropped', async () =
   assert.equal((await run(p, grep(content))).stdout, '');
 });
 
-test('fails open: an unreadable personal setting leaves the output alone', async () => {
+test('fails open: unreadable project answers leave the output alone', async () => {
   const p = await setup(null);
-  mkdirSync(join(p.home, '.yaw'), { recursive: true });
-  writeFileSync(join(p.home, 'elsewhere.json'), '{}');
-  symlinkSync(join(p.home, 'elsewhere.json'), join(p.home, '.yaw', 'compact.json'));
+  writeFileSync(join(p.root, '.yaw', 'answers.yaml'), 'answers: [\n');
   const r = await run(p, bash(`${'\x1b[31mFAIL\x1b[0m\n'.repeat(400)}`));
   assert.deepEqual([r.code, r.stdout], [0, '']);
   assert.match(readFileSync(join(p.home, '.yaw', 'logs', 'hook-errors.log'), 'utf8'), /compact\/compress: /);

@@ -83,7 +83,9 @@ test('edit CLI reviews a question with saved defaults and cancellation writes no
   const io = ioFor(root, interview({ 'idea.text': 'Updated idea.' }));
   assert.equal(await main(['edit', 'idea.text', '--skip-verify'], io), 0, io.stderr.text());
   assert.equal(readAnswers(root).answers['idea.text'], 'Updated idea.');
-  assert.deepEqual(readAnswers(root).answers['user.agents'], ['claude', 'codex', 'copilot']);
+  // T-027: the agents are personal; edit moves them to ~/.yaw/user-profile.yaml and reads them back over the project.
+  assert.equal(Object.hasOwn(readAnswers(root).answers, 'user.agents'), false);
+  assert.deepEqual(readAnswers(root, { env: io.env }).answers['user.agents'], ['claude', 'codex', 'copilot']);
   assert.equal(io.prompter.asked.filter((q) => q.endsWith('] > ')).length, 1);
 });
 

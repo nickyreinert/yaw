@@ -107,5 +107,7 @@ test('Quick terminal and browser both reuse a saved review trigger without a red
   const stderr = capture();
   const code = await main(['init', '--skip-verify'], { ...fixture, cwd: fixture.root, stdout: capture(), stderr, prompter: p });
   assert.equal(code, 0, stderr.text());
-  assert.deepEqual(readAnswers(fixture.root), browser.doc);
+  // T-027: the repository keeps the team answers; read over ~/.yaw/user-profile.yaml they match the browser.
+  assert.equal(Object.keys(readAnswers(fixture.root).answers).some((id) => id.startsWith('user.')), false);
+  assert.deepEqual(readAnswers(fixture.root, { env: fixture.env }), browser.doc);
 });

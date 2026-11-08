@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { envFileExists, envNames, validateSecretValues, writeEnvSecrets } from '../core/lib/env-secrets.js';
 import { createPrompter } from '../core/cli/prompt.js';
@@ -87,5 +87,7 @@ test('CLI secret entry uses hidden input and keeps values out of answers, logs a
   assert.equal(statSync(join(root, '.env')).mode & 0o777, 0o600);
   assert.doesNotMatch(stdout.text() + stderr.text(), /CLI_SECRET_CANARY_81cf/);
   assert.doesNotMatch(readFileSync(join(root, '.yaw/answers.yaml'), 'utf8'), /CLI_SECRET_CANARY_81cf/);
-  assert.equal(existsSync(join(home, '.yaw')), false);
+  // T-027: only the personal settings are saved, without the secret.
+  assert.deepEqual(readdirSync(join(home, '.yaw')), ['user-profile.yaml']);
+  assert.doesNotMatch(readFileSync(join(home, '.yaw/user-profile.yaml'), 'utf8'), /CLI_SECRET_CANARY_81cf/);
 });

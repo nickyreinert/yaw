@@ -14,6 +14,14 @@
         "tasks.mode": { "enum": ["local", "github", "both"] }
       }
     },
+    "scopes": {
+      "description": "Personal or team per setting (T-027), keyed by question id: a personal value is stored only in ~/.yaw/user-profile.yaml, a team value here.",
+      "type": "object",
+      "patternProperties": {
+        "^(?!.*(secret|token|password|passwd|apikey|api-key|credential))(user|idea|domain|arch|delivery|quality|ui|privacy|backup|vendors|tasks|governance|team|compact)\\.[a-z][a-z0-9-]*$": { "enum": ["personal", "team"] }
+      },
+      "additionalProperties": false
+    },
     "proposal": {
       "description": "Written by the PROPOSE step (/kickoff) for confirmation (doc 02 §1).",
       "type": "object",
