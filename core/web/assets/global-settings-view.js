@@ -247,8 +247,15 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       label.prepend(input); root.append(label); scopes.push([key, input]);
     }
     const run = async (resolution) => {
-      const result = await api('sync-run', { name: name.value || undefined, resolution });
-      await loadSync(); root.append(el('p', result.message, 'small muted'));
+      let job = await api('sync-run', { name: name.value || undefined, resolution });
+      const progress = el('p', '', 'small muted'), cancel = button('Cancel sync', () => api('sync-cancel', {}).catch(report));
+      root.append(progress, cancel);
+      while (job && ['running', 'cancelling'].includes(job.status)) {
+        progress.textContent = `${job.message} Step ${job.steps}: ${job.step}`;
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        job = await get('sync-job');
+      }
+      await loadSync(); root.append(el('p', job?.message ?? 'Sync finished.', job?.status === 'failed' ? 'warn' : 'small muted'));
     };
     const actions = el('div', null, 'interview-actions'); root.append(actions);
     actions.append(button('Save sync settings', async () => {
@@ -600,8 +607,8 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       `LAYA_HOST=${host} LAYA_PORT=${port} LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve`);
     step('3. Test it', 'Press Test connection above. The first answer may take a while as the checkpoint downloads and loads.', null);
     step('4. Classify', ['Press Classify in the filter bar of ', link('Global → Analytics', 'global-analytics'), ' (all workspaces) or ', link('Workspace → Analytics', 'analytics'), ' (this workspace), or run:'], 'yaw sessions evaluate --days 30');
-    const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), link = el('a', 'github.com/NandhaKishorM/laya');
-    link.href = 'https://github.com/NandhaKishorM/laya'; link.target = '_blank'; link.rel = 'noopener noreferrer'; more.append(link, '. YAW never installs, downloads or starts anything for Laya.');
+    const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), docs = el('a', 'github.com/NandhaKishorM/laya');
+    docs.href = 'https://github.com/NandhaKishorM/laya'; docs.target = '_blank'; docs.rel = 'noopener noreferrer'; more.append(docs, '. YAW never installs, downloads or starts anything for Laya.');
     card.append(more);
     return card;
   }

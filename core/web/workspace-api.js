@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
 import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSamples, classifierSettings, collectAnalysis, previewClassification, probeClassifier, readAnalysis, scanSummary } from '../lib/session-analysis.js';
@@ -15,7 +16,7 @@ import { interviewApply, interviewData, interviewAction, interviewPreview, saveT
 import { ProjectError } from '../render/project.js';
 import { removeReviewPrompt, reviewPromptsData, saveReviewPrompt } from './review-prompts.js';
 import { globalFile, globalFiles, presetAction, presetData, presetSave, presetsData, profileApply, profileData, profilePreview } from './global-settings.js';
-import { configureSync, runSync, syncStatus } from '../lib/data-sync.js';
+import { configureSync, runSyncAsync, syncStatus } from '../lib/data-sync.js';
 import { reviewSessions } from '../lib/session-insights.js';
 import { createImproveRunner, improveSettings, saveImproveSettings, planningAgents } from './improve-agents.js';
 import { previewPlanning, applyPlanning } from './planning.js';
@@ -28,7 +29,7 @@ import { improveHistory, savedImprovement, saveImprovement, importImprovement, d
 const userError = async (fn) => { try { return await fn(); } catch (e) { if (e instanceof ProjectError) throw new FormError(e.message); throw e; } };
 
 export const WORKSPACE_ACTIONS = ['planning-agents', 'planning-start', 'planning-job', 'planning-clear', 'planning-preview', 'planning-apply', 'collect', 'evaluate', 'preferences', 'classifier-save', 'classifier-test', 'classifier-preview', 'classifier-pause', 'classifier-resume', 'classifier-stop', 'notifications', 'notification-test', 'knowledge-save', 'knowledge-remove', 'project-add', 'taxonomy-save', 'interview-action', 'interview-preview', 'interview-apply',
-  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
+  'improve-history-save', 'improve-history-import', 'improve-history-read', 'improve-history-delete', 'improve-history-retention', 'improve-instruction-preview', 'improve-instruction-apply', 'setup-defaults-save', 'profile-preview', 'profile-apply', 'preset-save', 'preset-rename', 'preset-delete', 'review-prompt-save', 'review-prompt-remove', 'sync-setup', 'sync-run', 'sync-cancel', 'session-sources-save', 'session-sources-reset', 'insights-review', 'improve-settings', 'improve-agent-start', 'improve-agent-clear', 'remote-settings', 'server-status', 'server-open'];
 // Personal, not per workspace: Auto refresh applies to whichever Sessions page is open; the classifier is one local service.
 export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
@@ -48,7 +49,7 @@ const sourcesView = (env, data = sourcesData(env)) => {
 export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchFn, spawnFn }) {
   const reviewer = createImproveRunner({ env, spawnFn }), planner = createImproveRunner({ env, spawnFn, purpose: 'planning' });
   let running = false;
-  let classifierJob = null, resumePaused = null;
+  let classifierJob = null, resumePaused = null, syncJob = null;
   const rootOf = (value) => projects ? projects.resolve(value) : fixed;
   const publicClassifierJob = () => classifierJob && ({
     status: classifierJob.status, session: classifierJob.session, sessions: classifierJob.sessions,
@@ -56,10 +57,11 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
     unavailable: classifierJob.unavailable, skipped: classifierJob.skipped,
     sessionComplete: classifierJob.sessionComplete, message: classifierJob.message,
   });
+  const publicSyncJob = () => syncJob && ({ id: syncJob.id, status: syncJob.status, step: syncJob.step, steps: syncJob.steps, message: syncJob.message, result: syncJob.result });
   const resume = () => { const release = resumePaused; resumePaused = null; release?.(); };
   return {
     actions: WORKSPACE_ACTIONS,
-    close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); resume(); },
+    close: () => { planner.clear(); reviewer.clear(); classifierJob?.controller.abort(); syncJob?.controller.abort(); resume(); },
     get: {
       '/api/global/features': (params) => {
         return { remoteControl: remoteSettings(env), hubMigrated: Boolean(readUserData(env, 'hub-sync.json')), folderSync: Boolean(readUserData(env, 'sync-config.json')?.scopes.some((scope) => ['settings', 'presets', 'statistics'].includes(scope))), interfaces: lanInterfaces(), defaultInterface: defaultInterface(), root: rootOf(params?.get('workspace')) };
@@ -87,6 +89,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       '/api/preferences': () => webPreferences(env),
       '/api/classifier-samples': () => classifierSamples(env),
       '/api/classification-job': () => publicClassifierJob(),
+      '/api/sync-job': () => publicSyncJob(),
       '/api/notifications': (params) => notificationSettings({ root: rootOf(params?.get('workspace')), env }),
       '/api/settings': (params) => userError(() => settingsFiles({ root: rootOf(params?.get('workspace')), kitRoot })),
       '/api/settings/file': (params) => userError(() => settingsFile({ root: rootOf(params?.get('workspace')), kitRoot, path: params?.get('path') })),
@@ -174,9 +177,22 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
         try { return sourcesView(env, name === 'session-sources-save' ? saveSources(env, input.sources) : resetSources(env)); }
         catch (e) { throw new FormError(e.message); }
       }
-      if (name === 'sync-setup' || name === 'sync-run') {
-        try { return name === 'sync-setup' ? configureSync({ env, target: input.target, github: input.github, name: input.name, scopes: input.scopes }) : runSync({ env, kitRoot, resolution: input.resolution, name: input.name }); }
+      if (name === 'sync-setup') {
+        try { return configureSync({ env, target: input.target, github: input.github, name: input.name, scopes: input.scopes }); }
         catch (e) { throw new FormError(e.message); }
+      }
+      // Git/gh subprocesses can take a minute each, so sync runs as a background job that the page polls.
+      if (name === 'sync-run') {
+        if (['running', 'cancelling'].includes(syncJob?.status)) throw new FormError('Sync is already running', 409);
+        const job = syncJob = { id: randomUUID(), status: 'running', step: 'Starting', steps: 0, message: 'Sync started.', result: null, controller: new AbortController() };
+        runSyncAsync({ env, kitRoot, resolution: input.resolution, name: input.name, signal: job.controller.signal, onStep: (step) => { job.step = step; job.steps++; } })
+          .then((result) => { job.status = 'succeeded'; job.result = result; job.message = result.message; },
+            (e) => { job.status = job.controller.signal.aborted ? 'cancelled' : 'failed'; job.message = e.message; });
+        return publicSyncJob();
+      }
+      if (name === 'sync-cancel') {
+        if (syncJob?.status === 'running') { syncJob.status = 'cancelling'; syncJob.message = 'Cancelling sync.'; syncJob.controller.abort(); }
+        return publicSyncJob();
       }
       if (name === 'project-add') {
         if (!projects) throw new FormError('Project switching is not available here', 404);

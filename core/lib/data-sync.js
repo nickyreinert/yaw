@@ -3,7 +3,7 @@ import { constants, openSync, closeSync, fstatSync, readFileSync, writeFileSync,
 import { join, resolve, dirname, parse as parsePath, isAbsolute, sep } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { userDir, userDataDir, readUserData, writeUserData, secretFindings } from './user-store.js';
 import { parse, stringify } from './yaml.js';
 import { schemas } from '../render/kit.js';
@@ -109,34 +109,37 @@ function portable(key, value, kitRoot) {
   return doc;
 }
 // ~/.yaw/knowledge/**/*.md as portable records. Links, secret-looking names and text, and oversized files stay local.
-function localKnowledge(env, kitRoot) {
+// Markdown files that exist but cannot be synced are added to `excluded`, so the merge leaves them alone rather than reading them as deletions.
+function localKnowledge(env, kitRoot, excluded) {
   const out = {}, rules = loadRules({ kitRoot }), root = safe(join(userDir(env), 'knowledge'));
   const walk = (rel, depth) => {
     let names = [];
     try { names = readdirSync(join(root, rel)).sort(); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
     for (const name of names) {
       if (!PART.test(name)) continue;
-      const child = rel ? `${rel}/${name}` : name, path = join(root, child);
-      let st; try { st = lstatSync(path); } catch { continue; }
-      if (st.isSymbolicLink()) continue;
+      const child = rel ? `${rel}/${name}` : name, path = join(root, child), key = /\.md$/i.test(name) ? `knowledge/${child}` : null;
+      let st; try { st = lstatSync(path); } catch { if (key) excluded.add(key); continue; }
+      if (st.isSymbolicLink()) { if (key) excluded.add(key); continue; }
       if (st.isDirectory()) { if (depth < 4) walk(child, depth + 1); continue; }
-      if (!st.isFile() || !/\.md$/i.test(name) || st.size > MAX_RECORD || Object.keys(out).length >= 1000) continue;
-      let text; try { text = read(path); } catch { continue; }
-      if (text === null || !text.trim() || text.includes('\0') || secretValueRule(rules, text)) continue;
-      out[`knowledge/${child}`] = { text };
+      if (!key) continue;
+      if (!st.isFile() || st.size > MAX_RECORD || Object.keys(out).length >= 1000) { excluded.add(key); continue; }
+      let text; try { text = read(path); } catch { excluded.add(key); continue; }
+      if (text === null) continue;
+      if (!text.trim() || text.includes('\0') || secretValueRule(rules, text)) { excluded.add(key); continue; }
+      out[key] = { text };
     }
   };
   walk('', 0);
   return out;
 }
-function localRecords(env, scopes, kitRoot) {
+function localRecords(env, scopes, kitRoot, excluded = new Set()) {
   const out = {};
   if (scopes.includes('settings')) {
     const text = read(join(userDir(env), 'user-profile.yaml'));
     out['settings/profile'] = text === null ? null : portable('settings/profile', parse(text), kitRoot);
     if (out['settings/profile'] && !Object.keys(out['settings/profile'].answers).length) out['settings/profile'] = null;
   }
-  if (scopes.includes('knowledge')) Object.assign(out, localKnowledge(env, kitRoot));
+  if (scopes.includes('knowledge')) Object.assign(out, localKnowledge(env, kitRoot, excluded));
   if (scopes.includes('presets')) {
     const dir = safe(join(userDir(env), 'presets'));
     let names = [];
@@ -165,9 +168,11 @@ function statistics(env) {
     return row;
   });
 }
-export function mergeRecords(local, remote, base, resolution) {
+// Excluded keys exist locally but cannot be synced: they are neither published, applied nor reported as conflicts.
+export function mergeRecords(local, remote, base, resolution, excluded = []) {
   const records = {}, conflicts = [];
   for (const key of new Set([...Object.keys(local), ...Object.keys(remote), ...Object.keys(base)])) {
+    if (excluded.includes(key)) continue;
     const l = local[key] ?? null, r = remote[key] ?? null, b = base[key] ?? null;
     if (equal(l, r) || equal(r, b)) records[key] = l;
     else if (equal(l, b)) records[key] = r;
@@ -270,7 +275,28 @@ function command(bin, args, cwd, env) {
   if (result.status !== 0) throw new Error(`${bin} sync operation failed; check authentication, connectivity and repository permissions`);
   return result.stdout.trim();
 }
-export function runSync({ env, kitRoot, resolution, name, execute = command }) {
+// Cancellable counterpart of command() for the web job: the whole process group is stopped so Git helpers do not outlive an abort.
+function commandAsync(bin, args, cwd, env, signal) {
+  return new Promise((resolve, reject) => {
+    const fail = () => new Error(`${bin} sync operation failed; check authentication, connectivity and repository permissions`);
+    let child, out = '', done = false;
+    const stop = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } } };
+    const finish = (fn, value) => { if (done) return; done = true; clearTimeout(timer); signal?.removeEventListener('abort', onAbort); fn(value); };
+    const onAbort = () => { stop(); finish(reject, new Error('Sync cancelled')); };
+    if (signal?.aborted) return reject(new Error('Sync cancelled'));
+    try { child = spawn(bin, args, { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0' }, detached: true, stdio: ['ignore', 'pipe', 'ignore'] }); }
+    catch { return reject(fail()); }
+    const timer = setTimeout(() => { stop(); finish(reject, fail()); }, 60000);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { out += chunk; if (out.length > 1024 * 1024) { stop(); finish(reject, fail()); } });
+    child.on('error', () => finish(reject, fail()));
+    child.on('close', (code) => code === 0 ? finish(resolve, out.trim()) : finish(reject, fail()));
+  });
+}
+const describe = (bin, args) => { const rest = [...args]; while (rest[0] === '-c') rest.splice(0, 2); return `${bin} ${rest[0]}`; };
+// Each external command is yielded as [bin, args, cwd, env]; the caller runs it (synchronously for the CLI, asynchronously for the web job) and sends back its output.
+function* syncSteps({ env, kitRoot, resolution, name }) {
   if (resolution !== undefined && !['local', 'remote'].includes(resolution)) throw new Error('Resolution must be local or remote');
   const cfg = readUserData(env, 'sync-config.json');
   if (!cfg) throw new Error('Configure sync first');
@@ -284,10 +310,10 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
   try {
     let dir = cfg.target;
     if (cfg.github) {
-      if (execute('gh', ['repo', 'view', cfg.github, '--json', 'isPrivate', '--jq', '.isPrivate'], home, env) !== 'true') throw new Error('Sync requires a private GitHub repository');
+      if ((yield ['gh', ['repo', 'view', cfg.github, '--json', 'isPrivate', '--jq', '.isPrivate'], home, env]) !== 'true') throw new Error('Sync requires a private GitHub repository');
       dir = safe(join(home, 'sync-github'));
-      if (!read(join(dir, '.git', 'HEAD'))) execute('git', ['-c', 'core.hooksPath=/dev/null', 'clone', '--', `https://github.com/${cfg.github}.git`, dir], home, env);
-      else execute('git', ['-c', 'core.hooksPath=/dev/null', 'pull', '--ff-only'], dir, env);
+      if (!read(join(dir, '.git', 'HEAD'))) yield ['git', ['-c', 'core.hooksPath=/dev/null', 'clone', '--', `https://github.com/${cfg.github}.git`, dir], home, env];
+      else yield ['git', ['-c', 'core.hooksPath=/dev/null', 'pull', '--ff-only'], dir, env];
     }
     if (!lstatSync(safe(dir)).isDirectory()) throw new Error('Sync folder is unavailable');
     remoteLock = join(dir, '.yaw-sync.lock');
@@ -295,10 +321,10 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
     const file = join(dir, 'yaw-sync.json');
     const vault = validateVault(json(file, { version: 1, records: {}, devices: {} }), kitRoot);
     const state = readUserData(env, 'sync-state.json') ?? { base: {} };
-    const local = localRecords(env, cfg.scopes, kitRoot);
+    const excluded = new Set(), local = localRecords(env, cfg.scopes, kitRoot, excluded);
     const enabled = (key) => cfg.scopes.includes(scopeOf(key));
     const subset = (obj) => Object.fromEntries(Object.entries(obj).filter(([k]) => enabled(k)));
-    const merged = mergeRecords(local, subset(vault.records), subset(state.base ?? {}), resolution);
+    const merged = mergeRecords(local, subset(vault.records), subset(state.base ?? {}), resolution, [...excluded]);
     if (merged.conflicts.length) {
       writeUserData(env, 'sync-state.json', { ...state, conflicts: merged.conflicts });
       return { ...syncStatus({ env }), message: 'Conflicts need a choice; no portable records were changed.' };
@@ -312,24 +338,48 @@ export function runSync({ env, kitRoot, resolution, name, execute = command }) {
     validateVault(vault, kitRoot);
     write(file, `${JSON.stringify(vault)}\n`);
     if (cfg.github) {
-      execute('git', ['add', '--', 'yaw-sync.json'], dir, env);
-      if (execute('git', ['diff', '--cached', '--name-only', '--', 'yaw-sync.json'], dir, env)) execute('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=YAW Sync', '-c', 'user.email=yaw@localhost', 'commit', '--only', '-m', 'Sync portable YAW data', '--', 'yaw-sync.json'], dir, env);
-      execute('git', ['-c', 'core.hooksPath=/dev/null', 'push'], dir, env);
+      yield ['git', ['add', '--', 'yaw-sync.json'], dir, env];
+      if (yield ['git', ['diff', '--cached', '--name-only', '--', 'yaw-sync.json'], dir, env]) yield ['git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=YAW Sync', '-c', 'user.email=yaw@localhost', 'commit', '--only', '-m', 'Sync portable YAW data', '--', 'yaw-sync.json'], dir, env];
+      yield ['git', ['-c', 'core.hooksPath=/dev/null', 'push'], dir, env];
     }
     if (!equal(local, localRecords(env, cfg.scopes, kitRoot))) throw new Error('Local settings changed during sync; retry');
     applyPortableRecords({ env, records: merged.records });
     writeUserData(env, 'sync-state.json', { base: { ...(state.base ?? {}), ...merged.records }, devices: stats || tasks ? vault.devices : {}, lastSync: new Date().toISOString(), conflicts: [] });
-    return { ...syncStatus({ env }), message: 'Sync complete.' };
+    return { ...syncStatus({ env }), excluded: [...excluded], message: 'Sync complete.' };
   } finally {
     if (remoteLock) rmdirSync(remoteLock);
     rmdirSync(lock);
   }
 }
+export function runSync({ env, kitRoot, resolution, name, execute = command }) {
+  const steps = syncSteps({ env, kitRoot, resolution, name });
+  let step = steps.next();
+  while (!step.done) {
+    let output;
+    try { output = execute(...step.value); } catch (e) { step = steps.throw(e); continue; }
+    step = steps.next(output);
+  }
+  return step.value;
+}
+export async function runSyncAsync({ env, kitRoot, resolution, name, execute = commandAsync, signal, onStep }) {
+  const steps = syncSteps({ env, kitRoot, resolution, name });
+  let step = steps.next();
+  while (!step.done) {
+    let output;
+    try {
+      if (signal?.aborted) throw new Error('Sync cancelled');
+      onStep?.(describe(step.value[0], step.value[1]));
+      output = await execute(...step.value, signal);
+    } catch (e) { step = steps.throw(e); continue; }
+    step = steps.next(output);
+  }
+  return step.value;
+}
 
 export function portableSnapshot({ env, kitRoot, scopes, name, serverMode = false }) {
-  const records = localRecords(env, scopes, kitRoot);
+  const excluded = new Set(), records = localRecords(env, scopes, kitRoot, excluded);
   if (serverMode && scopes.includes('settings')) records['settings/setup-defaults'] = portable('settings/setup-defaults', readUserData(env, 'setup-defaults.json'), kitRoot);
-  return { records, device: { name: device(env, name).name, updated: new Date().toISOString(),
+  return { records, excluded: [...excluded], device: { name: device(env, name).name, updated: new Date().toISOString(),
     rows: scopes.includes('statistics') ? statistics(env) : [], ...(scopes.includes('tasks') ? { tasks: cleanTasks(readUserData(env, 'session-analysis.json')?.tasks, kitRoot) } : {}) } };
 }
 export const portableScope = scopeOf;

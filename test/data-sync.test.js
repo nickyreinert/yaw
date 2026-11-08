@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, realpathSync, renameSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, unlinkSync, symlinkSync, realpathSync, renameSync, chmodSync, existsSync } from 'node:fs';
 import { tmp as makeTmp } from './helpers/fixtures.js';
 import { join, resolve } from 'node:path';
 import { configureSync, runSync, syncStatus, syncedSessions } from '../core/lib/data-sync.js';
@@ -11,6 +11,14 @@ import { startFormServer } from '../core/web/form-server.js';
 import { sessionsData } from '../core/web/dashboard.js';
 
 const kitRoot = resolve('.');
+const settled = async (api) => {
+  for (let i = 0; i < 200; i++) {
+    const job = api.get['/api/sync-job']();
+    if (job && !['running', 'cancelling'].includes(job.status)) return job;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('sync job did not finish');
+};
 function pair(scopes) {
   const root = realpathSync(makeTmp('yaw-sync-'));
   const target = join(root, 'NAS'); mkdirSync(target);
@@ -87,7 +95,8 @@ test('CLI and authenticated workspace API share configuration, sync and device s
   assert.equal(await main(['sync', 'run'], io), 0); assert.equal(JSON.parse(out).message, 'Sync complete.');
   const api = createWorkspaceApi({ root: kitRoot, kitRoot, env: a });
   await api.action('sync-setup', { target, name: 'Renamed', scopes: ['statistics'] });
-  assert.equal((await api.action('sync-run', {})).device.name, 'Renamed');
+  assert.equal((await api.action('sync-run', {})).status, 'running');
+  assert.equal((await settled(api)).result.device.name, 'Renamed');
   assert.equal(api.get['/api/global/sync']().configured, true);
   await assert.rejects(api.action('sync-setup', { target, scopes: [] }), /Scopes/);
 });
@@ -138,6 +147,7 @@ test('sync HTTP actions require authentication and CSRF; reads never configure o
     assert.equal((await fetch(`${base}/api/sync-run`, { method: 'POST', headers, body: '{}' })).status, 403);
     const csrf = cookie.slice(cookie.indexOf('=') + 1);
     assert.equal((await fetch(`${base}/api/sync-run`, { method: 'POST', headers: { ...headers, 'x-yaw-token': csrf }, body: '{}' })).status, 200);
+    await settled(api);
     assert.ok(syncStatus({ env: a }).lastSync);
   } finally { await server.close(); }
 });
@@ -200,6 +210,30 @@ test('global knowledge syncs both ways, with deletions; secrets, links and other
   assert.throws(() => readFileSync(join(dir(a), 'team/style.md')), /ENOENT/);
 });
 
+test('a synced knowledge file that grows too large or turns secret-looking stays put instead of becoming a deletion', () => {
+  const { target, a, b, run } = pair(['knowledge']);
+  const dir = (env) => join(env.HOME, '.yaw/knowledge'); mkdirSync(dir(a), { recursive: true });
+  writeFileSync(join(dir(a), 'big.md'), '# Big\nsmall for now\n');
+  writeFileSync(join(dir(a), 'notes.md'), '# Notes\nplain\n');
+  run(a); run(b);
+  const large = `# Big\n${'x'.repeat(130 * 1024)}\n`, leaked = '# Notes\nAKIAIOSFODNN7EXAMPLE\n';
+  writeFileSync(join(dir(a), 'big.md'), large); writeFileSync(join(dir(a), 'notes.md'), leaked);
+  assert.deepEqual(run(a).excluded, ['knowledge/big.md', 'knowledge/notes.md']);
+  assert.equal(readFileSync(join(dir(a), 'big.md'), 'utf8'), large);
+  assert.equal(readFileSync(join(dir(a), 'notes.md'), 'utf8'), leaked);
+  const vault = JSON.parse(readFileSync(join(target, 'yaw-sync.json'), 'utf8'));
+  assert.equal(vault.records['knowledge/big.md'].text, '# Big\nsmall for now\n');
+  assert.equal(vault.records['knowledge/notes.md'].text, '# Notes\nplain\n');
+  run(b);
+  assert.equal(readFileSync(join(dir(b), 'big.md'), 'utf8'), '# Big\nsmall for now\n');
+  assert.equal(readFileSync(join(dir(b), 'notes.md'), 'utf8'), '# Notes\nplain\n');
+  // An edit from another device does not overwrite the excluded local file; once portable again, the edits conflict.
+  writeFileSync(join(dir(b), 'big.md'), '# Big\nedited on PC\n'); run(b); run(a);
+  assert.equal(readFileSync(join(dir(a), 'big.md'), 'utf8'), large);
+  writeFileSync(join(dir(a), 'big.md'), '# Big\ntrimmed\n');
+  assert.deepEqual(run(a).conflicts, ['knowledge/big.md']);
+});
+
 test('task snapshots sync as folder name plus items, appear on the other device only when the scope is on', async () => {
   const { target, a, b, run } = pair(['tasks']);
   const snapshot = { project: '/private/work/Shop', available: true, active: [{ id: 'T-001', issue: 4, title: 'Build cart', status: 'IN PROGRESS', progress: 40 }], backlog: [{ id: 'T-002', issue: null, title: 'Pay', note: 'later' }] };
@@ -219,4 +253,29 @@ test('tasks and knowledge are opt-in', () => {
   const root = realpathSync(makeTmp('yaw-sync-')), target = join(root, 'NAS'); mkdirSync(target);
   assert.deepEqual(configureSync({ env: { HOME: root }, target }).config.scopes, ['settings', 'presets', 'statistics']);
   assert.throws(() => configureSync({ env: { HOME: join(root, 'x') }, target, scopes: ['nope'] }), /Scopes/);
+});
+
+test('Git sync runs as a cancellable job and the event loop keeps serving while a subprocess waits', async () => {
+  const root = realpathSync(makeTmp('yaw-sync-job-')), bin = join(root, 'bin'), env = { HOME: join(root, 'home'), PATH: `${bin}:${process.env.PATH}` };
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'gh'), `#!/bin/sh\necho $$ > "${join(root, 'gh.pid')}"\nsleep 30\necho true\n`);
+  chmodSync(join(bin, 'gh'), 0o755);
+  configureSync({ env, github: 'owner/yaw-data', name: 'PC', scopes: ['settings'] });
+  const api = createWorkspaceApi({ root: kitRoot, kitRoot, env });
+  let ticks = 0; const timer = setInterval(() => { ticks++; }, 10);
+  try {
+    const started = Date.now();
+    assert.equal((await api.action('sync-run', {})).status, 'running');
+    await new Promise((r) => setTimeout(r, 300));
+    assert.ok(Date.now() - started < 2000 && ticks >= 10, `event loop was blocked (${ticks} ticks)`);
+    assert.equal(api.get['/api/global/sync']().configured, true);
+    assert.match(api.get['/api/sync-job']().step, /gh/);
+    await assert.rejects(api.action('sync-run', {}), /already running/);
+    assert.equal((await api.action('sync-cancel', {})).status, 'cancelling');
+    const job = await settled(api);
+    assert.equal(job.status, 'cancelled');
+    assert.equal(syncStatus({ env }).lastSync, null);
+    assert.equal(existsSync(join(env.HOME, '.yaw/sync.lock')), false);
+    assert.throws(() => process.kill(Number(readFileSync(join(root, 'gh.pid'), 'utf8')), 0), /ESRCH/);
+  } finally { clearInterval(timer); api.close(); }
 });

@@ -21,9 +21,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: low tier (Luna/Haiku) · effort: medium
 
 
-- T-017 [P2] Keep Git sync off the HTTP event loop — in progress. Resume: runSync becomes a generator driven sync (CLI/tests) or async (web job with progress/cancel); workspace-api sync-run starts job, add sync-job/sync-cancel, update UI + tests.
-  model: middle tier (Sonnet) · effort: high
-
 - T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
   in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
   model: middle tier (Sonnet) · effort: medium
