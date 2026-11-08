@@ -14,21 +14,21 @@ fmt:
 
 lint:
     @command -v java >/dev/null 2>&1 || { echo "lint: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew compileJava compileTestJava
+    ./gradlew --console=plain compileJava compileTestJava
 
 typecheck:
     @command -v java >/dev/null 2>&1 || { echo "typecheck: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew compileJava compileTestJava
+    ./gradlew --console=plain compileJava compileTestJava
 
 test:
     @command -v java >/dev/null 2>&1 || { echo "test: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew test
+    ./gradlew --console=plain test
 
 check: lint typecheck test audit sync-check
 
 build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew build
+    ./gradlew --console=plain build
 
 audit:
     @echo "audit: not applicable for java-basic (Dependabot can monitor Gradle dependencies)"

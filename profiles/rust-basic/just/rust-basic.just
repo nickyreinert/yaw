@@ -16,21 +16,21 @@ lint:
     @command -v rustfmt >/dev/null 2>&1 || { echo "lint: install rustfmt with 'rustup component add rustfmt'" >&2; exit 1; }
     @cargo clippy --version >/dev/null 2>&1 || { echo "lint: install clippy with 'rustup component add clippy'" >&2; exit 1; }
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy -q --all-targets -- -D warnings
 
 typecheck:
     @command -v cargo >/dev/null 2>&1 || { echo "typecheck: install Rust with rustup" >&2; exit 1; }
-    cargo check --all-targets
+    cargo check -q --all-targets
 
 test:
     @command -v cargo >/dev/null 2>&1 || { echo "test: install Rust with rustup" >&2; exit 1; }
-    cargo test
+    cargo test -q
 
 check: lint typecheck test audit sync-check
 
 build:
     @command -v cargo >/dev/null 2>&1 || { echo "build: install Rust with rustup" >&2; exit 1; }
-    cargo build
+    cargo build -q
 
 audit:
     @echo "audit: not applicable for rust-basic (no third-party crates)"

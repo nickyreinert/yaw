@@ -21,7 +21,7 @@ typecheck:
     uv run pyright
 
 test:
-    uv run pytest
+    uv run pytest -q
 
 check: lint typecheck test audit sync-check
 

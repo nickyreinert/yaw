@@ -27,7 +27,7 @@ typecheck:
 
 # Vitest in the Workers runtime (Miniflare, local).
 test:
-    npx vitest run
+    npx vitest run --reporter=dot
 
 check: lint typecheck test audit sync-check
 

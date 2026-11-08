@@ -10,3 +10,6 @@ defaults:
   modules: { devenv: true, ui-design: false, backup: false }
 requires: [just, uv]
 dependencyEcosystems: [pip]
+# Warning lines a passing step still shows with the compact module: Python warnings (pytest warnings summary), uv and pyright warnings, missing-tool notes.
+compact:
+  warnings: '\w+Warning: |^warning: | - warning: |^[a-z-]+: .* is not installed'

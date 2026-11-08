@@ -17,3 +17,6 @@ tools:
     install:
       macos: brew install --cask android-platform-tools
       linux: sudo apt install android-tools-adb
+# Warning lines a passing step still shows with the compact module: Kotlin and javac warnings, the Gradle deprecation notice, missing-tool notes.
+compact:
+  warnings: '^w: |: warning: |^warning: |^Deprecated Gradle features |^[a-z-]+: .* is not installed'

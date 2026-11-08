@@ -20,7 +20,7 @@ typecheck:
     npx tsc --noEmit
 
 test:
-    npx vitest run
+    npx vitest run --reporter=dot
 
 check: lint typecheck test audit sync-check
 

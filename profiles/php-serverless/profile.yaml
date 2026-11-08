@@ -34,3 +34,6 @@ tools:
       macos: brew install aws-sam-cli
       linux: pipx install aws-sam-cli
     when: { hosting: bref }
+# Warning lines a passing step still shows with the compact module: PHP warnings and deprecations, PHPUnit warnings, phpcs WARNING rows, missing-tool notes.
+compact:
+  warnings: '^(PHP )?(Warning|Deprecated|Notice): |^WARNINGS!|^OK, but |^\s*\d+ \| WARNING |^[a-z-]+: .* is not installed'

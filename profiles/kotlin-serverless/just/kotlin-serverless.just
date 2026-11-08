@@ -20,22 +20,22 @@ fmt:
 
 lint:
     @command -v java >/dev/null 2>&1 || { echo "lint: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew ktlintCheck
+    ./gradlew --console=plain ktlintCheck
 
 typecheck:
     @command -v java >/dev/null 2>&1 || { echo "typecheck: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew compileKotlin compileTestKotlin
+    ./gradlew --console=plain compileKotlin compileTestKotlin
 
 test:
     @command -v java >/dev/null 2>&1 || { echo "test: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew test
+    ./gradlew --console=plain test
 
 check: lint typecheck test build sync-check
 
 # Runs the Gradle build. Container: installs the launcher in build/install/app/bin/app; the image comes from the Dockerfile (docker build -t app ., needs Docker). Lambda: writes the zip to build/distributions/. Pushing and deploying need your approval.
 build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
-    @if grep -q aws-lambda-java build.gradle.kts; then ./gradlew build; else ./gradlew build installDist; fi
+    @if grep -q aws-lambda-java build.gradle.kts; then ./gradlew --console=plain build; else ./gradlew --console=plain build installDist; fi
 
 audit:
     @echo "audit: not applicable for kotlin-serverless (Dependabot can monitor Gradle dependencies)"

@@ -28,3 +28,6 @@ tools:
       macos: brew install awscli
       linux: curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip awscliv2.zip && sudo ./aws/install
     when: { hosting: lambda }
+# Warning lines a passing step still shows with the compact module: go command warnings, missing-tool notes.
+compact:
+  warnings: '^go: warning: |^[a-z-]+: .* is not installed'

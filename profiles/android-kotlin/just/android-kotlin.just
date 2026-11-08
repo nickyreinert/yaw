@@ -22,20 +22,20 @@ fmt: _wrapper
 
 # ktlint, detekt and Android Lint on the debug variant.
 lint: _wrapper
-    ./gradlew ktlintCheck detekt lintDebug
+    ./gradlew --console=plain ktlintCheck detekt lintDebug
 
 typecheck: _wrapper
-    ./gradlew compileDebugKotlin compileDebugUnitTestKotlin
+    ./gradlew --console=plain compileDebugKotlin compileDebugUnitTestKotlin
 
 # JUnit unit tests on the JVM (no emulator).
 test: _wrapper
-    ./gradlew testDebugUnitTest
+    ./gradlew --console=plain testDebugUnitTest
 
 check: lint typecheck test sync-check
 
 # Debug APK only. A release build is signed with your keystore, so it runs on your machine, not here (ADR-0040).
 build: _wrapper
-    ./gradlew assembleDebug
+    ./gradlew --console=plain assembleDebug
 
 audit:
     @echo "audit: not applicable for android-kotlin (doc 05 lists no dependency audit; Dependabot covers the Gradle versions)"

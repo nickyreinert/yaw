@@ -10,3 +10,6 @@ stack:
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }
 requires: [jdk>=17, just]
+# Warning lines a passing step still shows with the compact module: Kotlin and javac warnings, the Gradle deprecation notice, missing-tool notes.
+compact:
+  warnings: '^w: |: warning: |^warning: |^Deprecated Gradle features |^[a-z-]+: .* is not installed'

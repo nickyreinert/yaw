@@ -16,3 +16,6 @@ tools:
     install:
       macos: brew install node
       linux: curl -fsSL https://fnm.vercel.app/install | bash && fnm install --lts
+# Warning lines a passing step still shows with the compact module: Python warnings (pytest warnings summary), uv and pyright warnings, missing-tool notes.
+compact:
+  warnings: '\w+Warning: |^warning: | - warning: |^[a-z-]+: .* is not installed'

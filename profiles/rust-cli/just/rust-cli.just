@@ -18,18 +18,18 @@ fmt:
 
 lint:
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy -q --all-targets -- -D warnings
 
 typecheck:
-    cargo check --all-targets
+    cargo check -q --all-targets
 
 test:
-    cargo test
+    cargo test -q
 
 check: lint typecheck test sync-check
 
 build:
-    cargo build --release
+    cargo build -q --release
 
 audit:
     @echo "audit: not applicable for rust-cli (no third-party crates; add cargo-audit with your approval once there are)"

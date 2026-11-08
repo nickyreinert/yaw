@@ -18,19 +18,19 @@ fmt:
 
 lint:
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy -q --all-targets -- -D warnings
 
 typecheck:
-    cargo check --all-targets
+    cargo check -q --all-targets
 
 test:
-    cargo test
+    cargo test -q
 
 check: lint typecheck test audit build sync-check
 
 # Release binary in target/release/app. Container: the image comes from the Dockerfile (docker build -t app ., needs Docker). Lambda: cargo lambda build --release --arm64 (needs cargo-lambda). Pushing and deploying need your approval.
 build:
-    cargo build --release --locked
+    cargo build -q --release --locked
 
 # Vulnerability scan of Cargo.lock with cargo-audit (CI installs it; locally it is optional and installing it needs your approval).
 audit:

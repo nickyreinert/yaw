@@ -29,3 +29,6 @@ tools:
       macos: brew install rustup && rustup-init -y
       linux: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     when: { framework: tauri }
+# Warning lines a passing step still shows with the compact module: npm and Node warnings, eslint/stylelint/html-validate warning rows, missing-tool notes.
+compact:
+  warnings: '^npm (warn|WARN) |^\(node:\d+\) \w*Warning: |^\s+\d+:\d+\s+(warning|⚠)\s|^[a-z-]+: .* is not installed'
