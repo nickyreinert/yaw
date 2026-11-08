@@ -111,7 +111,9 @@ Optional on `PostToolUse` when a compress hook replaced the output (ADR-0007): `
 
 Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against the schema).
 
-`yaw run --compact` (compact module, ADR-0132) appends one line per recipe step to `~/.yaw/logs/run.jsonl`, with the same file rules: `{ v: 1, ts, step, method: ok|warnings|failed, exitCode, rawBytes, outBytes, ms }`. `rawBytes` is the step's combined stdout and stderr, `outBytes` what it printed instead. The output itself is never stored.
+`yaw run --compact` (compact module, ADR-0132) appends one line per recipe step to `~/.yaw/logs/run.jsonl`, with the same file rules: `{ v: 1, ts, step, method: ok|warnings|failed, exitCode, rawBytes, outBytes, ms }`. `rawBytes` is the step's combined stdout and stderr, `outBytes` what it printed instead. The output itself is never stored in the log.
+
+The optional recall store (compact `recall` choice, ADR-0133, NOTICE-0002) is the one place that keeps tool output: `~/.yaw/recall/<hash>.gz`, the gzip of the raw output of a cut result, named by the first 16 hex digits of its SHA-256. Directory 0700, files 0600, no symbolic links; at most 200 entries, 30 days and 10 MB of raw output per entry; never synced. `yaw recall <hash>` prints an entry.
 
 ## Session registry (`~/.yaw/yaw.db`)
 

@@ -12,6 +12,7 @@ adds:
   - "Project recipes run through a wrapper that condenses output of passing steps"
   - "Optional Claude Code hook that shortens long tool output"
   - "A short note in AGENTS.md (when committed for the team)"
+  - "Optional recall store: the full text of shortened output is kept in ~/.yaw/recall for 30 days (off by default)"
   - "Your choice: shared with the team or only for you"
 example: { when: "`just test` passes with 400 lines of output", then: "The agent sees one line: ok test (400 lines, 3.2s)." }
 cost: "About 3 lines in AGENTS.md; fewer tokens per tool call."
@@ -27,6 +28,7 @@ questions:
     choices:
       - { value: recipes, label: "Project recipes: passing steps print one line (all agents)" }
       - { value: hook, label: "Claude Code hook: long tool output is shortened" }
+      - { value: recall, label: "Recall store: keep the full text of shortened output on this machine (~/.yaw/recall, 30 days) so it can be shown again with yaw recall" }
     default: [recipes]
   - id: compact.personal
     ref: "16.2"

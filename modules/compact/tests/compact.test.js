@@ -48,7 +48,8 @@ test('definition: off at every depth, one levers question, low token cost', () =
   assert.deepEqual(def.depends, ['core']);
   const levers = def.questions.find((q) => q.id === 'compact.levers');
   assert.equal(levers.type, 'multi');
-  assert.deepEqual(levers.choices.map((c) => c.value), ['recipes', 'hook']);
+  assert.deepEqual(levers.choices.map((c) => c.value), ['recipes', 'hook', 'recall']);
+  assert.deepEqual(levers.default, ['recipes']);
   assert.ok(def.questions.some((q) => q.id === 'compact.personal' && q.type === 'boolean' && q.default === false));
   assert.equal(def.questions.some((q) => /recall/.test(q.id)), false);
 });

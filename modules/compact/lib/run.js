@@ -14,6 +14,7 @@ import { basename, dirname, join } from 'node:path';
 import { appendLog } from '../../../core/hooks/common.js';
 import { readAnswers } from '../../../core/render/project.js';
 import { UsageError } from '../../../core/cli/commands.js';
+import { storeRecall } from './recall.js';
 import { resolveCompact } from './settings.js';
 
 const WARNINGS_SHOWN = 10;
@@ -30,12 +31,14 @@ function projectRoot(cwd) {
   }
 }
 
-function compactOn(env, cwd) {
-  if (env.YAW_VERBOSE === '1') return false;
+// The levers in force for a step, [] when compact output is off (YAW_VERBOSE=1 included).
+function activeLevers(env, cwd) {
+  if (env.YAW_VERBOSE === '1') return [];
   const root = projectRoot(cwd);
   let answers = {};
   try { if (root) answers = readAnswers(root).answers ?? {}; } catch { /* unreadable answers: no project answer */ }
-  return resolveCompact({ env, root: root ?? cwd, answers }).levers.includes('recipes');
+  const { levers } = resolveCompact({ env, root: root ?? cwd, answers });
+  return levers.includes('recipes') ? levers : [];
 }
 
 const exitCode = (code, signal) => code ?? 128 + (constants.signals[signal] ?? 0);
@@ -46,8 +49,9 @@ function lines(text) {
   return rows;
 }
 
-// Failure output: ANSI, progress frames and repeats removed, then head and tail with the hint.
-export function condense(text) {
+// Failure output: ANSI, progress frames and repeats removed, then head and tail with the hint. `store` (the
+// recall lever) is called with nothing when the output is cut and returns the recall hash, or null.
+export function condense(text, store) {
   const rows = lines(text.replace(ANSI, '').replace(/\r\n/g, '\n')).map((l) => l.split('\r').filter(Boolean).at(-1) ?? '');
   const out = [];
   for (let i = 0; i < rows.length;) {
@@ -59,13 +63,15 @@ export function condense(text) {
     i += n;
   }
   if (out.length <= HEAD + TAIL) return out;
-  return [...out.slice(0, HEAD), `… ${out.length - HEAD - TAIL} lines cut …`, ...out.slice(-TAIL), 're-run with YAW_VERBOSE=1 for the full output'];
+  const hash = store?.() ?? null;
+  const hint = hash ? `full output: yaw recall ${hash}` : 're-run with YAW_VERBOSE=1 for the full output';
+  return [...out.slice(0, HEAD), `… ${out.length - HEAD - TAIL} lines cut …`, ...out.slice(-TAIL), hint];
 }
 
 // -> { text, method } for one finished step.
-export function summarize({ step, code, output, seconds, warn }) {
+export function summarize({ step, code, output, seconds, warn, store }) {
   if (code !== 0) {
-    const rows = condense(output);
+    const rows = condense(output, store);
     return { text: rows.length > 0 ? `${rows.join('\n')}\n` : '', method: 'failed' };
   }
   const rows = lines(output);
@@ -100,12 +106,14 @@ export async function run({ values, positionals, io }) {
     try { warn = new RegExp(values.warn); } catch { throw new UsageError(`--warn is not a valid regular expression: ${values.warn}`); }
   }
   const env = io.env ?? process.env;
-  if (!values.compact || !compactOn(env, io.cwd)) return (await spawnStep(command, args, { ...io, env }, false)).code;
+  const levers = values.compact ? activeLevers(env, io.cwd) : [];
+  if (levers.length === 0) return (await spawnStep(command, args, { ...io, env }, false)).code;
   const step = values.step || basename(command);
   const started = performance.now();
   const { code, output } = await spawnStep(command, args, { ...io, env }, true);
   const ms = Math.round(performance.now() - started);
-  const { text, method } = summarize({ step, code, output: output.toString('utf8'), seconds: ms / 1000, warn });
+  const store = levers.includes('recall') ? () => storeRecall(env, output) : undefined;
+  const { text, method } = summarize({ step, code, output: output.toString('utf8'), seconds: ms / 1000, warn, store });
   io.stdout.write(text);
   appendLog(env, 'run.jsonl', JSON.stringify({ v: 1, ts: new Date().toISOString(), step, method, exitCode: code, rawBytes: output.length, outBytes: Buffer.byteLength(text), ms }));
   return code;

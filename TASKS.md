@@ -27,6 +27,11 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
+- T-055 [P2] L6 optional recall store — `~/.yaw/recall/<hash>.gz` in a private directory: mode 0600, no symlinks (see T-010). At most 200 entries, 30 days and 10 MB per entry; excluded from sync; read back with `yaw recall <hash>`. Off by default; when off, cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Needs an ADR and a privacy NOTICE, since this is the first stored tool-output content. Depends on T-049.
+  spec: kickoff/16-compact-output.md §4 L6
+  model: middle tier (Sonnet) · effort: high
+  status: in progress · needs decision: accept ADR-0133 and NOTICE-0002 (both Proposed; the NOTICE wording is a privacy decision), and whether `recall` may be set by a committed project answer or only personally. Resume: implemented and tested (modules/compact/lib/recall.js, `yaw recall`, run.js); after the decision set both records to accepted and archive
+
 ## Backlog
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
@@ -83,10 +88,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-051 [P2] L1 for the remaining profiles — per profile: a warning pattern and quieter reporter flags (for example `pytest -q`). Depends on T-050.
   spec: kickoff/16-compact-output.md §4 L1
   acceptance: each profile's smoke test verifies its compact output
-  model: middle tier (Sonnet) · effort: high
-
-- T-055 [P2] L6 optional recall store — `~/.yaw/recall/<hash>.gz` in a private directory: mode 0600, no symlinks (see T-010). At most 200 entries, 30 days and 10 MB per entry; excluded from sync; read back with `yaw recall <hash>`. Off by default; when off, cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Needs an ADR and a privacy NOTICE, since this is the first stored tool-output content. Depends on T-049.
-  spec: kickoff/16-compact-output.md §4 L6
   model: middle tier (Sonnet) · effort: high
 
 - T-056 [P2] Savings view and A/B validation (L5, part 2) — Analytics shows `rawBytes`/`outBytes` per tool and method, with tokens estimated as bytes/4 and labelled as estimates. Compare the same kind of task with the module on and off, using per-session `tokensIn` and the number of `YAW_VERBOSE=1` re-runs (filter misses). Depends on T-050 or T-054.

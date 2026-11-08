@@ -3,7 +3,8 @@
 
 import { realpathSync } from 'node:fs';
 
-export const LEVERS = ['recipes', 'hook'];
+// `recall` (L6, T-055) is a separate choice that only an explicit setting turns on: YAW_COMPACT=1 does not.
+export const LEVERS = ['recipes', 'hook', 'recall'];
 
 // The key of a project in ~/.yaw/compact.json.
 export function projectKey(root) {
@@ -22,7 +23,7 @@ export function resolveLevers({ env, answers = {}, personal = null }) {
   const project = answers['compact.personal'] === true || !Array.isArray(answers['compact.levers']) ? null : answers['compact.levers'];
   const configured = personal ?? project;
   if (env.YAW_COMPACT === '0') return { levers: [], source: 'env' };
-  if (env.YAW_COMPACT === '1') return { levers: configured ?? [...LEVERS], source: 'env' };
+  if (env.YAW_COMPACT === '1') return { levers: configured ?? LEVERS.filter((l) => l !== 'recall'), source: 'env' };
   if (personal) return { levers: personal, source: 'personal' };
   if (project) return { levers: project, source: 'project' };
   return { levers: [], source: 'default' };
