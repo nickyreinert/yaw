@@ -1,5 +1,6 @@
 # Archive
 
+- T-045 Investigate Safe Verdicts — done 2026-11-08: panel removed by decision (read-only feature), commit bb85255
 - T-021 Add a cheap automatic CI gate — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: `.github/workflows/kit-ci.yml` now runs a `gate` job on pull_request (Ubuntu, Node 22.13: `npm run validate`, shellcheck, test/*.test.js minus server-mode and profile tests). Full suite (test, install-in-container, shellcheck) runs nightly, on workflow_dispatch, milestone opened/closed and `epic` label events; profile matrix and macOS stay dispatch-only. `nightly-summary` job writes a dated job summary (weak reminder: a failing nightly run gives GitHub's normal notification). Regression test: test/kit-ci-gate.test.js. Not run on GitHub Actions here.
