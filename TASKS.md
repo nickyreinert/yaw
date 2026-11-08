@@ -11,13 +11,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-- T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
-  model: middle tier (Sonnet) · effort: medium
-  status: needs decision: which tests count as "isolated core tests" (test/*.test.js only, excluding server-mode/install/profile tests? or modules/*/tests too?) and which Node/OS for the PR job (ubuntu, Node 22.13 only?) · resume: nothing edited yet; plan = pull_request trigger + cheap `gate` job (validate, shellcheck, selected tests), existing test/profile/install jobs stay workflow_dispatch-only; regression test first.
-
-
-
-
 - T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
   spec: kickoff/16-compact-output.md §4 L2 and §8
   acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
