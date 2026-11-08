@@ -11,6 +11,18 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
+- T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
+  model: low tier (Luna/Haiku) · effort: medium
+  needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
+  resume: diagnosed: JDK 21 at JAVA_HOME is valid; `gradlew` exits at its JAVA_HOME check when JAVA_HOME is invalid even with `java` on PATH (reproduced). Gates `kotlinSkip`, `javaSkip` and the Android gate check only `hasTool('java')`. Smoke tests currently skip with "just is not installed". Next after the decision: regression test for the JAVA_HOME gate, then run the smoke tests.
+
+- T-012 [P2] in progress — Fix Markdown deletion in sync. Resume: regression test added in test/data-sync.test.js (front-matter deletion); fix applied in core/lib/data-sync.js applyPortableRecords; next: npm test, archive.
+  model: low tier (Luna/Haiku) · effort: medium
+
+- T-049 [P2] in progress — Module `compact`: definition, interview and scope. Resume: write modules/compact/tests/compact.test.js (add/remove, committed vs personal, precedence), then modules/compact/module.yaml, lib/settings.js, templates/AGENTS.md.tmpl, `compact` group in common.schema.json questionId, hook into `yaw add/remove` in core/cli/commands.js.
+  spec: kickoff/16-compact-output.md §4 and §7
+  model: middle tier (Sonnet) · effort: high
+
 - T-018 [P2] in progress — Remove quadratic scan merging. Resume: regression test in test/session-insights.test.js (spy on rows.find during cached refresh), then replace `old.rows.find` with `byId.get` in core/lib/session-analysis.js collectAnalysis, benchmark 20,000 sessions.
   model: low tier (Luna/Haiku) · effort: medium
 
@@ -23,13 +35,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-011 [P2] Preserve permissions during atomic replacement — `core/render/files.js:writeAtomic` changes an existing 0600 file to 0644 under umask 022 and drops executable bits. Preserve existing modes unless an explicit override is supplied; check callers too. — in progress; fix + test in core/render/files.js, test/render.test.js; next: npm test, archive.
   model: middle tier (Sonnet) · effort: medium
 
-- T-025 [P2] Remove generated artifacts from scaffolds — tracked `.gradle/` caches in `profiles/android-kotlin/scaffold` and `profiles/java-basic/scaffold`, plus Android `build/reports/`, pollute generated projects. Remove them and enforce scaffold exclusions while retaining the Gradle wrapper.
-  model: low tier (Luna/Haiku) · effort: low
-  status: in progress · resume: write scaffold-artifact regression test, then remove tracked .gradle/build reports and add exclusions
-
-- T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
-  model: top tier (Astra/Opus) · effort: high
-  status: in progress · resume: investigate core/cli/init.js child processes and HostedProjects.close()
 
 - T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
   spec: kickoff/16-compact-output.md §4 L2 and §8
@@ -38,9 +43,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
 ## Backlog
-
-- T-012 [P2] Fix Markdown deletion in sync — `core/lib/data-sync.js:applyPortableRecords` parses deleted knowledge files as YAML; normal front matter throws and prevents deletion. Parse answers only for settings/preset records.
-  model: low tier (Luna/Haiku) · effort: medium
 
 - T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
   model: middle tier (Sonnet) · effort: medium
@@ -56,9 +58,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
 ## Backlog
-
-- T-012 [P2] Fix Markdown deletion in sync — `core/lib/data-sync.js:applyPortableRecords` parses deleted knowledge files as YAML; normal front matter throws and prevents deletion. Parse answers only for settings/preset records.
-  model: low tier (Luna/Haiku) · effort: medium
 
 - T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
   model: middle tier (Sonnet) · effort: medium
@@ -74,9 +73,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-022 [P2] Invalidate obsolete review approvals — `modules/review/lib/cli.js` caches only commit SHA and reviewer kind. Include effective prompts/rules, reviewed range and relevant configuration so changed review requirements cannot reuse an old PASS.
   model: middle tier (Sonnet) · effort: high
-
-- T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
-  model: low tier (Luna/Haiku) · effort: medium
 
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
@@ -134,11 +130,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-048 [P2] Measure tool-output share before building (L5, part 1) — transcript scan of tool-result sizes by tool and by the command's first word, shown in Analytics. Store sizes and first words only, no content (ADR-0052). Reuse the streaming reader in `core/lib/session-analysis.js` and respect T-016's line limits. First step, with T-047.
   spec: kickoff/16-compact-output.md §4 L5
-  model: middle tier (Sonnet) · effort: high
-
-- T-049 [P2] Module `compact`: definition, interview and scope — `modules/compact/module.yaml` with the `compact.levers` multi-choice question. Off in Basic; Quick reuses saved personal defaults; the All default is open (assume off). Per-project scope: committed (`.yaw/answers.yaml`, `.claude/settings.json`) or personal (`~/.yaw`, `.claude/settings.local.json`); precedence `YAW_COMPACT`, then personal, then project. The recall store (T-055) is a separate choice, off by default. Includes the L4 AGENTS.md fragment (`tokenCost: low`), rendered only when L1 or L2 is on.
-  spec: kickoff/16-compact-output.md §4 and §7
-  acceptance: `yaw add compact` and `yaw remove compact` proven by tests; both scopes render the right files
   model: middle tier (Sonnet) · effort: high
 
 - T-050 [P2] L1 wrapper `yaw run --compact` with the node-cli recipes — exit 0: one line `ok <step> (<n> lines, <s>s)`. Exit 0 with warnings: count line, first 10 warnings and `… +<k> more warnings`, as rtk does for `cargo build`. Exit not 0: ANSI, progress and dedup stripping plus a head/tail cap with a recovery hint; the exit code is kept. `YAW_VERBOSE=1` prints raw output; `rawBytes`/`outBytes` are recorded per step. This repo's recipes come first. Depends on T-049.

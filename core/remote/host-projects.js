@@ -12,7 +12,8 @@ export const projectSlug = (slug) => typeof slug === 'string' && /^[a-z0-9]+(?:-
 export class HostedProjects {
   constructor({ root, kitRoot, env, store, agents, verify = verifyProject }) {
     Object.assign(this, { root: safeDirectory(root), kitRoot, env, store, agents }); this.interviews = new Map(); this.applying = false;
-    this.verify = (options) => verify({ ...options, io: { ...options.io, env: { ...executionEnvironment(env), YAW_KIT: kitRoot } } });
+    // Verification of an accepted init is cancelled when the host stops (see close).
+    this.verify = (options) => verify({ ...options, signal: this.applying ? this.applying.cancel.signal : undefined, io: { ...options.io, env: { ...executionEnvironment(env), YAW_KIT: kitRoot } } });
   }
   create({ slug, command = 'init-local', skipVerify = false, handoff = null }, owner) {
     requireValue(!this.closed, 'Host is stopping', 503);
@@ -83,8 +84,10 @@ export class HostedProjects {
       safeDirectory(join(this.root, prepared.doc.answers['arch.language']), true);
       // mkdir without recursive is the cross-request collision guard. Never adopt an existing folder.
       try { mkdirSync(root, { mode: 0o700 }); } catch (e) { if (e.code === 'EEXIST') throw new FormError('Project folder already exists; choose another slug', 409); throw e; }
-      this.applying = true; i.status = 'applying';
       const project = { id: randomUUID(), path: root, slug: i.slug, language: prepared.doc.answers['arch.language'], state: 'initializing', interview: id, command: i.command };
+      const job = { project, interview: i, cancel: new AbortController(), abandoned: false };
+      this.applying = job; i.status = 'applying';
+      const halt = new FormError('Host stopped during initialization; partial files remain on the host. Inspect the project before retrying.', 503);
       let outcome = null;
       let writer;
       try {
@@ -93,6 +96,9 @@ export class HostedProjects {
         writer = createFormApi({ root, kitRoot: this.kitRoot, env: this.env, verify: this.verify, skipVerify: i.skipVerify, model: i.model });
         const confirmed = writer.prepareApply(input);
         await writer.apply(confirmed, (event) => { if (event.type === 'done') outcome = event; });
+        // close() already recorded the project as interrupted and the store may be closed.
+        if (job.abandoned) throw halt;
+        if (job.cancel.signal.aborted) { project.state = outcome?.ok ? 'initialized' : 'interrupted'; i.status = 'failed'; this.store.save(); throw halt; }
         project.state = outcome?.ok ? 'initialized' : 'verification-failed'; this.store.save();
         if (outcome?.ok) {
           try { project.session = this.agents.start(project).id; project.state = 'launched'; }
@@ -101,16 +107,27 @@ export class HostedProjects {
         i.status = 'submitted'; this.store.save();
         return { project: { ...project }, session: this.agents.list().find((s) => s.id === project.session) ?? null,
           ok: Boolean(outcome?.ok) && project.state === 'launched', message: project.state === 'launched' ? 'Project initialized. Claude Remote Control is starting.' : `Project ${project.state}. Inspect it on the host before retrying.` };
-      } catch {
-        project.state = 'initialization-failed'; i.status = 'failed'; this.store.save();
+      } catch (e) {
+        if (job.abandoned || e === halt) throw halt;
+        const interrupted = job.cancel.signal.aborted;
+        project.state = interrupted ? 'interrupted' : 'initialization-failed'; i.status = 'failed'; this.store.save();
+        if (interrupted) throw halt;
         throw new FormError('Initialization failed; partial files remain on the host. Inspect the project before retrying.', 500);
-      } finally { writer?.close(); this.applying = false; }
+      } finally { writer?.close(); if (this.applying === job) this.applying = false; }
     } finally { api.close(); }
   }
-  async close() {
+  async close({ grace = 10000 } = {}) {
     this.closed = true;
-    // An accepted init is allowed to settle before releasing the service lock.
-    while (this.applying) await new Promise((resolve) => setTimeout(resolve, 50));
+    // An accepted init is allowed to settle before releasing the service lock: its verification is cancelled
+    // (stopping the recipe's process tree) and, if it still has not settled after `grace` ms, the project is
+    // recorded as interrupted so the lock can be released; its partial files stay on the host.
+    const until = Date.now() + grace;
+    if (this.applying) this.applying.cancel.abort();
+    while (this.applying && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+    if (this.applying) {
+      const job = this.applying; job.abandoned = true; this.applying = false;
+      job.project.state = 'interrupted'; job.interview.status = 'failed'; this.store.save();
+    }
     for (const i of this.interviews.values()) rmSync(i.scratch, { recursive: true, force: true });
     this.interviews.clear();
   }

@@ -4,7 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { main } from '../core/cli/main.js';
+import { verifyProject } from '../core/cli/init.js';
 import { readManifest } from '../core/render/manifest.js';
 import { parseDocument } from '../core/lib/yaml.js';
 import { saveSetup } from '../core/lib/user-store.js';
@@ -302,6 +304,57 @@ test('verify without just: files stay, exit 1, install hint', async () => {
   assert.equal(r.code, 1);
   assert.match(r.err, /just is not installed, so the project could not be verified/);
   assert.ok(existsSync(join(r.cwd, '.yaw/manifest.json')));
+});
+
+// A `just` stand-in whose recipe never ends: the shell and a background grandchild hold the output pipe.
+function hangingJust(dir) {
+  const pids = join(dir, 'pids');
+  writeFileSync(join(dir, 'just'), `#!/bin/sh\necho $$ >> '${pids}'\nsleep 60 &\necho $! >> '${pids}'\nwait\n`, { mode: 0o755 });
+  return pids;
+}
+const started = async (pids) => { while (!existsSync(pids) || readFileSync(pids, 'utf8').trim().split('\n').length < 2) await new Promise((r) => setTimeout(r, 20)); return readFileSync(pids, 'utf8').trim().split('\n').map(Number); };
+// A zombie (state Z) has already ended; elsewhere signal 0 tells whether the process exists.
+const alive = (pid) => {
+  try { return !/^\S+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8')); } catch (e) { if (e.code !== 'ENOENT' || process.platform === 'linux') return false; }
+  try { process.kill(pid, 0); return true; } catch { return false; }
+};
+const gone = async (pids) => { const until = Date.now() + 3000; while (pids.some(alive) && Date.now() < until) await new Promise((r) => setTimeout(r, 20)); return pids.filter(alive); };
+const within = (promise, ms) => { let timer; return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`still running after ${ms} ms`)), ms); })]).finally(() => clearTimeout(timer)); };
+
+test('verify stops a recipe at its deadline and terminates its whole process tree', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids'), out = capture();
+  hangingJust(bin);
+  const ok = await within(verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: out, stderr: out }, timeoutMs: 300 }), 10000);
+  assert.equal(ok, false);
+  assert.match(out.text(), /just setup did not finish within 300 ms and was stopped/);
+  assert.deepEqual(await gone(await started(pids)), []);
+});
+
+test('verify cancellation stops the running recipe and its descendants; a cancelled verify starts nothing', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids'), out = capture();
+  hangingJust(bin);
+  const controller = new AbortController();
+  const verifying = verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: out, stderr: out }, signal: controller.signal });
+  const tree = await started(pids);
+  controller.abort();
+  assert.equal(await within(verifying, 10000), false);
+  assert.match(out.text(), /just setup was cancelled/);
+  assert.deepEqual(await gone(tree), []);
+  const later = capture();
+  assert.equal(await verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: later, stderr: later }, signal: controller.signal }), false);
+  assert.equal(readFileSync(pids, 'utf8').trim().split('\n').length, 2, 'no recipe ran after cancellation');
+});
+
+test('an interrupt during verify stops the recipe tree and still ends yaw by that signal', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids');
+  hangingJust(bin);
+  const script = `import { verifyProject } from ${JSON.stringify(new URL('../core/cli/init.js', import.meta.url).href)};\nawait verifyProject({ root: process.cwd(), io: { env: process.env, stdout: process.stdout, stderr: process.stderr } });\n`;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: tmp('yaw-proj-'), env: { PATH: `${bin}:${NODE_ONLY}` }, stdio: 'ignore' });
+  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+  const tree = await started(pids);
+  child.kill('SIGINT');
+  assert.deepEqual(await within(exited, 10000), { code: null, signal: 'SIGINT' });
+  assert.deepEqual(await gone(tree), []);
 });
 
 test('init ends with next steps: agent start, Codex hook trust, data locations, tools (#167, #176)', async () => {
