@@ -210,6 +210,20 @@ test('global knowledge syncs both ways, with deletions; secrets, links and other
   assert.throws(() => readFileSync(join(dir(a), 'team/style.md')), /ENOENT/);
 });
 
+test('global knowledge syncs the YAW_HOME store, not HOME/.yaw', () => {
+  const root = realpathSync(makeTmp('yaw-sync-home-')), target = join(root, 'NAS'); mkdirSync(target);
+  const a = { HOME: join(root, 'laptop'), YAW_HOME: join(root, 'a-data') }, b = { HOME: join(root, 'pc'), YAW_HOME: join(root, 'b-data') };
+  configureSync({ env: a, target, name: 'Laptop', scopes: ['knowledge'] });
+  configureSync({ env: b, target, name: 'PC', scopes: ['knowledge'] });
+  mkdirSync(join(a.YAW_HOME, 'knowledge'), { recursive: true });
+  writeFileSync(join(a.YAW_HOME, 'knowledge/style.md'), '# Style\nShort sentences.\n');
+  runSync({ env: a, kitRoot }); runSync({ env: b, kitRoot });
+  assert.equal(readFileSync(join(b.YAW_HOME, 'knowledge/style.md'), 'utf8'), '# Style\nShort sentences.\n');
+  assert.equal(existsSync(join(b.HOME, '.yaw/knowledge')), false);
+  assert.equal(existsSync(join(a.HOME, '.yaw/knowledge')), false);
+  assert.match(readFileSync(join(target, 'yaw-sync.json'), 'utf8'), /knowledge\/style\.md/);
+});
+
 test('a synced knowledge file that grows too large or turns secret-looking stays put instead of becoming a deletion', () => {
   const { target, a, b, run } = pair(['knowledge']);
   const dir = (env) => join(env.HOME, '.yaw/knowledge'); mkdirSync(dir(a), { recursive: true });

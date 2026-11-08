@@ -20,7 +20,7 @@ const EXTRA = ['started', 'minutes', 'medianAnswerChars', 'p95AnswerChars', 'med
 const LABELS = ['agent', 'model'];
 const LABEL_RE = /^[\p{L}\p{N} _.:\/@+()-]{1,80}$/u;
 const SCOPES = ['settings', 'presets', 'statistics', 'tasks', 'knowledge'];
-// A global knowledge record is a Markdown file below ~/.yaw/knowledge, at most five levels deep.
+// A global knowledge record is a Markdown file below the YAW data directory (~/.yaw, or YAW_HOME) in knowledge/, at most five levels deep.
 const PART = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 const KNOWLEDGE_KEY = (key) => typeof key === 'string' && key.startsWith('knowledge/') && key.length <= 310 && /\.md$/i.test(key) && key.split('/').length <= 6 && key.split('/').every((p) => PART.test(p));
 const MAX_RECORD = 128 * 1024, MAX_TASK_PROJECTS = 500, MAX_TASK_ITEMS = 500;
@@ -111,7 +111,7 @@ function portable(key, value, kitRoot) {
 // ~/.yaw/knowledge/**/*.md as portable records. Links, secret-looking names and text, and oversized files stay local.
 // Markdown files that exist but cannot be synced are added to `excluded`, so the merge leaves them alone rather than reading them as deletions.
 function localKnowledge(env, kitRoot, excluded) {
-  const out = {}, rules = loadRules({ kitRoot }), root = safe(join(userDir(env), 'knowledge'));
+  const out = {}, rules = loadRules({ kitRoot }), root = safe(join(userDataDir(env), 'knowledge'));
   const walk = (rel, depth) => {
     let names = [];
     try { names = readdirSync(join(root, rel)).sort(); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
@@ -390,7 +390,7 @@ export function applyPortableRecords({ env, records }) {
         else { const file = join(userDataDir(env), 'setup-defaults.json'); safe(file); try { unlinkSync(file); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
         continue;
       }
-      const path = join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : key.startsWith('knowledge/') ? join(...key.split('/')) : `${key}.yaml`);
+      const path = key.startsWith('knowledge/') ? join(userDataDir(env), ...key.split('/')) : join(userDir(env), key === 'settings/profile' ? 'user-profile.yaml' : `${key}.yaml`);
       if (value === null) {
         const previous = key.startsWith('knowledge/') ? null : read(path);
         const paths = Object.fromEntries(Object.entries(previous ? parse(previous)?.answers ?? {} : {}).filter(([k]) => /(path|folder|directory|endpoint|host|url|root)$/i.test(k)));

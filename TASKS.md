@@ -44,9 +44,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Backlog
 
-- T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
-  model: middle tier (Sonnet) · effort: medium
-
 - T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
   model: top tier (Astra/Opus) · effort: high
   status: in progress · resume: investigate core/cli/init.js child processes and HostedProjects.close()
@@ -58,9 +55,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
 ## Backlog
-
-- T-013 [P2] Use the same knowledge directory everywhere — `core/web/knowledge.js` honors YAW_HOME, while `core/lib/data-sync.js` reads/writes HOME/.yaw. Sync the configured knowledge store and test with distinct HOME and YAW_HOME.
-  model: middle tier (Sonnet) · effort: medium
 
 - T-014 [P2] Reject malformed LAN responses safely — `core/remote/lan.js:lanFetch` throws uncaught on HTTP 204 when constructing a Response with a body. Handle bodyless statuses and response-construction errors through promise rejection, including aborted responses.
   model: middle tier (Sonnet) · effort: medium

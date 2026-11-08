@@ -1,5 +1,9 @@
 # Archive
 
+- T-013 Use the same knowledge directory everywhere — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: `localKnowledge` and the knowledge write path in core/lib/data-sync.js use `userDataDir(env)` (YAW_HOME, else HOME/.yaw), matching core/web/knowledge.js; test with distinct HOME and YAW_HOME in test/data-sync.test.js.
+
 - T-015 Bound hosted setup and shutdown — done 2026-11-08
   model: top tier (Astra/Opus) · effort: high
   done: `verifyProject` in core/cli/init.js takes an AbortSignal and a deadline (`VERIFY_TIMEOUT_MS`, 30 minutes for setup plus check); each `just` recipe runs in its own process group and a deadline or cancellation sends SIGTERM to the group, then SIGKILL after 5 s, so grandchildren holding the output pipe cannot keep it waiting. A terminal SIGINT/SIGTERM/SIGHUP is passed on to the group and, when nothing else handles it, yaw still ends by that signal. `HostedProjects` passes a per-apply signal to verification; `close({ grace = 10000 })` cancels it, waits at most `grace` ms and otherwise records the project as `interrupted` (interview `failed`) so the service lock is released; a cancelled init is recorded as `interrupted` (or `initialized` when it had already passed), is never launched, keeps its partial files and a late result never overwrites the recorded status. Regression tests: three verify tests in test/init.test.js (deadline, cancellation, interrupt; all hung before the fix) and two `host shutdown` tests in test/server-mode.test.js. Suite: 1091 passed / 7 failed / 85 skipped; failures are in dogfood, form-ui, hooks, interview-full and silent-hooks tests, none in this change.
