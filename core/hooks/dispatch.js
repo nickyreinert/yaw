@@ -13,7 +13,7 @@ import { parseArgs } from 'node:util';
 import { hasModule, KIT_ROOT, loadModule, moduleDir, schemas } from '../render/kit.js';
 import { readManifest } from '../render/manifest.js';
 import { matcherAccepts, support } from '../render/agents.js';
-import { EVENTS, normalise, record, renderOutput } from './adapters.js';
+import { EVENTS, normalise, record, renderOutput, toolOutput } from './adapters.js';
 import { allowed, combine } from './policy.js';
 
 export const AGENTS = ['claude', 'codex', 'copilot'];
@@ -94,7 +94,7 @@ async function muted(fn) {
   }
 }
 
-// -> { stdout, result, ran } for one call; exported for tests.
+// -> { stdout, result, ran, compressed } for one call; exported for tests.
 export async function dispatch({ agent, event, module, payload, root, kitRoot = KIT_ROOT, env = process.env, now = new Date() }) {
   const ev = normalise({ agent, event, payload, now });
   const manifest = readManifest(root);
@@ -114,25 +114,29 @@ export async function dispatch({ agent, event, module, payload, root, kitRoot = 
   // The notification type (permission_prompt, idle_prompt, ...) is a short enum string; comfort notifications
   // read it (ADR-0030). Nothing else of the payload is handed on.
   const notificationType = typeof payload?.notification_type === 'string' && /^[a-z_]{1,40}$/.test(payload.notification_type) ? payload.notification_type : null;
+  // The tool's output goes to compress handlers only, in memory (ADR-0007); other kinds never see it.
+  const original = toolOutput(ev, payload);
   for (const item of items) {
     const file = join(moduleDir(kitRoot, module), 'hooks', `${item.name}.js`);
     let result;
     try {
       const handler = (await import(pathToFileURL(file).href)).default;
-      result = await muted(() => handler(ev, { root, kitRoot, manifest, module: def, item, env, prompt, transcript, notificationType }));
+      const ctx = { root, kitRoot, manifest, module: def, item, env, prompt, transcript, notificationType };
+      if (item.kind === 'compress') ctx.toolResponse = structuredClone(original);
+      result = await muted(() => handler(ev, ctx));
     } catch (e) {
       logError(env, `${module}/${item.name}`, e);
       continue;
     }
     ran.push(item);
-    outputs.push(allowed({ kind: item.kind, event: ev.event, agent: ev.agent, result }));
+    outputs.push(allowed({ kind: item.kind, event: ev.event, agent: ev.agent, result, original }));
   }
   const out = combine(outputs);
   let result = null;
   if (ev.event === 'PreToolUse' && ran.some((i) => i.kind === 'guard')) result = out.deny ? 'deny' : 'allow';
   if (ev.event === 'PostToolUse') result = 'ok';
   if (ev.event === 'PostToolUseFailure') result = 'error';
-  return { ev, stdout: renderOutput(ev.agent, ev.event, out), result, ran };
+  return { ev, stdout: renderOutput(ev.agent, ev.event, out), result, ran, compressed: out.compressed ?? null };
 }
 
 // CLI entry; always resolves to 0. io: { stdin, stdout, cwd, env, kitRoot }.
@@ -150,10 +154,10 @@ export async function runHook(args, io) {
     } catch {
       throw new HookError(`invalid JSON payload (${Buffer.byteLength(text)} bytes)`);
     }
-    const { ev, stdout, result } = await dispatch({ agent: values.agent, event, module: values.module, payload, root: io.cwd ?? process.cwd(), kitRoot: io.kitRoot ?? KIT_ROOT, env });
+    const { ev, stdout, result, compressed } = await dispatch({ agent: values.agent, event, module: values.module, payload, root: io.cwd ?? process.cwd(), kitRoot: io.kitRoot ?? KIT_ROOT, env });
     const hookMs = Math.round((performance.now() - started) * 10) / 10;
     if (EVENTS.includes(ev.event) && ev.sessionId) {
-      const rec = record(ev, { result, hookMs });
+      const rec = record(ev, { result, hookMs, compressed });
       if (schemas().validate('hook-event.schema.json', rec).length === 0) appendLog(env, 'hooks.jsonl', JSON.stringify(rec));
     }
     if (stdout) (io.stdout ?? process.stdout).write(stdout);

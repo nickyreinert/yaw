@@ -103,8 +103,8 @@
         "event": { "$ref": "hook-event.schema.json#/$defs/event" },
         "matcher": { "type": "string", "minLength": 1 },
         "kind": {
-          "description": "Token-free class (B rule 5): guard blocks, context is model-visible (needs tokenCost), comfort talks to the user only, evaluation is silent.",
-          "enum": ["guard", "context", "comfort", "evaluation"]
+          "description": "Token-free class (B rule 5): guard blocks, context is model-visible (needs tokenCost), comfort talks to the user only, evaluation is silent, compress replaces PostToolUse output with a smaller one (ADR-0007).",
+          "enum": ["guard", "context", "comfort", "evaluation", "compress"]
         },
         "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
         "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" }

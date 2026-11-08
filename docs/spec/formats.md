@@ -103,6 +103,8 @@ Mapping per agent (ADR-0021). Checked on 2026-10-20 against the vendor docs and 
 | `timing.ts` | time YAW received the event | same | payload `timestamp` |
 | `timing.hookMs` | run time of `yaw hook` | same | same |
 
+Optional on `PostToolUse` when a compress hook replaced the output (ADR-0007): `rawBytes` and `outBytes` (sizes of the tool's output and of the replacement as JSON) and `method` (a short identifier such as `cap`). The output itself is never stored.
+
 Records go to `~/.yaw/logs/hooks.jsonl` (one JSON line each, validated against the schema).
 
 ## Session registry (`~/.yaw/yaw.db`)

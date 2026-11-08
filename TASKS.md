@@ -38,12 +38,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
-- T-052 [P2] Hook kind `compress` — amend ADR-0007 and BUILD.md rule 5. PostToolUse only, returning only `updatedToolOutput`; the dispatcher drops any result that is not smaller than the original, and the result may end with one recall line. Add `compress` to the kind enum in `core/schema/module.schema.json`. In `core/hooks/adapters.js`, hold `tool_response` in memory for compress handlers only and add a PostToolUse branch to `renderOutput`. Optional `rawBytes`/`outBytes`/`method` in `hook-event.schema.json`. Depends on T-047.
-  spec: kickoff/16-compact-output.md §5
-  acceptance: existing silent-hook tests still pass; "never worse" is enforced; tool output never reaches a log
-  model: top tier (Astra/Opus) · effort: high
-  status: in progress · resume: read core/hooks/adapters.js, dispatch.js and schemas; write failing tests for compress kind first
-
 ## Backlog
 
 - T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
