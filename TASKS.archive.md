@@ -1,5 +1,10 @@
 # Archive
 
+- T-033 Rewrite Coding Assistance help texts — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: medium
+  done: `interview/help/comfort.md` (the help file of the Coding Assistance group, shown by the web interview and `?` in the CLI) now states for each feature what it does, the benefit and the technical change, checked against modules/comfort/lib/hygiene.js (thresholds from lib/config.js DEFAULTS), statusline.js, notify.js (duration gate, closed payload, detached ntfy/Telegram send) and cache.js (no keep-alive; timer for remote channels only; Claude only). Task Context is the active-task segment of the status line. Regression test: test/form-ui.test.js "comfort help" (fails on the old text).
+  open question: the `cache-reminder` choice label in modules/comfort/module.yaml ("a heads-up before Claude's prompt cache goes cold") omits that the heads-up needs ntfy or Telegram; the help text says so; the label was not changed here. The status line's cache segment reads prompt_cache fields that no live payload has confirmed (issue #94), so it may never show.
+
 - T-032 Rework Review Sub-Agents — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: Push gate (Warn/Block) is now a full-width card (`wide`) built before the agent cards in core/web/assets/setup-cards.js `reviewerCards`; app.css no longer resets its grid column. Quality, Business logic, UI/UX, Security unchanged. Feature fit kept unchanged: no other review or completion check compares the diff with the task's acceptance points (tasks ledger only stores acceptance; quality/logic prompts do not read TASKS.md; only modules/review/lib/cli.js:96 and prompts/feature.md do). Test: test/form-ui.test.js "review cards".

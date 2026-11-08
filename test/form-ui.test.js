@@ -104,6 +104,29 @@ async function serverFixture(t, extra = {}) {
   return { ...f, server, origin, cookie, token, headers, post, api, errors };
 }
 
+test('comfort help: each feature says what it does, the benefit and the technical change (T-033)', () => {
+  const help = readFileSync(join(KIT_ROOT, 'interview', 'help', 'comfort.md'), 'utf8');
+  const bullet = (name) => help.split('\n').find((l) => l.startsWith(`- ${name}`)) ?? '';
+  const hygiene = bullet('Session hygiene'), status = bullet('Status line'), notify = bullet('Notifications after long runs'), cache = bullet('Cache reminder');
+  assert.match(hygiene, /new topic or task.*switched branch/);
+  assert.match(hygiene, /Benefit: .*costs less.*keeps answers sharp/);
+  assert.match(hygiene, /Technically: .*~\/\.yaw.*no prompt text.*at most every 20 prompts/);
+  assert.match(status, /active task from TASKS\.md/);
+  assert.match(status, /Benefit: you see the task/);
+  assert.match(status, /Technically: Claude Code runs `yaw statusline`/);
+  assert.match(notify, /at least 3 minutes/);
+  assert.match(notify, /Benefit: you can leave the chat/);
+  assert.match(notify, /never code, diffs, tool output/);
+  assert.match(notify, /separate background process/);
+  assert.match(cache, /expires after 5 minutes idle/);
+  assert.match(cache, /Benefit: before a long break/);
+  assert.match(cache, /Technically: no keep-alive ping/);
+  assert.match(cache, /about one minute before expiry/);
+  for (const old of ['Hygiene hints: when to hand off', 'Status line: context and recent checks', 'Notifications: when a long run finishes', 'Cache reminder: before Claude\'s prompt cache goes cold (ntfy or Telegram), or what it cost']) {
+    assert.ok(!help.includes(old), `old wording removed: ${old}`);
+  }
+});
+
 test('web model: schema catalogue, local help, ownership and phase-3 choices', () => {
   const f = fixture(), m = createFormModel(f), c = m.bootstrap();
   assert.equal(c.questions[0].id, 'user.agents');
