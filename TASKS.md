@@ -92,11 +92,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   acceptance: each profile's smoke test verifies its compact output
   model: middle tier (Sonnet) · effort: high
 
-- T-056 [P2] Savings view and A/B validation (L5, part 2) — Analytics shows `rawBytes`/`outBytes` per tool and method, with tokens estimated as bytes/4 and labelled as estimates. Compare the same kind of task with the module on and off, using per-session `tokensIn` and the number of `YAW_VERBOSE=1` re-runs (filter misses). Depends on T-050 or T-054.
-  spec: kickoff/16-compact-output.md §4 L5
-  acceptance: the result is reported to the user
-  model: middle tier (Sonnet) · effort: medium
-
 - T-057 [P2] Decide on L3 command rewrite — after T-056, report to the user whether rewriting commands (`cargo test` → `yaw run -- cargo test`) is worth it. Claude Code checks permission rules against the rewritten command, so deny rules can be bypassed. If built: only a short allowlist of read-only commands, never auto-allow, and deny and ask rules read from every settings file. Also settle the All default left open in T-049. Do not implement before the user decides.
   spec: kickoff/16-compact-output.md §4 L3 and §7
   model: top tier (Astra/Opus) · effort: high

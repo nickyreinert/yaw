@@ -12,6 +12,7 @@ import { projectLanguage } from './project-language.js';
 import { readProjectFile } from '../render/files.js';
 import { mergeHistory } from './local-history.js';
 import { readAnalysis } from '../lib/session-analysis.js';
+import { readSavings } from '../lib/savings.js';
 import { sessionKey, syncedSessions, syncedTasks } from '../lib/data-sync.js';
 import { createWorkspaceApi } from './workspace-api.js';
 import { knowledgeData } from './knowledge.js';
@@ -36,6 +37,7 @@ const DASHBOARD_ASSETS = new Map([
   asset('overview-metrics.js', 'text/javascript; charset=utf-8'),
   asset('analytics-filters.js', 'text/javascript; charset=utf-8'),
   asset('tool-output.js', 'text/javascript; charset=utf-8'),
+  asset('savings.js', 'text/javascript; charset=utf-8'),
   asset('global-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-view.js', 'text/javascript; charset=utf-8'),
   asset('insights-model.js', 'text/javascript; charset=utf-8'),
@@ -169,10 +171,13 @@ export async function sessionsData({ root, kitRoot, env, projects }) {
   const known = projects ? projects.list().projects.map((p) => p.root) : [];
   const synced = syncedRows(env, new Set((h?.rows ?? []).map((r) => sessionKey(r.id))));
   if (!h && !synced.length) return { available: false, current, tasks, projects: known, history: { collected: saved.collected ?? null } };
+  const savings = section(() => readSavings(env));
+  const compressed = new Set(savings.sessions ?? []);
   return {
     available: true, current, tasks, projects: known,
     history: { local: Boolean(h?.saved.collected), collected: h?.saved.collected ?? null, registered: h?.stored?.rows.length ?? 0, synced: synced.length },
-    ...sessionRows(withProjectLanguages([...(h?.rows ?? []), ...synced])),
+    savings: savings.entries ?? [],
+    ...sessionRows(withProjectLanguages([...(h?.rows ?? []), ...synced]).map((r) => compressed.has(r.id) ? { ...r, compressed: true } : r)),
   };
 }
 

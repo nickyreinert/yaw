@@ -26,10 +26,17 @@ function firstWord(command) {
   for (const token of command.trim().split(/\s+/, 16)) if (!/^[A-Za-z_]\w*=/.test(token)) return word(token.split('/').pop());
   return null;
 }
+// A leading YAW_VERBOSE=1 marks a re-run after a compact filter cut output (T-056); only the count is kept.
+function isVerbose(command) {
+  if (typeof command !== 'string') return false;
+  for (const token of command.trim().split(/\s+/, 16)) { if (!/^[A-Za-z_]\w*=/.test(token)) return false; if (token === 'YAW_VERBOSE=1') return true; }
+  return false;
+}
 const outputBytes = (content) => typeof content === 'string' ? Buffer.byteLength(content) : Array.isArray(content)
   ? content.reduce((n, p) => n + (p?.type === 'text' && typeof p.text === 'string' ? Buffer.byteLength(p.text) : 0), 0) : 0;
 function toolScan() {
   const pending = new Map(), tools = new Map(), commands = new Map();
+  let verbose = 0;
   const add = (table, key, size) => {
     if (!table.has(key) && table.size >= MAX_KEYS) key = 'other';
     const t = table.get(key) ?? { calls: 0, bytes: 0, max: 0 };
@@ -43,16 +50,17 @@ function toolScan() {
       if (!Array.isArray(blocks)) return;
       for (const b of blocks) {
         if (b?.type === 'tool_use' && typeof b.id === 'string' && pending.size < MAX_PENDING) {
-          pending.set(b.id, { tool: word(b.name), command: b.name === 'Bash' ? firstWord(b.input?.command) : null });
+          pending.set(b.id, { tool: word(b.name), command: b.name === 'Bash' ? firstWord(b.input?.command) : null, verbose: b.name === 'Bash' && isVerbose(b.input?.command) });
         } else if (b?.type === 'tool_result') {
           const call = pending.get(b.tool_use_id) ?? { tool: 'other', command: null }, size = outputBytes(b.content);
           pending.delete(b.tool_use_id);
           add(tools, call.tool, size);
           if (call.command) add(commands, call.command, size);
+          if (call.verbose) verbose++;
         }
       }
     },
-    result: () => ({ tools: Object.fromEntries(tools), commands: Object.fromEntries(commands) }),
+    result: () => ({ tools: Object.fromEntries(tools), commands: Object.fromEntries(commands), ...(verbose > 0 ? { verbose } : {}) }),
   };
 }
 
