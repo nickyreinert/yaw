@@ -46,6 +46,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Changed
 
+- Command modules load on demand instead of all at startup. A `yaw hook` call takes 67 ms instead of 127 ms and `yaw --version` 54 ms instead of 114 ms (Node 22.23, Linux container, 20-run averages). Every hook on every tool call benefits.
 - Prepared the macOS/Node 22.13 and 24 hosted test matrix for the deferred November run. No hosted CI has been executed for these changes.
 - Pinned the remaining kit workflow actions to the full SHAs already used in its profile matrix.
 
