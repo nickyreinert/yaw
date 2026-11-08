@@ -28,8 +28,14 @@ export async function lanFetch(value, { method = 'GET', headers = {}, body, sign
       lookup: (_host, options, callback) => callback(null, options.all ? [target] : target.address, target.family) }, (res) => {
       const chunks = []; let size = 0;
       res.on('data', (chunk) => { size += chunk.length; if (size > 16 * 1024 * 1024) res.destroy(new RemoteError('Server response exceeds 16 MiB')); else chunks.push(chunk); });
-      res.on('error', reject);
-      res.on('end', () => resolve(new Response(Buffer.concat(chunks), { status: res.statusCode, headers: res.headers })));
+      res.on('error', (error) => reject(error instanceof RemoteError ? error : new RemoteError('LAN server response was interrupted', 502)));
+      res.on('close', () => { if (!res.complete) reject(new RemoteError('LAN server response was interrupted', 502)); });
+      res.on('end', () => {
+        try {
+          const bodyless = [101, 204, 205, 304].includes(res.statusCode) || res.statusCode < 200;
+          resolve(new Response(bodyless ? null : Buffer.concat(chunks), { status: res.statusCode, headers: res.headers }));
+        } catch { reject(new RemoteError('LAN server sent an invalid response', 502)); }
+      });
     });
     req.setTimeout(signal ? 0 : 30000, () => req.destroy(new Error('Server request timed out')));
     req.on('error', () => reject(new RemoteError('LAN server is unavailable; pending work was not replayed', 503)));

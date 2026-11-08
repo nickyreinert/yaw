@@ -1,5 +1,9 @@
 # Archive
 
+- T-014 Reject malformed LAN responses safely — done 2026-11-08
+  model: sonnet · effort: medium
+  done: `core/remote/lan.js:lanFetch` builds bodyless statuses (1xx/204/205/304) without a body and rejects through the promise on response-construction errors, interrupted or aborted responses. Regression: `test/lan-fetch.test.js`.
+
 - T-007 Preserve analytics when history is unavailable — done 2026-11-08
   model: sonnet · effort: high
   done: `collectAnalysis` in core/lib/session-analysis.js no longer drops saved rows the scan did not find (deleted/moved file, missing or disabled source, discovery limit). They keep their metrics and classifications; in-scope local rows not rediscovered are counted as `missing` and `scanSummary` reports them. Tests in test/session-analysis.test.js. Suite: 1073 passed / 10 failed / 85 skipped (none in session-analysis; test/analytics-filters.test.js failed under load but passes alone).
