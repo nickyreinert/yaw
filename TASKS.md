@@ -11,11 +11,10 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-- T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
+- T-018 [P2] in progress — Remove quadratic scan merging. Resume: regression test in test/session-insights.test.js (spy on rows.find during cached refresh), then replace `old.rows.find` with `byId.get` in core/lib/session-analysis.js collectAnalysis, benchmark 20,000 sessions.
+  model: low tier (Luna/Haiku) · effort: medium
 
-- T-006 [P1] Stop sync exclusions deleting files — `core/lib/data-sync.js`: a previously synced note exceeding 128 KiB is omitted, published as a tombstone and deleted locally. Distinguish excluded/unreadable records from intentional deletions.
-  model: top tier (Astra/Opus) · effort: high
-  status: in progress · resume: regression test in test/data-sync.test.js (folder + hub), then exclude present-but-unportable knowledge keys from merge/apply
+- T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
 
 - T-035 [P1] Fix Classification opening error (in progress) — resume point: TDZ in `core/web/assets/global-settings-view.js` renderClassifier/setupCard: `const link` shadows imported `link()`; add regression test in test/global-classification-view.test.js.
   model: low tier (Luna/Haiku) · effort: medium
@@ -73,9 +72,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-016 [P2] Enforce transcript limits before buffering — `core/lib/session-analysis.js` and `modules/sessions/lib/import.js` check line size after readline buffers it. A discarded 64 MiB line raised RSS from 87 to 247 MiB; bound line buffering and stream scan metrics.
   model: top tier (Astra/Opus) · effort: high
-
-- T-018 [P2] Remove quadratic scan merging — `core/lib/session-analysis.js:collectAnalysis` calls `old.rows.find` for every result despite already building `byId`. Use indexed lookup and benchmark a 20,000-session cached refresh.
-  model: low tier (Luna/Haiku) · effort: medium
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
   model: middle tier (Sonnet) · effort: medium

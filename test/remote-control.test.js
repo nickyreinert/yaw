@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { realpathSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { realpathSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
@@ -154,6 +154,31 @@ test('hub client migration excludes old transport writers and performs conflict-
     assert.equal(Object.keys(readUserData(env, 'hub-sync-state.json').devices).length, 2);
     assert.throws(() => configureHubClient({ env, url: 'http://nas.local:4318' }), /loopback/);
     hub.revoke(paired.id); await assert.rejects(syncHub({ env, kitRoot: KIT_ROOT, fetchFn }), /rejected/);
+  } finally { store.close(); }
+});
+
+test('hub client keeps a synced knowledge file that became too large instead of deleting or overwriting it', async () => {
+  const serverEnv = environment(), store = remoteStore(serverEnv), hub = createHub({ store, env: serverEnv, kitRoot: KIT_ROOT });
+  try {
+    const env = environment(), paired = hub.pair('MacBook'); env.YAW_HUB_TOKEN = paired.token;
+    configureHubClient({ env, url: 'http://127.0.0.1:4318', scopes: ['knowledge'] });
+    const fetchFn = async (_url, options) => {
+      const d = hub.authenticate(options.headers.authorization.slice(7));
+      return Response.json(options.method === 'GET' ? { ...hub.view(), deviceId: d.id } : hub.exchange(d, JSON.parse(options.body)));
+    };
+    const note = join(env.HOME, '.yaw/knowledge/big.md'), large = `# Big\n${'x'.repeat(130 * 1024)}\n`;
+    mkdirSync(join(env.HOME, '.yaw/knowledge'), { recursive: true }); writeFileSync(note, '# Big\nsmall\n');
+    await syncHub({ env, kitRoot: KIT_ROOT, fetchFn });
+    writeFileSync(note, large);
+    assert.deepEqual((await syncHub({ env, kitRoot: KIT_ROOT, fetchFn })).excluded, ['knowledge/big.md']);
+    assert.equal(readFileSync(note, 'utf8'), large);
+    assert.equal(hub.view().records['knowledge/big.md'].text, '# Big\nsmall\n');
+    const second = hub.pair('Second device');
+    hub.exchange(hub.authenticate(second.token), { schema: 1, revision: hub.view().revision, commandId: 'second-device-note', records: { 'knowledge/big.md': { text: '# Big\nedited\n' } }, device: { name: 'Second device', updated: new Date().toISOString(), rows: [] } });
+    await syncHub({ env, kitRoot: KIT_ROOT, fetchFn });
+    assert.equal(readFileSync(note, 'utf8'), large);
+    writeFileSync(note, '# Big\ntrimmed\n');
+    assert.deepEqual((await syncHub({ env, kitRoot: KIT_ROOT, fetchFn })).conflicts, ['knowledge/big.md']);
   } finally { store.close(); }
 });
 

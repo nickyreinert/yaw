@@ -50,14 +50,16 @@ export async function syncHub({ env, kitRoot, resolution, fetchFn = fetch }) {
     const remote = await call('GET');
     requireRemoteEnabled(env);
     const subset = (records) => Object.fromEntries(Object.entries(records).filter(([key]) => cfg.scopes.includes(portableScope(key))));
-    const merged = mergeRecords(snapshot.records, subset(remote.records), subset(state.base), resolution);
+    const merged = mergeRecords(snapshot.records, subset(remote.records), subset(state.base), resolution, snapshot.excluded);
     if (merged.conflicts.length) { writeUserData(env, 'hub-sync-state.json', { ...state, conflicts: merged.conflicts }); return { conflicts: merged.conflicts }; }
     const accepted = await call('POST', { schema: 1, revision: remote.revision, commandId: randomUUID(), records: merged.records, device: snapshot.device });
     requireRemoteEnabled(env);
     // Do not overwrite edits made locally while the request was in flight.
     requireValue(JSON.stringify(snapshot.records) === JSON.stringify(portableSnapshot({ env, kitRoot, scopes: cfg.scopes, serverMode: cfg.serverMode === true }).records), 'Local settings changed during sync; retry');
-    const records = subset(accepted.records); applyPortableRecords({ env, records });
-    writeUserData(env, 'hub-sync-state.json', { base: records, revision: accepted.revision, deviceId: accepted.deviceId, devices: accepted.devices, conflicts: [], lastSync: new Date().toISOString() });
-    return { revision: accepted.revision, conflicts: [], message: 'Hub sync complete.' };
+    // Files that exist locally but cannot be synced keep their content and their previous merge base.
+    const records = Object.fromEntries(Object.entries(subset(accepted.records)).filter(([key]) => !snapshot.excluded.includes(key))); applyPortableRecords({ env, records });
+    const kept = Object.fromEntries(Object.entries(state.base ?? {}).filter(([key]) => snapshot.excluded.includes(key)));
+    writeUserData(env, 'hub-sync-state.json', { base: { ...kept, ...records }, revision: accepted.revision, deviceId: accepted.deviceId, devices: accepted.devices, conflicts: [], lastSync: new Date().toISOString() });
+    return { revision: accepted.revision, conflicts: [], excluded: snapshot.excluded, message: 'Hub sync complete.' };
   } finally { rmdirSync(lock); }
 }

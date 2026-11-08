@@ -1,5 +1,9 @@
 # Archive
 
+- T-006 Stop sync exclusions deleting files — done 2026-11-08
+  model: opus · effort: high
+  done: `localKnowledge` in core/lib/data-sync.js reports Markdown files that exist but cannot be synced (over 128 KiB, unreadable, linked, non-regular, empty, secret-looking or past the 1000-file cap) as `excluded`; `mergeRecords` skips those keys, so they are never published as tombstones, never deleted or overwritten locally and keep their merge base. Folder sync (`runSync`) and the hub client (`syncHub`) both return `excluded`. Once a file is portable again, concurrent edits surface as a conflict. Tests in test/data-sync.test.js and test/remote-control.test.js. The data-sync.js and data-sync.test.js part landed in commit 8971c64 (committed together with T-017). Suite: 1075 passed / 9 failed / 85 skipped (none in sync or remote tests).
+
 - T-010 Harden hook logs — done 2026-11-08
   model: sonnet · effort: high
   done: `appendLog` in core/hooks/dispatch.js keeps `~/.yaw/logs` a real 0700 directory and opens log files with O_NOFOLLOW|O_NONBLOCK as 0600 regular files of the current user (symlinks, FIFOs and foreign owners are skipped, logging stays fail-open); loose modes left by older versions are tightened; rotation renames the verified file to `<file>.1` and reopens a new 0600 file. Tests in test/hook-logs.test.js. Offline suite: 9 failed, none from this change (2 hook tests, test/hooks.test.js and test/silent-hooks.test.js, also fail on HEAD).
