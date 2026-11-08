@@ -1,5 +1,8 @@
 # Archive
 
+- T-024 Validate the actual Gradle JDK prerequisite — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: medium
+  done: decision: an invalid JAVA_HOME fails, not skips. `gradleJdkProblem()` (test/helpers/fixtures.js) names JAVA_HOME when java is on PATH but JAVA_HOME has no bin/java; two tests in test/profiles.test.js assert it. `just` not installed (not approved), so the Java/Kotlin/Android smoke tests still skip on "just is not installed" and were not run.
 - T-009 Repair this repo's own YAW setup — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: .gitignore conflict markers resolved (.DS_Store plus kit block from .yaw/base/.gitignore). Decision: manifest is authoritative; `yaw apply` restored AGENTS.md, CLAUDE.md, .codex/hooks.json and .yaw/bin/yaw-hook (.claude/settings.json already present); no manifest entries dropped. .yaw/answers.yaml `arch.language` javascript -> typescript (renamed in T-002; apply refused the old value). apply also added docs/engineering.md and refreshed just/node-cli.just and the base copies. test/dogfood.test.js expects code-map among the modules.

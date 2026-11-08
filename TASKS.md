@@ -11,10 +11,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-- T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
-  model: low tier (Luna/Haiku) · effort: medium
-  needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
-  resume: diagnosed: JDK 21 at JAVA_HOME is valid; `gradlew` exits at its JAVA_HOME check when JAVA_HOME is invalid even with `java` on PATH (reproduced). Gates `kotlinSkip`, `javaSkip` and the Android gate check only `hasTool('java')`. Smoke tests currently skip with "just is not installed". Next after the decision: regression test for the JAVA_HOME gate, then run the smoke tests.
 
 
 

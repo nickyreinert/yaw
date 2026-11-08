@@ -1,7 +1,7 @@
 // Test helpers: temp dirs, file trees, fixture kits and a scripted prompter.
 // Not a test file (npm test only runs *.test.js).
 
-import { chmodSync, copyFileSync, mkdirSync, symlinkSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, symlinkSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -182,6 +182,16 @@ export function capture() {
 export function hasTool(name, env = process.env) {
   const r = spawnSync(name, ['--version'], { encoding: 'utf8', env });
   return !r.error && r.status === 0;
+}
+
+// Gradle reads JAVA_HOME before it looks at PATH. Returns a message naming JAVA_HOME when `java` is
+// installed but the Gradle wrapper would exit on a bad JAVA_HOME; null when the JDK is usable or absent.
+export function gradleJdkProblem(env = process.env) {
+  if (!hasTool('java', env)) return null;
+  const home = env.JAVA_HOME;
+  if (!home) return null;
+  if (existsSync(join(home, 'bin', 'java'))) return null;
+  return `JAVA_HOME is invalid: ${home} has no bin/java, so gradlew exits even though java is on PATH. Set JAVA_HOME to a JDK 17+ or unset it.`;
 }
 
 // A PATH like the host's, minus the named tools: a folder of links to every other executable on the
