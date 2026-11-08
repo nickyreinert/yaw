@@ -70,6 +70,10 @@
   acceptance: The UI card says TypeScript but the stored id is javascript. Rename the id in interview/base.yaml, every profile.yaml, examples, tests and docs; keep reading old answers files and saved presets that say javascript (map to typescript). Do before more TypeScript profiles are added.
   done: ADR-0103; id is typescript everywhere, core/interview/legacy.js reads old javascript answers, presets, API input and plan replies.
 
+- T-012 Fix Markdown deletion in sync — done 2026-11-08
+  model: low tier (Luna/Haiku) · effort: medium
+  done: `applyPortableRecords` in core/lib/data-sync.js parses the local file for path answers only for settings and preset records; deleted knowledge Markdown with front matter is removed and the deletion propagates. Regression test in test/data-sync.test.js (front-matter deletion).
+
 - T-017 Keep Git sync off the HTTP event loop — done 2026-11-08
   model: sonnet · effort: high
   done: `runSync` in core/lib/data-sync.js is now a generator (`syncSteps`) driven synchronously by `runSync` (CLI, tests) or asynchronously by `runSyncAsync` (cancellable process-group `commandAsync`). The web `sync-run` action starts a background job (409 while one runs); `GET /api/sync-job` reports status/step/result and `sync-cancel` aborts it, killing the Git/gh process tree and releasing the locks. The Sync settings page polls the job and offers Cancel. Tests in test/data-sync.test.js cover event-loop ticks during a blocked `gh`, concurrent reads, cancellation and process cleanup.
