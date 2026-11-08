@@ -14,7 +14,7 @@ import { parse } from '../../../core/lib/yaml.js';
 import { schemas } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, readAnswers, removeModule, updateProject } from '../../../core/render/project.js';
-import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
+import { KIT_ROOT, capture, cleanEnv, hasTool, pathWithout, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { GUARDED, VERBS } from '../lib/cli.js';
 import { branchName, checkIdForMode, parseTaskId, prBody, commitMessage, slugify, taskFromBranch } from '../lib/names.js';
 
@@ -31,7 +31,7 @@ async function project(options = {}) {
   return root;
 }
 
-const ENV = () => cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+const ENV = () => cleanEnv(tmp('yaw-home-'), { PATH: pathWithout('yaw') });
 
 // A project inside a git repo whose origin is a local bare repository, one commit pushed to main.
 async function repo(options = {}) {
@@ -204,7 +204,7 @@ test('the module has no hooks and nothing in setup, update or remove calls gh', 
     writeFileSync(join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> '${log}'\nexit 1\n`);
     chmodSync(join(bin, tool), 0o755);
   }
-  const env = { ...ENV(), PATH: `${bin}:${process.env.PATH}` };
+  const env = { ...ENV(), PATH: `${bin}:${pathWithout('yaw', 'gh')}` };
   const root = tmp('yaw-github-');
   const answers = writeAnswers(tmp('yaw-ans-'), answersText({ modules: ['core'] }));
   const r = await runMain(['init', '--answers', answers, '--yes', '--skip-verify'], root, env);

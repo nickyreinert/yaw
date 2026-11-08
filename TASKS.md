@@ -11,25 +11,51 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-## Backlog
-
 - T-006 [P1] Stop sync exclusions deleting files — `core/lib/data-sync.js`: a previously synced note exceeding 128 KiB is omitted, published as a tombstone and deleted locally. Distinguish excluded/unreadable records from intentional deletions.
   model: top tier (Astra/Opus) · effort: high
+  status: in progress · resume: regression test in test/data-sync.test.js (folder + hub), then exclude present-but-unportable knowledge keys from merge/apply
 
 - T-007 [P1] Preserve analytics when history is unavailable — `core/lib/session-analysis.js:collectAnalysis` replaces saved rows with an empty scan when a source disappears. Keep prior metrics/classifications and report incomplete discovery; cover disabled sources and discovery limits too.
   model: middle tier (Sonnet) · effort: high
+  in progress — resume: regression tests in test/session-analysis.test.js, then keep unrediscovered rows in collectAnalysis merge and report `missing` in scanSummary.
 
-- T-008 [P1] Fail the push review gate on Git errors — `modules/review/lib/cli.js:pushedCommits` turns an unknown remote SHA into zero commits, bypassing review; failed diffs also become empty text. Propagate failures and require an exact final verdict line.
+- T-023 [P2] Publish personal YAML updates atomically — `core/lib/user-store.js:write` truncates profiles/presets before writing. Use private temporary files and atomic publication; preserve existing data on write failure and prevent concurrent preset creation from overwriting another save.
+  model: middle tier (Sonnet) · effort: high
+  status: in progress — fix + tests done in core/lib/user-store.js, test/user-store.test.js; next: npm test, commit, archive
+
+- T-035 [P1] Fix Classification opening error (in progress) — resume point: TDZ in `core/web/assets/global-settings-view.js` renderClassifier/setupCard: `const link` shadows imported `link()`; add regression test in test/global-classification-view.test.js.
+  model: low tier (Luna/Haiku) · effort: medium
+
+
+- T-017 [P2] Keep Git sync off the HTTP event loop — in progress. Resume: runSync becomes a generator driven sync (CLI/tests) or async (web job with progress/cancel); workspace-api sync-run starts job, add sync-job/sync-cancel, update UI + tests.
   model: middle tier (Sonnet) · effort: high
 
 - T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
+  in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
+  model: middle tier (Sonnet) · effort: medium
+
+- T-011 [P2] Preserve permissions during atomic replacement — `core/render/files.js:writeAtomic` changes an existing 0600 file to 0644 under umask 022 and drops executable bits. Preserve existing modes unless an explicit override is supplied; check callers too. — in progress; fix + test in core/render/files.js, test/render.test.js; next: npm test, archive.
   model: middle tier (Sonnet) · effort: medium
 
 - T-010 [P2] Harden hook logs — `core/hooks/dispatch.js:appendLog` follows symlinks and creates 0644 logs containing session IDs/workspace paths. Require private directories/files, reject non-regular targets and preserve those protections during rotation.
   model: middle tier (Sonnet) · effort: high
+  status: in progress — resume: write failing test in test/ for appendLog (symlink, modes, rotation), then fix core/hooks/dispatch.js
 
-- T-011 [P2] Preserve permissions during atomic replacement — `core/render/files.js:writeAtomic` changes an existing 0600 file to 0644 under umask 022 and drops executable bits. Preserve existing modes unless an explicit override is supplied; check callers too.
+- T-025 [P2] Remove generated artifacts from scaffolds — tracked `.gradle/` caches in `profiles/android-kotlin/scaffold` and `profiles/java-basic/scaffold`, plus Android `build/reports/`, pollute generated projects. Remove them and enforce scaffold exclusions while retaining the Gradle wrapper.
+  model: low tier (Luna/Haiku) · effort: low
+  status: in progress · resume: write scaffold-artifact regression test, then remove tracked .gradle/build reports and add exclusions
+
+- T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
+  model: top tier (Astra/Opus) · effort: high
+  status: in progress · resume: investigate core/cli/init.js child processes and HostedProjects.close()
+
+- T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
+  spec: kickoff/16-compact-output.md §4 L2 and §8
+  acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
   model: middle tier (Sonnet) · effort: medium
+  status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
+
+## Backlog
 
 - T-012 [P2] Fix Markdown deletion in sync — `core/lib/data-sync.js:applyPortableRecords` parses deleted knowledge files as YAML; normal front matter throws and prevents deletion. Parse answers only for settings/preset records.
   model: low tier (Luna/Haiku) · effort: medium
@@ -40,20 +66,11 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-014 [P2] Reject malformed LAN responses safely — `core/remote/lan.js:lanFetch` throws uncaught on HTTP 204 when constructing a Response with a body. Handle bodyless statuses and response-construction errors through promise rejection, including aborted responses.
   model: middle tier (Sonnet) · effort: medium
 
-- T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
-  model: top tier (Astra/Opus) · effort: high
-
 - T-016 [P2] Enforce transcript limits before buffering — `core/lib/session-analysis.js` and `modules/sessions/lib/import.js` check line size after readline buffers it. A discarded 64 MiB line raised RSS from 87 to 247 MiB; bound line buffering and stream scan metrics.
   model: top tier (Astra/Opus) · effort: high
 
-- T-017 [P2] Keep Git sync off the HTTP event loop — `core/web/workspace-api.js` invokes synchronous `runSync`; each Git/gh subprocess can block for 60 seconds. Use an asynchronous job with progress, cancellation and concurrent dashboard reads.
-  model: middle tier (Sonnet) · effort: high
-
 - T-018 [P2] Remove quadratic scan merging — `core/lib/session-analysis.js:collectAnalysis` calls `old.rows.find` for every result despite already building `byId`. Use indexed lookup and benchmark a 20,000-session cached refresh.
   model: low tier (Luna/Haiku) · effort: medium
-
-- T-019 [P2] Isolate recipe tests from installed YAW — code-map, GitHub and composition tests inherit the host PATH, so “kit absent” cases execute the real installed CLI. Provide explicit tool stubs and isolated configuration instead.
-  model: middle tier (Sonnet) · effort: medium
 
 - T-020 [P2] Repair brittle UI/parity tests — `test/analytics-filters.test.js` addresses children by outdated positions; `test/form-parity.test.js` assumes unique labels (39 distinct labels for 41 questions). Locate controls semantically and identify questions by stable IDs.
   model: middle tier (Sonnet) · effort: medium
@@ -64,14 +81,8 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-022 [P2] Invalidate obsolete review approvals — `modules/review/lib/cli.js` caches only commit SHA and reviewer kind. Include effective prompts/rules, reviewed range and relevant configuration so changed review requirements cannot reuse an old PASS.
   model: middle tier (Sonnet) · effort: high
 
-- T-023 [P2] Publish personal YAML updates atomically — `core/lib/user-store.js:write` truncates profiles/presets before writing. Use private temporary files and atomic publication; preserve existing data on write failure and prevent concurrent preset creation from overwriting another save.
-  model: middle tier (Sonnet) · effort: high
-
 - T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
   model: low tier (Luna/Haiku) · effort: medium
-
-- T-025 [P2] Remove generated artifacts from scaffolds — tracked `.gradle/` caches in `profiles/android-kotlin/scaffold` and `profiles/java-basic/scaffold`, plus Android `build/reports/`, pollute generated projects. Remove them and enforce scaffold exclusions while retaining the Gradle wrapper.
-  model: low tier (Luna/Haiku) · effort: low
 
 - T-026 [P2] Simplify Communication Style — keep Language. Relabel "Frequency: How often should the agent ask before acting?", "Depth: How long should answers be?" (Brief & on point → generated rule "Prefer bullet points, key points and direct answers. Avoid unnecessary explanations."), "Response: Should the agent explain its actions?" (short confirmation vs. detailed change report). Remove "technical wording" and "examples and analogies"; move "Your experience with software development" here and derive technical level/analogies from it. Keep its effect on question coverage and tool permissions. Check which rules the removed questions generated and carry them over.
   model: middle tier (Sonnet) · effort: high
@@ -99,9 +110,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-034 [P2] Unify card layout and order — consistent grouping, spacing and containers; the five Coding Style cards adjacent in logical order; remove the extra frame around Coding Practices; use "Category: question" labels. Check whether the "Choose a support language and destination" step repeats already-asked stack questions. Do this after T-026–T-033 settle the card set. Principle: fewer questions, no lost behavior.
   model: middle tier (Sonnet) · effort: medium
-
-- T-035 [P1] Fix Classification opening error — opening Classification throws "Cannot access 'link' before initialization" (temporal dead zone in web code). Find the cause, fix it and add a regression test that opens the view.
-  model: low tier (Luna/Haiku) · effort: medium
 
 - T-036 [P2] Feature toggles: Settings Sync and Profiling — add a "Settings Sync" checkbox under Features (off → hide its tab and entry points; Server Mode unchanged). Merge Classification and Learning into one optional "Profiling" feature (name supersedes "Session Intelligence"; see T-042) with one checkbox; off → hide their Settings tabs, the sidebar Profiling section, workspace Profiling and the Analytics Classification block. Rename "Outcomes" in Analytics to "Classification". Check whether Classification and Learning are technically one function or two steps before merging internally. Hidden features must not be reachable via other navigation.
   model: top tier (Astra/Opus) · effort: high
@@ -131,11 +139,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: high
 
 - T-045 [P2] Investigate Safe Verdicts before changing it — explain what it stores, how verdicts arise, what "No Important Verdict", "Set Retention" and "Import a Verdict" do, why it is separate from Analytics and Sync, and its user benefit. Report to the user first; then decide keep/rename/move/remove. Do not alter or delete data or the UI before that decision.
-  model: middle tier (Sonnet) · effort: medium
-
-- T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
-  spec: kickoff/16-compact-output.md §4 L2 and §8
-  acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
   model: middle tier (Sonnet) · effort: medium
 
 - T-048 [P2] Measure tool-output share before building (L5, part 1) — transcript scan of tool-result sizes by tool and by the command's first word, shown in Analytics. Store sizes and first words only, no content (ADR-0052). Reuse the streaming reader in `core/lib/session-analysis.js` and respect T-016's line limits. First step, with T-047.

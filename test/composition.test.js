@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { composedVerbs } from '../core/render/kit.js';
 import { commandRule, loadRules, secretRule } from '../modules/security/lib/guards.js';
 import guardDestructive from '../modules/security/hooks/guard-destructive.js';
-import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
+import { KIT_ROOT, cleanEnv, hasTool, pathWithout, run, tmp } from './helpers/fixtures.js';
 
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
 const ANSWERS = join(KIT_ROOT, 'examples', 'composed', 'answers.yaml');
@@ -20,10 +20,23 @@ const read = (cwd, rel) => readFileSync(join(cwd, rel), 'utf8');
 
 function initComposed(extra = []) {
   const cwd = tmp('yaw-compose-');
-  const env = cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH, CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' });
+  const env = cleanEnv(tmp('yaw-home-'), { PATH: pathWithout('yaw'), CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' });
   const r = run(process.execPath, [YAW, 'init', '--answers', ANSWERS, '--yes', ...extra], { cwd, env });
   return { cwd, env, r };
 }
+
+test('pathWithout hides an installed tool from the PATH it returns and keeps the others', () => {
+  const real = tmp('yaw-real-');
+  for (const name of ['yaw', 'other']) writeFileSync(join(real, name), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const saved = process.env.PATH;
+  process.env.PATH = `${real}:${saved}`;
+  try {
+    const bin = pathWithout('yaw');
+    assert.equal(hasTool('yaw', { PATH: process.env.PATH }), true);
+    assert.equal(hasTool('yaw', { PATH: bin }), false);
+    assert.equal(hasTool('other', { PATH: bin }), true);
+  } finally { process.env.PATH = saved; }
+});
 
 test('composedVerbs: nothing for one profile; every verb calls every profile, check ends with sync-check', () => {
   assert.equal(composedVerbs(['static-site']), '');
@@ -67,7 +80,7 @@ test('top-level verbs call both profiles, namespaced verbs stay; deploy keeps th
   const dev = run('just', ['dev'], { cwd, env });
   assert.match(dev.stdout, /just static-site::dev, just cloudflare-workers::dev/);
   // deploy: only cloudflare-workers defines deploy, it refuses without the production guard, so the top level fails
-  const deploy = run('just', ['deploy', 'prod'], { cwd, env: { ...env, PATH: process.env.PATH } });
+  const deploy = run('just', ['deploy', 'prod'], { cwd, env });
   assert.notEqual(deploy.status, 0);
   assert.match(deploy.stderr, /deploy: refused/);
 });

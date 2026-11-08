@@ -1,5 +1,9 @@
 # Archive
 
+- T-019 Isolate recipe tests from installed YAW — done 2026-11-08
+  model: sonnet · effort: medium
+  done: `pathWithout()` in test/helpers/fixtures.js gives code-map, GitHub and composition tests the host PATH minus `yaw` (and `gh`), so kit-absent cases cannot run an installed CLI; `just` recipes were not run here (just not installed), github-status tests already used explicit stubs.
+
 - T-046 Load CLI command modules on demand (compact output, latency plan step 1) — done 2026-11-08
   model: sonnet · effort: low
   acceptance: `core/cli/main.js` loads command handlers and the hook dispatcher with `import()` when used, so a hook call does not load every command first. The full offline test suite shows the same failures before and after.
