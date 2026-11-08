@@ -45,9 +45,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
 
-- T-031 [P2] Dissolve Coding Practices — remove user-facing errors, diagnostic logs and internal documentation as user options. Generate equivalent rules automatically from language/framework/destination/architecture/tools (e.g. no logging infrastructure for a plain HTML page; docs rules coordinated with Code Map). Remove the section if no real decision remains.
-  model: middle tier (Sonnet) · effort: high
-
 - T-032 [P2] Rework Review Sub-Agents — keep Quality, Business Logic, UI/UX, Security. Show Push Gate (Warn/Block) as a full-width card above the agent cards. Decide on Feature Fit (possibly "Task Review"): check overlap with existing review/completion checks, merge if duplicated, do not remove unchecked.
   model: middle tier (Sonnet) · effort: medium
 

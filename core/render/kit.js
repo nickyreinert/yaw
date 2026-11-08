@@ -351,7 +351,7 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
     wrapper: { shell: flat['arch.wrapper'] === 'shell', make: flat['arch.wrapper'] === 'make' },
-    codingPractices: codingPractices(flat),
+    codingPractices: codingPractices(flat, { modules: [...modules] }),
     architecturePractices: architecturePractices(flat),
     stack,
     rules: {

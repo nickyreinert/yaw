@@ -29,6 +29,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 
 ### Changed
 - Coding Style cards (T-030): Unit Tests now says it is part of `just check` (non-empty, passing suite; off keeps tests optional). Local settings & secrets no longer lists or generates Dockerfile, compose.yaml or devcontainer.json; no profile shipped them, and Docker stays the Architecture switch (the agent rule) plus the stack scaffold.
+- Coding Practices dissolved (T-031): the options for user-facing errors, diagnostic logs and internal documentation are gone, and with them the section. `docs/engineering.md` and the kickoff prompt now derive these rules from language, destination and modules: a plain HTML page or static site gets "no logging infrastructure", other projects structured console logs, and with the Code map module the documentation rule points to `docs/code-map.md`. No real decision remained, so nothing replaces the section; answers saved earlier stay readable and are ignored.
 
 ### Fixed
 

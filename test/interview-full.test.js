@@ -42,7 +42,7 @@ async function init(replies) {
 }
 
 const IDEA = { 'Purpose/Idea': 'A small tool.', 'What language do you want': 'typescript', 'Where will it run': 'local' };
-const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential', 'quality.unit-tests': false };
+const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.unit-tests': false };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],

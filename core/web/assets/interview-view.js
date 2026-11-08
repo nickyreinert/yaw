@@ -67,7 +67,6 @@ const visitedSteps = new Set();
 const sectionOf = (question) => {
   const id = typeof question === 'string' ? question : question.id;
   if (id.startsWith('user.') && id !== 'user.agents') return 'communication';
-  if (['quality.error-detail', 'quality.log-output', 'quality.documentation'].includes(id)) return 'practices';
   return id.split('.')[0];
 };
 const belongs = (step, group) => step.groups === null ? !['user', 'communication', 'idea', 'arch'].includes(group) : step.groups.includes(group);
@@ -249,13 +248,13 @@ async function refreshPrompts() {
   }
 }
 function buildQuestions() {
-  const title = { user: 'About you', communication: 'Communication style', practices: 'Coding Practices', idea: 'Purpose/Idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
+  const title = { user: 'About you', communication: 'Communication style', idea: 'Purpose/Idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
   for (const q of catalog.questions) {
     const sectionId = sectionOf(q);
     if (!sections.has(sectionId)) {
       const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}`, class: 'settings-group', 'data-section': sectionId });
       const heading = element('h2', undefined, { id: `title-${sectionId}`, class: 'module-group-title' });
-      heading.append(decisionIcon(sectionId === 'practices' ? 'ruler' : 'file'), element('span', title[sectionId] ?? sectionId));
+      heading.append(decisionIcon('file'), element('span', title[sectionId] ?? sectionId));
       section.append(heading);
       $('questions').append(section);
       sections.set(sectionId, { node: section });
@@ -318,12 +317,6 @@ function buildQuestions() {
   if (personal) {
     const holder = element('div', undefined, { class: 'module-grid communication-card-holder' });
     personal.append(holder);
-  }
-  const practices = sections.get('practices')?.node;
-  if (practices) {
-    const grid = element('div', undefined, { class: 'module-grid practice-grid' });
-    grid.append(...[...controls.values()].filter((c) => sectionOf(c.q) === 'practices').map((c) => c.node));
-    practices.append(grid);
   }
   // Choose the kit profile first; optional planning constraints follow it.
   sections.get('arch')?.node.before($('stack'));
@@ -437,7 +430,6 @@ function renderModules() {
     onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); renderCommunication(); scopeIds(); $('compact-modules')?.focus(); },
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(), onExplain: explain, compactRoot: $('module-tools'),
-    afterGroup: (group) => group === 'basics' ? sections.get('practices')?.node : null,
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {

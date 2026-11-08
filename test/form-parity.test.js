@@ -46,7 +46,7 @@ const SCENARIOS = [
   { name: 'Quick, defaults', mode: 'quick', answers: BASE },
   { name: 'Quick, Gemini and GitHub', mode: 'quick', answers: { ...BASE, 'user.agents': ['gemini'], 'tasks.use-github': true } },
   ...['local', 'self-hosted', 'serverless', 'edge', 'static'].map((host) => ({ name: `Quick browser frontend on ${host}`, mode: 'quick', answers: { ...BASE, 'arch.language': 'html', 'arch.runs-on': host } })),
-  { name: 'Pro, Docker with reusable libraries and file logs', mode: 'pro', answers: { ...BASE, 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true, 'quality.log-output': 'file', 'quality.documentation': 'detailed' } },
+  { name: 'Pro, Docker with reusable libraries', mode: 'pro', answers: { ...BASE, 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true } },
   { name: 'Full solo, defaults', mode: 'full', answers: BASE },
   { name: 'Full solo without GitHub', mode: 'full', answers: { ...BASE, 'tasks.use-github': false } },
   { name: 'Full team', mode: 'full', answers: { ...BASE, 'idea.team': 'team', 'team.session-context': false } },

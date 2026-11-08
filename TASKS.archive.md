@@ -1,5 +1,9 @@
 # Archive
 
+- T-031 Dissolve Coding Practices — done 2026-11-08
+  model: middle tier (Sonnet) · effort: high
+  done: `quality.error-detail`, `quality.log-output` and `quality.documentation` are retired questions (interview/base.yaml legacy block, `RETIRED_ARCHITECTURE`): never asked, old answers stay readable and are ignored. The Coding Practices section, its grid and CSS are gone from the web interview (no real decision remained, so nothing replaces it; Unit Tests stays in the Quality card). `codingPractices(answers, { modules })` (core/lib/coding-practices.js) derives the rules: html language or static destination gets "No logging infrastructure ..."; other projects get structured console logs with redaction; with the code-map module the documentation rule points to docs/code-map.md. Tests: test/coding-practices-auto.test.js; updated form-parity, interview-depth, interview-full, setup-interview, setup-refinements and the setup-depth fixture hash for docs/engineering.md.
+
 - T-056 Savings view and A/B validation (L5, part 2) — done 2026-11-08 · A/B result: needs data
   model: middle tier (Sonnet) · effort: medium
   done: core/lib/savings.js reads hooks.jsonl (compress hook) and run.jsonl (`yaw run`) into rawBytes/outBytes per source, tool or step, and method, plus the sessions where a compress hook acted ("module on"). Analytics (core/web/assets/savings.js) has two new tables: Savings (rawBytes, outBytes, saved, tokens estimated as bytes / 4 and labelled as an estimate) and Savings on/off (per project, module on vs off: mean per-session tokensIn and YAW_VERBOSE=1 re-runs; a dash, never 0, when a side has no data). The session scan now counts Bash commands with a leading YAW_VERBOSE=1 as `toolOutput.verbose` (count only, no command text). Tests: test/savings.test.js.

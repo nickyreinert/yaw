@@ -847,7 +847,6 @@ button.decision-option[aria-pressed="true"] { background: var(--yellow, #ffe178)
 /* Personal preferences are configured once; workflow cards keep one shared grid. */
 .communication-card-holder { display: block; }
 .communication-card-holder .card-questions { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
-.interview-form .practice-grid > .question { padding: 14px; margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .module-grid .module-card.reviewer, .module-grid .module-card.push-gate { grid-column: auto; min-width: 0; }
 .module-grid .module-card :is(h4, .decision-options) { margin: 0 0 12px; }
 .module-grid .module-card .decision-options { margin-top: 8px; }
@@ -875,7 +874,7 @@ button.decision-option[aria-pressed="true"] { background: var(--yellow, #ffe178)
 .preset-card :is(span, small) { font-size: .8rem; font-weight: 400; overflow-wrap: anywhere; }
 .preset-card small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; color: var(--muted); }
 .preset-card .decision-icon { align-self: flex-end; }
-.interview-form .module-grid, .interview-form .practice-grid { gap: 16px; }
+.interview-form .module-grid { gap: 16px; }
 .interview-form .module-grid > .module-card { padding: 16px; }
 .module-group > .module-grid + .module-grid { margin-top: 16px; }
 .option-card .question { padding: 0; }

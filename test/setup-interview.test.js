@@ -27,7 +27,7 @@ function save(f, answers = PERSONAL) {
 test('project architecture constraints reach terminal, browser, kickoff and agent context independently of personal settings', async () => {
   const f = fixture();
   save(f);
-  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true, 'quality.log-output': 'file' };
+  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true };
   const result = await cli(f, prompts(chosen, 'pro'));
   assert.equal(result.code, 0, result.err);
   const answers = readAnswers(f.root).answers;
@@ -37,9 +37,9 @@ test('project architecture constraints reach terminal, browser, kickoff and agen
   const prompt = kickoffPrompt({ answers });
   assert.match(prompt, /Use suitable maintained libraries/);
   assert.match(prompt, /Docker is required/);
-  assert.match(prompt, /structured log files/);
+  assert.match(prompt, /structured console logs/);
   assert.equal(foundationContext({ root: f.root }).constraints['arch.docker'], true);
-  assert.equal(foundationContext({ root: f.root }).constraints['quality.log-output'], 'file');
+  assert.ok(!Object.hasOwn(foundationContext({ root: f.root }).constraints, 'quality.log-output'));
 });
 
 test('unknown project constraints remain explicit and mockups include layout before visual polish', () => {

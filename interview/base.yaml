@@ -144,38 +144,36 @@ questions:
     label: Unit Tests
     hint: "Part of `just check`: it needs a non-empty, passing unit-test suite. Off: unit tests stay optional."
     default: false
+  # Legacy project answers remain readable; these questions are no longer asked.
+  # Error, log and documentation rules are generated from language, destination and modules (T-031).
   - id: quality.error-detail
-    mode: S
+    mode: F
     type: choice
     label: User-facing errors
     hint: Recovery detail for users; internal traces stay private.
-    help: engineering
     choices:
       - { value: concise, label: Concise }
       - { value: detailed, label: Detailed guidance }
     default: concise
   - id: quality.log-output
-    mode: S
+    mode: F
     type: choice
     label: Diagnostic logs
     hint: Structured diagnostics with redaction and bounded retention.
-    help: engineering
     choices:
       - { value: console, label: Console }
       - { value: file, label: Files }
       - { value: both, label: Console and files }
     default: console
   - id: quality.documentation
-    mode: S
+    mode: F
     type: choice
     label: Internal documentation
     hint: Setup and contracts, or fuller maintenance guides.
-    help: engineering
     choices:
       - { value: essential, label: Essential }
       - { value: detailed, label: Detailed }
     default: essential
-  # Legacy project answers remain readable; these questions are no longer asked.
   - id: arch.framework
     ref: "3.12"
     mode: F
