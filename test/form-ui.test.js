@@ -158,7 +158,7 @@ test('web model: normalization and browser defaults match the CLI interview', as
         },
       });
       assert.deepEqual(normalized.doc.answers, cli.answers, `${mode}/${expertise}`);
-      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || isPreference(q) || q.id === 'tasks.use-github'), input.answers, mode);
+      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || isPreference(q) || q.id === 'tasks.use-github' || q.id.startsWith('compact.') && mode !== 'quick'), input.answers, mode);
       assert.deepEqual(browser, normalized.doc.answers);
       assert.deepEqual(defaultModules(c.modules, c.questions, input.answers, mode),
         selectModules({ kitRoot: KIT_ROOT, mode, facts: deriveFacts(effectiveAnswers(c.questions, input.answers, mode)) }));

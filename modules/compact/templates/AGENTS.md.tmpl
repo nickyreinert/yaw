@@ -1,0 +1,10 @@
+<% if answers.compact.personal %>
+<% else %>
+<% if answers.compact.levers %>
+## Compact output
+
+- Run checks with `just <verb>`; output of passing steps is condensed.
+- Re-run with `YAW_VERBOSE=1` only when a result is unusable.
+- Batch related commands in one call.
+<% end %>
+<% end %>

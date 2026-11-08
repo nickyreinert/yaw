@@ -55,6 +55,8 @@ const SOLO_FULL = {
   'arch.runs-on': 'local',
   ...CONSTRAINTS,
   'user.comfort': [],
+  'compact.levers': [],
+  'compact.personal': false,
   'user.length': 'balanced',
   'user.explain': 'short-paragraph',
   'quality.review-quality': 'off',

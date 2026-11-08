@@ -19,10 +19,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-012 [P2] in progress — Fix Markdown deletion in sync. Resume: regression test added in test/data-sync.test.js (front-matter deletion); fix applied in core/lib/data-sync.js applyPortableRecords; next: npm test, archive.
   model: low tier (Luna/Haiku) · effort: medium
 
-- T-049 [P2] in progress — Module `compact`: definition, interview and scope. Resume: write modules/compact/tests/compact.test.js (add/remove, committed vs personal, precedence), then modules/compact/module.yaml, lib/settings.js, templates/AGENTS.md.tmpl, `compact` group in common.schema.json questionId, hook into `yaw add/remove` in core/cli/commands.js.
-  spec: kickoff/16-compact-output.md §4 and §7
-  model: middle tier (Sonnet) · effort: high
-
 - T-018 [P2] in progress — Remove quadratic scan merging. Resume: regression test in test/session-insights.test.js (spy on rows.find during cached refresh), then replace `old.rows.find` with `byId.get` in core/lib/session-analysis.js collectAnalysis, benchmark 20,000 sessions.
   model: low tier (Luna/Haiku) · effort: medium
 
@@ -41,6 +37,12 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
+
+- T-052 [P2] Hook kind `compress` — amend ADR-0007 and BUILD.md rule 5. PostToolUse only, returning only `updatedToolOutput`; the dispatcher drops any result that is not smaller than the original, and the result may end with one recall line. Add `compress` to the kind enum in `core/schema/module.schema.json`. In `core/hooks/adapters.js`, hold `tool_response` in memory for compress handlers only and add a PostToolUse branch to `renderOutput`. Optional `rawBytes`/`outBytes`/`method` in `hook-event.schema.json`. Depends on T-047.
+  spec: kickoff/16-compact-output.md §5
+  acceptance: existing silent-hook tests still pass; "never worse" is enforced; tool output never reaches a log
+  model: top tier (Astra/Opus) · effort: high
+  status: in progress · resume: read core/hooks/adapters.js, dispatch.js and schemas; write failing tests for compress kind first
 
 ## Backlog
 
@@ -134,11 +136,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   spec: kickoff/16-compact-output.md §4 L1
   acceptance: each profile's smoke test verifies its compact output
   model: middle tier (Sonnet) · effort: high
-
-- T-052 [P2] Hook kind `compress` — amend ADR-0007 and BUILD.md rule 5. PostToolUse only, returning only `updatedToolOutput`; the dispatcher drops any result that is not smaller than the original, and the result may end with one recall line. Add `compress` to the kind enum in `core/schema/module.schema.json`. In `core/hooks/adapters.js`, hold `tool_response` in memory for compress handlers only and add a PostToolUse branch to `renderOutput`. Optional `rawBytes`/`outBytes`/`method` in `hook-event.schema.json`. Depends on T-047.
-  spec: kickoff/16-compact-output.md §5
-  acceptance: existing silent-hook tests still pass; "never worse" is enforced; tool output never reaches a log
-  model: top tier (Astra/Opus) · effort: high
 
 - T-053 [P2] Lean compress entry and shim size gate — a compress entry point that loads neither the kit nor the schemas (prototype: 34 ms against 67 ms through `yaw hook`). The shim exits without starting Node below a payload threshold (prototype: 3 ms); the threshold applies to the whole payload, not to the output alone. Depends on T-052.
   spec: kickoff/16-compact-output.md §5 (latency plan, steps 2 and 3)

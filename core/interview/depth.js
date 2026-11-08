@@ -20,7 +20,7 @@ export function asksAtDepth(q, mode) {
 export function defaultQuestion(q) {
   if (/^quality\.review-(quality|logic|ux|feature|security)$/.test(q.id)) return { ...q, default: 'off' };
   if (['tasks.use-github', 'user.knowledge', 'user.dashboard'].includes(q.id)) return { ...q, default: false };
-  if (['user.comfort', 'user.evaluation'].includes(q.id)) return { ...q, default: [] };
+  if (['user.comfort', 'user.evaluation', 'compact.levers'].includes(q.id)) return { ...q, default: [] };
   return q;
 }
 // Explicit saved modules win. Fresh optional tools start off at every depth.
@@ -28,6 +28,7 @@ export function selectedByPolicy(definitions, { answers = {}, modules = [] } = {
   const byName = new Map(definitions.map((d) => [d.name, d]));
   const chosen = new Set(['core', ...modules]);
   if (answers['tasks.use-github'] === true) chosen.add('github');
+  if (answers['compact.levers']?.length) chosen.add('compact');
   if (['quality', 'logic', 'ux', 'feature', 'security'].some((kind) => answers[`quality.review-${kind}`] && answers[`quality.review-${kind}`] !== 'off')) chosen.add('review');
   const add = (name) => { for (const dep of byName.get(name)?.depends ?? []) if (!chosen.has(dep)) { chosen.add(dep); add(dep); } };
   for (const name of chosen) add(name);

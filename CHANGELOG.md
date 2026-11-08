@@ -5,6 +5,7 @@ All notable changes to YAW are documented here. This project follows [Keep a Cha
 ## [Unreleased]
 
 ### Added
+- Optional `compact` module (`yaw add compact`, `yaw remove compact`; off at every depth): the `compact.levers` question, a committed or personal scope per project (personal settings live in `~/.yaw/compact.json`, precedence `YAW_COMPACT`, then personal, then project) and a three-line AGENTS.md note when a lever is committed. The levers themselves follow in later releases.
 - `yaw init` offers `p) Load a previous setup` in its first menu. Choose a saved preset to review its mode and answers as defaults, edit them for the new project, or continue in the browser without losing unreviewed defaults. Loading does not copy project files or secrets, modify the source, or bypass confirmation.
 - Bare `yaw` and general help group commands by project setup, daily work, monitoring, YAW maintenance and agent integrations. Unimplemented `apply`, `config` and `session` commands are explicitly labelled placeholders; their help explains what is missing instead of promising past phase steps.
 - `yaw web --background` keeps a loopback-only dashboard running after the CLI returns, with no idle shutdown. Run `yaw web` in the same folder to reopen it with a fresh login link, and `yaw web --stop` to stop it. The dashboard is also available in uninitialized folders; setup is an explicit action in Workspace → Settings → Interview.

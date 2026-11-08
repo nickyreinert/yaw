@@ -125,7 +125,11 @@ export async function add({ values, positionals, io }) {
       return 1;
     }
   }
+  // compact: a personal setting goes to ~/.yaw, not into the committed answers (kickoff/16 §4).
+  const personal = module === 'compact' && newAnswers['compact.personal'] === true ? newAnswers['compact.levers'] ?? [] : null;
+  if (personal) newAnswers = Object.fromEntries(Object.entries(newAnswers).filter(([id]) => id !== 'compact.levers'));
   const result = await addModule({ root: io.cwd, kitRoot: io.kitRoot, module, newAnswers, strategy, interactive, prompter: io.prompter });
+  if (personal) (await import(pathToFileURL(join(io.kitRoot, 'modules', 'compact', 'lib', 'settings.js')).href)).writePersonal(io.env ?? process.env, io.cwd, personal);
   printReport(io.stdout, result);
   printToolHints(io.stdout, [module]);
   return result.conflicts.length > 0 ? 1 : 0;
@@ -160,6 +164,7 @@ export async function remove({ values, positionals, io }) {
   });
   printReport(io.stdout, result);
   if (module === 'code-map') await dropMapCache(io);
+  if (module === 'compact') (await import(pathToFileURL(join(io.kitRoot, 'modules', 'compact', 'lib', 'settings.js')).href)).writePersonal(io.env ?? process.env, io.cwd, null);
   return result.conflicts.length > 0 ? 1 : 0;
 }
 

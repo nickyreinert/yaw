@@ -1,5 +1,9 @@
 # Archive
 
+- T-049 Module `compact`: definition, interview and scope — done 2026-11-08
+  model: middle tier (Sonnet) · effort: high
+  done: `modules/compact/` (module.yaml, lib/settings.js, templates/AGENTS.md.tmpl): off at every depth, questions `compact.levers` (recipes, hook; default recipes) and `compact.personal` (committed vs personal), L4 note (`tokenCost: low`) rendered only for a committed scope with a lever on. A personal choice goes to `~/.yaw/compact.json` per project (`yaw add` writes it, `yaw remove` clears it) and keeps levers out of answers.yaml; `resolveCompact` applies YAW_COMPACT, then personal, then project. All asks the levers (default none) and selects the module when one is chosen; Quick reuses saved defaults (`setup-defaults`). Tests in modules/compact/tests/compact.test.js. Open: settings.json / settings.local.json hook entries wait for T-052 (ADR-0012/0030 say the kit writes no settings.local.json); recall store question left to T-055.
+
 - T-013 Use the same knowledge directory everywhere — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
   done: `localKnowledge` and the knowledge write path in core/lib/data-sync.js use `userDataDir(env)` (YAW_HOME, else HOME/.yaw), matching core/web/knowledge.js; test with distinct HOME and YAW_HOME in test/data-sync.test.js.

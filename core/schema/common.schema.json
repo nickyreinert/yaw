@@ -75,7 +75,7 @@
     "questionId": {
       "description": "<group>.<name>; group is a doc 03 section name. Words that suggest secrets are not allowed.",
       "type": "string",
-      "pattern": "^(?!.*(secret|token|password|passwd|apikey|api-key|credential))(user|idea|domain|arch|delivery|quality|ui|privacy|backup|vendors|tasks|governance|team)\\.[a-z][a-z0-9-]*$"
+      "pattern": "^(?!.*(secret|token|password|passwd|apikey|api-key|credential))(user|idea|domain|arch|delivery|quality|ui|privacy|backup|vendors|tasks|governance|team|compact)\\.[a-z][a-z0-9-]*$"
     },
     "answerValue": {
       "description": "An answer: a scalar or a list of scalars.",
@@ -86,7 +86,7 @@
       "description": "Answers keyed by question id.",
       "type": "object",
       "patternProperties": {
-        "^(?!.*(secret|token|password|passwd|apikey|api-key|credential))(user|idea|domain|arch|delivery|quality|ui|privacy|backup|vendors|tasks|governance|team)\\.[a-z][a-z0-9-]*$": { "$ref": "#/$defs/answerValue" }
+        "^(?!.*(secret|token|password|passwd|apikey|api-key|credential))(user|idea|domain|arch|delivery|quality|ui|privacy|backup|vendors|tasks|governance|team|compact)\\.[a-z][a-z0-9-]*$": { "$ref": "#/$defs/answerValue" }
       },
       "additionalProperties": false
     },
