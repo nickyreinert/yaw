@@ -9,7 +9,7 @@ adds:
   - "Blocks agents from reading secret files (.env, keys)"
   - "Blocks destructive commands (rm -rf, force push) unless you run them"
 example: { when: "Agent runs", run: "cat .env", then: "blocked: \"secret file; ask the user\". Same for rm -rf, force push, prod deploy." }
-depends: [standards]
+depends: [core]
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:

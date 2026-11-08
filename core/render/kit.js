@@ -215,7 +215,7 @@ const STYLE = {
 };
 const STYLE_DEFAULTS = { length: 'balanced', expertise: 'intermediate' };
 
-// ADR-0024: the stack overlay of the standards module (profiles/<p>/standards.md) has at most 20 lines.
+// ADR-0024: the stack overlay rendered in docs/engineering.md (profiles/<p>/standards.md) has at most 20 lines.
 export const OVERLAY_MAX_LINES = 20;
 
 export function profileOverlay(kitRoot, profiles) {
@@ -488,7 +488,7 @@ export function compactJust(text, { warnings } = {}) {
 //   .gitignore part <- profiles/<p>/gitignore
 //   scaffold        <- profiles/<p>/scaffold/**            (user-owned code, written once; `scaffold` is a
 //                      function rel -> boolean (file exists); one existing file skips the whole scaffold)
-// standards.md, guards.yaml and ci/check.yml are read by the modules that need them (standards, security, ci).
+// standards.md, guards.yaml and ci/check.yml are read by the modules that need them (core, security, ci).
 // Profiles missing from the kit are reported, not rendered.
 // -> { parts: [{ path, module, kind, content }], files: Map<path, { module, content, fragments, managed }>, missing }
 // A profile option with scaffold: true adds profiles/<p>/variants/<choice>/ to the scaffold (ADR-0105); `answers` picks the choice.

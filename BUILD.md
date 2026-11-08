@@ -56,7 +56,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 | 2 | `github.yaml` / `taxonomy.json` | `github.yaml` stays YAML (user edits labels/rules). `taxonomy.json` stays JSON (managed through `yaw decisions` commands, as in the blueprint). |
 | 3 | `yaw.db`, release plan, `pr-policy` | Phase 1 defines only the tables it uses (session registry). The `decisions` table (discovery index for the decisions module) is approved by the user (ADR-0028). Evaluation tables and `release-plan.yaml` come in phase 2. Phase-1 `pr-policy` enforces only "PR links an open issue"; phase gating comes with the launch plan in phase 2. |
 | 4 | Tasks source of truth | Local mode: `TASKS.md` is the source of truth, IDs `T-NNN`. GitHub-only and team mode: issues are the source, IDs are issue numbers (`#123`), `TASKS.md` is a generated read-only view. Both mode: `T-NNN` with linked issue number. |
-| 5 | Presets | "Lean" = **Quick** (one name, docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; doc 04, ADR-0009). Setup depths are Quick and Full; Standard is merged into Full and `standard` stays an alias (ADR-0032). Step 3 builds `core` only; Quick is complete after 5.3. No reordering. |
+| 5 | Presets | "Lean" = **Quick** (one name, docs updated). Quick = `core`, `communication`, `devenv`, `tasks`, `security` (minimal; doc 04, ADR-0009). Setup depths are Quick and Full; Standard is merged into Full and `standard` stays an alias (ADR-0032). Step 3 builds `core` only; Quick is complete after 5.3. No reordering. |
 | 6 | `security` / `quality-code` | Minimal `security` joins phase 1: deny reading `.env*`/secret files, guard destructive commands (`rm -rf`, force push, prod deploy). This is the blocking hook that proves step 4. `quality-code` reviewer subagent stays phase 2; `just check` gates come from the profiles. |
 | 7 | Dogfooding profile, ADR location | Add 9th profile **`node-cli`** (Node ≥ 22, `node --test`, no deps) and use it for this repo. ADRs live in `docs/adr/` until step 5.6, then move into `.decisions/` via the decisions module. |
 | 8 | Gemini CLI | Phase 3, together with Antigravity (Gemini CLI is enterprise/API-key only now). Phase 1 agents: Claude, Codex, Copilot. |
@@ -125,7 +125,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 | # | Module | Docs | Model / effort |
 |---|---|---|---|
 | 5.0 | Minimal `security`: `.env*`/secret read deny, destructive-command guard (built together with step 4) | 04, 08 | **A, `high`** |
-| 5.1 | `communication`, `standards` | 04 | B, `low` |
+| 5.1 | `communication` (the former `standards` module was merged into core's docs/engineering.md, T-030) | 04 | B, `low` |
 | 5.2 | `devenv` | 04, 05 | B, `medium` |
 | 5.3 | `tasks` (local / GitHub / both) | 10 | B, `medium` |
 | 5.4 | `git-hooks` (lefthook, gitleaks) | 04 | B, `low` |

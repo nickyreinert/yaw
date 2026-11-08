@@ -24,17 +24,17 @@ test('the Coding Style cards share one grid in a logical order', async (t) => {
   const { renderModuleGroups } = await import('../core/web/assets/setup-cards.js');
   const root = new Element('div');
   const unit = new Element('div'); unit.attrs['data-card'] = 'unit-tests';
-  const modules = ['core', 'devenv', 'security', 'standards'].map((name) => ({ name, title: name, group: 'basics', short: name }));
+  const modules = ['core', 'devenv', 'security'].map((name) => ({ name, title: name, group: 'basics', short: name }));
   renderModuleGroups(root, { modules, selected: modules.map((m) => m.name), answers: {}, questions: [], groupNodes: (g) => g === 'basics' ? [unit] : [], questionNodes: () => [], compact: true });
   const section = root.all((n) => n.tag === 'section' && n.attrs['aria-label'] === 'Coding Style')[0];
   const grids = section.all((n) => n.attrs.class === 'module-grid');
   assert.equal(grids.length, 1, 'one grid, no separate container for Unit Tests');
   const cards = grids[0].children.map((card) => card.all((n) => n.tag === 'code')[0]?.textContent ?? 'unit-tests');
-  assert.deepEqual(cards, ['core', 'standards', 'unit-tests', 'devenv', 'security']);
+  assert.deepEqual(cards, ['core', 'unit-tests', 'devenv', 'security']);
 });
 
 test('orderCards keeps unknown cards last, in their given order', () => {
-  assert.deepEqual(CARD_ORDER.basics, ['core', 'standards', 'unit-tests', 'devenv', 'security']);
+  assert.deepEqual(CARD_ORDER.basics, ['core', 'unit-tests', 'devenv', 'security']);
   assert.deepEqual(orderCards('basics', ['x', 'security', 'core', 'y']), ['core', 'security', 'x', 'y']);
   assert.deepEqual(orderCards('github', ['b', 'a']), ['b', 'a']);
 });

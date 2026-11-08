@@ -95,7 +95,7 @@ export function languageIcon(language) {
   icon.classList.add('language-icon'); return icon;
 }
 export function moduleIcon(name) {
-  return decisionIcon(({ core: 'book', standards: 'ruler', security: 'shield', devenv: 'terminal', github: 'branch', 'git-hooks': 'branch', ci: 'shuffle', 'code-map': 'map', decisions: 'book', communication: 'message', tasks: 'list', review: 'shield', comfort: 'bell', sessions: 'chart', team: 'users', backup: 'memory' })[name] ?? 'box');
+  return decisionIcon(({ core: 'book', security: 'shield', devenv: 'terminal', github: 'branch', 'git-hooks': 'branch', ci: 'shuffle', 'code-map': 'map', decisions: 'book', communication: 'message', tasks: 'list', review: 'shield', comfort: 'bell', sessions: 'chart', team: 'users', backup: 'memory' })[name] ?? 'box');
 }
 const GROUP_ICONS = { github: 'branch', tasks: 'list', basics: 'box', memory: 'memory', quality: 'shield', comfort: 'bell' };
 const ARCH_DECISIONS = {

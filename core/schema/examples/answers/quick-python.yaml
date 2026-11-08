@@ -12,7 +12,7 @@ proposal:
   status: confirmed
   summary: Single Python CLI managed with uv; tasks stay local.
   profiles: [python-cli]
-  modules: [core, communication, standards, devenv, tasks]
+  modules: [core, communication, devenv, tasks]
   shape: single CLI
   data: none
   hosting: none

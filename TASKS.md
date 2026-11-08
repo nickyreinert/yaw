@@ -20,11 +20,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
-- T-030 [P2] Consolidate Coding Rules cards — clarify Unit Tests wording (part of `just check`, no overlap with other test/standards settings). Remove Docker from Local Settings and Secrets if it has no independent function. Audit Coding Standards / Git Style / Rules of your Stack against stack, Coding Rules and other cards; remove or merge the card and move missing rules into generated agent instructions.
-  model: middle tier (Sonnet) · effort: high
-  status: in progress · needs decision: should the Coding standards card (module `standards`: docs/standards.md = clean code, security, performance, testing, review, git style + the profile's stack rules) be merged into Project rules (docs/engineering.md, always on, so the toggle disappears), or kept as is with only the duplicated Testing/Security lines trimmed? It has unique content (clean code, performance, Conventional Commits, stack rules), and `security` depends on it, so merging means removing a module and regenerating the manifests/fixtures.
-  done: Unit Tests wording ("Part of `just check`: ..."), Docker removed from Local settings & secrets (card text, Dockerfile/compose/devcontainer templates, profileDevenv container support; tests in test/coding-rules-cards.test.js, modules/devenv/tests). resume: after the decision, merge or trim `standards`, then archive.
-
 ## Backlog
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.

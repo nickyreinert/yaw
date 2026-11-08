@@ -193,8 +193,8 @@ test('web model: normalization and browser defaults match the CLI interview', as
 
 test('web state: toggles add dependencies, cascade removal and immediately hide questions', () => {
   const m = createFormModel(fixture()), c = m.bootstrap();
-  const repaired = toggleModules(c.modules, ['core', 'security'], 'security', true);
-  assert.ok(repaired.includes('standards'), 'repair dependencies of an already selected module');
+  const repaired = toggleModules(c.modules, ['core', 'ci'], 'ci', true);
+  assert.ok(repaired.includes('github'), 'repair dependencies of an already selected module');
   const enabled = toggleModules(c.modules, ['core'], 'team', true);
   for (const n of ['core', 'team', 'tasks', 'github', 'git-hooks']) assert.ok(enabled.includes(n));
   const questions = visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', enabled);

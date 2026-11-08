@@ -1,4 +1,5 @@
-// Shared project rules for generated AGENTS.md, standards and the local-agent kickoff.
+// Shared project rules for generated docs/engineering.md and the local-agent kickoff (T-030: the former Coding standards
+// card is merged in here, so these rules are always on).
 // Error, logging and documentation rules are not user options (T-031): they follow the language, the destination
 // and the enabled modules. context.modules is known only where files are rendered.
 export function codingPractices(answers = {}, { modules = [] } = {}) {
@@ -17,6 +18,9 @@ export function codingPractices(answers = {}, { modules = [] } = {}) {
     'Test changed behavior, boundaries, failure paths and security-sensitive checks; add regression tests for bugs. Report what could not be tested.',
     `${errors} ${logging}`,
     `${documentation} Follow the stack formatter, linter and type checks; validate external inputs and use parameterized queries.`,
+    'Write small, focused units with clear names; no dead code or speculative abstraction; comment only what the code cannot say.',
+    'Avoid N+1 queries; bound loops and queries and paginate; cache only where measured; keep assets within a size budget.',
+    'Use Conventional Commits and small pull requests.',
   ];
 }
 

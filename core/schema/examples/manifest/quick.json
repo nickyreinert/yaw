@@ -15,9 +15,6 @@
     "communication": {
       "enabled": true
     },
-    "standards": {
-      "enabled": true
-    },
     "devenv": {
       "enabled": true
     },
@@ -37,10 +34,6 @@
         {
           "module": "communication",
           "hash": "sha256:d4e16994df9002e53294f899714d7137592fd13ba986fcd070214dc85d659968"
-        },
-        {
-          "module": "standards",
-          "hash": "sha256:0b21aaddae93d0233f598f4d15c6bdc695206094e89cba27044e721a83c79219"
         },
         {
           "module": "tasks",

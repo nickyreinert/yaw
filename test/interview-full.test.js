@@ -79,7 +79,7 @@ const QUICK = {
 };
 Object.assign(QUICK, { 'user.length': 'balanced', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];
-const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
+const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'tasks'];
 
 test('Quick: depth is the first question; answers.yaml holds the Q answers and the Quick modules', async () => {
   const r = await init({ depth: 'quick', ...IDEA });

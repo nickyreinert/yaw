@@ -33,3 +33,30 @@ test('the Docker rule still comes from the Docker switch, not from Local setting
   for (const file of ['Dockerfile', 'compose.yaml', '.devcontainer/devcontainer.json']) assert.equal(Object.hasOwn(tree, file), false, file);
   assert.match(tree['.env.example'], /Copy to \.env/);
 });
+
+test('the Coding standards card is gone; the Safety guard still resolves without it', async () => {
+  const { hasModule, loadModule: load } = await import('../core/render/kit.js');
+  const { CARD_ORDER } = await import('../core/interview/module-groups.js');
+  const { checkDependencies } = await import('../core/render/project.js');
+  assert.equal(hasModule(KIT_ROOT, 'standards'), false);
+  assert.equal(CARD_ORDER.basics.includes('standards'), false);
+  assert.equal(existsSync(join(KIT_ROOT, 'modules/standards')), false);
+  assert.ok(!(load(KIT_ROOT, 'security').depends ?? []).includes('standards'));
+  assert.doesNotThrow(() => checkDependencies({ kitRoot: KIT_ROOT, modules: ['core', 'security'] }));
+});
+
+test('the unique standards rules and the stack rules reach docs/engineering.md, always on', async () => {
+  const root = tmp('yaw-cards-merge-');
+  const answers = `mode: quick\nanswers:\n  user.agents: [claude]\n  idea.text: A small tool.\n  arch.language: typescript\n  arch.runs-on: local\nproposal:\n  status: confirmed\n  summary: test\n  profiles: [node-cli]\n  modules: [core]\n`;
+  await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-cards-ans-'), answers), modules: ['core'] });
+  const tree = readTree(root);
+  const doc = tree['docs/engineering.md'];
+  assert.match(doc, /small, focused units/i);
+  assert.match(doc, /N\+1/);
+  assert.match(doc, /Conventional Commits/);
+  assert.match(doc, /small pull requests/i);
+  assert.match(doc, /Stack rules/);
+  assert.match(doc, /node:test/);
+  assert.equal(Object.hasOwn(tree, 'docs/standards.md'), false);
+  assert.doesNotMatch(tree['AGENTS.md'], /docs\/standards\.md/);
+});

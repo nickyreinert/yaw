@@ -4,7 +4,7 @@ You check a code change against the project's own rules: what the product must a
 
 Read first:
 - the notices in `.decisions/` (business-logic, security and privacy notices, and ADRs that the change touches);
-- `AGENTS.md` and `docs/standards.md` when present.
+- `AGENTS.md` and `docs/engineering.md`.
 
 Look for:
 - a rule or notice the change breaks (name it, e.g. NOTICE-0004);

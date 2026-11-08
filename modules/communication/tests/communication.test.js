@@ -11,7 +11,7 @@ import { OVERLAY_MAX_LINES } from '../../../core/render/kit.js';
 import { collectQuestions } from '../../../core/render/kit.js';
 import { KIT_ROOT, read, readJson, readTree, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 
-const MODULES = ['core', 'communication', 'standards'];
+const MODULES = ['core', 'communication'];
 
 // T-027: the style is personal unless the project switches it to team; most tests render a shared style.
 const STYLE = ['user.length', 'user.explain', 'user.expertise', 'user.language', 'user.autonomy'];
@@ -104,14 +104,15 @@ test('personal by default (ADR-0013, T-027): the style is not committed, solo or
   }
 });
 
-test('standards: baseline plus the stack overlay of the profile, one pointer line in AGENTS.md', async () => {
+test('engineering rules: clean code, git style and the stack overlay of the profile, no standards file (T-030)', async () => {
   const root = await project();
-  const doc = read(root, 'docs/standards.md');
-  assert.match(doc, /\*\*Clean code:\*\*/);
-  assert.match(doc, /\*\*Git:\*\*/);
-  assert.match(doc, /## Stack notes \(node-cli - /);
+  const doc = read(root, 'docs/engineering.md');
+  assert.match(doc, /small, focused units/);
+  assert.match(doc, /Conventional Commits/);
+  assert.match(doc, /## Stack rules/);
   assert.match(doc, /built-ins/);
-  assert.equal(section(read(root, 'AGENTS.md'), 'standards').trim().split('\n').length, 1);
+  assert.equal(existsSync(join(root, 'docs/standards.md')), false);
+  assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:standards|docs\/standards\.md/);
 });
 
 test('every profile overlay has at most 20 lines', () => {
@@ -127,28 +128,25 @@ test('manifest entries: owner, fragments and hashes', async () => {
   const root = await project({ extra: { 'user.length': 'brief' } });
   const m = readManifest(root);
   const byPath = Object.fromEntries(m.files.map((f) => [f.path, f]));
-  assert.equal(byPath['docs/standards.md'].module, 'standards');
+  assert.equal(byPath['docs/engineering.md'].module, 'core');
   assert.equal(byPath['.claude/output-styles/yaw.md'].module, 'communication');
-  assert.deepEqual(byPath['AGENTS.md'].fragments.map((f) => f.module).sort(), ['communication', 'standards']);
+  assert.deepEqual(byPath['AGENTS.md'].fragments.map((f) => f.module).sort(), ['communication']);
   assert.deepEqual(byPath['.claude/settings.json'].fragments.map((f) => f.module), ['communication']);
-  assert.ok(byPath["docs/standards.md"].hash);
+  assert.ok(byPath['docs/engineering.md'].hash);
 });
 
 test('removing communication removes optional artifacts, keeps core preferences and re-add restores the same files', async () => {
   const root = await project({ extra: { 'user.length': 'brief' } });
   const withBoth = readTree(root);
   await removeModule({ root, kitRoot: KIT_ROOT, module: 'communication' });
-  await removeModule({ root, kitRoot: KIT_ROOT, module: 'standards' });
   const left = readTree(root);
-  for (const gone of ['.claude/output-styles/yaw.md', '.claude/settings.json', 'docs/standards.md']) {
+  for (const gone of ['.claude/output-styles/yaw.md', '.claude/settings.json']) {
     assert.equal(Object.hasOwn(left, gone), false, gone);
   }
-  assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication|yaw:standards/);
+  assert.doesNotMatch(read(root, 'AGENTS.md'), /yaw:communication/);
   assert.match(read(root, 'AGENTS.md'), /Prefer bullet points/, 'core still applies personal preferences without an optional output style');
   assert.equal(readAnswers(root).answers['user.length'], 'brief'); // user answers kept
-  assert.equal(existsSync(join(root, '.yaw/base/docs/standards.md')), false);
   assert.equal(existsSync(join(root, '.yaw/base/docs/engineering.md')), true, 'core engineering baseline survives removing optional modules');
   await addModule({ root, kitRoot: KIT_ROOT, module: 'communication' });
-  await addModule({ root, kitRoot: KIT_ROOT, module: 'standards' });
   assert.deepEqual(readTree(root), withBoth); // same result as before the removal
 });

@@ -71,7 +71,7 @@ test('CLI secret entry uses hidden input and keeps values out of answers, logs a
   const stdout = capture(), stderr = capture(), prompter = scripted(['y']);
   const answersFile = join(root, 'answers.yaml');
   writeFileSync(answersFile, readFileSync(join(KIT_ROOT, 'examples/node-cli/answers.yaml'), 'utf8')
-    .replace('modules: [core]', 'modules: [core, communication, devenv, security, standards, tasks]'));
+    .replace('modules: [core]', 'modules: [core, communication, devenv, security, tasks]'));
   const canary = 'CLI_SECRET_CANARY_81cf';
   prompter.askSecret = async (question) => {
     prompter.asked.push(question);

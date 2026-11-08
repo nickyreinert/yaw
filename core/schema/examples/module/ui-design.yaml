@@ -2,7 +2,7 @@
 name: ui-design
 description: Design direction, tokens, screenshots and visual review.
 appliesTo: { hasUI: true }            # hidden when the product has no UI
-depends: [standards]
+depends: [core]
 default: { quick: false, standard: { hasUI: true }, full: { hasUI: true } }
 questions:
   - id: ui.direction

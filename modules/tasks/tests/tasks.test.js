@@ -155,7 +155,7 @@ test('install: github mode has its own rules and git-ignores the per-person view
 
 test('install: AGENTS.md stays within the 80-line budget with all Quick modules', async () => {
   const root = tmp('yaw-tasks-');
-  const modules = ['core', 'communication', 'standards', 'devenv', 'security', 'tasks'];
+  const modules = ['core', 'communication', 'devenv', 'security', 'tasks'];
   const text = answersText({ mode: 'both' }).replace('[core, tasks]', `[${modules.join(', ')}]`);
   await initProject({ root, answersFile: writeAnswers(tmp('yaw-ans-'), text), modules });
   assert.ok(read(root, 'AGENTS.md').split('\n').length <= 80);

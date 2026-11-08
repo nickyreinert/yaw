@@ -1,7 +1,7 @@
 # modules/security/module.yaml (Y-5.0, ADR-0022): minimal guards (BD6); in Quick (ADR-0009).
 name: security
 description: Denies reading .env and secret files and guards destructive commands (rm -rf, force push, prod deploy).
-depends: [standards]
+depends: [core]
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:

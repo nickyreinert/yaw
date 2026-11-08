@@ -41,7 +41,7 @@ test('Quick produces exactly its baseline modules and files', () => {
 
 test('Full: github and ci follow the GitHub answer; git-hooks, decisions, sessions, comfort, code-map, review are always on', () => {
   const on = render('node-cli', { mode: 'full' }).modules;
-  assert.deepEqual(on, ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks']);
+  assert.deepEqual(on, ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'tasks']);
   const off = render('node-cli', { mode: 'full', github: false }).modules;
   assert.deepEqual(off, on.filter((m) => m !== 'github' && m !== 'ci'));
 });

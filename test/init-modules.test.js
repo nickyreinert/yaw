@@ -8,25 +8,25 @@ import { collectQuestions, loadModule, hasModule } from '../core/render/kit.js';
 import { selectModules } from '../core/render/project.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
-const definitions = ['core', 'git-hooks', 'security', 'standards', 'decisions', 'github'].map((name) => loadModule(KIT_ROOT, name));
+const definitions = ['core', 'git-hooks', 'security', 'decisions', 'github'].map((name) => loadModule(KIT_ROOT, name));
 const answers = { 'tasks.use-github': false };
 
 test('module chooser groups numbered choices with purposes and adds required dependencies through shared policy', async () => {
-  const p = scripted(['1, 2, 4, 2']);
+  const p = scripted(['1, 2, 3, 2']);
   const result = await chooseInitModules({ prompter: p, definitions, answers });
   assert.deepEqual(result.modules, ['git-hooks', 'security', 'decisions']);
   const shown = p.shown.join('');
   assert.match(shown, /Git & GitHub[\s\S]*1\) Checks before every commit/);
-  assert.match(shown, /2\) Safety guard \(security\)\n {9}Blocks secret reads and destructive commands\n {9}Requires: standards/);
+  assert.match(shown, /2\) Safety guard \(security\)\n {9}Blocks secret reads and destructive commands\n\n/);
   assert.match(shown, /– GitHub workflow \(github\) · needs GitHub/);
   assert.deepEqual(new Set(selectModules({ kitRoot: KIT_ROOT, mode: 'pro', answers, defaults: result.modules })),
-    new Set(['core', 'git-hooks', 'security', 'decisions', 'standards']));
+    new Set(['core', 'git-hooks', 'security', 'decisions']));
 });
 
 test('module chooser supports defaults, all, none, names, validation retries and browser switching', async () => {
   for (const [replies, expected] of [
-    [[''], ['security']], [['all'], ['git-hooks', 'security', 'standards', 'decisions']],
-    [['none'], []], [['security, 4'], ['security', 'decisions']],
+    [[''], ['security']], [['all'], ['git-hooks', 'security', 'decisions']],
+    [['none'], []], [['security, 3'], ['security', 'decisions']],
     [['0', '500', 'github', '2oops', '?', 'none'], []],
   ]) {
     const p = scripted(replies), ask = p.ask;
@@ -71,7 +71,7 @@ test('All starts with agents, puts stack before Workflow modules, and preserves 
   assert.ok(order.indexOf('tasks.use-github') < order.indexOf('modules'));
   assert.ok(!order.includes('user.comfort'), 'unselected comfort questions stay defaulted');
   assert.ok(!order.includes('quality.review-quality'), 'unselected review questions stay defaulted');
-  assert.match(io.stdout.text(), /modules: core, decisions, security, standards/);
+  assert.match(io.stdout.text(), /modules: core, decisions, security/);
   assert.deepEqual(readdirSync(io.cwd), []);
 });
 
@@ -84,7 +84,7 @@ test('All browser handoff retains numbered module choices and their dependencies
     assert.ok(opened, io.stderr.text());
     const cookie = (await fetch(opened, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
     const boot = await (await fetch(new URL('/api/bootstrap', opened), { headers: { cookie } })).json();
-    assert.deepEqual(new Set(boot.handoff.modules), new Set(['core', 'comfort', 'decisions', 'security', 'standards']));
+    assert.deepEqual(new Set(boot.handoff.modules), new Set(['core', 'comfort', 'decisions', 'security']));
     assert.equal(boot.handoff.answers['arch.language'], 'python');
     assert.equal(boot.handoff.answers['tasks.use-github'], false);
     assert.deepEqual(readdirSync(io.cwd), []);

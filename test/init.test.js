@@ -159,7 +159,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     modules: ['core'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + communication + standards + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
+  // Quick = core + communication + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), []);
   assert.equal(readManifest(dir).files.length, 11);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
@@ -362,7 +362,7 @@ test('an interrupt during verify stops the recipe tree and still ends yaw by tha
 });
 
 test('init ends with next steps: agent start, Codex hook trust, data locations, tools (#167, #176)', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('user.agents: [claude]', 'user.agents: [codex]').replace('modules: [core]', 'modules: [core, standards, security, tasks, sessions, decisions]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('user.agents: [claude]', 'user.agents: [codex]').replace('modules: [core]', 'modules: [core, security, tasks, sessions, decisions]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
   const steps = r.out.slice(r.out.indexOf('\nNext steps\n'));
