@@ -4,6 +4,10 @@
   model: middle tier (Sonnet) · effort: high
   done: modules/review/lib/cli.js `pushedCommits` and the push diff use a strict git call that throws on failure instead of reading it as zero commits or an empty diff; the gate then stops with exit 2 and `review gate: git failed`, unless `YAW_REVIEW=skip`. `verdict()` accepts only an exact final `VERDICT: PASS|FINDINGS` line (as the prompt already demands). Tests in modules/review/tests/review.test.js (verdict, pushedCommits with an unknown remote sha, gate with unknown sha and failing diff) fail on the old code (3 failures) and pass now; review tests 14/14, foundations/setup-refinements/improve-store 26/26. Commit b743793.
 
+- T-020 Repair brittle UI/parity tests — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: test/analytics-filters.test.js finds search box, option list, checkboxes and empty note by type/class/aria-label instead of child position; test/form-parity.test.js picks questions by label plus `when` condition and asserts unique IDs instead of unique labels.
+
 - T-018 Remove quadratic scan merging — done 2026-11-08
   model: low tier (Luna/Haiku) · effort: medium
   done: `collectAnalysis` in core/lib/session-analysis.js reads each saved row's previous version from the existing `byId` map instead of `old.rows.find` per result. Regression test in test/session-insights.test.js spies on `Array.prototype.find` during a cached refresh of 61 saved sessions and expects no scan of the saved rows (fails before the fix with 61 scans). Benchmark (scratchpad script, 20,000 Codex transcripts, cached refresh with all rows reused): 2,541 ms before, 546 ms after. Suite: 1,197 tests, 1,108 passed / 4 failed / 85 skipped; failures are outside the touched code (YAW manifest and managed-file checks, T-009; fixture normalisation test; comfort hooks test).
@@ -113,3 +117,7 @@
 - T-012 Fix Markdown deletion in sync — done 2026-11-08
   model: low tier (Luna/Haiku) · effort: medium
   done: `applyPortableRecords` in core/lib/data-sync.js parses only settings records when deleting synced files; regression test for front-matter deletion in test/data-sync.test.js. Commits 492699e and 6b714f1.
+
+- T-011 Preserve permissions during atomic replacement — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: `writeAtomic` in core/render/files.js keeps an existing regular file's mode (chmod after write, so umask cannot widen 0600 or drop +x) unless `options.mode` is given; callers pass explicit modes already. Regression test in test/render.test.js.
