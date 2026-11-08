@@ -292,6 +292,15 @@ function moduleCard(m, ctx, selected, hasGit) {
 function reviewerCards(ctx, on, hasGit) {
   const trig = (k) => ctx.answers[`quality.review-${k}`] ?? ctx.questions.find((q) => q.id === `quality.review-${k}`)?.default ?? 'off';
   const cards = [];
+  const gated = REVIEWERS.some(([k]) => trig(k) === 'push');
+  const field = choiceField({ name: 'review-gate', id: 'review-gate', label: 'Push gate', value: ctx.answers['quality.review-gate'] ?? 'warn',
+    disabled: !on || !hasGit || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
+    onChange: (value) => ctx.onAnswer('quality.review-gate', value) });
+  const gateHelp = 'Warn asks before a push with findings; Block stops it. The gate requires Git and at least one reviewer required before push.';
+  const explainGate = () => ctx.onExplain?.('Push gate', [el('p', { text: gateHelp })], { module: 'review' });
+  cards.push(el('article', { class: 'module-card push-gate wide', onfocusin: explainGate, onmouseenter: explainGate },
+    el('h4', { class: 'module-group-title' }, decisionIcon('branch'), el('span', { text: 'Push gate' })), field.node,
+    ctx.compact === false || !hasGit || !gated ? el('p', { class: 'small muted', text: !hasGit ? 'Needs a Git repository.' : !gated ? 'Set a reviewer to Required before push.' : gateHelp }) : null));
   for (const [k, title, what, example] of REVIEWERS) {
     const { node: choices } = choiceField({ name: `review-trigger-${k}`, id: `review-${k}`, label: `${title} reviewer`, value: trig(k), disabled: !on || ctx.readOnly,
       choices: TRIGGERS.map(([value, label]) => ({ value, label: value === 'push' && !hasGit ? `${label} (needs git)` : label, disabled: value === 'push' && !hasGit })),
@@ -301,14 +310,5 @@ function reviewerCards(ctx, on, hasGit) {
       el('h4', { class: 'module-group-title' }, decisionIcon(k === 'security' ? 'shield' : 'file'), el('span', { text: title })),
       choices, ctx.compact === false ? el('p', { class: 'small', text: what }) : null));
   }
-  const gated = REVIEWERS.some(([k]) => trig(k) === 'push');
-  const field = choiceField({ name: 'review-gate', id: 'review-gate', label: 'Push gate', value: ctx.answers['quality.review-gate'] ?? 'warn',
-    disabled: !on || !hasGit || !gated || ctx.readOnly, choices: [{ value: 'warn', label: 'Warn' }, { value: 'block', label: 'Block' }],
-    onChange: (value) => ctx.onAnswer('quality.review-gate', value) });
-  const gateHelp = 'Warn asks before a push with findings; Block stops it. The gate requires Git and at least one reviewer required before push.';
-  const explainGate = () => ctx.onExplain?.('Push gate', [el('p', { text: gateHelp })], { module: 'review' });
-  cards.push(el('article', { class: 'module-card push-gate', onfocusin: explainGate, onmouseenter: explainGate },
-    el('h4', { class: 'module-group-title' }, decisionIcon('branch'), el('span', { text: 'Push gate' })), field.node,
-    ctx.compact === false || !hasGit || !gated ? el('p', { class: 'small muted', text: !hasGit ? 'Needs a Git repository.' : !gated ? 'Set a reviewer to Required before push.' : gateHelp }) : null));
   return cards;
 }

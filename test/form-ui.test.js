@@ -658,3 +658,14 @@ test('web API: console file previews return full text through authenticated, rea
   const protectedFile = await f.post('file-preview', { setup: setup(), path: '.env' });
   assert.equal(protectedFile.status, 403);
 });
+
+test('review cards: the push gate is a full-width card before the agent cards; Feature fit stays (no duplicate check)', () => {
+  const cards = readFileSync(join(KIT_ROOT, 'core/web/assets/setup-cards.js'), 'utf8');
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  const fn = cards.slice(cards.indexOf('function reviewerCards'));
+  const gate = fn.indexOf("class: 'module-card push-gate wide'");
+  assert.ok(gate > 0, 'push gate card is full width');
+  assert.ok(gate < fn.indexOf('for (const [k, title, what, example] of REVIEWERS)'), 'push gate is built before the agent cards');
+  assert.ok(!/\.module-card\.push-gate[^{]*\{[^}]*grid-column: auto/.test(css), 'css does not undo the full width');
+  assert.deepEqual(cards.match(/\['(quality|logic|ux|security|feature)', '/g).map((s) => s.slice(2, -4)), ['quality', 'logic', 'ux', 'security', 'feature']);
+});

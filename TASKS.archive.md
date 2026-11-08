@@ -1,5 +1,10 @@
 # Archive
 
+- T-032 Rework Review Sub-Agents — done 2026-11-08
+  model: middle tier (Sonnet) · effort: medium
+  done: Push gate (Warn/Block) is now a full-width card (`wide`) built before the agent cards in core/web/assets/setup-cards.js `reviewerCards`; app.css no longer resets its grid column. Quality, Business logic, UI/UX, Security unchanged. Feature fit kept unchanged: no other review or completion check compares the diff with the task's acceptance points (tasks ledger only stores acceptance; quality/logic prompts do not read TASKS.md; only modules/review/lib/cli.js:96 and prompts/feature.md do). Test: test/form-ui.test.js "review cards".
+  open question: rename Feature fit to "Task Review"? Not done, no overlap evidence supports it.
+
 - T-031 Dissolve Coding Practices — done 2026-11-08
   model: middle tier (Sonnet) · effort: high
   done: `quality.error-detail`, `quality.log-output` and `quality.documentation` are retired questions (interview/base.yaml legacy block, `RETIRED_ARCHITECTURE`): never asked, old answers stay readable and are ignored. The Coding Practices section, its grid and CSS are gone from the web interview (no real decision remained, so nothing replaces it; Unit Tests stays in the Quality card). `codingPractices(answers, { modules })` (core/lib/coding-practices.js) derives the rules: html language or static destination gets "No logging infrastructure ..."; other projects get structured console logs with redaction; with the code-map module the documentation rule points to docs/code-map.md. Tests: test/coding-practices-auto.test.js; updated form-parity, interview-depth, interview-full, setup-interview, setup-refinements and the setup-depth fixture hash for docs/engineering.md.
