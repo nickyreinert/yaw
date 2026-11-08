@@ -16,13 +16,12 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
   resume: diagnosed: JDK 21 at JAVA_HOME is valid; `gradlew` exits at its JAVA_HOME check when JAVA_HOME is invalid even with `java` on PATH (reproduced). Gates `kotlinSkip`, `javaSkip` and the Android gate check only `hasTool('java')`. Smoke tests currently skip with "just is not installed". Next after the decision: regression test for the JAVA_HOME gate, then run the smoke tests.
 
-- T-012 [P2] in progress — Fix Markdown deletion in sync. Resume: regression test added in test/data-sync.test.js (front-matter deletion); fix applied in core/lib/data-sync.js applyPortableRecords; next: npm test, archive.
-  model: low tier (Luna/Haiku) · effort: medium
-
-- T-018 [P2] in progress — Remove quadratic scan merging. Resume: regression test in test/session-insights.test.js (spy on rows.find during cached refresh), then replace `old.rows.find` with `byId.get` in core/lib/session-analysis.js collectAnalysis, benchmark 20,000 sessions.
-  model: low tier (Luna/Haiku) · effort: medium
-
 - T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
+
+- T-008 [P1] Fail the push review gate on Git errors — `modules/review/lib/cli.js:pushedCommits` turns an unknown remote SHA into zero commits, bypassing review; failed diffs also become empty text. Propagate failures and require an exact final verdict line.
+  model: middle tier (Sonnet) · effort: high
+  status: in progress
+  resume: uncommitted fix in modules/review/lib/cli.js and modules/review/tests/review.test.js; continue from there
 
 - T-009 [P1] Repair this repo's own YAW setup — resolve `.gitignore` conflict markers; reconcile missing AGENTS.md, CLAUDE.md, agent settings and hook shim with `.yaw/manifest.json`. Align `test/dogfood.test.js` with the selected code-map module.
   in progress: needs decision: keep the intentional removal of AGENTS.md/CLAUDE.md/.claude hooks/.codex/hooks.json/.yaw/bin/yaw-hook (commit a1411d8) and drop them from .yaw/manifest.json, or restore them via `yaw apply`? Resume: resolve .gitignore markers (keep .DS_Store plus kit block), then apply the choice and align test/dogfood.test.js module list with code-map.
@@ -38,22 +37,12 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
   status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
 
-## Backlog
-
-- T-015 [P2] Bound hosted setup and shutdown — `core/cli/init.js` has no child-process deadline; `HostedProjects.close()` waits indefinitely for verification. Add cancellation, process-tree termination and a bounded shutdown that preserves partial-project status.
+- T-050 [P2] L1 wrapper `yaw run --compact` with the node-cli recipes — exit 0: one line `ok <step> (<n> lines, <s>s)`. Exit 0 with warnings: count line, first 10 warnings and `… +<k> more warnings`, as rtk does for `cargo build`. Exit not 0: ANSI, progress and dedup stripping plus a head/tail cap with a recovery hint; the exit code is kept. `YAW_VERBOSE=1` prints raw output; `rawBytes`/`outBytes` are recorded per step. This repo's recipes come first. Depends on T-049.
+  spec: kickoff/16-compact-output.md §4 L1
   model: top tier (Astra/Opus) · effort: high
-  status: in progress · resume: investigate core/cli/init.js child processes and HostedProjects.close()
-
-- T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
-  spec: kickoff/16-compact-output.md §4 L2 and §8
-  acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
-  model: middle tier (Sonnet) · effort: medium
-  status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
+  status: in progress · resume: write failing tests (modules/compact/tests/run.test.js) for `yaw run --compact` and the wrapped node-cli recipes, then modules/compact/lib/run.js, the `run` command and the recipe transform in renderProfiles
 
 ## Backlog
-
-- T-014 [P2] Reject malformed LAN responses safely — `core/remote/lan.js:lanFetch` throws uncaught on HTTP 204 when constructing a Response with a body. Handle bodyless statuses and response-construction errors through promise rejection, including aborted responses.
-  model: middle tier (Sonnet) · effort: medium
 
 - T-016 [P2] Enforce transcript limits before buffering — `core/lib/session-analysis.js` and `modules/sessions/lib/import.js` check line size after readline buffers it. A discarded 64 MiB line raised RSS from 87 to 247 MiB; bound line buffering and stream scan metrics.
   model: top tier (Astra/Opus) · effort: high
@@ -66,9 +55,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-027 [P2] Separate personal from shared settings — in team projects, Communication Style and personal agent preferences must not sync via Git; hooks, skills, tools, shared instructions and project rules may. Decide the storage split (open architecture point), implement it, and rewrite the Solo/Team explanation. Reduce "Who works on this project?" to Solo/Team (drop External Reviewers; check dependents).
   model: top tier (Astra/Opus) · effort: high
-
-- T-028 [P2] Rework Collaboration texts and rules — inspect the implementation first. (a) "Checks on GitHub": describe the actual workflows, checks, Dependabot role and failure behavior. (b) "GitHub Workflow": explain as project-management support; audit epics, milestones, structured issues and progress tracking, add what is missing. (c) Rename "Team Rules" to "Workflow Rules"; verify real session-start behavior (issue display, PR creation) and that it applies to solo projects.
-  model: middle tier (Sonnet) · effort: high
 
 - T-029 [P2] Move Task List and add model recommendations — move Task List out of Advanced Coding Rules to directly below Collaboration; mark "Local only"; describe it as backlog/in-progress/done management with priorities for coding agents. Every task and GitHub issue (local list, issue templates, generated tasks, planning-skill issues) must carry priority, status, recommended model and reasoning effort; audit existing support and make it consistent.
   model: middle tier (Sonnet) · effort: high
@@ -121,10 +107,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-048 [P2] Measure tool-output share before building (L5, part 1) — transcript scan of tool-result sizes by tool and by the command's first word, shown in Analytics. Store sizes and first words only, no content (ADR-0052). Reuse the streaming reader in `core/lib/session-analysis.js` and respect T-016's line limits. First step, with T-047.
   spec: kickoff/16-compact-output.md §4 L5
   model: middle tier (Sonnet) · effort: high
-
-- T-050 [P2] L1 wrapper `yaw run --compact` with the node-cli recipes — exit 0: one line `ok <step> (<n> lines, <s>s)`. Exit 0 with warnings: count line, first 10 warnings and `… +<k> more warnings`, as rtk does for `cargo build`. Exit not 0: ANSI, progress and dedup stripping plus a head/tail cap with a recovery hint; the exit code is kept. `YAW_VERBOSE=1` prints raw output; `rawBytes`/`outBytes` are recorded per step. This repo's recipes come first. Depends on T-049.
-  spec: kickoff/16-compact-output.md §4 L1
-  model: top tier (Astra/Opus) · effort: high
 
 - T-051 [P2] L1 for the remaining profiles — per profile: a warning pattern and quieter reporter flags (for example `pytest -q`). Depends on T-050.
   spec: kickoff/16-compact-output.md §4 L1
