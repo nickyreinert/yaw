@@ -15,6 +15,30 @@ export function projectReviews(rows) {
   return [...groups.values()].map((g) => ({ ...g, classified: g.rows.filter((r) => r.evaluation).length, attention: g.rows.filter(hasFriction).length,
     corrections: sum(g.rows, correctionCount), frustrated: sum(g.rows, frustrationCount), unresolved: sum(g.rows, unresolvedCount), last: Math.max(...g.rows.map((r) => r.started)) }));
 }
+// One level of the project/folder hierarchy. `at` is a folder or project path below `root` ('' = the top); synced
+// sessions and sessions without a project path are listed at the top under a label and open as that label.
+const groupLabel = (row) => row.source === 'synced' ? `Synced · ${row.deviceName ?? 'Other device'}` : row.project?.startsWith('/') ? null : 'Project unavailable';
+export function folderLevel(rows, at = '', root = '') {
+  const kids = new Map(), direct = [], here = at || root;
+  const add = (key, name, row, deeper) => {
+    const kid = kids.get(key) ?? { key, name, rows: [], deeper: false };
+    kid.rows.push(row); kid.deeper ||= deeper; kids.set(key, kid);
+  };
+  for (const row of rows) {
+    const label = groupLabel(row), project = row.project;
+    if (label) { if (!at) add(label, label, row, false); else if (at === label) direct.push(row); }
+    else if (project === here) direct.push(row);
+    else if (at.startsWith('/') || !at) {
+      if (project.startsWith(`${here}/`)) { const name = project.slice(here.length + 1).split('/')[0], key = `${here}/${name}`; add(key, name, row, project !== key); }
+      else if (!at) add(project, project, row, false);
+    }
+  }
+  return { direct, kids: [...kids.values()].map((k) => ({ ...k, classified: k.rows.filter((r) => r.evaluation).length, attention: k.rows.filter(hasFriction).length, last: Math.max(...k.rows.map((r) => r.started)) })) };
+}
+export function folderParent(at, root = '') {
+  const parent = at.slice(0, at.lastIndexOf('/'));
+  return !at.startsWith(`${root}/`) || parent === root ? '' : parent;
+}
 export function automaticExamples(session) {
   const friction = session.candidates.filter((c) => c.reasons.some((reason) => /correction|admission|apology/i.test(reason)));
   const chosen = friction.length ? [...friction, ...session.candidates.filter((c) => c.reasons.some((reason) => /recovery/i.test(reason)))] : session.candidates;

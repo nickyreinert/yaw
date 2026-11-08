@@ -42,9 +42,9 @@ const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', {
 const measured = (r) => r.prompts !== null;
 const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · project paths unavailable`;
 
-const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
+const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'folders', improveAt: '', improveFocus: 'attention' };
 const FILTERS = ['path', ...FACET_KEYS, 'period', 'from', 'to', 'split'];
-const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], profiling: ['agent', 'model', 'period', 'from', 'to', 'split', 'improveView', 'improveFocus'], 'global-tasks': ['path', 'project'] };
+const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveAt', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], profiling: ['agent', 'model', 'period', 'from', 'to', 'split', 'improveView', 'improveAt', 'improveFocus'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
@@ -108,10 +108,11 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       const t = tables[m[2]] ??= {};
       if (m[1] === 'sort') { [t.sort, t.dir] = v.split('.'); t.sortSet = true; } else t[m[1]] = m[1] === 'q' ? v : Number(v) || 1;
     }
+    if (state.improveView === 'projects') state.improveView = 'folders'; // the former Projects button
     if (!['7', '30', '90', 'all'].includes(state.period)) state.period = DEFAULTS.period;
     if (!DIMS.some(([d]) => d === state.split) || (locked() && ['folder', 'project'].includes(state.split))) state.split = DEFAULTS.split;
   }
-  const visibleTables = () => profilingPage() ? [`improve-${state.improveView}`] : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
+  const visibleTables = () => profilingPage() ? (state.improveView === 'sessions' ? ['improve-sessions'] : ['improve-folders', 'improve-folder-sessions']) : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
   function writeUrl() {
     if (!route) return;
     const p = new URLSearchParams();
@@ -628,12 +629,11 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     fill($('improve-classify'), classifyController());
     fill($('improve-filter'), filterBar('improve'));
     const rows = filtered(), [from, to] = bounds();
-    if (!['projects', 'sessions'].includes(state.improveView)) state.improveView = 'projects';
+    if (!['folders', 'sessions'].includes(state.improveView)) state.improveView = DEFAULTS.improveView;
     if (!['attention', 'classified', 'all'].includes(state.improveFocus)) state.improveFocus = 'attention';
     insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set,
-      onConversation: (open) => { $('improve-filter').hidden = open; $('improve-classify').hidden = open; },
-      settings: improvePrefs, view: state.improveView, focus: state.improveFocus,
-      scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView]),
+      settings: improvePrefs, view: state.improveView, at: state.improveAt, root: ROOTP, focus: state.improveFocus,
+      scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView, state.improveAt]),
       period: `${day(from)} through ${day(to - 1)} UTC; ${rows.length} filtered saved sessions${data.limited ? '; list capped at 20,000' : ''}` });
   }
 

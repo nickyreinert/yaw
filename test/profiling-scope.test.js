@@ -108,3 +108,24 @@ test('Profiling uses one component: the workspace route shows only the open work
   assert.doesNotMatch(byId('improve-content').text, /Elsewhere/);
   assert.equal(urls.at(-1), '#profiling?improveView=sessions&improveFocus=all', 'the workspace page keeps its own URL');
 });
+
+test('Profiling opens in the Folder Browser; the location lives in the URL and both views use one filtered row set', async (t) => {
+  const byId = withDom(t);
+  const { createGlobal } = await import('../core/web/assets/global-view.js');
+  const row = (id, project, title) => ({ id, title, agent: 'claude', model: 'm', project, deviceId: 'local', deviceName: 'This device', language: 'javascript', started: Date.now() - 3600000,
+    minutes: 5, prompts: 2, answers: 2, promptChars: 40, answerChars: 80, tokensIn: 10, tokensOut: 10, cost: null, medianResp: 2, p95Resp: 3, medianAnswer: 40, p95Answer: 50,
+    outcome: 'success', evaluation: { classified: 2, counts: { outcome: { success: 2 } } } });
+  const body = { available: true, rows: [row('a', '/work/p', 'Mine one'), row('c', '/work/other', 'Elsewhere')], projects: ['/work/p', '/work/other'], tasks: [], current: '/work/p', history: {}, savings: [] };
+  const get = async (name) => name === 'sessions' ? body : name === 'preferences' ? { autoRefresh: false, classifier: { endpoint: 'http://127.0.0.1:8000' } } : name === 'improve/settings' ? { enabledAgents: [] } : null;
+  const urls = [];
+  const view = createGlobal({ get, api: async () => ({}), report: (e) => { throw e; }, openProject() {}, replace: (u) => urls.push(u) });
+  await view.show('global-improve', 'improveFocus=all');
+  assert.match(byId('improve-content').text, /Folder Browser/);
+  assert.doesNotMatch(byId('improve-content').text, /Mine one/, 'sessions are inside their project');
+  await view.show('global-improve', 'improveFocus=all&improveAt=/work/p');
+  assert.match(byId('improve-content').text, /Mine one/); assert.doesNotMatch(byId('improve-content').text, /Elsewhere/);
+  assert.equal(urls.at(-1), '#global-improve?improveAt=/work/p&improveFocus=all');
+  await view.show('global-improve', 'improveView=projects&improveFocus=all');
+  assert.doesNotMatch(byId('improve-content').text, /Mine one/, 'the old Projects link opens the Folder Browser');
+  assert.equal(urls.at(-1), '#global-improve?improveFocus=all');
+});

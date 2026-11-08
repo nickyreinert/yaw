@@ -56,9 +56,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   model: middle tier (Sonnet) · effort: medium
 
 
-- T-044 [P2] Rebuild "Where did work get difficult?" navigation and preview — replace the Projects/Sessions buttons with a "View" switch: Folder Browser (project/folder hierarchy, reliable back navigation) vs. All Sessions (flat list); same data and filters in both. "Read Conversation" opens a right-hand preview (table narrows) with an X that restores full width, no page change. Make the preview component reusable for other session lists; reuse existing folder-hierarchy components.
-  model: middle tier (Sonnet) · effort: high
-
 - T-045 [P2] Investigate Safe Verdicts before changing it — explain what it stores, how verdicts arise, what "No Important Verdict", "Set Retention" and "Import a Verdict" do, why it is separate from Analytics and Sync, and its user benefit. Report to the user first; then decide keep/rename/move/remove. Do not alter or delete data or the UI before that decision.
   model: middle tier (Sonnet) · effort: medium
 

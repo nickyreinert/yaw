@@ -270,7 +270,7 @@ test('Insights action and browser modules use existing authenticated no-store an
   assert.equal((await action('improve-agent-start', { agent: 'shell', prompt: 'Never execute arbitrary commands.', confirm: true })).status, 400);
   assert.equal((await fetch(`${base}/api/improve/job`, { headers: { cookie } })).status, 200);
   assert.match(html, /data-route="global-improve"/); assert.match(html, /id="gs-improve"/);
-  for (const file of ['insights-model.js', 'insights-view.js', 'chat-services.js']) {
+  for (const file of ['insights-model.js', 'insights-view.js', 'session-preview.js', 'chat-services.js']) {
     const response = await fetch(`${base}/${file}`, { headers: { cookie } });
     assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /javascript/);
   }

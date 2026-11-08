@@ -1,5 +1,6 @@
-import { automaticExamples, correctionCount, frustrationCount, hasFriction, insightCoverage, projectReviews, redactPaths, reviewPrompt } from './insights-model.js';
+import { automaticExamples, correctionCount, folderLevel, folderParent, frustrationCount, hasFriction, insightCoverage, reviewPrompt } from './insights-model.js';
 import { CHATS } from './chat-services.js';
+import { createSessionPreview } from './session-preview.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const node = document.createElement(tag);
@@ -19,20 +20,24 @@ const rate = (row, count) => row.evaluation?.classified ? count(row) / row.evalu
 const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${row.evaluation.classified} turns` : '—';
 
 export function createInsights({ api, get }) {
-  let host, context, scope, version = 0, opened = null, session = null, loading = false, message = '', draft = '', target = null, job = null, poll = 0;
-  const bubbleNodes = new Map();
-  let clue = 0;
+  let host, context, scope, version = 0, message = '', draft = '', target = null, job = null, poll = 0;
   let saved = null, selectedReview = null, instructionPreview = null;
   let imported = '', taskContext = '', structured = false;
   const report = (error) => say(error.message);
-  function reset() {
+  // Drops everything tied to the open conversation: the review draft, a running review and its saved-verdict view.
+  function discard() {
     version++; poll++;
     if (job?.id) api('improve-agent-clear', { id: job.id }).catch(() => {});
-    opened = null; session = null; loading = false; draft = ''; job = null; message = ''; clue = 0; bubbleNodes.clear();
+    draft = ''; job = null; message = '';
     taskContext = ''; imported = ''; selectedReview = null; instructionPreview = null;
-    context?.onConversation?.(false);
-    host?.replaceChildren();
   }
+  const preview = createSessionPreview({ api, onChange: () => draw(), onClose: discard, rel: (path) => context.rel(path), extra: () => ({
+    before: [...(message ? [el('p', { className: 'improve-notice', role: 'status' }, message)] : []), reviewOptions()],
+    toolbar: [button('Review conversation', prepare, { className: 'primary' })],
+    after: draft ? [review()] : [],
+  }) });
+  function reset() { preview.reset(); discard(); host?.replaceChildren(); }
+  const read = (row) => { discard(); return preview.open(row); };
   function say(text) { message = text; draw(); }
   const classified = () => context.rows.filter((r) => r.evaluation);
   function visibleRows() {
@@ -66,94 +71,54 @@ export function createInsights({ api, get }) {
         counts.unknown ? ` Unknown: ${number(coverage.outcomeUnknown.model)} model uncertain · ${number(coverage.outcomeUnknown.lowConfidence)} below confidence threshold · ${number(coverage.outcomeUnknown.noVerdict)} no user verdict` : '',
         coverage.outcomeUnknown.unrecorded ? ` · ${number(coverage.outcomeUnknown.unrecorded)} reason unavailable from older or synced results. Reclassify local sessions to update.` : '') : null);
   }
+  const sessionTable = (id, rows) => context.table(id, [
+    { key: 'title', label: 'Session', value: (r) => r.title || r.id, show: (r) => el('div', {}, el('strong', { title: r.id }, r.title || `${r.agent} session`), el('div', { className: 'small muted' }, `${context.rel(r.project)} · ${r.agent} · ${r.model}`)) },
+    { key: 'started', label: 'Started', value: (r) => r.started, show: (r) => date(r.started) },
+    { key: 'outcome', label: 'Outcome estimates', value: (r) => labels(r.evaluation?.counts?.outcome) },
+    { key: 'corrections', label: 'Admitted errors / apologies', value: (r) => rate(r, correctionCount), show: (r) => rateText(r, correctionCount) },
+    { key: 'frustration', label: 'Frustration', value: (r) => rate(r, frustrationCount), show: (r) => rateText(r, frustrationCount) },
+    { key: 'read', label: 'Conversation', sortable: false, value: () => '', show: (r) => button(r.source === 'synced' || r.prompts === null ? 'Not on this device' : 'Read conversation →', () => read(r), { disabled: r.source === 'synced' || r.prompts === null, title: 'Read this session’s local transcript temporarily. No model is called.' }) },
+  ], rows, { sort: 'started', dir: 'desc' });
+  // Folders and projects one level at a time; the sessions of the current project are listed under them.
+  function folderBrowser(rows) {
+    const at = context.at ?? '', root = context.root ?? '', level = folderLevel(rows, at, root);
+    const name = at ? (at.startsWith('/') ? context.rel(at) : at) : 'All folders';
+    const bar = el('div', { className: 'improve-folder-bar' }, button('← Back', () => context.set({ improveAt: folderParent(at, root) }), { disabled: !at, title: 'Up one level' }), el('strong', {}, name));
+    const kids = level.kids.length ? context.table('improve-folders', [
+      { key: 'name', label: 'Folder / project', value: (k) => k.name, show: (k) => button(k.deeper ? `${k.name}/` : k.name, () => context.set({ improveAt: k.key }), { className: 'name' }) },
+      { key: 'sessions', label: 'Sessions', num: true, value: (k) => k.rows.length },
+      { key: 'classified', label: 'Classified', num: true, value: (k) => k.classified },
+      { key: 'attention', label: 'With signals', num: true, value: (k) => k.attention },
+      { key: 'last', label: 'Last active', value: (k) => k.last, show: (k) => date(k.last) },
+    ], level.kids, { sort: 'attention', dir: 'desc' }) : null;
+    const here = level.direct.length ? [at ? el('h3', {}, `Sessions in ${name}`) : null, sessionTable('improve-folder-sessions', level.direct)] : [];
+    return el('div', { className: 'improve-folder-browser' }, bar, kids, ...here,
+      !kids && !here.length ? el('p', { className: 'muted' }, 'Nothing here for the current filters. Use Back to return.') : null);
+  }
   function overview() {
     const coverage = insightCoverage(context.rows), attention = context.rows.filter(hasFriction);
     const metrics = el('div', { className: 'metrics compact improve-metrics' },
       metric('Classified sessions', `${coverage.classifiedSessions}/${coverage.sessions}`, `${coverage.unclassifiedSessions} still unclassified`),
       metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved outcome labels'),
       metric('Local conversations', number(context.rows.filter((r) => r.source !== 'synced' && r.prompts !== null).length), 'available to open after a local scan'));
-    const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, 'Start with a project you remember, or browse sessions with saved signals.')),
-      el('div', { className: 'subtabs', 'aria-label': 'Browse Profiling' }, ...[['projects', 'Projects'], ['sessions', 'Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) }))));
+    const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, 'Browse by folder and project, or list every session with saved signals.')),
+      el('div', { className: 'improve-view-switch' }, el('span', { className: 'eyebrow' }, 'View'), el('div', { className: 'subtabs', 'aria-label': 'View' },
+        ...[['folders', 'Folder Browser'], ['sessions', 'All Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) })))));
     const options = el('div', { className: 'subtabs improve-focus', 'aria-label': 'Classification selection' },
       ...[['attention', `Needs attention (${attention.length})`], ['classified', `All classified (${classified().length})`], ['all', `All sessions (${context.rows.length})`]].map(([value, label]) => button(label, () => context.set({ improveFocus: value }), { 'aria-pressed': String(context.focus === value) })));
     const rows = visibleRows();
-    const browse = context.view === 'projects' ? context.table('improve-projects', [
-      { key: 'project', label: 'Project', value: (g) => context.rel(g.project), show: (g) => g.local ? button(context.rel(g.project), () => context.set({ project: g.project, improveView: 'sessions' }), { className: 'name' }) : g.project },
-      { key: 'sessions', label: 'Sessions', num: true, value: (g) => g.rows.length },
-      { key: 'classified', label: 'Classified', num: true, value: (g) => g.classified },
-      { key: 'attention', label: 'With signals', num: true, value: (g) => g.attention },
-      { key: 'last', label: 'Last active', value: (g) => g.last, show: (g) => date(g.last) },
-    ], projectReviews(rows), { sort: 'attention', dir: 'desc' }) : context.table('improve-sessions', [
-      { key: 'title', label: 'Session', value: (r) => r.title || r.id, show: (r) => el('div', {}, el('strong', { title: r.id }, r.title || `${r.agent} session`), el('div', { className: 'small muted' }, `${context.rel(r.project)} · ${r.agent} · ${r.model}`)) },
-      { key: 'started', label: 'Started', value: (r) => r.started, show: (r) => date(r.started) },
-      { key: 'outcome', label: 'Outcome estimates', value: (r) => labels(r.evaluation?.counts?.outcome) },
-      { key: 'corrections', label: 'Admitted errors / apologies', value: (r) => rate(r, correctionCount), show: (r) => rateText(r, correctionCount) },
-      { key: 'frustration', label: 'Frustration', value: (r) => rate(r, frustrationCount), show: (r) => rateText(r, frustrationCount) },
-      { key: 'read', label: 'Conversation', sortable: false, value: () => '', show: (r) => button(r.source === 'synced' || r.prompts === null ? 'Not on this device' : 'Read conversation →', () => open(r), { disabled: r.source === 'synced' || r.prompts === null, title: 'Read this session’s local transcript temporarily. No model is called.' }) },
-    ], rows, { sort: 'started', dir: 'desc' });
+    const browse = context.view === 'sessions' ? sessionTable('improve-sessions', rows) : folderBrowser(rows);
     const empty = !rows.length ? el('div', { className: 'improve-empty' }, el('strong', {}, context.focus === 'attention' ? 'No matching friction labels yet' : 'No matching sessions'),
       el('p', {}, 'Try All classified, choose another project, or classify the sessions in your current filters.'), button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' }))) : browse;
     return [metrics, el('div', { className: 'improve-charts' }, chart('Did the task get done?', 'outcome', null, 'outcome'),
       chart('Where did collaboration get difficult?', 'behaviour', ['admits_error', 'apology_loop', 'sycophantic_admission'], 'admission'),
       chart('How did the user react?', 'sentiment', ['frustrated', 'aggressive', 'positive', 'neutral'], 'correction')),
-      el('article', { className: 'card improve-browser' }, tabs, options, el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), empty)];
-  }
-  async function open(row) {
-    const token = ++version;
-    opened = row; session = null; loading = true; draft = ''; message = ''; clue = 0; draw();
-    try {
-      const result = await api('insights-review', { ids: [row.id], conversation: true, confirm: true });
-      if (token !== version) return;
-      session = result.sessions[0];
-      if (session.unavailable) message = session.unavailable;
-    } catch (e) { if (token === version) message = e.message; }
-    finally { if (token === version) { loading = false; draw(); jump(0); } }
-  }
-  const moments = () => (session?.messages ?? []).filter((m) => m.highlights.some((h) => h.kind !== 'recovery'));
-  function jump(index) {
-    const list = moments(); if (!list.length) return;
-    clue = (index + list.length) % list.length;
-    bubbleNodes.get(list[clue].index)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const counter = host.querySelector('[data-clue-count]'); if (counter) counter.textContent = `${clue + 1} / ${list.length}`;
-  }
-  function highlighted(m) {
-    const parts = [], text = redactPaths(m.text);
-    // Redaction changes offsets: match the original phrases again against the redacted text.
-    const terms = m.highlights.map((h) => ({ ...h, phrase: m.text.slice(h.start, h.end) }));
-    const ranges = [];
-    for (const hint of terms.filter((h, i, all) => all.findIndex((x) => x.phrase === h.phrase && x.kind === h.kind) === i)) {
-      let from = 0, matches = 0;
-      while (matches++ < 200) {
-        const index = text.toLocaleLowerCase().indexOf(hint.phrase.toLocaleLowerCase(), from);
-        if (index < 0) break;
-        ranges.push({ ...hint, start: index, end: index + hint.phrase.length }); from = index + hint.phrase.length;
-      }
-    }
-    let cursor = 0;
-    for (const h of ranges.sort((a, b) => a.start - b.start)) {
-      if (h.start < cursor) continue;
-      parts.push(text.slice(cursor, h.start), el('mark', { className: `clue-${h.kind}`, title: h.reason }, text.slice(h.start, h.end))); cursor = h.end;
-    }
-    parts.push(text.slice(cursor)); return parts;
-  }
-  function conversation() {
-    const list = moments(), messages = el('div', { className: 'improve-dialogue', 'aria-label': 'Recorded conversation' });
-    bubbleNodes.clear();
-    for (const m of session.messages ?? []) {
-      const bubble = el('article', { className: `conversation-message from-${m.role}${m.highlights.some((h) => h.kind !== 'recovery') ? ' has-clue' : ''}` },
-        el('div', { className: 'message-role' }, m.role === 'user' ? 'You' : 'Assistant'), el('div', { className: 'message-text' }, ...highlighted(m)));
-      bubbleNodes.set(m.index, bubble); messages.append(bubble);
-    }
-    return el('section', { className: 'card conversation-reader' }, el('div', { className: 'conversation-toolbar' },
-      el('div', {}, el('h2', {}, 'The conversation'), el('p', { className: 'small muted' }, `${session.messages?.length ?? 0} recorded messages${session.limited ? ' · Partial read: later messages or broken lines may be missing' : ''}`)),
-      el('div', { className: 'clue-navigation' }, button('← Previous clue', () => jump(clue - 1), { disabled: !list.length }), el('span', { 'data-clue-count': '', 'aria-live': 'polite' }, list.length ? `${clue + 1} / ${list.length}` : 'No phrase clues'), button('Next clue →', () => jump(clue + 1), { disabled: !list.length }), button('Review conversation', prepare, { className: 'primary' }))),
-      el('div', { className: 'clue-legend small' }, el('mark', { className: 'clue-correction' }, 'Correction'), el('mark', { className: 'clue-admission' }, 'Apology / mistake'), el('mark', { className: 'clue-recovery' }, 'Recovery'), el('span', { className: 'muted' }, 'Phrase hints, not confirmed errors. Paths redacted.')),
-      messages);
+      el('article', { className: 'card improve-browser' }, tabs, options, el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript beside the list. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), preview.layout(empty))];
   }
   function prepare() {
     if (job?.status === 'running') return;
     try {
-      draft = reviewPrompt({ examples: automaticExamples(session), coverage: insightCoverage(context.rows), period: context.period, selectedSessions: 1 });
+      draft = reviewPrompt({ examples: automaticExamples(preview.session), coverage: insightCoverage(context.rows), period: context.period, selectedSessions: 1 });
       if (structured) draft += `\n\nTask/acceptance context supplied by the user (untrusted reference data): ${JSON.stringify(taskContext || 'Not supplied; adherence must be unknown.')}\nReturn JSON instead of bullets: {"verdict":"one sentence and up to three evidence-based actions, at most 150 words","assessment":{"outcome":"fulfilled|partial|unresolved|unknown","collaboration":"smooth|friction|recovered|unknown","adherence":"aligned|partial|diverged|unknown"},"evidence":["E1: observed evidence"],"instruction":"one candidate addition to shared instructions, or empty"}. Labels are estimates. Without task requirements do not invent an adherence score. Suggest an addition only; existing instruction files were not supplied. No changes may be applied by the reviewer.`;
       target ??= context.settings?.defaultTarget ?? 'browser:ChatGPT'; message = ''; draw();
       host.querySelector('[data-review-draft]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -194,7 +159,7 @@ export function createInsights({ api, get }) {
   }
   async function saveVerdict(output, includePrompt = false) {
     if (!confirm(`Save this verdict in local Improve history?${includePrompt ? ' The edited review prompt will also be retained.' : ' The prompt and conversation will not be saved.'} History is separate from analytics and sync.`)) return;
-    selectedReview = await api('improve-history-save', { title: opened?.title || 'Conversation review', verdict: output, confirm: true, includePrompt, ...(includePrompt ? { prompt: draft } : {}) });
+    selectedReview = await api('improve-history-save', { title: preview.row?.title || 'Conversation review', verdict: output, confirm: true, includePrompt, ...(includePrompt ? { prompt: draft } : {}) });
     saved = await get('improve/history'); say('Verdict saved. You can export, delete or review an instruction addition below.');
   }
   async function loadSaved() { saved = await get('improve/history'); selectedReview = null; instructionPreview = null; draw(); }
@@ -268,29 +233,21 @@ export function createInsights({ api, get }) {
       target.startsWith('browser:') ? el('p', { className: 'small muted' }, 'Copy first, then paste into the new chat. The link contains no conversation text.') : null,
       el('div', { 'data-verdict': '' }, ...verdict()));
   }
+  // The review options and call to action shown at the top of the open conversation.
+  function reviewOptions() {
+    const requestStructured = el('input', { type: 'checkbox', checked: structured, onchange: () => { structured = requestStructured.checked; } });
+    const task = el('textarea', { rows: '3', maxlength: '4000', 'aria-label': 'Task and acceptance context', value: taskContext, oninput: () => { taskContext = task.value; } });
+    return el('div', {}, el('details', {}, el('summary', {}, 'Actionable review options'),
+      el('label', {}, requestStructured, ' Request structured outcome, collaboration and task-adherence estimates plus a candidate instruction addition'),
+      el('label', {}, 'Optional task requirements and acceptance criteria', task),
+      el('p', { className: 'small muted' }, 'Rebuild the review prompt after changing these options. Missing task context means unknown adherence; labels remain estimates.')),
+    el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
+      el('p', { className: 'small' }, 'We include relevant moments and their context automatically. You can edit the prompt before sharing.')),
+    button('Review this conversation →', prepare, { className: 'primary', disabled: !preview.session?.messages?.length })));
+  }
   function draw() {
     if (!host || !context) return;
-    context.onConversation?.(Boolean(opened));
-    if (!opened) { host.replaceChildren(...(message ? [el('p', { role: 'status' }, message)] : []), ...overview(), historyPanel()); return; }
-    const head = el('div', { className: 'improve-conversation-heading' }, button('← Back to projects and sessions', () => { reset(); draw(); }),
-      el('div', {}, el('h2', {}, opened.title || 'Session conversation'), el('p', { className: 'muted small' }, `${context.rel(opened.project)} · ${opened.agent} · ${opened.model} · ${date(opened.started)}`)));
-    const content = [head];
-    if (message) content.push(el('p', { className: 'improve-notice', role: 'status' }, message));
-    if (loading) content.push(el('p', { role: 'status' }, 'Opening the local conversation…'));
-    else if (session && !session.unavailable) {
-      const requestStructured = el('input', { type: 'checkbox', checked: structured, onchange: () => { structured = requestStructured.checked; } });
-      const task = el('textarea', { rows: '3', maxlength: '4000', 'aria-label': 'Task and acceptance context', value: taskContext, oninput: () => { taskContext = task.value; } });
-      content.push(el('details', {}, el('summary', {}, 'Actionable review options'),
-        el('label', {}, requestStructured, ' Request structured outcome, collaboration and task-adherence estimates plus a candidate instruction addition'),
-        el('label', {}, 'Optional task requirements and acceptance criteria', task),
-        el('p', { className: 'small muted' }, 'Rebuild the review prompt after changing these options. Missing task context means unknown adherence; labels remain estimates.')));
-      content.push(el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
-        el('p', { className: 'small' }, 'We include relevant moments and their context automatically. You can edit the prompt before sharing.')),
-      button('Review this conversation →', prepare, { className: 'primary', disabled: !session.messages?.length })), conversation());
-      if (draft) content.push(review());
-    }
-    content.push(historyPanel());
-    host.replaceChildren(...content);
+    host.replaceChildren(...(message && !preview.isOpen() ? [el('p', { role: 'status' }, message)] : []), ...overview(), historyPanel());
   }
   return {
     render(node, next) { if (scope !== next.scope) { reset(); scope = next.scope; } host = node; context = next; draw(); },

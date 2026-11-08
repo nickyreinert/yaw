@@ -40,6 +40,7 @@ const assets = new Map([
   ['/tool-output.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/tool-output.js', import.meta.url))]],
   ['/global-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-view.js', import.meta.url))]],
   ['/insights-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-view.js', import.meta.url))]],
+  ['/session-preview.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/session-preview.js', import.meta.url))]],
   ['/insights-model.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-model.js', import.meta.url))]],
   ['/global-settings-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-settings-view.js', import.meta.url))]],
   ['/yaw-shark.svg', ['image/svg+xml', readFileSync(new URL('./assets/yaw-shark.svg', import.meta.url))]],
