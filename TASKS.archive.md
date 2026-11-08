@@ -1,5 +1,10 @@
 # Archive
 
+- T-046 Load CLI command modules on demand (compact output, latency plan step 1) — done 2026-11-08
+  model: sonnet · effort: low
+  acceptance: `core/cli/main.js` loads command handlers and the hook dispatcher with `import()` when used, so a hook call does not load every command first. The full offline test suite shows the same failures before and after.
+  done: commit 7204b07, on main (332b364). Measured on Node 22.23.4 in a Linux container, 20-run averages: `yaw hook` 127 → 67 ms, `yaw --version` 114 → 54 ms. Offline suite after the merge: 1055 passed, 4 failed, 85 skipped; the 4 failures also fail without the change.
+
 - T-004 Tell users which third-party tools a stack needs
   model: sonnet · effort: medium
   acceptance: Every arch stack requiring third-party tools (e.g. AWS CLI) tells the user while selecting it and at the end of setup, with copy-paste install commands per platform. Profiles declare them in an optional `tools` list (ADR-0116); proof: php-serverless (bref), rust-serverless (lambda), node-app (tauri). Add the remaining profiles' tools as they are tailored.

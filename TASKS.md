@@ -133,4 +133,55 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-045 [P2] Investigate Safe Verdicts before changing it — explain what it stores, how verdicts arise, what "No Important Verdict", "Set Retention" and "Import a Verdict" do, why it is separate from Analytics and Sync, and its user benefit. Report to the user first; then decide keep/rename/move/remove. Do not alter or delete data or the UI before that decision.
   model: middle tier (Sonnet) · effort: medium
 
+- T-047 [P2] Record Claude Code fixtures for output replacement — capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048.
+  spec: kickoff/16-compact-output.md §4 L2 and §8
+  acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
+  model: middle tier (Sonnet) · effort: medium
+
+- T-048 [P2] Measure tool-output share before building (L5, part 1) — transcript scan of tool-result sizes by tool and by the command's first word, shown in Analytics. Store sizes and first words only, no content (ADR-0052). Reuse the streaming reader in `core/lib/session-analysis.js` and respect T-016's line limits. First step, with T-047.
+  spec: kickoff/16-compact-output.md §4 L5
+  model: middle tier (Sonnet) · effort: high
+
+- T-049 [P2] Module `compact`: definition, interview and scope — `modules/compact/module.yaml` with the `compact.levers` multi-choice question. Off in Basic; Quick reuses saved personal defaults; the All default is open (assume off). Per-project scope: committed (`.yaw/answers.yaml`, `.claude/settings.json`) or personal (`~/.yaw`, `.claude/settings.local.json`); precedence `YAW_COMPACT`, then personal, then project. The recall store (T-055) is a separate choice, off by default. Includes the L4 AGENTS.md fragment (`tokenCost: low`), rendered only when L1 or L2 is on.
+  spec: kickoff/16-compact-output.md §4 and §7
+  acceptance: `yaw add compact` and `yaw remove compact` proven by tests; both scopes render the right files
+  model: middle tier (Sonnet) · effort: high
+
+- T-050 [P2] L1 wrapper `yaw run --compact` with the node-cli recipes — exit 0: one line `ok <step> (<n> lines, <s>s)`. Exit 0 with warnings: count line, first 10 warnings and `… +<k> more warnings`, as rtk does for `cargo build`. Exit not 0: ANSI, progress and dedup stripping plus a head/tail cap with a recovery hint; the exit code is kept. `YAW_VERBOSE=1` prints raw output; `rawBytes`/`outBytes` are recorded per step. This repo's recipes come first. Depends on T-049.
+  spec: kickoff/16-compact-output.md §4 L1
+  model: top tier (Astra/Opus) · effort: high
+
+- T-051 [P2] L1 for the remaining profiles — per profile: a warning pattern and quieter reporter flags (for example `pytest -q`). Depends on T-050.
+  spec: kickoff/16-compact-output.md §4 L1
+  acceptance: each profile's smoke test verifies its compact output
+  model: middle tier (Sonnet) · effort: high
+
+- T-052 [P2] Hook kind `compress` — amend ADR-0007 and BUILD.md rule 5. PostToolUse only, returning only `updatedToolOutput`; the dispatcher drops any result that is not smaller than the original, and the result may end with one recall line. Add `compress` to the kind enum in `core/schema/module.schema.json`. In `core/hooks/adapters.js`, hold `tool_response` in memory for compress handlers only and add a PostToolUse branch to `renderOutput`. Optional `rawBytes`/`outBytes`/`method` in `hook-event.schema.json`. Depends on T-047.
+  spec: kickoff/16-compact-output.md §5
+  acceptance: existing silent-hook tests still pass; "never worse" is enforced; tool output never reaches a log
+  model: top tier (Astra/Opus) · effort: high
+
+- T-053 [P2] Lean compress entry and shim size gate — a compress entry point that loads neither the kit nor the schemas (prototype: 34 ms against 67 ms through `yaw hook`). The shim exits without starting Node below a payload threshold (prototype: 3 ms); the threshold applies to the whole payload, not to the output alone. Depends on T-052.
+  spec: kickoff/16-compact-output.md §5 (latency plan, steps 2 and 3)
+  acceptance: a timing check that does not depend on the machine
+  model: middle tier (Sonnet) · effort: medium
+
+- T-054 [P2] L2 compress methods and guards (Claude Code) — methods: `ansi`, `progress`, `dedup`, `cap` (recall or re-run hint), grep grouping by file, lockfile summary. Skips output under 512 bytes, commands with detail flags (`-v`, `--verbose`, `--nocapture`), `git diff|show`, `yaw run` output and every Read except lockfiles. Fails open. Depends on T-047, T-052 and T-053.
+  spec: kickoff/16-compact-output.md §4 L2
+  acceptance: tests run on the T-047 fixtures
+  model: top tier (Astra/Opus) · effort: high
+
+- T-055 [P2] L6 optional recall store — `~/.yaw/recall/<hash>.gz` in a private directory: mode 0600, no symlinks (see T-010). At most 200 entries, 30 days and 10 MB per entry; excluded from sync; read back with `yaw recall <hash>`. Off by default; when off, cut output ends with a hint to re-run with `YAW_VERBOSE=1`. Needs an ADR and a privacy NOTICE, since this is the first stored tool-output content. Depends on T-049.
+  spec: kickoff/16-compact-output.md §4 L6
+  model: middle tier (Sonnet) · effort: high
+
+- T-056 [P2] Savings view and A/B validation (L5, part 2) — Analytics shows `rawBytes`/`outBytes` per tool and method, with tokens estimated as bytes/4 and labelled as estimates. Compare the same kind of task with the module on and off, using per-session `tokensIn` and the number of `YAW_VERBOSE=1` re-runs (filter misses). Depends on T-050 or T-054.
+  spec: kickoff/16-compact-output.md §4 L5
+  acceptance: the result is reported to the user
+  model: middle tier (Sonnet) · effort: medium
+
+- T-057 [P2] Decide on L3 command rewrite — after T-056, report to the user whether rewriting commands (`cargo test` → `yaw run -- cargo test`) is worth it. Claude Code checks permission rules against the rewritten command, so deny rules can be bypassed. If built: only a short allowlist of read-only commands, never auto-allow, and deny and ask rules read from every settings file. Also settle the All default left open in T-049. Do not implement before the user decides.
+  spec: kickoff/16-compact-output.md §4 L3 and §7
+  model: top tier (Astra/Opus) · effort: high
+
 ## Done → TASKS.archive.md
