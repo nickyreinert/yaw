@@ -56,7 +56,7 @@ To inspect the installer or follow platform-specific steps, use the [full gettin
 | Get notified after a long run | The optional comfort module can send Telegram notifications. Preferences are personal; credentials stay in environment variables. |
 | Optionally create projects on a LAN host | Enable **Global / Settings / Features / Server mode**, then choose Host or Client. `yaw host` opens the persistent host; `yaw init-local` and `yaw init-remote` create workspace projects and launch native Claude Remote Control. Telegram interviews belong only to the host. See [server mode](docs/server-mode.md). |
 
-Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.
+Opening `yaw web` reads saved session analysis; transcript collection (**Refresh**) and classification (**Classify**, in the Profiling controller) need an explicit action unless you tick **Auto**, which refreshes but never classifies. The [dashboard guide](docs/workspace-dashboard.md) explains coverage, privacy and controls.
 
 The programming-language filter uses YAW configuration or detects the language from local project filenames. Projects with no recognizable evidence and unavailable or synced projects remain **Unknown**.
 
@@ -74,7 +74,7 @@ python3 -m venv ~/.laya
 LAYA_HOST=127.0.0.1 LAYA_PORT=8000 LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve
 ```
 
-Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **Global → Settings → Classification** in `yaw web` to test the connection and adjust settings, and press **Classify** in Global → Profiling or on a Sessions page (or run `yaw sessions evaluate --days 30`). See [Local Laya classification](docs/workspace-dashboard.md#local-laya-classification-experimental).
+Keep `LAYA_HOST=127.0.0.1`; otherwise Laya listens on your network. Then open **Global → Settings → Classification** in `yaw web` to test the connection and adjust settings, and press **Classify** in the controller on Global → Profiling or Workspace → Profiling (or run `yaw sessions evaluate --days 30`). See [Local Laya classification](docs/workspace-dashboard.md#local-laya-classification-experimental).
 
 ## See the setup
 

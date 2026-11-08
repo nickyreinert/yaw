@@ -154,7 +154,7 @@ test('features: Analytics names the table Classification; Profiling off hides th
     let shown = page();
     assert.ok(shown.tabs.includes('Classification'), `${route}: tables ${shown.tabs}`);
     assert.ok(!shown.tabs.includes('Outcomes'), `${route}: no Outcomes tab`);
-    assert.ok(shown.buttons.includes('Classify'), `${route}: Classify is offered`);
+    assert.ok(!shown.buttons.includes('Classify'), `${route}: Classify moved to the Profiling controller`);
     assert.match(shown.charts, /Experimental outcomes/);
     assert.match(byId('ss-browse').text, /Classified turns/, 'the Classification table opens from its old URL');
     setFeatures({ profiling: false });
@@ -162,7 +162,6 @@ test('features: Analytics names the table Classification; Profiling off hides th
     assert.deepEqual(reported, []);
     shown = page();
     assert.ok(!shown.tabs.includes('Classification') && !shown.tabs.includes('Outcomes'), `${route}: tables ${shown.tabs}`);
-    assert.ok(!shown.buttons.includes('Classify'), `${route}: no Classify button`);
     assert.doesNotMatch(shown.charts, /outcomes/i);
     assert.doesNotMatch(byId('ss-browse').text, /Classified turns/, 'an old Classification URL falls back to Sessions');
     setFeatures({});

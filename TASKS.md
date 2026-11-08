@@ -11,7 +11,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
-
 - T-024 [P2] Validate the actual Gradle JDK prerequisite — `test/profiles.test.js` checks Java on PATH, but Gradle uses JAVA_HOME. Nine smoke tests hit an invalid JAVA_HOME; diagnose that mismatch explicitly and rerun Java/Kotlin/Android checks with a valid supported JDK.
   model: low tier (Luna/Haiku) · effort: medium
   needs decision: with an invalid JAVA_HOME, should the Java/Kotlin/Android smoke gates fail with a message naming JAVA_HOME instead of skipping; and may `just` be installed here (`cargo install just --locked`, denied in this session) so the smoke tests can run?
@@ -56,8 +55,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-037 [P2] Replace Settings/Interview buttons with a segmented switch — keep behavior; review its interplay with the Focus switch so the two switches have a clear hierarchy and do not change views ambiguously.
   model: middle tier (Sonnet) · effort: medium
 
-- T-043 [P2] Classify controller and slimmer filter bar — remove Classify, Classify Unclassified and Classification Settings buttons from the shared filter bar (keep Search, Refresh, Auto, Expand filters, Reset, sticky). Add a separate controller above it (`/global/improve` and the workspace view) with 5 / 10 / All sessions, a start button and a deep link to Profiling Settings. First check how sessions are selected, whether batching exists, how "All" is handled and whether only unclassified sessions are processed; reuse the existing logic.
-  model: middle tier (Sonnet) · effort: high
 
 - T-044 [P2] Rebuild "Where did work get difficult?" navigation and preview — replace the Projects/Sessions buttons with a "View" switch: Folder Browser (project/folder hierarchy, reliable back navigation) vs. All Sessions (flat list); same data and filters in both. "Read Conversation" opens a right-hand preview (table narrows) with an X that restores full width, no page change. Make the preview component reusable for other session lists; reuse existing folder-hierarchy components.
   model: middle tier (Sonnet) · effort: high

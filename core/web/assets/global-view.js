@@ -1,7 +1,8 @@
 import { renderOverviewMetrics, summarizeOverview } from './overview-metrics.js';
 // Global Overview, Analytics (also Workspace → Analytics, locked to the open project) and Global Tasks.
 // One column browser drives every card, chart and table; filters, split and table state live in the URL. It
-// also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
+// also holds Refresh / Auto, scoped to all workspaces (Global) or the open one (Workspace). Classification starts from
+// the separate controller above the Profiling filter bar.
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
 import { createInsights } from './insights-view.js';
@@ -355,30 +356,38 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     return bar;
   }
 
-  // ---------- Refresh / Auto / Classify ----------
+  // ---------- Refresh / Auto, and the Profiling Classify controller ----------
   const scopeText = () => locked() ? 'this workspace' : 'all discovered workspaces';
   const periodText = () => state.from || state.to ? 'all history (a custom date range scans everything)' : state.period === 'all' ? 'all history' : `the last ${state.period} days`;
   const improveEligible = () => filtered().filter((r) => r.source !== 'synced' && r.prompts !== null);
+  // Unclassified local sessions of the current filters; when all are classified, the filtered local sessions (Reclassify).
   const improveToClassify = () => { const rows = improveEligible(), pending = rows.filter((r) => !r.evaluation); return pending.length ? pending : rows; };
+  // The controller caps that selection at 5 or 10 (newest first) or takes all of it. The server runs one job per request.
+  const CLASSIFY_SIZES = [[5, '5'], [10, '10'], [Infinity, 'All']];
+  let classifySize = 5;
+  const classifySelection = () => [...improveToClassify()].sort((a, b) => (b.started ?? 0) - (a.started ?? 0)).slice(0, classifySize);
+  function classifyController() {
+    const rows = classifySelection(), pending = improveToClassify().some((r) => !r.evaluation), busy = Boolean(job.busy);
+    return h('section', { class: 'classify-controller card', 'aria-label': 'Classify sessions' },
+      h('strong', {}, 'Classify sessions'),
+      h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Sessions to classify' },
+        ...CLASSIFY_SIZES.map(([size, label]) => h('button', { type: 'button', 'aria-pressed': String(classifySize === size), disabled: busy,
+          title: size === Infinity ? 'Every session the current filters select: all unclassified local sessions, or all filtered local sessions when none is unclassified.' : `The ${label} newest ${pending ? 'unclassified' : 'filtered'} local sessions.`,
+          on: { click: () => { classifySize = size; render(); } } }, label))),
+      h('button', { type: 'button', class: 'primary', disabled: busy || !rows.length, on: { click: () => run(true) },
+        title: `Send each prompt/answer turn of these sessions to your local Laya service at ${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}. Experimental and slow; asks before reading messages. Only the counts are saved.` },
+      job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} session${rows.length === 1 ? '' : 's'}`),
+      h('a', { href: '#global-settings/improve', class: 'small' }, 'Profiling Settings'));
+  }
   function collectControls() {
-    if (profilingPage()) {
-      const rows = improveToClassify(), pending = rows.some((r) => !r.evaluation);
-      return h('div', { class: 'collect-actions' },
-        h('button', { type: 'button', disabled: Boolean(job.busy), on: { click: () => run(false) }, title: 'Refresh saved metadata from configured local histories.' }, '↻ Refresh'),
-        h('button', { type: 'button', class: 'primary', disabled: Boolean(job.busy) || !rows.length, on: { click: () => run(true) } }, job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} sessions`),
-        h('a', { href: '#global-settings/classification', class: 'small' }, 'Classification settings'));
-    }
-    const busy = Boolean(job.busy), endpoint = prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000';
-    return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' },
-      h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
-        title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
-      job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
+    const busy = Boolean(job.busy);
+    const refresh = h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
+      title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
+    job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh');
+    if (profilingPage()) return h('div', { class: 'collect-actions' }, refresh);
+    return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' }, refresh,
       h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when Analytics opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Analytics' : 'all workspaces here, only the open one on Workspace → Analytics'}). A personal setting; it never classifies.` },
-        h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
-      // Classify is part of Profiling (Global → Settings → Features).
-      featureOn('profiling') ? h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
-        title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
-      job.busy === 'classify' ? 'Classifying…' : 'Classify') : null);
+        h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'));
   }
   function collectStatus() {
     const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
@@ -454,8 +463,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   async function run(classify) {
     if (job.busy) return;
     const all = !locked();
-    const ids = classify && profilingPage() ? improveToClassify().map((r) => r.id) : undefined;
-    if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Narrow the project, date or agent filters.', error: true }); render(); return; }
+    const ids = classify && profilingPage() ? classifySelection().map((r) => r.id) : undefined;
+    if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Choose fewer sessions or narrow the project, date or agent filters.', error: true }); render(); return; }
     const scope = ids ? `${ids.length} saved local sessions matching these filters` : `${scopeText()} for ${periodText()}`;
     if (classify && !confirm(`Classify ${scope}?\n\nYAW reads these conversations and sends eligible turns to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Only aggregate counts are saved. Pause and Stop remain available while it runs.`)) return;
     Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, skipped: 0, classify,
@@ -616,12 +625,13 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   // ---------- Profiling: shared metadata filters and sorting; explicit conversation reads ----------
   function improve() {
     $('improve-intro').textContent = locked() ? `This workspace · ${data.current ?? ''}` : 'Find a difficult session. Make the next one better.';
+    fill($('improve-classify'), classifyController());
     fill($('improve-filter'), filterBar('improve'));
     const rows = filtered(), [from, to] = bounds();
     if (!['projects', 'sessions'].includes(state.improveView)) state.improveView = 'projects';
     if (!['attention', 'classified', 'all'].includes(state.improveFocus)) state.improveFocus = 'attention';
     insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set,
-      onConversation: (open) => { $('improve-filter').hidden = open; },
+      onConversation: (open) => { $('improve-filter').hidden = open; $('improve-classify').hidden = open; },
       settings: improvePrefs, view: state.improveView, focus: state.improveFocus,
       scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView]),
       period: `${day(from)} through ${day(to - 1)} UTC; ${rows.length} filtered saved sessions${data.limited ? '; list capped at 20,000' : ''}` });

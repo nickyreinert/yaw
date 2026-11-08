@@ -515,7 +515,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
     const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
-    card.append(hint('small muted', 'Classify (in the filter bar of ', link('Analytics', 'global-analytics'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
+    card.append(hint('small muted', 'Classify (in the controller on ', link('Profiling', 'global-improve'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
     const form = el('div', null, 'classifier-form'), inputs = {};
     for (const [key, label, type, help, step] of FIELDS) {
       const wrap = el('label', label), input = el('input'), range = limits[key];
@@ -618,7 +618,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
     step('2. Start the service on this computer only', 'Keep this terminal open while you classify. LAYA_HOST matters: by default laya-serve listens on all network interfaces (0.0.0.0). Add LAYA_DEVICE=mps (Apple), cuda or cpu to pick the device.',
       `LAYA_HOST=${host} LAYA_PORT=${port} LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve`);
     step('3. Test it', 'Press Test connection above. The first answer may take a while as the checkpoint downloads and loads.', null);
-    step('4. Classify', ['Press Classify in the filter bar of ', link('Global → Analytics', 'global-analytics'), ' (all workspaces) or ', link('Workspace → Analytics', 'analytics'), ' (this workspace), or run:'], 'yaw sessions evaluate --days 30');
+    step('4. Classify', ['Choose 5, 10 or All and press Classify in the controller on ', link('Global → Profiling', 'global-improve'), ' (all workspaces) or ', link('Workspace → Profiling', 'profiling'), ' (this workspace; results also appear in ', link('Analytics', 'global-analytics'), '), or run:'], 'yaw sessions evaluate --days 30');
     const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), docs = el('a', 'github.com/NandhaKishorM/laya');
     docs.href = 'https://github.com/NandhaKishorM/laya'; docs.target = '_blank'; docs.rel = 'noopener noreferrer'; more.append(docs, '. YAW never installs, downloads or starts anything for Laya.');
     card.append(more);

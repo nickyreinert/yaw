@@ -989,3 +989,7 @@ body:not(:has(.content-footer)) { --status-footer-height: 0px; }
 .analytics-filter.compact .gfilter-status { display: none; }
 @media (max-width: 760px) { .gfilter-slot:has(.analytics-filter.compact) { position: static; } }
 .gfilter-slot:has(.analytics-filter.compact) { background: var(--sea, #f7f3ef); padding-bottom: 8px; margin-bottom: .6rem; }
+
+/* Classify controller above the Profiling filter bar */
+.classify-controller { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; padding: 10px 14px; margin: 0 0 .7rem; }
+.classify-controller .subtabs { margin: 0; }
