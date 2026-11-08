@@ -186,7 +186,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   function presentInterview() {
     const mode = tab === 'interview' ? 'interview' : 'settings';
     mountedInterview.setPresentation(mode);
-    presentationControls.querySelectorAll('[data-presentation]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.presentation === mode)));
+    presentationControls.querySelectorAll('[data-presentation]').forEach((b) => { const on = b.dataset.presentation === mode; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
     if (pendingSection) { mountedInterview.showSection(pendingSection); pendingSection = null; }
   }
 
@@ -285,11 +285,11 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     }
     const json = (body) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
     const content = el('div'); content.append(...root.childNodes); root.append(content);
-    presentationControls = el('div', null, 'settings-presentation');
-    presentationControls.setAttribute('role', 'group'); presentationControls.setAttribute('aria-label', 'Project settings view');
+    presentationControls = el('div', null, 'segmented');
+    presentationControls.setAttribute('role', 'radiogroup'); presentationControls.setAttribute('aria-label', 'Project settings view');
     for (const [mode, label] of [['settings', 'Settings'], ['interview', 'Interview']]) {
       const pick = button(label, () => go(mode === 'interview' ? 'interview' : 'project'));
-      pick.dataset.presentation = mode; presentationControls.append(pick);
+      pick.dataset.presentation = mode; pick.setAttribute('role', 'radio'); presentationControls.append(pick);
     }
     root.prepend(presentationControls);
     mountedInterview = await mountInterview(content, {

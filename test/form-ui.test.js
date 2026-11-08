@@ -712,3 +712,20 @@ test('knowledge UI: Knowledge and Decision Categories tabs, sticky filter bar th
   assert.ok(z > 0 && z < sidebarZ, 'filter bar sits below the sidebar navigation');
   assert.match(readFileSync(join(dir, 'workspace.js'), 'utf8'), /knowledge-tabs/);
 });
+
+// T-037: Settings | Interview is one segmented control; the Focus switch belongs to the Interview view only.
+test('settings page: one Settings | Interview segmented control, Focus switch only inside Interview', () => {
+  const view = readFileSync(join(KIT_ROOT, 'core/web/assets/settings-view.js'), 'utf8');
+  const workspace = readFileSync(join(KIT_ROOT, 'core/web/assets/workspace.js'), 'utf8');
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  assert.match(view, /el\('div', null, 'segmented'\)/, 'one segmented control');
+  assert.match(view, /setAttribute\('role', 'radiogroup'\)/);
+  assert.match(view, /\[\['settings', 'Settings'\], \['interview', 'Interview'\]\]/);
+  assert.doesNotMatch(view, /settings-presentation/, 'no separate pressed buttons');
+  assert.match(view, /setAttribute\('role', 'radio'\)/);
+  assert.match(view, /b\.dataset\.presentation === mode; b\.setAttribute\('aria-checked', String\(on\)\)/, 'active segment follows the route');
+  assert.match(css, /\.segmented \[aria-checked=true\]/);
+  assert.ok(!view.includes('focus-toggle'), 'Focus switch is not part of the Settings view');
+  assert.match(workspace, /const interviewView = name === 'setup' \|\| name === 'settings' && sub === 'interview'/);
+  assert.match(workspace, /else if \(!interviewView\) setInterviewFocus\(false\)/, 'leaving Interview ends Focus');
+});

@@ -812,8 +812,10 @@ a.button.primary { background: var(--accent); color: #fff; }
 }
 
 /* Settings uses the shared controls as a grouped form; the wizard is opt-in. */
-.settings-presentation { display: flex; gap: 8px; margin: 0 0 20px; }
-.settings-presentation [aria-pressed=true] { background: var(--ink); color: var(--sun); border-color: var(--ink); }
+.segmented { display: inline-flex; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.segmented button { border: 0; border-radius: 0; margin: 0; }
+.segmented button + button { border-left: 1px solid var(--line); }
+.segmented [aria-checked=true] { background: var(--ink); color: var(--sun); }
 /* Interview presentation: the full wizard, without the Settings heading and tabs. */
 #settings-view.interview-mode > :is(.page-heading, #settings-tabs) { display: none; }
 .settings-form .wizard-layout { display: block; }
