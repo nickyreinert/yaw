@@ -3,11 +3,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import fs, { existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
-import { saveSetup, secretFindings } from '../core/lib/user-store.js';
+import { saveSetup, secretFindings, writePresetAnswers } from '../core/lib/user-store.js';
 import { schemas } from '../core/render/kit.js';
 import { KIT_ROOT, capture, scripted, tmp } from './helpers/fixtures.js';
 
@@ -265,4 +266,67 @@ test('preset listings display the All label for stored pro depth', async () => {
   const list = await yaw(['presets', 'list'], { home });
   assert.equal(list.code, 0, list.err);
   assert.match(list.out, /^2026-10-29-all-tools +all {2}/m);
+});
+
+// Replace a node:fs function for the user-store module (live ESM bindings) while `body` runs.
+function patched(name, wrap, body) {
+  const original = fs[name];
+  fs[name] = wrap(original);
+  syncBuiltinESMExports();
+  try { return body(); } finally { fs[name] = original; syncBuiltinESMExports(); }
+}
+
+test('user-store keeps existing data when a write fails and leaves no temporary files', () => {
+  const home = tmp('yaw-home-');
+  const env = { HOME: home };
+  const save = (now) => saveSetup({ env, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'], 'idea.team': 'solo' }, mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', now });
+  save(new Date('2026-10-20T10:00:00Z'));
+  const profile = join(home, '.yaw/user-profile.yaml');
+  const preset = join(home, '.yaw/presets/2026-10-20-app.yaml');
+  const before = [readFileSync(profile, 'utf8'), readFileSync(preset, 'utf8')];
+  const failing = (original) => (...args) => { if (typeof args[1] === 'string' && args[1].length > 10) throw Object.assign(new Error('no space left'), { code: 'ENOSPC' }); return original(...args); };
+  patched('writeFileSync', failing, () => {
+    assert.throws(() => saveSetup({ env, kitRoot: KIT_ROOT, answers: { 'user.agents': ['codex'] }, mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', preset: false }), /no space/);
+    assert.throws(() => writePresetAnswers(env, '2026-10-20-app', { 'idea.team': 'team' }), /no space/);
+  });
+  assert.deepEqual([readFileSync(profile, 'utf8'), readFileSync(preset, 'utf8')], before);
+  assert.deepEqual(readdirSync(join(home, '.yaw')).sort(), ['history.jsonl', 'presets', 'user-profile.yaml']);
+  assert.deepEqual(readdirSync(join(home, '.yaw/presets')), ['2026-10-20-app.yaml']);
+});
+
+test('user-store publishes replacements as new private files, never through hard links', () => {
+  const home = tmp('yaw-home-');
+  const env = { HOME: home };
+  saveSetup({ env, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'] }, mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', preset: false });
+  const profile = join(home, '.yaw/user-profile.yaml');
+  const link = join(home, 'linked.yaml');
+  fs.linkSync(profile, link);
+  const old = readFileSync(link, 'utf8');
+  saveSetup({ env, kitRoot: KIT_ROOT, answers: { 'user.agents': ['codex'] }, mode: 'quick', projectRoot: '/work/app', kit: '0.0.0', preset: false });
+  assert.equal(readFileSync(link, 'utf8'), old);
+  assert.match(readFileSync(profile, 'utf8'), /codex/);
+  assert.equal(mode(profile), 0o600);
+});
+
+test('concurrent preset creation never overwrites a preset another save just published', () => {
+  const home = tmp('yaw-home-');
+  const env = { HOME: home };
+  const other = join(home, '.yaw/presets/2026-10-20-app.yaml');
+  mkdirSync(join(home, '.yaw/presets'), { recursive: true });
+  let raced = false;
+  // Another save publishes the same name right after this one found it free.
+  const race = (original) => (path, ...rest) => {
+    try { return original(path, ...rest); } catch (e) {
+      if (!raced && e.code === 'ENOENT' && path === other) { raced = true; writeFileSync(other, 'name: other\n'); }
+      throw e;
+    }
+  };
+  const result = patched('lstatSync', race, () => saveSetup({
+    env, kitRoot: KIT_ROOT, answers: { 'user.agents': ['claude'] }, mode: 'quick', projectRoot: '/work/app', kit: '0.0.0',
+    now: new Date('2026-10-20T10:00:00Z'), profile: false,
+  }));
+  assert.ok(raced);
+  assert.equal(result.preset, '2026-10-20-app-2');
+  assert.equal(readFileSync(other, 'utf8'), 'name: other\n');
+  assert.deepEqual(readdirSync(join(home, '.yaw/presets')).sort(), ['2026-10-20-app-2.yaml', '2026-10-20-app.yaml']);
 });

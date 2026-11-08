@@ -1,5 +1,9 @@
 # Archive
 
+- T-023 Publish personal YAML updates atomically — done 2026-11-08
+  model: sonnet · effort: high
+  done: `write()` in core/lib/user-store.js publishes a private 0600 temp file in the target directory by rename (replace) or link (exclusive); profile, preset, user data and seeded defaults use it, new presets and renames never replace a concurrent save (preset names retry with the next suffix). Tests in test/user-store.test.js. Offline suite: 1072 passed / 11 failed (none in user-store).
+
 - T-019 Isolate recipe tests from installed YAW — done 2026-11-08
   model: sonnet · effort: medium
   done: `pathWithout()` in test/helpers/fixtures.js gives code-map, GitHub and composition tests the host PATH minus `yaw` (and `gh`), so kit-absent cases cannot run an installed CLI; `just` recipes were not run here (just not installed), github-status tests already used explicit stubs.

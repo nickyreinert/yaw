@@ -1,10 +1,10 @@
 // The user folder ~/.yaw/ (Y-7.2, ADR-0043, doc 02 §5): user profile, saved setups ("presets"), history.jsonl.
 // Created only after the user opted in; files 0600, folders 0700; answers only, never secrets (doc 08).
 
-import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, lstatSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import { PERSONAL_PREFERENCES } from '../interview/policy.js';
 import { depthOf } from '../interview/depth.js';
 import { parse, stringify, YamlError } from './yaml.js';
@@ -78,18 +78,33 @@ function read(path) {
   }
 }
 
-function write(path, text, { append = false } = {}) {
+// Appends in place; otherwise publishes a complete private file by rename (replace) or link (exclusive: EEXIST if it exists),
+// so a failed write leaves the previous file intact and a reader never sees a truncated one.
+function write(path, text, { append = false, exclusive = false } = {}) {
   let fd;
-  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK |
-    (append ? constants.O_APPEND : 0);
+  if (append) {
+    try {
+      fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK | constants.O_APPEND, 0o600);
+      if (!fstatSync(fd).isFile()) throw new Error(`${path} must be a regular file`);
+      fchmodSync(fd, 0o600);
+      writeFileSync(fd, text);
+    } finally {
+      if (fd !== undefined) closeSync(fd);
+    }
+    return;
+  }
+  const temp = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
   try {
-    fd = openSync(path, flags, 0o600);
-    if (!fstatSync(fd).isFile()) throw new Error(`${path} must be a regular file`);
-    fchmodSync(fd, 0o600);
-    if (!append) ftruncateSync(fd, 0);
+    fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     writeFileSync(fd, text);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    if (exclusive) linkSync(temp, path);
+    else renameSync(temp, path);
   } finally {
     if (fd !== undefined) closeSync(fd);
+    rmSync(temp, { force: true });
   }
 }
 
@@ -162,7 +177,14 @@ export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now =
   directory(presetsDir(env), true);
   if (profileDoc) write(profileFile(env), stringify(profileDoc));
   if (presetDoc) {
-    write(presetFile(env, name), stringify(presetDoc));
+    for (let n = 2; ; n += 1) {
+      try { write(presetFile(env, name), stringify(presetDoc), { exclusive: true }); break; } catch (e) {
+        if (e.code !== 'EEXIST') throw e;
+        name = `${date}-${slug(basename(projectRoot))}-${n}`;
+        presetDoc.name = name;
+        check(`presets/${name}.yaml`, 'preset.schema.json', presetDoc);
+      }
+    }
     const history = join(userDir(env), 'history.jsonl');
     write(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { append: true });
   }
@@ -233,7 +255,10 @@ export function renamePreset(env, name, to) {
   const doc = parse(read(from)) ?? {};
   doc.name = to;
   check(`presets/${to}.yaml`, 'preset.schema.json', doc);
-  write(target, stringify(doc));
+  try { write(target, stringify(doc), { exclusive: true }); } catch (e) {
+    if (e.code === 'EEXIST') throw new Error(`A preset named "${to}" already exists`);
+    throw e;
+  }
   rmSync(from);
   return to;
 }
@@ -281,12 +306,9 @@ export function writeUserData(env, name, value) {
   if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('Invalid user data name');
   const dir = userDataDir(env);
   directory(dir, true);
-  const file = join(dir, name), temp = `${file}.${randomUUID()}.tmp`;
+  const file = join(dir, name);
   existingStat(file);
-  try {
-    write(temp, `${JSON.stringify(value)}\n`);
-    renameSync(temp, file);
-  } finally { rmSync(temp, { force: true }); }
+  write(file, `${JSON.stringify(value)}\n`);
 }
 
 export function userDataDir(env) {
@@ -307,7 +329,7 @@ export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed 
   const doc = { answers: chosen };
   check('user-profile.yaml', 'user-profile.schema.json', doc);
   const dir = userDir(env); directory(dir, true);
-  const file = profileFile(env), temp = join(dir, `personal-defaults.${randomUUID()}.tmp`);
+  const file = profileFile(env);
   if (existingStat(file)) {
     // A legacy profile may contain agent/tool choices but no personal preferences yet.
     const before = read(file), current = readUserProfile(env);
@@ -317,9 +339,6 @@ export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed 
     write(file, stringify(merged));
     return { saved: true };
   }
-  try {
-    write(temp, stringify(doc));
-    try { linkSync(temp, file); } catch (e) { if (e.code === 'EEXIST') return { saved: false }; throw e; }
-  } finally { rmSync(temp, { force: true }); }
+  try { write(file, stringify(doc), { exclusive: true }); } catch (e) { if (e.code === 'EEXIST') return { saved: false }; throw e; }
   return { saved: true };
 }

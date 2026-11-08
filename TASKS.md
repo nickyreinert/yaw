@@ -11,6 +11,8 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
+- T-020 [P2] in progress — Repair brittle UI/parity tests. Resume: run test/analytics-filters.test.js and test/form-parity.test.js, make them locate controls semantically / questions by id.
+
 - T-006 [P1] Stop sync exclusions deleting files — `core/lib/data-sync.js`: a previously synced note exceeding 128 KiB is omitted, published as a tombstone and deleted locally. Distinguish excluded/unreadable records from intentional deletions.
   model: top tier (Astra/Opus) · effort: high
   status: in progress · resume: regression test in test/data-sync.test.js (folder + hub), then exclude present-but-unportable knowledge keys from merge/apply
@@ -18,10 +20,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-007 [P1] Preserve analytics when history is unavailable — `core/lib/session-analysis.js:collectAnalysis` replaces saved rows with an empty scan when a source disappears. Keep prior metrics/classifications and report incomplete discovery; cover disabled sources and discovery limits too.
   model: middle tier (Sonnet) · effort: high
   in progress — resume: regression tests in test/session-analysis.test.js, then keep unrediscovered rows in collectAnalysis merge and report `missing` in scanSummary.
-
-- T-023 [P2] Publish personal YAML updates atomically — `core/lib/user-store.js:write` truncates profiles/presets before writing. Use private temporary files and atomic publication; preserve existing data on write failure and prevent concurrent preset creation from overwriting another save.
-  model: middle tier (Sonnet) · effort: high
-  status: in progress — fix + tests done in core/lib/user-store.js, test/user-store.test.js; next: npm test, commit, archive
 
 - T-035 [P1] Fix Classification opening error (in progress) — resume point: TDZ in `core/web/assets/global-settings-view.js` renderClassifier/setupCard: `const link` shadows imported `link()`; add regression test in test/global-classification-view.test.js.
   model: low tier (Luna/Haiku) · effort: medium
@@ -71,9 +69,6 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 - T-018 [P2] Remove quadratic scan merging — `core/lib/session-analysis.js:collectAnalysis` calls `old.rows.find` for every result despite already building `byId`. Use indexed lookup and benchmark a 20,000-session cached refresh.
   model: low tier (Luna/Haiku) · effort: medium
-
-- T-020 [P2] Repair brittle UI/parity tests — `test/analytics-filters.test.js` addresses children by outdated positions; `test/form-parity.test.js` assumes unique labels (39 distinct labels for 41 questions). Locate controls semantically and identify questions by stable IDs.
-  model: middle tier (Sonnet) · effort: medium
 
 - T-021 [P2] Add a cheap automatic CI gate — `.github/workflows/kit-ci.yml` runs only manually. Run schema checks, shell checks and isolated core tests on PRs; keep expensive profile builds separate to respect the documented minutes budget.
   model: middle tier (Sonnet) · effort: medium
