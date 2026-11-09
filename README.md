@@ -18,7 +18,7 @@
 
 It does not matter if you are a layperson or an experienced developer. If you 
 
-- tend to work on multiple projects,
+- work on multiple projects,
 - want to prevent coding-agent lock-in or
 - work with different languages, frameworks and architectures,
 
