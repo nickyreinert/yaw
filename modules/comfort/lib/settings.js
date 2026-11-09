@@ -10,7 +10,7 @@ export function notificationSettings({ root, env }) {
   const config = settings(personal.config).notify;
   return {
     installed: enabledModules(readManifest(root) ?? { modules: {} }).includes('comfort'),
-    enabled: resolveFeatures({ root, personal: personal.config }).features.includes('notifications'),
+    enabled: resolveFeatures({ root, personal: personal.config, env }).features.includes('notifications'),
     minutes: config.minutes, terminal: config.terminal,
     telegram: { enabled: config.telegram?.enabled === true, tokenEnv: config.telegram?.tokenEnv ?? 'YAW_TELEGRAM_BOT_TOKEN', chatIdEnv: config.telegram?.chatIdEnv ?? 'YAW_TELEGRAM_CHAT_ID' },
     telegramReady: Boolean(config.telegram?.enabled && env[config.telegram.tokenEnv] && env[config.telegram.chatIdEnv]),

@@ -122,6 +122,22 @@ test('module: no agent-side command guard; a user-only session sync and one cont
   assert.ok(def.agentsMd.trim().split('\n').length <= 3);
 });
 
+test('card: named Workflow rules and explains what it enforces and when', () => {
+  const def = loadModule(KIT_ROOT, 'team');
+  assert.equal(def.title, 'Workflow rules');
+  assert.ok(def.title.length <= 40);
+  const text = [def.what, ...def.details, ...def.adds].join('\n');
+  for (const word of [/issue/, /session start/, /pull request/, /commit/, /default branch/, /solo/i, /just start/]) assert.match(text, word);
+});
+
+test('solo project: the module applies and the ruleset asks for no approval', async () => {
+  const root = await project({ team: 'solo', extra: '  tasks.use-github: true\n' });
+  const github = parse(readTree(root)['.yaw/github.yaml']);
+  assert.equal(github.rules.requireIssue, true);
+  assert.equal(github.rules.approvals, 0, 'nobody else can approve a solo project');
+  assert.deepEqual(github.rules.requiredChecks, ['quality-gate', 'secret-scan', 'pr-policy']);
+});
+
 test('selection: preselected in Standard and Full for a team, never in Quick or for a solo project', () => {
   assert.ok(selectModules({ mode: 'standard', facts: { team: true } }).includes('team'));
   assert.ok(selectModules({ mode: 'full', facts: { team: true } }).includes('team'));
@@ -143,7 +159,7 @@ test('install: lefthook commit-msg in a team block, pre-push job in the git-hook
   assert.match(tree.justfile, /# yaw:team\nimport 'just\/team.just'\n# \/yaw:team/);
   assert.deepEqual(parse(tree['.yaw/github.yaml']).rules.requiredChecks, ['quality-gate', 'secret-scan', 'pr-policy']);
   assert.ok(tree['AGENTS.md'].split('\n').length <= 80);
-  assert.match(tree['AGENTS.md'], /<!-- yaw:team -->\n- Team mode: no change without an issue/);
+  assert.match(tree['AGENTS.md'], /<!-- yaw:team -->\n- Workflow rules: no change without an issue/);
   const files = Object.fromEntries(readManifest(root).files.map((f) => [f.path, f]));
   assert.equal(files['lefthook.yml'].module, 'git-hooks');
   assert.deepEqual(files['lefthook.yml'].fragments.map((f) => f.module), ['team']);
@@ -375,7 +391,7 @@ test('sync: main, clean and behind is fast-forwarded; my issues and PRs are list
   assert.equal(existsSync(marker), false, 'no git hook ran during the fast-forward');
   assert.ok(existsSync(join(r.root, 'theirs.txt')));
   const text = result.lines.join('\n');
-  assert.match(text, /^YAW team · main: pulled 1 commit from origin\/main \(fast-forward\); edits need an issue branch: just task start <#>/);
+  assert.match(text, /^YAW workflow · main: pulled 1 commit from origin\/main \(fast-forward\); edits need an issue branch: just task start <#>/);
   assert.match(text, /My open issues \(3\):\n {2}#12 \[P0\] Urgent\n {2}#34 \[P1, S\] Login crash \[31m on start · v1\.0 due 2026-11-01\n {2}#7 \[P3\] Low one/);
   assert.match(text, /Waiting for my review: #40 Add invite flow/);
   assert.match(text, /My pull requests: #38 Fix x \(checks failing\); #39 Y \(changes requested\)/);
@@ -396,7 +412,7 @@ test('sync: a dirty tree is not pulled; a diverged branch is reported; a feature
   r.teammate('feat/34-x', 'theirs.txt');
   r.teammate('main', 'two.txt');
   const behind = await sessionStart({ root: r.root, env: r.env });
-  assert.match(behind.lines[0], /^YAW team · feat\/34-x \(#34\): pulled 1 commit from origin\/feat\/34-x \(fast-forward\); 2 commits behind main: rebase or merge when it suits you \(never automatic\)$/);
+  assert.match(behind.lines[0], /^YAW workflow · feat\/34-x \(#34\): pulled 1 commit from origin\/feat\/34-x \(fast-forward\); 2 commits behind main: rebase or merge when it suits you \(never automatic\)$/);
 
   writeFileSync(join(r.root, 'mine.txt'), 'mine\n');
   r.git('add', 'mine.txt');
@@ -513,7 +529,7 @@ test('session-start hooks: the user gets a systemMessage (Claude, Codex); the mo
       assert.equal(out.additionalContext, 'Active issue: #34 "Login crash [31m on start" (branch feat/34-login-crash).');
     } else {
       assert.equal(out.hookSpecificOutput.additionalContext, 'Active issue: #34 "Login crash [31m on start" (branch feat/34-login-crash).');
-      assert.match(out.systemMessage, /^YAW team · feat\/34-login-crash \(#34\)/);
+      assert.match(out.systemMessage, /^YAW workflow · feat\/34-login-crash \(#34\)/);
       assert.match(out.systemMessage, /My open issues \(3\)/);
       assert.ok(!out.hookSpecificOutput.additionalContext.includes('My open issues'), 'the issue list is for the user only');
     }
@@ -525,7 +541,7 @@ test('session-issue: off with team.session-context: false; nothing on main; no t
   off.git('switch', '--quiet', '-c', 'feat/34-x');
   const a = viaShim(off, 'claude', 'SessionStart', fixture('claude', 'SessionStart'));
   assert.doesNotMatch(a.stdout, /additionalContext/);
-  assert.match(JSON.parse(a.stdout).systemMessage, /YAW team/);
+  assert.match(JSON.parse(a.stdout).systemMessage, /YAW workflow/);
 
   const r = await repo();
   const onMain = viaShim(r, 'claude', 'SessionStart', fixture('claude', 'SessionStart'));
@@ -565,7 +581,7 @@ test('yaw session-start prints the sync for the terminal; it needs the team modu
   const stderr = capture();
   const code = await main(['session-start'], { stdout, stderr, cwd: r.root, env: r.env });
   assert.equal(code, 0, stderr.text());
-  assert.match(stdout.text(), /^YAW team · main: up to date with origin\/main/);
+  assert.match(stdout.text(), /^YAW workflow · main: up to date with origin\/main/);
   const solo = await project({ team: 'solo', modules: ['core', 'tasks'], extra: '  tasks.mode: local\n' });
   const err = capture();
   assert.equal(await main(['session-start'], { stdout: capture(), stderr: err, cwd: solo, env: r.env }), 1);

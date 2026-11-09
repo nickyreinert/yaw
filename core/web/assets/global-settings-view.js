@@ -1,7 +1,7 @@
 // Global Settings: Defaults (your defaults for new projects or one preset, in sub-tabs), Files (~/.yaw, read-only),
 // Notifications (personal channels), Classification (local Laya settings and setup steps) and Review prompts (your blueprint). Text nodes only; writes go through CSRF-protected actions and are hash-checked.
 import { about, button, el, grid, hint, link, press, source, tabs } from './settings-view.js';
-import { asksIn, available, choiceLabel, choiceValue } from './ui-state.js';
+import { asksIn, available, choiceLabel, choiceValue, routeHidden, setFeatures, settingsRoute } from './ui-state.js';
 import { renderReviewPrompts } from './review-prompts-view.js';
 import { GROUPS, choiceField } from './setup-cards.js';
 import { pickFolder } from './folder-picker.js';
@@ -39,15 +39,18 @@ function formView(value, depth = 0) {
   return grid(['Key', 'Value'], keys.map((k) => [code(k), formView(value[k], depth + 1)]));
 }
 
-export function createGlobalSettings({ api, get, report, notifications, onFile }) {
+export function createGlobalSettings({ api, get, report, notifications, onFile, onFeatures = () => {} }) {
   let tab = 'interview', classifier = null, classifierSamples = null, profile = null, answers = null, presets = null, files = null, comfort = null, selected = null;
   const drawer = $('global-detail');
   const closeDrawer = () => { drawer.hidden = true; document.body.classList.remove('has-drawer'); selected = null; onFile(''); renderFiles(); };
   drawer.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
+  // Tabs of a feature that is off (Global → Settings → Features) are hidden and open Defaults instead.
+  const tabHidden = (id) => routeHidden(settingsRoute('global-settings', id));
+  const drawTabs = () => document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => { b.hidden = tabHidden(b.dataset.tab); b.setAttribute('aria-pressed', String(b.dataset.tab === tab)); });
   function show(sub, query = '') {
-    tab = TABS.includes(sub) ? sub : 'interview';
-    document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    tab = TABS.includes(sub) && !tabHidden(sub) ? sub : 'interview';
+    drawTabs();
     for (const id of TABS) $(`gs-${id}`).hidden = id !== tab;
     for (const id of ['sync', 'sessions']) $(`gs-${id}`).classList.add('card', 'settings-panel');
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
@@ -84,9 +87,18 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const update = () => { details.hidden = !enabled.checked; client.hidden = role.value !== 'client'; host.hidden = role.value !== 'host'; };
     enabled.addEventListener('change', update); role.addEventListener('change', update); update();
     details.append(role, client, host);
-    const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), label, details);
+    const toggle = (text, on, help) => {
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = on !== false;
+      const box = el('label', ` ${text}`, 'setting-toggle'); box.prepend(input);
+      return [input, box, el('p', help, 'small muted')];
+    };
+    const [sync, syncLabel, syncHelp] = toggle('Settings Sync', data.features?.sync, 'Share defaults, presets and statistics between your devices through a folder or a private GitHub repository. Off hides the Sync tab; saved sync settings are kept.');
+    const [profiling, profilingLabel, profilingHelp] = toggle('Profiling', data.features?.profiling, 'Classification labels saved sessions with your local Laya service; reviews look at the sessions that need attention. Off hides the Profiling pages (Global and Workspace), the Classification and Profiling settings and the Classification parts of Analytics; saved results are kept.');
+    const card = el('article', null, 'card'); card.append(el('h2', 'Optional features'), syncLabel, syncHelp, profilingLabel, profilingHelp, label, details);
     card.append(button('Save features', async () => {
       try {
+        const saved = await api('features-save', { sync: sync.checked, profiling: profiling.checked });
+        setFeatures(saved.features); drawTabs(); onFeatures(saved.features);
         const input = { enabled: enabled.checked, port: Number(port.value) };
         const migration = enabled.checked && data.folderSync && !data.hubMigrated;
         if (migration) {
@@ -143,16 +155,16 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const label = el('label', 'Preferred reviewer'); label.append(defaultTarget, el('span', 'Preselected when you request a review; you can change it for each review.', 'small muted'));
     root.replaceChildren(el('article', null, 'card'));
     const flow = el('ol', null, 'learn-flow');
-    for (const [title, text] of [['Choose sessions', 'In Learn, select saved conversations to inspect.'], ['Preview the prompt', 'Review the context before sharing it with a reviewer.'], ['Request a review', 'Use a browser chat or an enabled CLI. Review proposed changes before applying them.']]) {
+    for (const [title, text] of [['Choose sessions', 'In Profiling, select saved conversations to inspect.'], ['Preview the prompt', 'Review the context before sharing it with a reviewer.'], ['Request a review', 'Use a browser chat or an enabled CLI. Review proposed changes before applying them.']]) {
       const step = el('li'); step.append(el('strong', title), el('span', text, 'small muted')); flow.append(step);
     }
     const help = el('details', null, 'settings-help');
     help.append(el('summary', 'How are reviews run?'),
-      el('p', 'Learn runs only when you request a review. It does not forward each prompt. Session hooks collect metadata; model diagnosis happens separately on selected saved conversations.', 'small muted'),
+      el('p', 'Profiling reviews run only when you request one. It does not forward each prompt. Session hooks collect metadata; model diagnosis happens separately on selected saved conversations.', 'small muted'),
       el('p', 'Browser chats open empty: paste the reviewed prompt yourself. CLI reviews run on the computer running yaw web (normally this computer), in a separate temporary folder, using your existing sign-in and model provider. They may use paid hosted models. YAW shows the response here; it does not apply suggestions automatically.', 'small muted'),
       el('p', 'Install and sign in to Claude Code or Codex separately. YAW does not install them or store credentials. Codex user config is excluded for this restricted review; provider retention still applies.', 'small muted'));
     const actions = el('div', null, 'interview-actions');
-    root.firstChild.append(el('h2', 'Learn · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
+    root.firstChild.append(el('h2', 'Profiling Settings · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
       el('h3', 'CLI reviewers'), el('p', 'Allow these tools as review choices. Availability is checked on the computer running yaw web.', 'small muted'), choices,
       label, actions);
     actions.append(button('Save review destinations', async () => {
@@ -247,8 +259,15 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
       label.prepend(input); root.append(label); scopes.push([key, input]);
     }
     const run = async (resolution) => {
-      const result = await api('sync-run', { name: name.value || undefined, resolution });
-      await loadSync(); root.append(el('p', result.message, 'small muted'));
+      let job = await api('sync-run', { name: name.value || undefined, resolution });
+      const progress = el('p', '', 'small muted'), cancel = button('Cancel sync', () => api('sync-cancel', {}).catch(report));
+      root.append(progress, cancel);
+      while (job && ['running', 'cancelling'].includes(job.status)) {
+        progress.textContent = `${job.message} Step ${job.steps}: ${job.step}`;
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        job = await get('sync-job');
+      }
+      await loadSync(); root.append(el('p', job?.message ?? 'Sync finished.', job?.status === 'failed' ? 'warn' : 'small muted'));
     };
     const actions = el('div', null, 'interview-actions'); root.append(actions);
     actions.append(button('Save sync settings', async () => {
@@ -278,7 +297,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
   // Defaults ---------------------------------------------------------------------------------------------
   // One editor for your defaults (profile + tool defaults) or one preset (answers only), chosen at the top.
   const SUBTABS = [['about', 'About you'], ['communication', 'Communication'], ['tools', 'Tools'], ['workflow', 'Workflow']];
-  const subOf = (id) => ['user.agents', 'user.expertise'].includes(id) ? 'about' : 'communication';
+  const subOf = (id) => id === 'user.agents' ? 'about' : 'communication';
   let setupPolicy = null, target = '', preset = null, policy = {}, tools = new Set(), touched = new Set(), dirty = { profile: false, tools: false }, sub = 'about', note = '';
   async function loadInterview() {
     [setupPolicy, profile, presets] = await Promise.all([get('global/setup-defaults'), get('global/profile'), get('global/presets')]);
@@ -496,7 +515,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
     const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
-    card.append(hint('small muted', 'Classify (in the filter bar of ', link('Analytics', 'global-analytics'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
+    card.append(hint('small muted', 'Classify (in the controller on ', link('Profiling', 'global-improve'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
     const form = el('div', null, 'classifier-form'), inputs = {};
     for (const [key, label, type, help, step] of FIELDS) {
       const wrap = el('label', label), input = el('input'), range = limits[key];
@@ -599,9 +618,9 @@ export function createGlobalSettings({ api, get, report, notifications, onFile }
     step('2. Start the service on this computer only', 'Keep this terminal open while you classify. LAYA_HOST matters: by default laya-serve listens on all network interfaces (0.0.0.0). Add LAYA_DEVICE=mps (Apple), cuda or cpu to pick the device.',
       `LAYA_HOST=${host} LAYA_PORT=${port} LAYA_MODELS=multilingual LAYA_DEFAULT_MODEL=multilingual ~/.laya/bin/laya-serve`);
     step('3. Test it', 'Press Test connection above. The first answer may take a while as the checkpoint downloads and loads.', null);
-    step('4. Classify', ['Press Classify in the filter bar of ', link('Global → Analytics', 'global-analytics'), ' (all workspaces) or ', link('Workspace → Analytics', 'analytics'), ' (this workspace), or run:'], 'yaw sessions evaluate --days 30');
-    const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), link = el('a', 'github.com/NandhaKishorM/laya');
-    link.href = 'https://github.com/NandhaKishorM/laya'; link.target = '_blank'; link.rel = 'noopener noreferrer'; more.append(link, '. YAW never installs, downloads or starts anything for Laya.');
+    step('4. Classify', ['Choose 5, 10 or All and press Classify in the controller on ', link('Global → Profiling', 'global-improve'), ' (all workspaces) or ', link('Workspace → Profiling', 'profiling'), ' (this workspace; results also appear in ', link('Analytics', 'global-analytics'), '), or run:'], 'yaw sessions evaluate --days 30');
+    const more = el('p', 'Full instructions, GPU builds and troubleshooting: ', 'small muted'), docs = el('a', 'github.com/NandhaKishorM/laya');
+    docs.href = 'https://github.com/NandhaKishorM/laya'; docs.target = '_blank'; docs.rel = 'noopener noreferrer'; more.append(docs, '. YAW never installs, downloads or starts anything for Laya.');
     card.append(more);
     return card;
   }

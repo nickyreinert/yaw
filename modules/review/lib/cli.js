@@ -6,6 +6,7 @@
 // Exit codes: 0 ok / push allowed, 1 findings block the push, 2 usage or environment.
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, writeFileSync, writeSync, chmodSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,9 +48,16 @@ function git(root, args, { input } = {}) {
   return r.status === 0 ? r.stdout : null;
 }
 
+// For the push gate: a failed git call must not read as "no commits" or "empty diff".
+function gitStrict(root, args) {
+  const r = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (r.status === 0) return r.stdout;
+  throw new Error(`git ${args[0]} failed: ${(r.error?.message ?? r.stderr ?? '').trim() || `exit ${r.status}`}`);
+}
+
 export function triggers(root) {
   try {
-    return reviewTriggers(readAnswers(root).answers ?? {});
+    return reviewTriggers(readAnswers(root, { env: process.env }).answers ?? {});
   } catch {
     return reviewTriggers({});
   }
@@ -57,7 +65,7 @@ export function triggers(root) {
 
 function gateMode(root) {
   try {
-    return readAnswers(root).answers?.['quality.review-gate'] === 'block' ? 'block' : 'warn';
+    return readAnswers(root, { env: process.env }).answers?.['quality.review-gate'] === 'block' ? 'block' : 'warn';
   } catch {
     return 'warn';
   }
@@ -115,16 +123,20 @@ export function runAgent({ agent, prompt, root, env }) {
   return { ok: true, output };
 }
 
+// Only the exact last line counts; anything else is treated as no verdict.
 export function verdict(output) {
-  const lines = String(output).trim().split('\n').reverse();
-  for (const line of lines) {
-    const m = /VERDICT:\s*(PASS|FINDINGS)\b/i.exec(line);
-    if (m) return m[1].toUpperCase();
-  }
-  return null;
+  const last = String(output).trim().split('\n').pop().trim();
+  const m = /^VERDICT: (PASS|FINDINGS)$/.exec(last);
+  return m ? m[1] : null;
 }
 
 // ------------------------------------------------------------------ cache (per commit, per reviewer)
+
+// A stored PASS is { <commit>: { <reviewer>: <fingerprint> } }. The fingerprint hashes the whole prompt the reviewer got
+// (effective prompt and rules, foundations, relevant configuration, reviewed range and diff), so any change in what is
+// reviewed or how makes the old PASS stale. Older entries (a plain list of reviewers) carry no fingerprint and never match.
+const fingerprint = (prompt) => createHash('sha256').update(prompt).digest('hex');
+const approved = (cache, commit, kind, print) => cache[commit]?.[kind] === print;
 
 function cacheFile(root) {
   const dir = git(root, ['rev-parse', '--git-dir'])?.trim();
@@ -152,7 +164,7 @@ function writeCache(root, cache) {
 
 // ------------------------------------------------------------------ push ranges
 
-// git's pre-push stdin: "<local ref> <local sha> <remote ref> <remote sha>" per line.
+// git's pre-push stdin: "<local ref> <local sha> <remote ref> <remote sha>" per line. Throws when git fails.
 export function pushedCommits(root, stdin) {
   const commits = [];
   const ranges = [];
@@ -160,7 +172,7 @@ export function pushedCommits(root, stdin) {
     const [, localSha, , remoteSha] = line.trim().split(/\s+/);
     if (!localSha || ZERO.test(localSha)) continue; // deleting a branch
     const args = remoteSha && !ZERO.test(remoteSha) ? ['rev-list', '--reverse', `${remoteSha}..${localSha}`] : ['rev-list', '--reverse', localSha, '--not', '--remotes'];
-    const list = (git(root, args) ?? '').split('\n').filter(Boolean);
+    const list = gitStrict(root, args).split('\n').filter(Boolean);
     if (list.length === 0) continue;
     commits.push(...list);
     const base = git(root, ['rev-parse', '--verify', '--quiet', `${list[0]}^`])?.trim() || EMPTY_TREE;
@@ -238,10 +250,24 @@ function gate({ io, stdin }) {
   const env = io.env;
   const required = Object.entries(triggers(io.root)).filter(([, t]) => t === 'push').map(([k]) => k);
   if (required.length === 0) return 0;
-  const { commits, ranges } = pushedCommits(io.root, stdin);
+  let pushed;
+  try {
+    pushed = pushedCommits(io.root, stdin);
+  } catch (e) {
+    return gitFailed(io, e);
+  }
+  const { commits, ranges } = pushed;
   if (commits.length === 0) return 0;
+  let diff;
+  try {
+    diff = ranges.map((r) => gitStrict(io.root, ['diff', r.base, r.head])).join('\n');
+  } catch (e) {
+    return gitFailed(io, e);
+  }
+  const label = ranges.map((r) => `${r.base.slice(0, 7)}..${r.head.slice(0, 7)}`).join(', ');
+  const prompts = Object.fromEntries(required.map((kind) => [kind, buildPrompt({ root: io.root, kind, range: label, diff, env })]));
   const cache = readCache(io.root);
-  const todo = required.filter((k) => commits.some((c) => !(cache[c] ?? []).includes(k)));
+  const todo = required.filter((k) => commits.some((c) => !approved(cache, c, k, fingerprint(prompts[k]))));
   if (todo.length === 0) {
     io.stderr.write(`review gate: ${commits.length} commit(s) already reviewed\n`);
     return 0;
@@ -260,15 +286,13 @@ function gate({ io, stdin }) {
     io.stderr.write('review gate: no agent CLI found (claude, codex or copilot), so the push was not reviewed\n');
     return mode === 'block' ? stop(io) : 0;
   }
-  const diff = ranges.map((r) => git(io.root, ['diff', r.base, r.head]) ?? '').join('\n');
-  const label = ranges.map((r) => `${r.base.slice(0, 7)}..${r.head.slice(0, 7)}`).join(', ');
   const failed = [];
   for (const kind of todo) {
     io.stderr.write(`review gate: ${LABEL[kind]} review of ${commits.length} commit(s) (${agent.name})...\n`);
-    const result = runAgent({ agent, prompt: buildPrompt({ root: io.root, kind, range: label, diff, env }), root: io.root, env });
+    const result = runAgent({ agent, prompt: prompts[kind], root: io.root, env });
     const v = result.ok ? verdict(result.output) : null;
     if (v === 'PASS') {
-      for (const c of commits) cache[c] = [...new Set([...(cache[c] ?? []), kind])];
+      for (const c of commits) cache[c] = { ...(Array.isArray(cache[c]) ? {} : cache[c]), [kind]: fingerprint(prompts[kind]) };
       continue;
     }
     failed.push(kind);
@@ -284,6 +308,16 @@ function gate({ io, stdin }) {
     if (answer === 'y' || answer === 'yes') return 0;
   }
   return stop(io);
+}
+
+// Git could not tell what is being pushed, so nothing was reviewed: stop (exit 2), whatever the gate mode.
+function gitFailed(io, e) {
+  if (io.env.YAW_REVIEW === 'skip') {
+    io.stderr.write(`review gate: skipped (YAW_REVIEW=skip); ${e.message}\n`);
+    return 0;
+  }
+  io.stderr.write(`review gate: git failed, so the push was not reviewed: ${e.message}\nTo push anyway once: YAW_REVIEW=skip git push\n`);
+  return 2;
 }
 
 function stop(io) {

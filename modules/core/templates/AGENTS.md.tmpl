@@ -9,10 +9,12 @@
 
 ## Working agreement
 
-<% if team %>
-- Write code, comments, commit messages and docs in English; agree on chat language and autonomy per contributor.
-<% else %>
+<% if share.language %>
 - Chat in "<%= answers.user.language %>"; write code, comments, commit messages and docs in English.
+<% else %>
+- Write code, comments, commit messages and docs in English; chat language, autonomy and answer style are each person's own settings.
+<% end %>
+<% if share.autonomy %>
 - <%= rules.autonomy %>
 <% end %>
 <% if coreCommunication %>

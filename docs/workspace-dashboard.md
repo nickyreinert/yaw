@@ -71,11 +71,11 @@ and applies to all visible metrics, charts and tables.
   parent folder (such as your home folder) is listed as `./` or by full path.
 - **Sessions**: usage and message-insight cards, then charts (sessions per
   week, duration, prompt and answer length, response time, tokens by model,
-  outcomes), then the tables (sessions, lengths and timing, agents, models,
+  outcomes), then the tables (sessions with lengths and timing, agents, models,
   folders, projects, outcomes). The sessions table distinguishes project from
-  device. The sticky filter bar also holds **Refresh**, **Auto** and
-  **Classify**, described below.
-- **Learn**: classified projects and sessions, highlighted conversations, and browser or configured CLI reviews (below).
+  device. The sticky filter bar also holds **Refresh** and **Auto**, described
+  below; classification starts from the controller on **Profiling**.
+- **Profiling**: classified projects and sessions, highlighted conversations, and browser or configured CLI reviews (below). Workspace → Profiling is the same page limited to this workspace's sessions.
 - **Tasks**: open tasks across projects, filterable by folder and project;
   **Open →** switches the dashboard to that project's Tasks page.
 - **Knowledge**: your personal records in `~/.yaw/knowledge`. Other
@@ -88,7 +88,14 @@ and applies to all visible metrics, charts and tables.
   projects have the comfort module; **Classification** holds the Laya settings
   and setup steps (see below); **Review prompts** edits your blueprint
   (`~/.yaw/review/<kind>.md`), which every project without its own prompt
-  uses, and **Reset to kit default** removes it.
+  uses, and **Reset to kit default** removes it. **Features** switches the
+  optional features, each on by default: **Server mode**, **Settings Sync**
+  (off hides the **Sync** tab) and **Profiling**, which covers Classification
+  and the reviews, two steps of one feature (Classification labels sessions,
+  reviews look at the ones that need attention). Profiling off hides **Profiling**
+  (Global and Workspace), the **Classification** and **Profiling Settings** tabs, the Classify controller and the
+  Analytics **Classification** table and chart; links, the sidebar search and
+  typed addresses no longer reach them. Saved settings and results are kept.
 
 Every table can be filtered and sorted and is paged. Filters, splits, tabs,
 table searches, sorting, pages and the open file are kept in the address
@@ -96,19 +103,19 @@ table searches, sorting, pages and the open file are kept in the address
 view can be bookmarked and Back/Forward work. Workspace **Sessions** is the
 same view locked to the current workspace.
 
-### Global → Learn
+### Global → Profiling
 
-Open **Global → Learn** to find a project or session that could teach you something. The same filters and sortable/searchable tables as Sessions apply here. Charts use already saved classification results, preserving unknown and mixed labels. **Needs attention** lists sessions with estimated friction or unresolved work; **All classified** and **All sessions** let you recognize work you remember. Click a project to browse its sessions.
+Open **Global → Profiling** (or **Workspace → Profiling** for this workspace only) to find a project or session that could teach you something. The same filters and sortable/searchable tables as Sessions apply here. Charts use already saved classification results, preserving unknown and mixed labels. **Needs attention** lists sessions with estimated friction or unresolved work; **All classified** and **All sessions** let you recognize work you remember. The **View** switch chooses how to browse, with the same data and filters in both: **Folder Browser** (default) lists the folders and projects one level at a time, with **Back** and the folder path, and shows a project's sessions once you open it; **All Sessions** is one flat list. The Folder Browser location is kept in the page address.
 
-**Classify** processes unclassified local sessions matching the current filters. When those are classified, **Reclassify** updates matching local sessions. Classification is explicit, uses loopback Laya, and retains Pause, Resume and Stop. Missing or unreadable transcripts are skipped individually, with a count; existing results for those sessions remain available. If none can be read, no model runs. Check **Global → Settings → Sessions** for history-folder locations, or **Refresh** for a new scan; classifier settings do not restore missing histories. Unrelated saved sessions remain unchanged. Synced records contribute statistics but cannot open a transcript on this device.
+The Classify controller above the filter bar chooses how many sessions to process: **5**, **10** or **All** (default 5), then **Classify** starts the run; **Profiling Settings** opens the settings. It takes the unclassified local sessions matching the current filters, newest first, capped at the chosen number; **All** takes every one of them. When none is unclassified, **Reclassify** takes the matching local sessions the same way. The server runs one job per request, so there is no batching beyond that cap. Classification is explicit, uses loopback Laya, and retains Pause, Resume and Stop. Missing or unreadable transcripts are skipped individually, with a count; existing results for those sessions remain available. If none can be read, no model runs. Check **Global → Settings → Sessions** for history-folder locations, or **Refresh** for a new scan; classifier settings do not restore missing histories. Unrelated saved sessions remain unchanged. Synced records contribute statistics but cannot open a transcript on this device.
 
-Click **Read conversation** to authorize reading that session. You see the chronological dialogue, with corrections highlighted in gold, apologies/mistakes in pink and recovery in green. **Previous clue** and **Next clue** jump between possible friction signals. These are phrase hints, not confirmed errors. The transcript is read up to 8 MiB or 1,000 messages; partial or unavailable evidence is identified. Larger Gemini JSON files cannot be opened in this bounded reader. Recognized absolute paths are redacted initially; other sensitive details may remain.
+Click **Read conversation** to authorize reading that session. It opens in a preview on the right while the list narrows; **✕** closes it and the list returns to full width, without leaving the page. You see the chronological dialogue, with corrections highlighted in gold, apologies/mistakes in pink and recovery in green. **Previous clue** and **Next clue** jump between possible friction signals. These are phrase hints, not confirmed errors. The transcript is read up to 8 MiB or 1,000 messages; partial or unavailable evidence is identified. Larger Gemini JSON files cannot be opened in this bounded reader. Recognized absolute paths are redacted initially; other sensitive details may remain.
 
 **Review this conversation** prepares relevant moments and their context automatically. Inspect and redact the editable prompt, then **Copy review prompt** and **Open ChatGPT**, Claude or another browser chat. This reuses the interview's destinations and sends no prompt in the link. The requested answer is one verdict sentence and up to three actions within 150 words. You decide which suggestion to apply.
 
-To use a coding agent directly, configure **Global → Settings → Learn**: enable an installed **Claude Code** or **Codex** CLI and select your default destination. Choose it in the review panel and press **Run review with CLI**. Confirmation identifies the deliberate disclosure: the CLI uses your sign-in and may send the prompt to a paid hosted provider. YAW starts a fresh, restricted review and displays the result here, without applying changes. Claude uses bare mode without tools; Codex excludes user config and uses an ephemeral read-only session with shell tools, apps, hooks and delegation disabled. Unsupported CLI versions or missing sign-in fail visibly. Vendor references: [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive), [Codex feature configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
+To use a coding agent directly, configure **Global → Settings → Profiling Settings**: enable an installed **Claude Code** or **Codex** CLI and select your default destination. Choose it in the review panel and press **Run review with CLI**. Confirmation identifies the deliberate disclosure: the CLI uses your sign-in and may send the prompt to a paid hosted provider. YAW starts a fresh, restricted review and displays the result here, without applying changes. Claude uses bare mode without tools; Codex excludes user config and uses an ephemeral read-only session with shell tools, apps, hooks and delegation disabled. Unsupported CLI versions or missing sign-in fail visibly. Vendor references: [Claude CLI](https://code.claude.com/docs/en/cli-reference), [Codex non-interactive mode](https://developers.openai.com/codex/noninteractive), [Codex feature configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
 
-Stop a CLI review at any time; it times out after three minutes. Prompt size is capped at 24,000 characters and output at 32,000. YAW stores no conversation text, review prompts or verdicts in analytics, registry, sync or logs. Temporary reviews clear when you leave Learn, change filters or refresh; server verdicts expire after 15 minutes. Provider-side retention is separate. See ADR-0065.
+Stop a CLI review at any time; it times out after three minutes. Prompt size is capped at 24,000 characters and output at 32,000. YAW stores no conversation text, review prompts or verdicts (there is no saved-verdicts history) in analytics, registry, sync or logs. Temporary reviews clear when you leave Profiling, change filters or refresh; server verdicts expire after 15 minutes. Provider-side retention is separate. See ADR-0065.
 
 ## Sync between devices
 
@@ -235,8 +242,8 @@ yaw sessions evaluate --days 30
 yaw sessions evaluate --all --endpoint http://127.0.0.1:8000
 ```
 
-Or press **Classify** in the filter bar of a Sessions page (same scope as
-Refresh) and confirm the message-reading prompt. While it runs, the expandable
+Or choose 5, 10 or All in the controller on **Global → Profiling** (or
+**Workspace → Profiling**), press **Classify** and confirm the message-reading prompt. While it runs, the expandable
 sidebar status shows session/turn progress and offers **Pause after current
 turn**, **Resume**, and **Stop**. Stop aborts the active local request and
 discards the unfinished run; only a completed run replaces saved evaluations.
@@ -314,7 +321,7 @@ explicit outcome criteria. Model predictions below the unchanged threshold becom
 original model label and confidence alongside the applied label and source.
 Other classification categories continue to use Laya.
 
-Learn shows aggregate UNKNOWN reasons: model uncertainty, threshold rejection,
+Profiling shows aggregate UNKNOWN reasons: model uncertainty, threshold rejection,
 or no user verdict. Older evaluations may have no recorded reason; use
 **Reclassify** on the matching local sessions to update them. Refresh alone does
 not reclassify. Only aggregate reason and rule-use counts are saved.

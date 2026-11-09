@@ -49,8 +49,9 @@ const OTHER_TOPIC = [
 // built at run time so no secret-looking literal sits in the repository
 const FAKE_KEY = `sk-${'a1b2c3d4'.repeat(5)}`;
 
-function answersText({ agents = 'claude, codex, copilot', modules = MODULES, team = 'solo', comfort = '[hygiene, status-line, notifications]' } = {}) {
-  return `mode: standard\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny command-line tool.\n  idea.team: ${team}\n  tasks.mode: local\n  user.comfort: ${comfort}\nproposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${modules.join(', ')}]\n`;
+// shared: the project switched user.comfort to team (T-027), so the status line may be committed.
+function answersText({ agents = 'claude, codex, copilot', modules = MODULES, team = 'solo', comfort = '[hygiene, status-line, notifications]', shared = false } = {}) {
+  return `mode: standard\nanswers:\n  user.agents: [${agents}]\n  idea.text: A tiny command-line tool.\n  idea.team: ${team}\n  tasks.mode: local\n  user.comfort: ${comfort}\n${shared ? 'scopes:\n  user.comfort: team\n' : ''}proposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${modules.join(', ')}]\n`;
 }
 
 async function project(options = {}) {
@@ -106,8 +107,8 @@ test('module: comfort and evaluation hooks only, tokenCost none, one question', 
   assert.equal(def.agents.copilot.support, 'fallback');
 });
 
-test('install: hooks for Claude and Codex, status line for a solo Claude project, manifest entries', async () => {
-  const root = await project();
+test('install: hooks for Claude and Codex, status line for a Claude project that shares it, manifest entries', async () => {
+  const root = await project({ shared: true });
   const claude = JSON.parse(readFileSync(join(root, '.claude/settings.json'), 'utf8'));
   const codex = JSON.parse(readFileSync(join(root, '.codex/hooks.json'), 'utf8'));
   for (const event of ['UserPromptSubmit', 'Stop', 'Notification', 'StopFailure', 'PostToolUse', 'PostToolUseFailure']) {
@@ -130,7 +131,9 @@ test('install: hooks for Claude and Codex, status line for a solo Claude project
 test('install: no status line without Claude or without the choice', async () => {
   const codexOnly = await project({ agents: 'codex' });
   assert.equal(existsSync(join(codexOnly, '.claude/settings.json')), false);
-  const noLine = await project({ comfort: '[hygiene]' });
+  const personal = await project();
+  assert.equal(JSON.parse(readFileSync(join(personal, '.claude/settings.json'), 'utf8')).statusLine, undefined, 'a personal choice is not committed (T-027)');
+  const noLine = await project({ comfort: '[hygiene]', shared: true });
   assert.equal(JSON.parse(readFileSync(join(noLine, '.claude/settings.json'), 'utf8')).statusLine, undefined);
 });
 

@@ -22,6 +22,25 @@ export function settingsRoute(page, tab, query = '') {
 }
 export const settingsPresentation = (tab, params = new URLSearchParams()) =>
   tab === 'interview' || params.has('interview') ? 'interview' : 'settings';
+// Optional features, switched under Global → Settings → Features (personal, both on by default). Settings Sync is the
+// Sync tab. Profiling is two steps of one feature: Classification (local Laya labels per session) feeds the
+// reviews of selected sessions; it has a Global page and a Workspace page (`profiling`, this workspace only).
+// A feature that is off hides every page, tab, sidebar entry, search hit and link listed here; its saved data and settings stay as they are.
+export const FEATURE_ROUTES = {
+  sync: ['global-settings/sync'],
+  profiling: ['global-improve', 'profiling', 'global-settings/classification', 'global-settings/improve'],
+};
+const features = { sync: true, profiling: true };
+export const featureOn = (name) => features[name] !== false;
+export function setFeatures(next = {}) {
+  for (const name of Object.keys(FEATURE_ROUTES)) features[name] = next?.[name] !== false;
+  return { ...features };
+}
+// `#route[/sub][?query]` of a page that belongs to a feature that is off.
+export function routeHidden(hash) {
+  const route = String(hash ?? '').replace(/^#/, '').split('?')[0];
+  return Object.entries(FEATURE_ROUTES).some(([name, routes]) => !featureOn(name) && routes.some((r) => route === r || route.startsWith(`${r}/`)));
+}
 export function installDialogCancellation(dialog) {
   const cancel = (event) => {
     event.preventDefault();
@@ -55,7 +74,7 @@ export function visibleQuestions(questions, given, mode, modules) {
 export function defaultModules(definitions, questions, given, mode) {
   const a = effectiveAnswers(questions, given, mode);
   if (['quick', 'basic', 'pro', 'all'].includes(mode)) return selectedByPolicy(definitions, { answers: a, modules: definitions.filter((d) => d.savedDefault).map((d) => d.name) });
-  const facts = { team: ['team', 'external-reviewers'].includes(a['idea.team']), usesGitHub: a['tasks.use-github'] !== false };
+  const facts = { team: a['idea.team'] === 'team', usesGitHub: a['tasks.use-github'] !== false };
   if (a['arch.language'] && a['arch.language'] !== 'auto') facts.language = a['arch.language'];
   if (a['arch.runs-on'] && a['arch.runs-on'] !== 'auto') {
     facts.runsOn = a['arch.runs-on'];
@@ -111,25 +130,14 @@ export function focusStepStart(start, heading) {
 export function interviewDetailText(id) {
   return ({
     'user.length': [
-      'Brief: key points and direct answers.',
+      'Brief: bullet points, key points and direct answers; no unnecessary explanations.',
       'Balanced: the result first, with enough context to understand it.',
       'Extensive: fuller reasoning and supporting detail.',
     ],
-    'user.register': [
-      'Plain words: everyday language; avoid jargon.',
-      'Professional: neutral workplace language.',
-      'Technical: precise technical terms.',
-      'Scientific: rigorous wording; state the basis for claims.',
-    ],
-    'user.examples': [
-      'Only when useful: add an example when it helps explain the point.',
-      'Always: illustrate each explanation with an example or analogy.',
-      'Never: include examples only when you explicitly ask for them.',
-    ],
     'user.explain': [
-      'In one line: give the reason briefly.',
-      'In a short paragraph: explain the choice with a little context.',
-      'Only on request: give the reason when you ask.',
+      'Short confirmation: say briefly what was done.',
+      'Detailed change report: say what changed and why.',
+      'Only on request: explain actions when you ask.',
     ],
     'user.autonomy': [
       'Ask often: check before every non-trivial change.',
@@ -138,16 +146,17 @@ export function interviewDetailText(id) {
     ],
     'user.language': ['Sets the language used in chat. Code, comments and project documentation remain in English.'],
     'user.expertise': [
-      'Layperson: plain language, explained terms and step-by-step guidance.',
-      'Intermediate: concise explanations with context for less familiar decisions.',
-      'Expert: precise technical language; skip introductory explanations.',
+      'Layperson: plain words, examples and analogies, explained terms and step-by-step guidance.',
+      'Intermediate: professional wording with context for less familiar decisions; examples when they help.',
+      'Expert: precise technical language, no examples unless asked; skip introductory explanations.',
       'This changes the agent’s explanation style in `AGENTS.md`. Question coverage and tool permissions stay the same.',
     ],
     'idea.team': [
-      'Solo: project instructions include your personal communication and autonomy preferences.',
-      'Team: shared instructions use English for code and documentation; chat language and autonomy are agreed per contributor.',
-      'External reviewers: the same shared rules as Team, for occasional contributors and reviewers.',
-      'GitHub, task tracking and review gates remain separate choices. The optional Team rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
+      'Solo or Team, personal settings stay personal: your answer style, chat language, autonomy, agents and comfort helpers live in ~/.yaw/user-profile.yaml on your machine and never go into a committed file.',
+      'Team settings are committed with the repository and apply to everyone: hooks, skills, tools, shared instructions and project rules.',
+      'Solo: you are the only contributor; workflow rules ask for no approvals. Team: several people work on the repository; workflow rules can require reviews and pull requests.',
+      'Each setting has a Personal / Team switch. Hooks, the security module and project rules are always team settings.',
+      'GitHub, task tracking and review gates remain separate choices. The optional Workflow rules module adds issue-linked commits and pull-request checks when enabled with GitHub.',
     ],
   })[id] ?? null;
 }

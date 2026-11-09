@@ -2,7 +2,7 @@
 // Every write and delete goes through here, so no kit command can touch a path outside the project.
 
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 
 export const MANIFEST = '.yaw/manifest.json';
@@ -92,8 +92,17 @@ export function writeAtomic(root, rel, content, options) {
   mkdirSync(dirname(target), { recursive: true });
   resolveInside(root, rel, options); // re-check after creating directories
   const tmp = join(dirname(target), `.${basename(target)}.yaw-${process.pid}-${randomBytes(4).toString('hex')}`);
+  // An existing regular file keeps its mode (umask would otherwise widen 0600 or drop +x) unless the caller overrides it.
+  let keepMode;
+  if (options?.mode === undefined) {
+    try {
+      const st = lstatSync(target);
+      if (st.isFile()) keepMode = st.mode & 0o7777;
+    } catch { /* new file */ }
+  }
   try {
-    writeFileSync(tmp, content, { flag: 'wx', mode: options?.mode ?? 0o666 });
+    writeFileSync(tmp, content, { flag: 'wx', mode: keepMode ?? options?.mode ?? 0o666 });
+    if (keepMode !== undefined) chmodSync(tmp, keepMode);
     renameSync(tmp, target);
   } catch (e) {
     try { unlinkSync(tmp); } catch { /* already gone */ }

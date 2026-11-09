@@ -10,6 +10,14 @@ const COMFORT = {
   terminalSequence: ['claude'],
 };
 
+// Agents whose PostToolUse output YAW may replace: Claude Code (fixtures, T-047). Copilot's `modifiedResult` is
+// not verified; Codex cannot replace tool output.
+const COMPRESS = ['claude'];
+// The method goes to the event log, so it is a short identifier, never text from the output.
+const METHOD = /^[a-z][a-z0-9+-]{0,39}$/;
+
+const bytes = (value) => Buffer.byteLength(JSON.stringify(value));
+
 function oneLine(text, max) {
   const s = String(text).replace(/\s+/g, ' ').trim();
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
@@ -20,9 +28,11 @@ function clipContext(text) {
   return lines.length > CONTEXT_MAX_CHARS ? lines.slice(0, CONTEXT_MAX_CHARS) : lines;
 }
 
-// kind: guard | context | comfort | evaluation; event: normalised event name; result: handler return value.
-// -> { deny?: reason, context?: text, systemMessage?: text, terminalSequence?: text } (possibly empty)
-export function allowed({ kind, event, agent, result }) {
+// kind: guard | context | comfort | evaluation | compress; event: normalised event name; result: handler return
+// value; original: the tool's output (compress only).
+// -> { deny?: reason, context?: text, systemMessage?: text, terminalSequence?: text,
+//      updatedToolOutput?: value, compressed?: { rawBytes, outBytes, method } } (possibly empty)
+export function allowed({ kind, event, agent, result, original }) {
   const out = {};
   if (!result || typeof result !== 'object') return out;
   if (kind === 'guard') {
@@ -35,12 +45,25 @@ export function allowed({ kind, event, agent, result }) {
     for (const [field, agents] of Object.entries(COMFORT)) {
       if (agents.includes(agent) && typeof result[field] === 'string' && result[field] !== '') out[field] = result[field];
     }
+  } else if (kind === 'compress') {
+    // A replacement in the tool's own JSON type, kept only when smaller than the original (never worse).
+    const update = result.updatedToolOutput;
+    if (event === 'PostToolUse' && COMPRESS.includes(agent) && original != null && update != null
+      && typeof update === typeof original && Array.isArray(update) === Array.isArray(original)) {
+      const rawBytes = bytes(original);
+      const outBytes = bytes(update);
+      if (outBytes < rawBytes) {
+        out.updatedToolOutput = update;
+        out.compressed = { rawBytes, outBytes, method: typeof result.method === 'string' && METHOD.test(result.method) ? result.method : null };
+      }
+    }
   }
   // evaluation: nothing, ever
   return out;
 }
 
-// Combine the allowed outputs of several handlers: deny reasons and contexts are joined.
+// Combine the allowed outputs of several handlers: deny reasons and contexts are joined; the first replaced
+// output wins, with its sizes.
 export function combine(outputs) {
   const acc = {};
   for (const o of outputs) {

@@ -270,8 +270,25 @@ test('Insights action and browser modules use existing authenticated no-store an
   assert.equal((await action('improve-agent-start', { agent: 'shell', prompt: 'Never execute arbitrary commands.', confirm: true })).status, 400);
   assert.equal((await fetch(`${base}/api/improve/job`, { headers: { cookie } })).status, 200);
   assert.match(html, /data-route="global-improve"/); assert.match(html, /id="gs-improve"/);
-  for (const file of ['insights-model.js', 'insights-view.js', 'chat-services.js']) {
+  for (const file of ['insights-model.js', 'insights-view.js', 'session-preview.js', 'chat-services.js']) {
     const response = await fetch(`${base}/${file}`, { headers: { cookie } });
     assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /javascript/);
   }
+});
+
+test('a cached refresh finds each saved row by ID instead of scanning all saved rows per session', async () => {
+  const f = fixture();
+  const transcript = (id) => [
+    { type: 'session_meta', timestamp: time, payload: { id, cwd: f.root } },
+    ...messages.map((m) => ({ type: 'response_item', timestamp: m.time, payload: { type: 'message', role: m.role, content: [{ type: 'text', text: m.text }] } })),
+  ].map(JSON.stringify).join('\n');
+  writeTree(f.env.CODEX_HOME, Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`sessions/2026/10/24/rollout-n${i}.jsonl`, transcript(`n${i}`)])));
+  await collectAnalysis({ ...f, all: true });
+  const saved = readAnalysis(f.env).rows.length;
+  let scans = 0; const find = Array.prototype.find;
+  Array.prototype.find = function (...args) { if (this.length === saved && this[0]?.file_key) scans++; return find.apply(this, args); };
+  let result;
+  try { result = await collectAnalysis({ ...f, all: true }); } finally { Array.prototype.find = find; }
+  assert.equal(result.reused, saved);
+  assert.equal(scans, 0);
 });

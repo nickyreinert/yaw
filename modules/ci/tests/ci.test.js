@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from '../../../core/lib/yaml.js';
-import { profileCi } from '../../../core/render/kit.js';
+import { loadModule, profileCi } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, removeModule } from '../../../core/render/project.js';
 import { KIT_ROOT, cleanEnv, makeKitRepo, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
@@ -251,4 +251,17 @@ test('profileCi: a malformed fragment is reported', () => {
   const kit = fixtureKit({ bad: 'steps:\n- uses: x\n', worse: 'steps: nope\n' });
   assert.throws(() => profileCi(kit, ['bad']), /cannot read the step|steps/);
   assert.throws(() => profileCi(kit, ['worse']), /"steps" must be a list/);
+});
+
+test('the card describes the two workflows, their triggers, the Dependabot role and what a failure does', () => {
+  const def = loadModule(KIT_ROOT, 'ci');
+  const text = [def.what, ...def.details, ...def.adds].join('\n');
+  assert.match(text, /quality-gate/);
+  assert.match(text, /just check/);
+  assert.match(text, /secret-scan/);
+  assert.match(text, /gitleaks/);
+  assert.match(text, /main or master/);
+  assert.match(text, /Dependabot[^\n]*weekly[^\n]*never merges/);
+  assert.match(text, /red cross/);
+  assert.match(text, /just gh-protect/, 'merging is blocked only through the ruleset');
 });

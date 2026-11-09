@@ -196,10 +196,11 @@ export function createFormApi({ root, kitRoot, env, verify, skipVerify = false, 
         emit({ type: 'log', text: git.created ? 'Created a git repository (git init).\n' : `git init failed: ${git.error}; create it later with git init.\n` });
       }
       const result = edit
-        ? await editProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc } })
-        : await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules });
+        ? await editProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, env })
+        : await initProject({ root, kitRoot, answers: { text: prepared.text, doc: prepared.doc }, modules: prepared.modules, env });
       printReport(output, result);
-      emit({ type: 'log', text: 'Wrote .yaw/answers.yaml and .yaw/manifest.json\n' });
+      emit({ type: 'log', text: 'Wrote .yaw/answers.yaml and .yaw/manifest.json (team settings); personal settings stay in ~/.yaw/user-profile.yaml\n' });
+      if (result.personalWarning) emit({ type: 'log', text: `${result.personalWarning}\n` });
       if (!edit) {
         try {
           const seeded = seedPersonalPreferences({ env, kitRoot, mode: prepared.doc.mode, answers: prepared.doc.answers, reviewed: prepared.reviewedPreferences });

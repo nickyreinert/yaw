@@ -78,3 +78,12 @@ test('basic profile CI and guard fragments parse', () => {
     }
   }
 });
+
+test('Gradle output never reaches a generated project; the wrapper does', () => {
+  const generated = /(?:^|\/)(?:\.gradle|build)\//;
+  for (const name of ['android-kotlin', 'java-basic']) {
+    const paths = [...renderProfiles({ kitRoot: KIT_ROOT, profiles: [name], scaffold: () => false }).files.keys()];
+    assert.deepEqual(paths.filter((p) => generated.test(p)), [], `${name} scaffold has no Gradle caches or build output`);
+    assert.ok(paths.includes('gradlew') && paths.includes('gradle/wrapper/gradle-wrapper.jar'), `${name} scaffold keeps the Gradle wrapper`);
+  }
+});

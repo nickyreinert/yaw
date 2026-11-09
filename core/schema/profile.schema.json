@@ -113,6 +113,14 @@
       "type": "array",
       "items": { "enum": ["npm", "pip", "composer", "gradle", "swift", "cargo", "gomod"] },
       "uniqueItems": true
+    },
+    "compact": {
+      "description": "Compact recipe output (compact module, kickoff/16-compact-output.md §4 L1).",
+      "type": "object",
+      "properties": {
+        "warnings": { "description": "JavaScript regular expression for the warning lines a passing step still shows.", "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

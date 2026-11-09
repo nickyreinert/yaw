@@ -1,15 +1,15 @@
 // The user folder ~/.yaw/ (Y-7.2, ADR-0043, doc 02 §5): user profile, saved setups ("presets"), history.jsonl.
 // Created only after the user opted in; files 0600, folders 0700; answers only, never secrets (doc 08).
 
-import { closeSync, constants, fchmodSync, fstatSync, ftruncateSync, lstatSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, lstatSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import { PERSONAL_PREFERENCES } from '../interview/policy.js';
 import { depthOf } from '../interview/depth.js';
 import { parse, stringify, YamlError } from './yaml.js';
 import { formatError } from './schema.js';
-import { schemas } from '../render/kit.js';
+import { schemas, KIT_ROOT } from '../render/kit.js';
 import { loadRules, secretValueRule } from '../../modules/security/lib/guards.js';
 
 export const PRESET_NAME = /^[a-z0-9][a-z0-9-]*$/;
@@ -78,18 +78,33 @@ function read(path) {
   }
 }
 
-function write(path, text, { append = false } = {}) {
+// Appends in place; otherwise publishes a complete private file by rename (replace) or link (exclusive: EEXIST if it exists),
+// so a failed write leaves the previous file intact and a reader never sees a truncated one.
+function write(path, text, { append = false, exclusive = false } = {}) {
   let fd;
-  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK |
-    (append ? constants.O_APPEND : 0);
+  if (append) {
+    try {
+      fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK | constants.O_APPEND, 0o600);
+      if (!fstatSync(fd).isFile()) throw new Error(`${path} must be a regular file`);
+      fchmodSync(fd, 0o600);
+      writeFileSync(fd, text);
+    } finally {
+      if (fd !== undefined) closeSync(fd);
+    }
+    return;
+  }
+  const temp = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
   try {
-    fd = openSync(path, flags, 0o600);
-    if (!fstatSync(fd).isFile()) throw new Error(`${path} must be a regular file`);
-    fchmodSync(fd, 0o600);
-    if (!append) ftruncateSync(fd, 0);
+    fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
     writeFileSync(fd, text);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    if (exclusive) linkSync(temp, path);
+    else renameSync(temp, path);
   } finally {
     if (fd !== undefined) closeSync(fd);
+    rmSync(temp, { force: true });
   }
 }
 
@@ -162,7 +177,14 @@ export function saveSetup({ env, kitRoot, answers, mode, projectRoot, kit, now =
   directory(presetsDir(env), true);
   if (profileDoc) write(profileFile(env), stringify(profileDoc));
   if (presetDoc) {
-    write(presetFile(env, name), stringify(presetDoc));
+    for (let n = 2; ; n += 1) {
+      try { write(presetFile(env, name), stringify(presetDoc), { exclusive: true }); break; } catch (e) {
+        if (e.code !== 'EEXIST') throw e;
+        name = `${date}-${slug(basename(projectRoot))}-${n}`;
+        presetDoc.name = name;
+        check(`presets/${name}.yaml`, 'preset.schema.json', presetDoc);
+      }
+    }
     const history = join(userDir(env), 'history.jsonl');
     write(history, `${JSON.stringify({ path: projectRoot, date, kit, preset: name })}\n`, { append: true });
   }
@@ -233,7 +255,10 @@ export function renamePreset(env, name, to) {
   const doc = parse(read(from)) ?? {};
   doc.name = to;
   check(`presets/${to}.yaml`, 'preset.schema.json', doc);
-  write(target, stringify(doc));
+  try { write(target, stringify(doc), { exclusive: true }); } catch (e) {
+    if (e.code === 'EEXIST') throw new Error(`A preset named "${to}" already exists`);
+    throw e;
+  }
   rmSync(from);
   return to;
 }
@@ -247,6 +272,12 @@ export function writePresetAnswers(env, name, answers) {
   write(file, stringify(doc));
 }
 
+// Keys the user profile holds: the section-0 answers of its schema and any setting a project switched to personal (T-027).
+function profileKey(k) {
+  const answers = schemas().schemas.get('user-profile.schema.json').properties.answers;
+  return Object.hasOwn(answers.properties, k) || Object.keys(answers.patternProperties ?? {}).some((re) => new RegExp(re).test(k));
+}
+
 // -> { before: text | null, after: text } for the given personal answers; nothing is written.
 export function nextUserProfile(env, answers) {
   directory(userDir(env));
@@ -256,11 +287,29 @@ export function nextUserProfile(env, answers) {
   if (before !== null) {
     try { profile = parse(before)?.answers ?? {}; } catch { throw new Error(`${file} cannot be read; fix or remove the file (it was left untouched)`); }
   }
-  const known = Object.keys(schemas().schemas.get('user-profile.schema.json').properties.answers.properties);
-  for (const k of known) if (Object.hasOwn(answers, k)) profile[k] = answers[k];
+  for (const k of Object.keys(answers)) if (profileKey(k)) profile[k] = answers[k];
   const doc = { answers: profile };
   check('user-profile.yaml', 'user-profile.schema.json', doc);
   return { before, after: stringify(doc) };
+}
+
+// The personal answers of a project (T-027) go only to ~/.yaw/user-profile.yaml, merged into it; never into the
+// repository. An unreadable or invalid profile, or a value that looks like a secret, is left untouched. The profile
+// is YAW's own file: its schema and secret rules are those of the installed kit, whatever kit renders the project.
+// -> { saved: boolean, warning: string | null }
+export function savePersonalAnswers({ env, answers }) {
+  if (!Object.keys(answers).length) return { saved: false, warning: null };
+  const warning = (why) => ({ saved: false, warning: `Personal settings were not saved to ${profileFile(env)}: ${why}` });
+  if (secretFindings({ answers, kitRoot: KIT_ROOT }).length) return warning('an answer looks like a secret.');
+  try {
+    // An invalid profile (unknown key, wrong value) is never repaired by overwriting it (ADR-0043).
+    try { readUserProfile(env); } catch { return warning('the file is unreadable or invalid; fix or remove it (it was left untouched).'); }
+    const { before, after } = nextUserProfile(env, answers);
+    if (before !== after) writeUserProfile(env, after);
+    return { saved: true, warning: null };
+  } catch (e) {
+    return warning(e.message);
+  }
 }
 
 export function writeUserProfile(env, text) {
@@ -281,12 +330,9 @@ export function writeUserData(env, name, value) {
   if (!/^[a-z][a-z0-9-]*\.json$/.test(name)) throw new Error('Invalid user data name');
   const dir = userDataDir(env);
   directory(dir, true);
-  const file = join(dir, name), temp = `${file}.${randomUUID()}.tmp`;
+  const file = join(dir, name);
   existingStat(file);
-  try {
-    write(temp, `${JSON.stringify(value)}\n`);
-    renameSync(temp, file);
-  } finally { rmSync(temp, { force: true }); }
+  write(file, `${JSON.stringify(value)}\n`);
 }
 
 export function userDataDir(env) {
@@ -307,7 +353,7 @@ export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed 
   const doc = { answers: chosen };
   check('user-profile.yaml', 'user-profile.schema.json', doc);
   const dir = userDir(env); directory(dir, true);
-  const file = profileFile(env), temp = join(dir, `personal-defaults.${randomUUID()}.tmp`);
+  const file = profileFile(env);
   if (existingStat(file)) {
     // A legacy profile may contain agent/tool choices but no personal preferences yet.
     const before = read(file), current = readUserProfile(env);
@@ -317,9 +363,6 @@ export function seedPersonalPreferences({ env, kitRoot, mode, answers, reviewed 
     write(file, stringify(merged));
     return { saved: true };
   }
-  try {
-    write(temp, stringify(doc));
-    try { linkSync(temp, file); } catch (e) { if (e.code === 'EEXIST') return { saved: false }; throw e; }
-  } finally { rmSync(temp, { force: true }); }
+  try { write(file, stringify(doc), { exclusive: true }); } catch (e) { if (e.code === 'EEXIST') return { saved: false }; throw e; }
   return { saved: true };
 }

@@ -120,7 +120,8 @@ test('step navigation focuses the heading then explicitly returns to the start o
   const experience = interviewDetailText('user.expertise').join(' ');
   for (const value of ['Layperson', 'Intermediate', 'Expert', 'permissions']) assert.ok(experience.includes(value));
   const team = interviewDetailText('idea.team').join(' ');
-  for (const value of ['Solo', 'Team', 'External reviewers', 'separate choices']) assert.ok(team.includes(value));
+  for (const value of ['Solo', 'Team', 'user-profile.yaml', 'Personal / Team switch', 'separate choices']) assert.ok(team.includes(value), value);
+  assert.doesNotMatch(team, /External reviewers/, 'Solo or Team only (T-027)');
 });
 
 
@@ -144,12 +145,13 @@ test('console refuses symlinks and bounds large existing file previews', () => {
 });
 
 
-test('communication preference help briefly distinguishes all available wording and length options', async () => {
+test('communication preference help briefly distinguishes all available depth and response options', async () => {
   const { interviewDetailText } = await import('../core/web/assets/ui-state.js');
-  const wording = interviewDetailText('user.register');
-  assert.equal(wording.length, 4);
-  for (const label of ['Plain words', 'Professional', 'Technical', 'Scientific']) assert.ok(wording.some((line) => line.startsWith(`${label}:`)), label);
-  assert.match(wording.join(' '), /everyday language|avoid jargon/);
-  assert.match(wording.join(' '), /basis for claims/);
-  for (const id of ['user.length', 'user.examples', 'user.explain', 'user.autonomy', 'user.language']) assert.ok(interviewDetailText(id)?.length, id);
+  const depth = interviewDetailText('user.length');
+  assert.equal(depth.length, 3);
+  for (const label of ['Brief', 'Balanced', 'Extensive']) assert.ok(depth.some((line) => line.startsWith(`${label}:`)), label);
+  assert.match(depth.join(' '), /bullet points/);
+  assert.equal(interviewDetailText('user.register'), null);
+  assert.equal(interviewDetailText('user.examples'), null);
+  for (const id of ['user.length', 'user.explain', 'user.autonomy', 'user.language']) assert.ok(interviewDetailText(id)?.length, id);
 });

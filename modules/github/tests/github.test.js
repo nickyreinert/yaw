@@ -11,10 +11,10 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { main } from '../../../core/cli/main.js';
 import { parse } from '../../../core/lib/yaml.js';
-import { schemas } from '../../../core/render/kit.js';
+import { loadModule, schemas } from '../../../core/render/kit.js';
 import { readManifest } from '../../../core/render/manifest.js';
 import { addModule, initProject, readAnswers, removeModule, updateProject } from '../../../core/render/project.js';
-import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
+import { KIT_ROOT, capture, cleanEnv, hasTool, pathWithout, read, readTree, run, tmp, writeAnswers } from '../../../test/helpers/fixtures.js';
 import { GUARDED, VERBS } from '../lib/cli.js';
 import { branchName, checkIdForMode, parseTaskId, prBody, commitMessage, slugify, taskFromBranch } from '../lib/names.js';
 
@@ -31,7 +31,7 @@ async function project(options = {}) {
   return root;
 }
 
-const ENV = () => cleanEnv(tmp('yaw-home-'), { PATH: process.env.PATH });
+const ENV = () => cleanEnv(tmp('yaw-home-'), { PATH: pathWithout('yaw') });
 
 // A project inside a git repo whose origin is a local bare repository, one commit pushed to main.
 async function repo(options = {}) {
@@ -54,7 +54,7 @@ async function repo(options = {}) {
 }
 
 // gh stand-in: records every call, answers the reads, and keeps what the tests need to see.
-function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['quality-gate', 'secret-scan', 'pr-policy', 'lint'], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false } = {}) {
+function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['quality-gate', 'secret-scan', 'pr-policy', 'lint'], repoView = { nameWithOwner: 'octo/demo', visibility: 'PRIVATE' }, failGraphql = false, milestones = [], issues = [] } = {}) {
   const calls = [];
   const state = { rulesets: [...rulesets] };
   const gh = (args, opts = {}) => {
@@ -70,6 +70,8 @@ function fakeGh({ native = [], labels = [], rulesets = [], prs = [], checks = ['
     if (args[0] === 'api') {
       const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
       const path = args.find((a) => a.startsWith('repos/'));
+      if (path.startsWith('repos/octo/demo/milestones?')) return JSON.stringify([milestones]);
+      if (path.startsWith('repos/octo/demo/issues?')) return JSON.stringify([issues]);
       if (path.endsWith('/check-runs')) return checks.join('\n');
       if (path.endsWith('/statuses')) return '';
       if (path.endsWith('/rulesets') && method === 'GET') return JSON.stringify(state.rulesets);
@@ -160,7 +162,7 @@ test('renders the recipes, the PR template, github.yaml and the ask rules; manif
   const root = await project();
   const tree = readTree(root);
   for (const f of ['just/github.just', '.github/pull_request_template.md', '.yaw/github.yaml']) assert.ok(Object.hasOwn(tree, f), f);
-  for (const recipe of ['gh-init', 'gh-labels', 'gh-protect', 'gh-issue', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add']) {
+  for (const recipe of ['gh-init', 'gh-labels', 'gh-protect', 'gh-issue', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add', 'progress']) {
     assert.match(tree['just/github.just'], new RegExp(`^${recipe} \\*args:`, 'm'), recipe);
   }
   assert.match(tree.justfile, /# yaw:github\nimport 'just\/github.just'\n# \/yaw:github/);
@@ -204,7 +206,7 @@ test('the module has no hooks and nothing in setup, update or remove calls gh', 
     writeFileSync(join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> '${log}'\nexit 1\n`);
     chmodSync(join(bin, tool), 0o755);
   }
-  const env = { ...ENV(), PATH: `${bin}:${process.env.PATH}` };
+  const env = { ...ENV(), PATH: `${bin}:${pathWithout('yaw', 'gh')}` };
   const root = tmp('yaw-github-');
   const answers = writeAnswers(tmp('yaw-ans-'), answersText({ modules: ['core'] }));
   const r = await runMain(['init', '--answers', answers, '--yes', '--skip-verify'], root, env);
@@ -405,7 +407,7 @@ test('issue: native issue type when the repository has it, otherwise the type:* 
   const b = await yaw(root, ['issue', 'feature', 'Add login'], { gh: fallback, env });
   assert.match(b.out, /issues\/8 \(label type:feature\)/);
   const create = fallback.calls.find((c) => c.args[1] === 'create');
-  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', '', '--label', 'type:feature']);
+  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', '', '--label', 'type:feature', '--label', 'status:todo']);
 
   assert.match((await yaw(root, ['issue', 'story', 'x'], { gh: fakeGh(), env })).err, /unknown issue type/);
   assert.match((await yaw(root, ['issue', 'bug', 'x', '--priority', 'P9'], { gh: fakeGh(), env })).err, /--priority/);
@@ -659,6 +661,40 @@ test('pr-status prints the review state and the checks', async () => {
   assert.match(r.out, /legacy: PENDING/);
 });
 
+test('the card presents project-management support: forms, epics, milestones, planning skills and progress', () => {
+  const def = loadModule(KIT_ROOT, 'github');
+  const text = [def.what, ...def.details, ...def.adds].join('\n');
+  assert.match(def.what, /project[- ]management/i);
+  for (const word of [/Epics?/, /sub-issues/, /milestone/i, /priority/i, /estimate/i, /issue-triage/, /epic-plan/, /just progress/]) assert.match(text, word);
+});
+
+test('progress: open milestones and epics with sub-issue counts, read only', async () => {
+  const { root, env } = await repo();
+  const gh = fakeGh({
+    milestones: [
+      { title: 'v0.2.0', open_issues: 5, closed_issues: 3, due_on: '2026-12-01T00:00:00Z' },
+      { title: 'Later', open_issues: 0, closed_issues: 0, due_on: null },
+    ],
+    issues: [
+      { number: 42, title: 'Invite flow', labels: [{ name: 'type:epic' }], milestone: { title: 'v0.2.0' }, sub_issues_summary: { total: 5, completed: 2, percent_completed: 40 } },
+      { number: 43, title: 'Native epic', type: { name: 'Epic' }, labels: [], sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 } },
+      { number: 44, title: 'Plain issue', labels: [], sub_issues_summary: { total: 0, completed: 0, percent_completed: 0 } },
+      { number: 45, title: 'A pull request', labels: [{ name: 'type:epic' }], pull_request: {} },
+    ],
+  });
+  const r = await yaw(root, ['progress'], { gh, env });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /v0\.2\.0: 3 of 8 issues closed \(38%\), due 2026-12-01/);
+  assert.match(r.out, /Later: no issues yet/);
+  assert.match(r.out, /#42 Invite flow: 2 of 5 sub-issues done \(40%\), milestone v0\.2\.0/);
+  assert.match(r.out, /#43 Native epic: no sub-issues yet/);
+  assert.doesNotMatch(r.out, /#44|#45/);
+  assert.deepEqual(gh.writes(), [], 'nothing is changed');
+  const empty = await yaw(root, ['progress'], { gh: fakeGh(), env });
+  assert.match(empty.out, /no open milestones/);
+  assert.match(empty.out, /no open epics/);
+});
+
 // ----------------------------------------------------------------------------------- release
 
 test('release: tag, push the tag, GitHub release; refuses a dirty tree, another branch, a behind branch and an existing tag', async () => {
@@ -856,4 +892,36 @@ test('guarded GitHub verbs and the configured task workflow all require authoris
   const code = readFileSync(join(KIT_ROOT, 'modules', 'github', 'lib', 'cli.js'), 'utf8');
   assert.equal((code.match(/await authorise\(/g) ?? []).length, GUARDED.length + 1, 'one additional call site guards configured task workflows');
   for (const verb of GUARDED) assert.ok(VERBS.includes(verb), verb);
+});
+
+// ----------------------------------------------------------------------------- task fields (T-029)
+
+test('issue forms and planning skills carry priority, status, recommended model and reasoning effort (T-029)', () => {
+  const dir = join(KIT_ROOT, 'modules', 'github', 'templates', '.github', 'ISSUE_TEMPLATE');
+  for (const name of ['bug', 'chore', 'epic', 'feature', 'spike']) {
+    const form = parse(readFileSync(join(dir, `${name}.yml`), 'utf8'));
+    const field = (id) => form.body.find((b) => b.id === id);
+    assert.ok(form.labels.includes('status:todo'), `${name}: status`);
+    assert.deepEqual(field('priority').attributes.options, ['P0', 'P1', 'P2', 'P3'], name);
+    assert.equal(field('model').attributes.label, 'Recommended model', name);
+    assert.ok(field('model').attributes.options.length >= 3 && field('model').validations.required, name);
+    assert.deepEqual(field('effort').attributes.options, ['low', 'medium', 'high', 'xhigh', 'max'], name);
+    assert.equal(field('effort').attributes.label, 'Reasoning effort', name);
+  }
+  for (const skill of ['issue-create', 'epic-plan', 'issue-triage']) {
+    const text = readFileSync(join(KIT_ROOT, 'modules', 'github', 'skills', skill, 'SKILL.md'), 'utf8');
+    for (const word of [/priority/i, /status/i, /model/i, /effort/i]) assert.match(text, word, `${skill} ${word}`);
+  }
+});
+
+test('issue: model, effort and the todo status are written for new issues (T-029)', async () => {
+  const { root, env } = await repo();
+  const gh = fakeGh({ native: [] });
+  const r = await yaw(root, ['issue', 'feature', 'Add login', '--priority', 'P1', '--model', 'sonnet', '--effort', 'medium', '--body', 'why'], { gh, env });
+  assert.equal(r.code, 0, r.err);
+  const create = gh.calls.find((c) => c.args[1] === 'create');
+  assert.deepEqual(create.args, ['issue', 'create', '--title', 'Add login', '--body', 'why\n\n**Model / effort:** sonnet · effort: medium',
+    '--label', 'type:feature', '--label', 'priority:P1', '--label', 'status:todo']);
+  assert.match((await yaw(root, ['issue', 'bug', 'x', '--effort', 'high'], { gh: fakeGh(), env })).err, /--effort needs --model/);
+  assert.match((await yaw(root, ['issue', 'bug', 'x', '--model', 's', '--effort', 'huge'], { gh: fakeGh(), env })).err, /--effort/);
 });

@@ -58,7 +58,7 @@ export function createImproveRunner({ env = process.env, spawnFn = spawn, timeou
       if (input.confirm !== true) throw new Error(`Confirm sending this ${noun} prompt to the selected CLI provider`);
       if (job?.status === 'running' || child) throw new Error(`A CLI ${noun} is already running`);
       const agent = input.agent;
-      if (!Object.hasOwn(CLIS, agent) || !planning && !improveSettings(env).enabledAgents.includes(agent)) throw new Error(planning ? 'Choose a supported installed coding agent' : 'Enable this CLI reviewer in Global Settings → Learn first');
+      if (!Object.hasOwn(CLIS, agent) || !planning && !improveSettings(env).enabledAgents.includes(agent)) throw new Error(planning ? 'Choose a supported installed coding agent' : 'Enable this CLI reviewer in Global Settings → Profiling Settings first');
       const file = executable(agent, env);
       if (!file) throw new Error('This CLI is not available on the computer running yaw web');
       if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > limits.prompt) throw new Error(`The ${noun} prompt must contain 1–${limits.prompt.toLocaleString('en')} characters`);

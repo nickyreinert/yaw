@@ -1,0 +1,54 @@
+# modules/compact/module.yaml (T-049, kickoff/16-compact-output.md): shorter tool output for the agent.
+# Opt-in per project and removable (`yaw add compact`, `yaw remove compact`); off in every depth. This file holds
+# the definition, the interview and the L4 rules fragment; the levers themselves arrive with their own tasks.
+# Scope: a team setting (T-027): the answer lives in .yaw/answers.yaml; YAW_COMPACT overrides it per shell.
+name: compact
+description: Shorter tool output for the agent (condensed passing steps in the project recipes, a Claude Code output hook) so it spends fewer tokens; a team setting committed for everyone.
+title: Compact tool output
+group: comfort
+short: "Shorter command output for the agent"
+what: "Passing steps in the project recipes print one line instead of their full output, and Claude Code can shorten long tool output. Failures stay readable."
+adds:
+  - "Project recipes run through a wrapper that condenses output of passing steps"
+  - "Optional Claude Code hook that shortens long tool output"
+  - "A short note in AGENTS.md"
+  - "A team setting: everyone gets the same levers; YAW_COMPACT=0 or 1 overrides them in your shell"
+example: { when: "`just test` passes with 400 lines of output", then: "The agent sees one line: ok test (400 lines, 3.2s)." }
+cost: "About 3 lines in AGENTS.md; fewer tokens per tool call."
+depends: [core]
+default: { quick: false, standard: false, full: false }
+questions:
+  - id: compact.levers
+    ref: "16.1"
+    scope: team
+    mode: Q
+    type: multi
+    label: "Compact: Which parts of compact output do you want?"
+    hint: "Output of failing steps is shortened, never dropped."
+    choices:
+      - { value: recipes, label: "Project recipes: passing steps print one line (all agents)" }
+      - { value: hook, label: "Claude Code hook: long tool output is shortened" }
+    default: [recipes]
+outputs:
+  # Renders to nothing when no lever is chosen (ADR-0024).
+  templates: [AGENTS.md]
+  hooks:
+    # L2 (T-054): registered with the module; like the recipes wrapper it decides at run time whether the `hook`
+    # lever is on. Read is matched for lockfiles only (the handler leaves every other Read alone). WebFetch waits
+    # for a recorded successful payload (T-047).
+    - name: compress
+      event: PostToolUse
+      matcher: Bash|Grep|Read
+      kind: compress
+      tokenCost: none
+      agents:
+        claude: { support: native, via: "PostToolUse updatedToolOutput" }
+        codex: { support: none, note: "no output replacement" }
+        copilot: { support: none, note: "modifiedResult not verified" }
+agents:
+  claude:  { support: native, via: "recipes wrapper; PostToolUse output hook" }
+  codex:   { support: partial, via: "recipes wrapper", note: "no output hook" }
+  copilot: { support: partial, via: "recipes wrapper", note: "output hook not verified" }
+  gemini:  { support: partial, via: "recipes wrapper", note: "no output hook" }
+tokenCost: low
+lastVerified: 2026-11-08

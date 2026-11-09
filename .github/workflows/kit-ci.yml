@@ -1,22 +1,49 @@
-# Kit CI (Y-2.2, ADR-0008, ADR-0014): kit tests on Node 22.13 (floor) and 24, macOS and Linux;
+# Kit CI (Y-2.2, ADR-0008, ADR-0014, T-021): kit tests on Node 22.13 (floor) and 24, macOS and Linux;
 # install.sh end-to-end in a Debian container; shellcheck on every shell script; schema examples validate.
+# Pull requests run only the cheap `gate` job (Ubuntu, Node 22). The full suite runs on manual dispatch,
+# on milestone open/close and when an issue gets the `epic` label. The profile matrix and macOS stay manual-only.
 name: kit-ci
 
 on:
-  # manual only (free-minutes budget): run once at the end of the build phase
+  pull_request:
   workflow_dispatch:
+  milestone:
+    types: [opened, closed]
+  issues:
+    types: [labeled]
 
 permissions:
   contents: read
 
 jobs:
+  gate:
+    # Cheap automatic gate on every pull request: schema examples, shellcheck, core tests (no server-mode, no profile tests).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.13'
+      - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+      - run: npm run validate
+      - name: shellcheck every shell script
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck
+      - name: core tests (test/*.test.js without server-mode and profile tests)
+        run: |
+          files=$(ls test/*.test.js | grep -Ev '/(server-mode|profiles|basic-profiles|profile-options)\.test\.js$')
+          node --test $files
+
   test:
+    # Full suite: manual, milestone, epic label. macOS only on manual dispatch (ADR-0008).
+    if: github.event_name != 'pull_request' && (github.event_name != 'issues' || github.event.label.name == 'epic')
     name: test (${{ matrix.os }}, node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["ubuntu-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
         node: ['22.13', '24']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -47,6 +74,7 @@ jobs:
       - run: npm run validate
 
   profile:
+    if: github.event_name == 'workflow_dispatch'
     # Profile matrix (Y-6): yaw init (runs just setup and just check) on examples/<profile>/answers.yaml.
     name: profile ${{ matrix.profile }}
     # swift-app builds SwiftUI, which needs macOS (ADR-0112); every other profile runs on Linux.
@@ -116,6 +144,7 @@ jobs:
           node "$GITHUB_WORKSPACE/bin/yaw" init --answers "$GITHUB_WORKSPACE/examples/${{ matrix.profile }}/answers.yaml" --yes
 
   install-in-container:
+    if: github.event_name != 'pull_request' && (github.event_name != 'issues' || github.event.label.name == 'epic')
     # install.sh end-to-end on a clean Debian image (Y-2.3), Node at the floor.
     runs-on: ubuntu-latest
     container: node:22.13-bookworm
@@ -125,6 +154,7 @@ jobs:
       - run: node --test test/install.test.js
 
   shellcheck:
+    if: github.event_name != 'pull_request' && (github.event_name != 'issues' || github.event.label.name == 'epic')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

@@ -9,6 +9,7 @@ export const READ_ONLY_NOTICE =
 
 const FIELDS = [
   ['brief', 'Brief'],
+  ['priority', 'Priority'],
   ['model', 'Model / effort'],
   ['spec', 'Spec'],
   ['resume', 'Resume point'],
@@ -18,6 +19,8 @@ const LABEL_TO_KEY = new Map(FIELDS.map(([k, label]) => [label, k]));
 // Optional block of working rules for the agent, kept verbatim (#175).
 export const RULES_HEADING = '## How to work with this file';
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+// P0 blocks the release, P1 needed, P2 desirable, P3 may wait (the GitHub issue forms use the same scale).
+export const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
 const MODEL_LINE = /^ {2}model: (\S(?:.*?\S)?)(?: · effort: (\S+))?$/;
 
 // "sonnet", "medium" -> "sonnet · effort: medium" (the Model / effort field of an active task)
@@ -135,6 +138,7 @@ export function parseTasksDocument(text, { file } = {}) {
       const key = LABEL_TO_KEY.get(f[1]);
       if (!key) fail(`unknown field "${f[1]}" (expected ${FIELDS.map(([, l]) => l).join(', ')}, Journal)`, idx);
       if (Object.prototype.hasOwnProperty.call(task, key)) fail(`duplicate field "${f[1]}"`, idx);
+      if (key === 'priority' && !PRIORITIES.includes(f[2])) fail(`priority must be one of ${PRIORITIES.join(', ')}`, idx);
       task[key] = f[2];
       inJournal = false;
       pointers.set(`${base}/${key}`, idx + 1);
@@ -143,9 +147,10 @@ export function parseTasksDocument(text, { file } = {}) {
     if (section === 'backlog') {
       if (line.startsWith('  ')) {
         const item = ledger.backlog.at(-1);
-        const field = /^ {2}(spec|acceptance): (\S.*)$/.exec(line);
+        const field = /^ {2}(spec|acceptance|priority): (\S.*)$/.exec(line);
         if (item && field) {
           if (item[field[1]] !== undefined) fail(`duplicate ${field[1]} line for ${item.id}`, idx);
+          if (field[1] === 'priority' && !PRIORITIES.includes(field[2])) fail(`priority must be one of ${PRIORITIES.join(', ')}`, idx);
           item[field[1]] = field[2];
           pointers.set(`/backlog/${ledger.backlog.length - 1}/${field[1]}`, idx + 1);
           return;
@@ -212,6 +217,7 @@ export function renderTasks(ledger) {
     const issue = b.issue !== undefined ? ` (#${b.issue})` : '';
     const note = b.note !== undefined ? ` — ${b.note}` : '';
     out.push(`- ${b.id}${issue} ${b.title}${note}`);
+    if (b.priority !== undefined) out.push(`  priority: ${b.priority}`);
     if (b.model !== undefined) out.push(`  model: ${modelEffort(b.model, b.effort)}`);
     for (const key of ['spec', 'acceptance']) if (b[key] !== undefined) out.push(`  ${key}: ${b[key]}`);
   }

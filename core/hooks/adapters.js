@@ -78,8 +78,15 @@ export function normalise({ agent: declared, event: argEvent, payload, now = new
   };
 }
 
-// The record written to the event log (ADR-0018): no prompt text, no tool input, no output.
-export function record(ev, { result = null, hookMs = null } = {}) {
+// The tool's output on PostToolUse, for compress handlers only (ADR-0007): held in memory, never part of the
+// normalised event or any log.
+export function toolOutput(ev, payload) {
+  return ev.event === 'PostToolUse' && payload && typeof payload === 'object' ? payload.tool_response : undefined;
+}
+
+// The record written to the event log (ADR-0018): no prompt text, no tool input, no output; for a replaced
+// output only its sizes and method.
+export function record(ev, { result = null, hookMs = null, compressed = null } = {}) {
   return {
     v: 1,
     agent: ev.agent,
@@ -92,6 +99,7 @@ export function record(ev, { result = null, hookMs = null } = {}) {
     promptLength: ev.promptLength,
     tool: ev.tool,
     result,
+    ...(compressed ? { rawBytes: compressed.rawBytes, outBytes: compressed.outBytes, ...(compressed.method ? { method: compressed.method } : {}) } : {}),
     timing: { ts: ev.ts, hookMs },
   };
 }
@@ -102,11 +110,16 @@ export function renderOutput(agent, event, out) {
   if (agent === 'copilot') {
     if (event === 'PreToolUse' && out.deny) Object.assign(json, { permissionDecision: 'deny', permissionDecisionReason: out.deny });
     if (event === 'SessionStart' && out.context) json.additionalContext = out.context;
+    // PostToolUse: no replacement until `modifiedResult` is verified (policy.js drops it).
   } else {
     if (event === 'PreToolUse' && out.deny) {
       json.hookSpecificOutput = { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: out.deny };
     }
     if (event === 'SessionStart' && out.context) json.hookSpecificOutput = { hookEventName: 'SessionStart', additionalContext: out.context };
+    // Claude Code only (policy.js); Codex cannot replace tool output.
+    if (event === 'PostToolUse' && out.updatedToolOutput !== undefined) {
+      json.hookSpecificOutput = { hookEventName: 'PostToolUse', updatedToolOutput: out.updatedToolOutput };
+    }
     if (out.systemMessage) json.systemMessage = out.systemMessage;
     if (out.terminalSequence) json.terminalSequence = out.terminalSequence;
   }

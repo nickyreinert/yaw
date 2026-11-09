@@ -85,16 +85,95 @@ test('discarded reviews ignore in-flight conversation results after changing fil
   assert.doesNotMatch(host.text, /I changed the renderer/);
 });
 
-test('project selection uses the same table sorting contract and narrows to that project’s sessions', (t) => {
+test('a View switch replaces the Projects and Sessions buttons', (t) => {
   const { host, context } = environment(t);
-  let changes, table;
+  let changes;
   const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
-  view.render(host, { ...context, view: 'projects', set: (next) => { changes = next; }, table: (id, columns, rows, options) => {
-    table = { id, columns, rows, options }; const node = new Element('div'); node.append(columns[0].show(rows[0])); return node;
-  } });
-  assert.equal(table.id, 'improve-projects'); assert.equal(table.options.sort, 'attention');
-  button(host, '/private/demo').fire('click');
-  assert.deepEqual(changes, { project: '/private/demo', improveView: 'sessions' });
+  view.render(host, { ...context, view: 'folders', set: (next) => { changes = next; } });
+  assert.ok(field(host, 'View'), 'labelled View switch');
+  assert.equal(button(host, 'Projects'), undefined); assert.equal(button(host, 'Sessions'), undefined);
+  assert.equal(button(host, 'Folder Browser').attrs['aria-pressed'], 'true');
+  assert.equal(button(host, 'All Sessions').attrs['aria-pressed'], 'false');
+  button(host, 'All Sessions').fire('click');
+  assert.deepEqual(changes, { improveView: 'sessions' });
+});
+
+test('Folder Browser walks the project hierarchy and Back always returns one level', (t) => {
+  const { host, context } = environment(t);
+  const calls = [], tables = [];
+  const mk = (id, project) => ({ ...row, id, title: `Title ${id}`, project });
+  const rows = [mk('a', '/w/app/api'), mk('b', '/w/app/web'), mk('c', '/w/tools'), mk('d', '/w/app')];
+  const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
+  const render = (at) => view.render(host, { ...context, view: 'folders', rows, root: '/w', at, set: (next) => calls.push(next),
+    table: (id, columns, list) => { tables.push(id); return context.table(id, columns, list); } });
+  render('');
+  assert.ok(button(host, 'app/') && button(host, 'tools'), 'top level lists folders and projects');
+  assert.equal(button(host, '← Back').disabled, true, 'nothing above the top level');
+  assert.doesNotMatch(host.text, /Title a/, 'sessions appear only inside their project');
+  button(host, 'app/').fire('click');
+  assert.deepEqual(calls.at(-1), { improveAt: '/w/app' });
+  render('/w/app');
+  assert.ok(button(host, 'api') && button(host, 'web'), 'sub-projects listed');
+  assert.match(host.text, /Title d/, 'sessions of the folder that is itself a project');
+  assert.ok(tables.includes('improve-folder-sessions'));
+  button(host, '← Back').fire('click');
+  assert.deepEqual(calls.at(-1), { improveAt: '' });
+  render('/w/app/api');
+  assert.match(host.text, /Title a/); assert.doesNotMatch(host.text, /Title b/);
+  button(host, '← Back').fire('click');
+  assert.deepEqual(calls.at(-1), { improveAt: '/w/app' }, 'one level up, not to the top');
+  render('/gone');
+  assert.match(host.text, /Nothing here/); button(host, '← Back').fire('click');
+  assert.deepEqual(calls.at(-1), { improveAt: '' }, 'a stale location can still be left');
+});
+
+test('Folder Browser and All Sessions show the same sessions for the same filters', (t) => {
+  const { host, context } = environment(t);
+  const rows = [{ ...row, title: 'Alpha', project: '/w/p' }, { ...row, id: 'x', title: 'Beta', project: '/w/p' }];
+  const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
+  view.render(host, { ...context, rows, view: 'sessions', focus: 'all' });
+  const flat = host.text;
+  view.render(host, { ...context, rows, view: 'folders', focus: 'all', root: '/w', at: '/w/p' });
+  for (const title of ['Alpha', 'Beta']) { assert.match(flat, new RegExp(title)); assert.match(host.text, new RegExp(title)); }
+  assert.match(host.text, /Needs attention/); assert.match(flat, /Needs attention/);
+});
+
+test('Read Conversation opens a preview beside the table; its X restores full width without changing the page', async (t) => {
+  const { host, context } = environment(t);
+  let sets = 0;
+  const view = createInsights({ api: async () => response });
+  const ctx = { ...context, set: () => { sets++; } };
+  view.render(host, ctx);
+  const layout = () => host.all((n) => n.className?.startsWith?.('session-split'))[0];
+  assert.doesNotMatch(layout().className, /has-preview/);
+  assert.equal(host.all((n) => n.tag === 'aside').length, 0);
+  await button(host, 'Read conversation →').fire('click');
+  assert.match(layout().className, /has-preview/);
+  const aside = host.all((n) => n.tag === 'aside' && n.attrs['aria-label'] === 'Conversation preview')[0];
+  assert.ok(aside, 'right-hand preview');
+  assert.ok(layout().all((n) => n.tag === 'table').length === 1, 'the table is still shown beside it');
+  assert.match(host.text, /Where did work get difficult\?/, 'the page did not change');
+  assert.match(aside.text, /I changed the renderer/);
+  await field(host, 'Close conversation preview').fire('click');
+  assert.doesNotMatch(layout().className, /has-preview/);
+  assert.equal(host.all((n) => n.tag === 'aside').length, 0);
+  assert.equal(sets, 0, 'closing never navigates');
+  assert.match(host.text, /Fix parser/);
+});
+
+test('the session preview is a reusable component for any session list', async (t) => {
+  const { host } = environment(t);
+  const { createSessionPreview } = await import('../core/web/assets/session-preview.js');
+  let changes = 0, closed = 0;
+  const preview = createSessionPreview({ api: async (action, input) => { assert.equal(action, 'insights-review'); assert.deepEqual(input.ids, [row.id]); return response; },
+    onChange: () => { changes++; host.replaceChildren(preview.layout(new Element('table'))); }, onClose: () => { closed++; }, rel: (s) => s, extra: () => new Element('div') });
+  assert.equal(preview.isOpen(), false);
+  await preview.open(row);
+  assert.equal(preview.isOpen(), true); assert.equal(preview.row, row); assert.ok(preview.session.messages.length);
+  assert.match(host.text, /My mistake/);
+  preview.close();
+  assert.equal(preview.isOpen(), false); assert.equal(closed, 1);
+  assert.doesNotMatch(host.text, /My mistake/);
 });
 
 test('a configured installed CLI receives only the inspected prompt and renders its temporary verdict', async (t) => {
@@ -112,6 +191,8 @@ test('a configured installed CLI receives only the inspected prompt and renders 
   await button(host, 'Run review with CLI').fire('click');
   assert.deepEqual(calls.find((c) => c.action === 'improve-agent-start').input, { agent: 'claude', prompt: 'Inspected, redacted prompt', confirm: true });
   assert.match(host.text, /Verdict: Possible scope confusion/);
+  assert.doesNotMatch(host.text, /Saved verdicts|No saved verdicts|Save this verdict|Import a verdict|Set retention/);
+  assert.ok(!calls.some((c) => /history/.test(c.action)), 'a review never touches stored history');
   field(host, 'Review prompt').value = 'Changed evidence'; await field(host, 'Review prompt').fire('input');
   assert.doesNotMatch(host.text, /Verdict: Possible scope confusion/);
   assert.equal(calls.at(-1).action, 'improve-agent-clear');
@@ -128,7 +209,7 @@ test('chart splitting uses the selected series rather than ignoring the shared s
   assert.equal(bars[0].children[0].style.width, '50%');
 });
 
-test('Learn explains UNKNOWN causes and tells users how to update older results', (t) => {
+test('Profiling explains UNKNOWN causes and tells users how to update older results', (t) => {
   const { host, context } = environment(t);
   const fresh = { ...row, evaluation: { classified: 3, skipped: 0, counts: { outcome: { unknown: 3 } }, outcomeUnknown: { model: 1, lowConfidence: 2 } } };
   const view = createInsights({ api: () => { throw new Error('Metadata only'); } });
@@ -139,4 +220,17 @@ test('Learn explains UNKNOWN causes and tells users how to update older results'
   assert.match(host.text, /Reclassify local sessions to update/);
   view.render(host, { ...context, rows: [fresh] });
   assert.doesNotMatch(host.text, /reason unavailable/);
+});
+
+test('folder levels list the next folders or projects, keep other sessions at the top, and walk up one level', async () => {
+  const { folderLevel, folderParent } = await import('../core/web/assets/insights-model.js');
+  const at = (project, extra = {}) => ({ id: project, project, source: 'local', started: 1, ...extra });
+  const rows = [at('/w/a/x'), at('/w/a/y'), at('/w/a'), at('/w/b'), at('/other/z'), at('', { id: 's', source: 'synced', deviceName: 'Laptop' })];
+  const top = folderLevel(rows, '', '/w');
+  assert.deepEqual(top.kids.map((k) => [k.name, k.rows.length, k.deeper]).sort(), [['/other/z', 1, false], ['Synced · Laptop', 1, false], ['a', 3, true], ['b', 1, false]]);
+  assert.deepEqual(top.direct, []);
+  const inside = folderLevel(rows, '/w/a', '/w');
+  assert.deepEqual(inside.kids.map((k) => k.name).sort(), ['x', 'y']); assert.deepEqual(inside.direct.map((r) => r.id), ['/w/a']);
+  assert.deepEqual(folderLevel(rows, 'Synced · Laptop', '/w').direct.map((r) => r.id), ['s']);
+  assert.equal(folderParent('/w/a/x', '/w'), '/w/a'); assert.equal(folderParent('/w/a', '/w'), ''); assert.equal(folderParent('/other/z', '/w'), ''); assert.equal(folderParent('Synced · Laptop', '/w'), '');
 });

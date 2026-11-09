@@ -20,7 +20,7 @@ typecheck:
     vendor/bin/phpstan analyse --no-progress
 
 test:
-    vendor/bin/phpunit
+    vendor/bin/phpunit --no-progress
 
 check: lint typecheck test audit sync-check
 

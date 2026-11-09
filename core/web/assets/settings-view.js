@@ -1,4 +1,4 @@
-import { settingsPresentation } from './ui-state.js';
+import { routeHidden, settingsPresentation } from './ui-state.js';
 import { mountInterview } from './interview-view.js';
 // Settings (Project | Files | Review prompts | Kickoff) and the decision-category editor. Text nodes only: file content,
 // answers and categories are never parsed as HTML. Every write goes through a CSRF-protected workspace action.
@@ -12,8 +12,8 @@ export function el(tag, text, cls) {
   if (cls) node.className = cls;
   return node;
 }
-// Hints that name another section link to it.
-export function link(label, route) { const a = el('a', label); a.href = `#${route}`; return a; }
+// Hints that name another section link to it; a link to a feature that is off is not shown.
+export function link(label, route) { const a = el('a', label); a.href = `#${route}`; a.hidden = routeHidden(route); return a; }
 export function hint(cls, ...parts) { const p = el('p', null, cls); p.append(...parts); return p; }
 // A file description with links to where that file is edited (`links`: [[label, route]]).
 export const about = (f, cls = 'small muted') => hint(cls, f.about ?? '', ...(f.links ?? []).flatMap(([label, route]) => [' ', link(`${label} →`, route)]));
@@ -186,7 +186,7 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
   function presentInterview() {
     const mode = tab === 'interview' ? 'interview' : 'settings';
     mountedInterview.setPresentation(mode);
-    presentationControls.querySelectorAll('[data-presentation]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.presentation === mode)));
+    presentationControls.querySelectorAll('[data-presentation]').forEach((b) => { const on = b.dataset.presentation === mode; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
     if (pendingSection) { mountedInterview.showSection(pendingSection); pendingSection = null; }
   }
 
@@ -285,11 +285,11 @@ export function createSettings({ api, get, report, refresh, go, openSetup }) {
     }
     const json = (body) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
     const content = el('div'); content.append(...root.childNodes); root.append(content);
-    presentationControls = el('div', null, 'settings-presentation');
-    presentationControls.setAttribute('role', 'group'); presentationControls.setAttribute('aria-label', 'Project settings view');
+    presentationControls = el('div', null, 'segmented');
+    presentationControls.setAttribute('role', 'radiogroup'); presentationControls.setAttribute('aria-label', 'Project settings view');
     for (const [mode, label] of [['settings', 'Settings'], ['interview', 'Interview']]) {
       const pick = button(label, () => go(mode === 'interview' ? 'interview' : 'project'));
-      pick.dataset.presentation = mode; presentationControls.append(pick);
+      pick.dataset.presentation = mode; pick.setAttribute('role', 'radio'); presentationControls.append(pick);
     }
     root.prepend(presentationControls);
     mountedInterview = await mountInterview(content, {

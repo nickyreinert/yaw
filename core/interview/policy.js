@@ -1,13 +1,24 @@
 // Pure interview rules shared by the terminal, server and browser (ADR-0072).
 import { asksAtDepth, RETIRED_ARCHITECTURE } from './depth.js';
-export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.register', 'user.examples', 'user.explain'];
+export const PERSONAL_PREFERENCES = ['user.expertise', 'user.language', 'user.autonomy', 'user.length', 'user.explain'];
 export const isPreference = (q) => PERSONAL_PREFERENCES.includes(typeof q === 'string' ? q : q.id);
 export function orderSetupQuestions(questions) {
   const rank = (q) => q.id.startsWith('user.') && (isPreference(q) || q.id === 'user.agents') ? 0 : q.id.startsWith('idea.') ? 1 : q.id.startsWith('arch.') ? 2 : 3;
   return [...questions].sort((a, b) => rank(a) - rank(b));
 }
 export const isPersonal = (q) => q.scope === 'user' && q.id !== 'user.agents';
-export const asksIn = (q, mode) => q.reviewSelected || isPersonal(q) && q.reviewPersonal ? true : isPreference(q) && mode === 'basic' ? true : asksAtDepth(q, mode);
+// Personal or team (T-027): every setting is team by default, committed in .yaw/answers.yaml. Only the
+// communication-like preferences (isPersonal) can be switched to personal, kept only in ~/.yaw/user-profile.yaml;
+// all others (security, Unit Tests, hooks, project rules, settings that generate committed files) are team only.
+// `scopes` is the project's per-setting switch from .yaw/answers.yaml.
+export const switchable = (q) => typeof q !== 'string' && isPersonal(q);
+export function settingClass(q, scopes = {}) {
+  if (typeof q !== 'string' && !switchable(q)) return 'team';
+  return scopes?.[typeof q === 'string' ? q : q.id] === 'personal' ? 'personal' : 'team';
+}
+// "Who works on this project?" is Solo or Team (T-027); a saved `external-reviewers` reads as `team`.
+export const migrateAnswers = (answers = {}) => answers['idea.team'] === 'external-reviewers' ? { ...answers, 'idea.team': 'team' } : answers;
+export const asksIn =(q, mode) => q.reviewSelected || isPersonal(q) && q.reviewPersonal ? true : isPreference(q) && mode === 'basic' ? true : asksAtDepth(q, mode);
 export const resolved = (q, value) => !q.required || (typeof value === 'string' && value.trim().length > 0);
 export const missingAnswers = (questions, answers) => questions.filter((q) => !resolved(q, answers[q.id])).map((q) => q.id);
 export const sourceOf = (q, used) => used ? 'answered' : q.defaultSource ?? 'documented default';

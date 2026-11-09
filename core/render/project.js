@@ -6,10 +6,12 @@ import { join, resolve } from 'node:path';
 import { parseDocument, stringify } from '../lib/yaml.js';
 import { matchFacts } from '../interview/facts.js';
 import { selectedByPolicy } from '../interview/depth.js';
+import { migrateAnswers, settingClass, switchable } from '../interview/policy.js';
+import { readUserProfile, savePersonalAnswers } from '../lib/user-store.js';
 import { formatError } from '../lib/schema.js';
 import { tasksMode } from '../lib/tasks.js';
 import { BASE_DIR, MANIFEST, hashContent, pruneEmptyDirs, readProjectFile, writeAtomic } from './files.js';
-import { compareVersions, hasModule, kitVersion, loadModule, renderModules, renderProfiles, schemas, templateContext, KIT_ROOT } from './kit.js';
+import { collectQuestions, compareVersions, hasModule, kitVersion, loadModule, renderModules, renderProfiles, schemas, templateContext, KIT_ROOT } from './kit.js';
 import { deleteManifest, readManifest, writeManifest } from './manifest.js';
 import { hasConflictMarkers, reconcile } from './reconcile.js';
 
@@ -26,13 +28,70 @@ export function parseAnswers(text, file = ANSWERS) {
   const { value, lines } = parseDocument(text, { file });
   const errors = schemas().validate('answers.schema.json', value, { lines });
   if (errors.length > 0) throw new ProjectError(errors.map((e) => formatError(e, file)).join('\n'));
-  return value;
+  return { ...value, answers: migrateAnswers(value.answers) };
 }
 
-export function readAnswers(root) {
+// The project answers. With `env`, the personal settings of ~/.yaw/user-profile.yaml are merged over them (T-027);
+// a personal answer an older answers.yaml still holds is the fallback until the next `yaw update` moves it.
+export function readAnswers(root, { env, kitRoot = KIT_ROOT } = {}) {
   const buf = readProjectFile(root, ANSWERS);
   if (buf === null) throw new ProjectError(`${ANSWERS} is missing`);
-  return parseAnswers(buf.toString('utf8'));
+  const doc = parseAnswers(buf.toString('utf8'));
+  return env ? withPersonal(doc, { env, kitRoot }) : doc;
+}
+
+// Every question of the kit by id: the base questions and those of every module.
+function kitQuestions(kitRoot) {
+  const dir = join(kitRoot, 'modules');
+  const names = existsSync(dir) ? readdirSync(dir).filter((n) => hasModule(kitRoot, n)).sort() : [];
+  return new Map(collectQuestions(kitRoot, names).map((q) => [q.id, q]));
+}
+
+export function withPersonal(doc, { env, kitRoot = KIT_ROOT }) {
+  let profile = {};
+  try { profile = readUserProfile(env)?.answers ?? {}; } catch { /* unreadable or invalid profile: the project answers only */ }
+  const questions = kitQuestions(kitRoot);
+  const answers = { ...doc.answers };
+  for (const [id, value] of Object.entries(profile)) {
+    if (settingClass(questions.get(id) ?? id, doc.scopes) === 'personal') answers[id] = value;
+  }
+  return { ...doc, answers };
+}
+
+// The answers text without the lines of `ids` (top-level answers), so comments survive; null when unsure.
+function dropAnswerLines(text, ids, expected) {
+  const { lines } = parseDocument(text);
+  const rows = text.split('\n');
+  const drop = new Set();
+  for (const id of ids) {
+    const pointer = `/answers/${id}`;
+    const start = lines.get(pointer);
+    if (!start) return null;
+    const following = [...lines].filter(([p, n]) => n > start && p !== pointer && !p.startsWith(`${pointer}/`)).map(([, n]) => n - 1);
+    let end = Math.min(rows.length, ...following);
+    while (end > start && /^\s*(#.*)?$/.test(rows[end - 1])) end--;
+    for (let i = start - 1; i < end; i++) drop.add(i);
+  }
+  const out = rows.filter((_, i) => !drop.has(i)).join('\n');
+  try { return JSON.stringify(parseDocument(out).value) === JSON.stringify(expected) ? out : null; } catch { return null; }
+}
+
+// Split answers into what the repository keeps and the personal answers (T-027). A team-only setting (hooks,
+// project rules) cannot be switched to personal. -> { text, doc, personal }; `text` stays byte for byte when
+// nothing is removed or migrated, and keeps its comments when only personal lines go.
+export function splitAnswers({ text, doc, kitRoot = KIT_ROOT }) {
+  const questions = kitQuestions(kitRoot);
+  for (const [id, scope] of Object.entries(doc.scopes ?? {})) {
+    if (scope === 'personal' && questions.has(id) && !switchable(questions.get(id))) throw new ProjectError(`${id} is a team setting; it cannot be personal`);
+  }
+  const personal = {};
+  const kept = {};
+  for (const [id, value] of Object.entries(doc.answers ?? {})) {
+    (settingClass(questions.get(id) ?? id, doc.scopes) === 'personal' ? personal : kept)[id] = value;
+  }
+  const repo = { ...doc, answers: kept };
+  const same = Object.keys(personal).length === 0 && JSON.stringify(parseDocument(String(text)).value) === JSON.stringify(repo);
+  return { text: same ? text : dropAnswerLines(String(text), Object.keys(personal), repo) ?? stringify(repo), doc: repo, personal };
 }
 
 export function requireManifest(root) {
@@ -84,15 +143,23 @@ function syncProposalModules(root, modules, answers) {
 
 // Render `modules` and reconcile the project with the result; writes files, bases and the manifest.
 // Used by update (same modules), remove (one fewer) and, later, add (one more).
-export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, reconfigure = false, ...options }) {
+// `env` is where ~/.yaw lives: personal answers are saved there and never written to answers.yaml (T-027).
+// The CLI and the web setup always pass it.
+export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = 'update', removing, answers, reconfigure = false, env, ...options }) {
   let manifest = requireManifest(root);
   checkKitNotOlder(manifest, kitRoot);
   if (reconfigure) {
     manifest = { ...manifest, profiles: answers.doc.proposal.profiles, agents: answers.doc.answers['user.agents'], preset: answers.doc.mode };
   }
   answers = syncProposalModules(root, modules, answers);
-  const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules, answersDoc: answers?.doc });
+  const answersDoc = answers?.doc ?? (env ? readAnswers(root, { env, kitRoot }) : undefined);
+  const { desired, missing, profileOutput } = renderProject({ root, kitRoot, manifest, modules, answersDoc });
   const version = kitVersion(kitRoot);
+  // Without `env` (a library call with no user folder) the answers are written as given.
+  if (answers && env) {
+    const split = splitAnswers({ text: answers.text, doc: answers.doc, kitRoot });
+    answers = { text: split.text, doc: answers.doc, warning: savePersonalAnswers({ env, answers: split.personal }).warning };
+  }
   // New answers (yaw add) are written only after the render succeeded; the answers entry gets the new hash.
   if (answers) writeAtomic(root, ANSWERS, answers.text);
   const result = await reconcile(root, manifest.files, desired, { ...options, mode, removing, label: `kit ${version}` });
@@ -119,7 +186,7 @@ export async function applyModules({ root, kitRoot = KIT_ROOT, modules, mode = '
     return { ...result, manifest: null, missingModules: missing, missingProfiles: [] };
   }
   const written = writeManifest(root, { ...manifest, kit: version, modules: nextModules, files: result.files });
-  return { ...result, manifest: written, missingModules: missing, missingProfiles: profileOutput?.missing ?? [] };
+  return { ...result, manifest: written, missingModules: missing, missingProfiles: profileOutput?.missing ?? [], personalWarning: answers?.warning ?? null };
 }
 
 // Render `modules` for an existing project from the installed kit and its answers; writes nothing.
@@ -133,9 +200,11 @@ export function renderProject({ root, kitRoot = KIT_ROOT, manifest, modules, ans
     throw new ProjectError(`profiles differ: ${ANSWERS} proposal.profiles is [${fromAnswers.join(', ')}], ${MANIFEST} profiles is [${manifest.profiles.join(', ')}]; make both lists the same`);
   }
   const definitions = new Map(available.map((m) => [m, loadModule(kitRoot, m)]));
+  // The repository carries the files of the agents in its manifest; user.agents itself is personal (T-027).
+  if (manifest.agents?.length) answersDoc = { ...answersDoc, answers: { ...answersDoc.answers, 'user.agents': manifest.agents } };
   const context = templateContext({ kitRoot, answersDoc, modules: available, definitions });
   // Profile files belong to core: they go away with it (the scaffold is user code and stays).
-  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles }) : undefined;
+  const profileOutput = available.length > 0 ? renderProfiles({ kitRoot, profiles: manifest.profiles, modules: available }) : undefined;
   const desired = renderModules({ kitRoot, modules: available, context, definitions, profileOutput, root });
   return { desired, missing, profileOutput };
 }
@@ -144,7 +213,7 @@ export function enabledModules(manifest) {
   return Object.entries(manifest.modules).filter(([, e]) => e.enabled).map(([m]) => m);
 }
 
-export async function editProject({ root, kitRoot = KIT_ROOT, answers }) {
+export async function editProject({ root, kitRoot = KIT_ROOT, answers, env }) {
   const doc = parseAnswers(answers.text);
   if (JSON.stringify(doc) !== JSON.stringify(answers.doc)) throw new ProjectError('edited answers do not match their document');
   const modules = doc.proposal?.modules;
@@ -154,7 +223,7 @@ export async function editProject({ root, kitRoot = KIT_ROOT, answers }) {
   checkDependencies({ kitRoot, modules });
   const previous = readProjectFile(root, ANSWERS);
   try {
-    return await applyModules({ root, kitRoot, modules, answers, reconfigure: true, strategy: 'keep' });
+    return await applyModules({ root, kitRoot, modules, answers, reconfigure: true, strategy: 'keep', env });
   } catch (e) {
     if (previous !== null) writeAtomic(root, ANSWERS, previous);
     throw e;
@@ -170,7 +239,20 @@ export function updateProject({ root, kitRoot = KIT_ROOT, ...options }) {
       if (readProjectFile(root, p) !== null) throw new ProjectError(`${flag} ${p}: the file exists; ${flag} is only for missing files`);
     }
   }
-  return applyModules({ root, kitRoot, modules: enabledModules(manifest), mode: 'update', ...options });
+  // An older answers.yaml may still hold personal answers: with `env` they move to ~/.yaw/user-profile.yaml (the
+  // saved profile wins) and leave the repository; while the profile cannot be written they stay.
+  let answers;
+  const text = options.env ? readProjectFile(root, ANSWERS)?.toString('utf8') : null;
+  if (text) {
+    const doc = parseAnswers(text);
+    const split = splitAnswers({ text, doc, kitRoot });
+    if (split.text !== text) {
+      const merged = withPersonal(doc, { env: options.env, kitRoot });
+      const saved = savePersonalAnswers({ env: options.env, answers: Object.fromEntries(Object.keys(split.personal).map((id) => [id, merged.answers[id]])) });
+      if (!saved.warning) answers = { text, doc: merged };
+    }
+  }
+  return applyModules({ root, kitRoot, modules: enabledModules(manifest), mode: 'update', answers, ...options });
 }
 
 // Choose the modules a mode starts with: every module the kit has whose default for the mode is true or
@@ -207,7 +289,7 @@ export function renderInit({ root, kitRoot = KIT_ROOT, answersDoc, modules }) {
   const profiles = answersDoc.proposal.profiles;
   const definitions = new Map(modules.map((m) => [m, loadModule(kitRoot, m)]));
   const context = templateContext({ kitRoot, answersDoc, modules, definitions });
-  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null, answers: answersDoc.answers });
+  const profileOutput = renderProfiles({ kitRoot, profiles, scaffold: (rel) => readProjectFile(root, rel) !== null, answers: answersDoc.answers, modules });
   const desired = renderModules({ kitRoot, modules, context, definitions, profileOutput, root });
   return { desired, definitions, missingProfiles: profileOutput.missing };
 }
@@ -237,7 +319,8 @@ export function writeIdeaReadme(root, idea) {
 
 // `yaw init`: render, then write files, bases and the manifest. The answers come from a file
 // (`answersFile`, copied byte for byte, ADR-0019) or from the interview (`answers: { text, doc }`).
-export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answers, modules = ['core'], ...options }) {
+// Personal answers go to ~/.yaw/user-profile.yaml under `env` (T-027); answers.yaml keeps the team answers only.
+export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answers, modules = ['core'], env, ...options }) {
   if (readManifest(root)) throw new ProjectError(`${MANIFEST} already exists; use yaw update`);
   let text;
   let answersDoc;
@@ -265,8 +348,10 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
   const { desired, missingProfiles } = renderInit({ root, kitRoot, answersDoc, modules });
   const version = kitVersion(kitRoot);
 
-  if (!sameFile) writeAtomic(root, ANSWERS, text);
-  const answersEntry = { path: ANSWERS, module: 'core', hash: hashContent(text), managed: false };
+  const split = env ? splitAnswers({ text, doc: answersDoc, kitRoot }) : { text, personal: {} };
+  const personal = env ? savePersonalAnswers({ env, answers: split.personal }) : { warning: null };
+  if (!sameFile || split.text !== text) writeAtomic(root, ANSWERS, split.text);
+  const answersEntry = { path: ANSWERS, module: 'core', hash: hashContent(split.text), managed: false };
   const result = await reconcile(root, [], desired, { ...options, mode: 'init', label: `kit ${version}` });
   const readme = desired.has(README) ? null : writeIdeaReadme(root, answersDoc.answers['idea.text']);
   if (readme) result.report.push({ path: README, action: readme.action });
@@ -280,7 +365,7 @@ export async function initProject({ root, kitRoot = KIT_ROOT, answersFile, answe
     mcpServers: [],
     files: [...result.files, answersEntry, ...(readme?.action === 'added' ? [{ path: README, module: 'core', hash: readme.hash, managed: false }] : [])],
   });
-  return { ...result, manifest, missingProfiles };
+  return { ...result, manifest, missingProfiles, personalWarning: personal.warning };
 }
 
 // `yaw add <module>` checks. Dependency violations are reported, never fixed (doc 04 §1).
@@ -299,22 +384,22 @@ export function planAdd({ root, kitRoot = KIT_ROOT, module }) {
 }
 
 // The module's questions; a previous answer (kept by `yaw remove`) becomes the default (ADR-0023).
-export function moduleQuestions({ root, definition }) {
-  const given = readAnswers(root).answers;
+export function moduleQuestions({ root, definition, env }) {
+  const given = readAnswers(root, { env }).answers;
   return (definition.questions ?? []).map((q) => (Object.hasOwn(given, q.id) ? { ...q, default: given[q.id] } : q));
 }
 
 // Add the module: new answers are merged into answers.yaml, files are rendered and reconciled.
-export async function addModule({ root, kitRoot = KIT_ROOT, module, newAnswers = {}, ...options }) {
+export async function addModule({ root, kitRoot = KIT_ROOT, module, newAnswers = {}, env, ...options }) {
   const { enabled } = planAdd({ root, kitRoot, module });
-  const doc = readAnswers(root);
+  const doc = readAnswers(root, { env, kitRoot });
   const nextDoc = { ...doc, answers: { ...doc.answers, ...newAnswers } };
   // Nothing new or changed: answers.yaml is not touched, so the user's comments survive.
   const changed = Object.entries(newAnswers).some(([id, v]) => JSON.stringify(doc.answers[id]) !== JSON.stringify(v));
   const answers = changed ? { text: stringify(nextDoc), doc: nextDoc } : undefined;
   const previous = readProjectFile(root, ANSWERS);
   try {
-    return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers, ...options });
+    return await applyModules({ root, kitRoot, modules: [...enabled, module], mode: 'update', answers, env, ...options });
   } catch (e) {
     if (previous !== null) writeAtomic(root, ANSWERS, previous);
     throw e;

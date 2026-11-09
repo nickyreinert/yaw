@@ -17,8 +17,8 @@
         "id": { "$ref": "common.schema.json#/$defs/questionId" },
         "ref": { "description": "Catalogue number in kickoff/03-interview.md.", "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
         "scope": {
-          "description": "project: stored in .yaw/answers.yaml. user: default stored in ~/.yaw/user-profile.yaml, a project may override it.",
-          "enum": ["project", "user"]
+          "description": "Personal or team (T-027). Every setting is team by default, stored in .yaw/answers.yaml. user (communication-like preferences, not user.agents): can be switched to personal per project (answers.yaml scopes), then stored only in ~/.yaw/user-profile.yaml. project (or absent) and team: team-only, no switch.",
+          "enum": ["project", "user", "team"]
         },
         "mode": { "description": "Q: shown in Quick, S: Standard, F: Full only.", "enum": ["Q", "S", "F"] },
         "type": { "enum": ["text", "choice", "multi", "boolean", "number"] },

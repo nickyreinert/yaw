@@ -1,8 +1,6 @@
 import { createReadStream, constants, openSync, closeSync, fstatSync, readFileSync } from 'node:fs';
-import { createInterface } from 'node:readline';
-import { once } from 'node:events';
 import { createHash } from 'node:crypto';
-import { findSessions, transcriptFiles } from '../../modules/sessions/lib/import.js';
+import { boundedLines, findSessions, transcriptFiles } from '../../modules/sessions/lib/import.js';
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
 import { effectiveSources } from './session-sources.js';
@@ -13,11 +11,58 @@ export const LABELS = {
   behaviour: ['admits_error', 'apology_loop', 'sycophantic_admission', 'none'],
   failure: ['misunderstood_intent', 'wrong_scope', 'broke_something', 'ignored_rule_or_adr', 'hallucinated_api', 'too_slow', 'tooling_error', 'none'],
 };
-// Transcripts are streamed in full; only single lines over MAX_LINE (usually huge tool output) are skipped.
+// Transcripts are streamed in full; only single lines over MAX_LINE bytes (usually huge tool output) are skipped unbuffered.
 // READER marks rows read this way, so rows from the older capped reader are read once more.
-const MAX_LINE = 4 * 1024 * 1024, READER = 2;
+const MAX_LINE = 4 * 1024 * 1024, READER = 3;
 const textOf = (content) => typeof content === 'string' ? content : Array.isArray(content)
   ? content.filter((p) => ['text', 'input_text', 'output_text'].includes(p?.type) && typeof p.text === 'string').map((p) => p.text).join('\n') : '';
+
+// Tool-result sizes by tool and by the command's first word (T-048, L5). Only counts and byte sizes are kept, no output and
+// no command text: names must look like a plain word, and a leading NAME=value is skipped because it may hold a secret.
+const WORD = /^[\w.+-]{1,40}$/, MAX_KEYS = 40, MAX_PENDING = 10000;
+const word = (name) => WORD.test(name ?? '') ? name : 'other';
+function firstWord(command) {
+  if (typeof command !== 'string') return null;
+  for (const token of command.trim().split(/\s+/, 16)) if (!/^[A-Za-z_]\w*=/.test(token)) return word(token.split('/').pop());
+  return null;
+}
+// A leading YAW_VERBOSE=1 marks a re-run after a compact filter cut output (T-056); only the count is kept.
+function isVerbose(command) {
+  if (typeof command !== 'string') return false;
+  for (const token of command.trim().split(/\s+/, 16)) { if (!/^[A-Za-z_]\w*=/.test(token)) return false; if (token === 'YAW_VERBOSE=1') return true; }
+  return false;
+}
+const outputBytes = (content) => typeof content === 'string' ? Buffer.byteLength(content) : Array.isArray(content)
+  ? content.reduce((n, p) => n + (p?.type === 'text' && typeof p.text === 'string' ? Buffer.byteLength(p.text) : 0), 0) : 0;
+function toolScan() {
+  const pending = new Map(), tools = new Map(), commands = new Map();
+  let verbose = 0;
+  const add = (table, key, size) => {
+    if (!table.has(key) && table.size >= MAX_KEYS) key = 'other';
+    const t = table.get(key) ?? { calls: 0, bytes: 0, max: 0 };
+    t.calls++; t.bytes += size; t.max = Math.max(t.max, size);
+    table.set(key, t);
+  };
+  return {
+    // Claude Code: a tool_use block in an assistant line, its tool_result block in a later user line.
+    line(o) {
+      const blocks = o?.message?.content;
+      if (!Array.isArray(blocks)) return;
+      for (const b of blocks) {
+        if (b?.type === 'tool_use' && typeof b.id === 'string' && pending.size < MAX_PENDING) {
+          pending.set(b.id, { tool: word(b.name), command: b.name === 'Bash' ? firstWord(b.input?.command) : null, verbose: b.name === 'Bash' && isVerbose(b.input?.command) });
+        } else if (b?.type === 'tool_result') {
+          const call = pending.get(b.tool_use_id) ?? { tool: 'other', command: null }, size = outputBytes(b.content);
+          pending.delete(b.tool_use_id);
+          add(tools, call.tool, size);
+          if (call.command) add(commands, call.command, size);
+          if (call.verbose) verbose++;
+        }
+      }
+    },
+    result: () => ({ tools: Object.fromEntries(tools), commands: Object.fromEntries(commands), ...(verbose > 0 ? { verbose } : {}) }),
+  };
+}
 
 export function messageOf(agent, o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
@@ -64,42 +109,42 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
   const messages = [], seen = new Map();
   let input;
   let limited = false, userTurns = 0;
+  const scan = agent === 'claude' ? toolScan() : null;
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('Session analysis reads regular transcript files only');
     limited = st.size > maxBytes;
-    input = createReadStream(file, { fd, encoding: 'utf8', ...(maxBytes === Infinity ? {} : { end: maxBytes - 1 }) });
-    const lines = createInterface({ input, crlfDelay: Infinity });
-    try {
-      for await (const line of lines) {
-        if (!line) continue;
-        if (line.length > MAX_LINE) { limited = true; continue; }
-        let o;
-        try { o = JSON.parse(line); } catch { limited = true; continue; }
-        const m = messageOf(agent, o);
-        if (!m?.text) continue;
-        const key = m.id ? `${m.role}:${m.id}` : null;
-        const existing = key && seen.get(key);
-        if (existing) {
-          if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
-          continue;
-        }
-        if (messages.length >= maxMessages) { limited = true; break; }
-        const message = { role: m.role, text: m.text, time: m.time };
-        if (key) seen.set(key, message);
-        messages.push(message);
-        if (m.role === 'user' && ++userTurns > maxUserTurns) break;
+    input = createReadStream(file, { fd, ...(maxBytes === Infinity ? {} : { end: maxBytes - 1 }) });
+    for await (const line of boundedLines(input, MAX_LINE)) {
+      if (line === null) { limited = true; continue; }
+      if (!line) continue;
+      let o;
+      try { o = JSON.parse(line); } catch { limited = true; continue; }
+      scan?.line(o);
+      const m = messageOf(agent, o);
+      if (!m?.text) continue;
+      const key = m.id ? `${m.role}:${m.id}` : null;
+      const existing = key && seen.get(key);
+      if (existing) {
+        if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
+        continue;
       }
-    } finally { lines.close(); }
+      if (messages.length >= maxMessages) { limited = true; break; }
+      const message = { role: m.role, text: m.text, time: m.time };
+      if (key) seen.set(key, message);
+      messages.push(message);
+      if (m.role === 'user' && ++userTurns > maxUserTurns) break;
+    }
   } finally {
     if (!input) closeSync(fd);
     else if (!input.closed) {
-      const closed = once(input, 'close');
+      // Leaving the loop early destroys the stream with an AbortError; wait for the file to close, not for that error.
+      const closed = new Promise((resolve) => input.on('error', () => {}).once('close', resolve));
       input.destroy();
       await closed;
     }
   }
-  return { messages, limited };
+  return { messages, limited, ...(scan ? { tools: scan.result() } : {}) };
 }
 
 export function messageMetrics(messages, limited = false) {
@@ -377,6 +422,7 @@ export async function collectAnalysis({ root, env, all = false, classify = false
       id: sessionId(s.agent, s.native), project: realRoot(s.cwd), agent: s.agent, title: '', started: s.started, ended: s.ended,
       model: s.model, branch: s.branch, tokens_in: s.tokensIn, tokens_out: s.tokensOut, cost_usd: s.costUsd, source: 'local', reader: READER,
       metrics: messageMetrics(turns.messages, turns.limited), fingerprint: hash.digest('hex'),
+      ...(turns.tools ? { toolOutput: turns.tools } : {}),
     };
     if (!row.id) continue;
     if (s.transcript && s.stamp) Object.assign(row, { file_key: sourceKey(s.transcript), stamp: s.stamp });
@@ -392,10 +438,13 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
   if (classify && !rows.length) return { sessions: 0, reused, skipped, unavailable, limited, collected: old.collected, classified: true };
   const project = realRoot(root);
-  // Classification updates readable sessions only; a missing/unreadable transcript must never erase saved results.
-  const merged = new Map(old.rows.filter((r) => classify || (!all && r.project !== project) || Date.parse(r.started) < since).map((r) => [r.id, r]));
+  // A scan updates only the sessions it found. Saved rows whose history is missing, disabled, unreadable or past a discovery
+  // limit are kept with their metrics and classifications, and counted so the summary can say the scan was incomplete.
+  const merged = new Map(old.rows.map((r) => [r.id, r]));
+  const found = new Set(rows.map((r) => r.id));
+  const missing = classify ? 0 : old.rows.filter((r) => r.source !== 'synced' && !found.has(r.id) && (all || r.project === project) && Date.parse(r.started) >= since).length;
   for (const row of rows) {
-    const previous = old.rows.find((r) => r.id === row.id);
+    const previous = byId.get(row.id);
     if (!classify && !row.evaluation && previous?.fingerprint === row.fingerprint) row.evaluation = previous.evaluation;
     merged.set(row.id, row);
   }
@@ -406,11 +455,12 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   ] : old.tasks;
   const data = { version: 1, rows: [...merged.values()], tasks, collected: new Date().toISOString() };
   writeUserData(env, 'session-analysis.json', data);
-  return { sessions: rows.length, reused, skipped, unavailable, limited, collected: data.collected, classified: classify };
+  return { sessions: rows.length, reused, skipped, unavailable, missing, limited, collected: data.collected, classified: classify };
 }
 
 export const scanSummary = (r) => [`Saved ${r.sessions} session(s)`, r.reused ? `${r.reused} unchanged and reused` : '',
   r.limited ? `${r.limited} partial (oversized or broken lines skipped)` : '',
   r.unavailable ? `${r.unavailable} local transcripts unavailable and skipped` : '',
+  r.missing ? `${r.missing} saved session(s) not found in the configured folders (kept; check Global Settings → Sessions for disabled or missing history folders)` : '',
   r.skipped > (r.unavailable ?? 0) ? `${r.skipped - (r.unavailable ?? 0)} unreadable and skipped` : '',
   r.classified && r.skipped ? 'existing results kept for skipped sessions; check Global Settings → Sessions for history folders' : ''].filter(Boolean).join('; ') + '.';

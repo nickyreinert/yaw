@@ -5,7 +5,7 @@
 //   github mode: viewFromIssues() issues -> generated read-only ledger; journal lines are issue comments
 
 import { GhError, defaultGh } from '../../../core/lib/gh.js';
-import { EFFORTS, modelEffort } from '../../../core/lib/tasks.js';
+import { EFFORTS, PRIORITIES, modelEffort } from '../../../core/lib/tasks.js';
 import { localDate, oneLine, parseArchive } from './ledger.js';
 
 export { GhError, defaultGh };
@@ -26,12 +26,13 @@ const normalise = (text) => String(text ?? '').replace(/\r\n?/g, '\n').trim();
 
 // ------------------------------------------------------------------ both mode: TASKS.md -> issues
 
-const FIELDS = [['brief', 'Brief'], ['model', 'Model / effort'], ['spec', 'Spec'], ['acceptance', 'Acceptance'], ['resume', 'Resume point'], ['note', 'Note']];
+const FIELDS = [['priority', 'Priority'], ['status', 'Status'], ['brief', 'Brief'], ['model', 'Model / effort'], ['spec', 'Spec'], ['acceptance', 'Acceptance'], ['resume', 'Resume point'], ['note', 'Note']];
 
 export function issueBody(task) {
   const lines = [taskMark(task.id), ''];
   // A backlog item keeps model and effort apart (#175); the issue gets the one Model / effort line.
-  const fields = task.effort !== undefined ? { ...task, model: modelEffort(task.model, task.effort) } : task;
+  // Every issue carries its status; a backlog item has not been started.
+  const fields = { ...task, status: task.status ?? 'todo', ...(task.effort !== undefined ? { model: modelEffort(task.model, task.effort) } : {}) };
   for (const [key, label] of FIELDS) if (fields[key] !== undefined) lines.push(`**${label}:** ${fields[key]}`, '');
   if (task.progress !== undefined) lines.push(`**Progress:** ${task.progress} %`, '');
   lines.push('_Mirrored from TASKS.md by yaw (one way). Edit the task there; changes here are overwritten._');
@@ -95,6 +96,24 @@ const labelValue = (issue, prefix) => labelNames(issue).find((n) => n.startsWith
 
 const MODEL_BODY = /^\*\*Model \/ effort:\*\* (.+)$/m;
 
+// The answer to a dropdown of an issue form: GitHub renders it as "### <label>" and the answer below.
+function formAnswer(issue, label) {
+  const m = new RegExp(`^### ${label}\\n\\n(.+)$`, 'm').exec(normalise(issue.body));
+  return m ? oneLine(m[1]) : undefined;
+}
+
+// Priority of an issue: the priority:Pn label, else the "**Priority:** Pn" body line, else the issue form answer.
+export function issuePriority(issue) {
+  const value = labelValue(issue, 'priority:') ?? /^\*\*Priority:\*\* (\S+)$/m.exec(normalise(issue.body))?.[1] ?? formAnswer(issue, 'Priority');
+  return PRIORITIES.includes(value) ? value : undefined;
+}
+
+// Status of an issue: the status:<state> label, else the "**Status:** <state>" body line.
+function issueStatus(issue) {
+  const label = labelValue(issue, 'status:');
+  return STATUS[label] ?? Object.values(STATUS).find((v) => v === /^\*\*Status:\*\* (.+)$/m.exec(normalise(issue.body))?.[1]);
+}
+
 // Model tier and effort of an issue (#175): labels model:<tier> and effort:<level>, else the body line
 // "**Model / effort:** sonnet · effort: medium". -> { model?, effort? }
 export function issueModel(issue) {
@@ -102,7 +121,11 @@ export function issueModel(issue) {
   const effort = labelValue(issue, 'effort:');
   if (label) return { model: oneLine(label), ...(EFFORTS.includes(effort) ? { effort } : {}) };
   const m = MODEL_BODY.exec(normalise(issue.body));
-  if (!m) return {};
+  if (!m) {
+    const form = formAnswer(issue, 'Recommended model');
+    const level = formAnswer(issue, 'Reasoning effort');
+    return form ? { model: form, ...(EFFORTS.includes(level) ? { effort: level } : {}) } : {};
+  }
   const [, tier, level] = /^(.+?)(?: · effort: (\S+))?$/.exec(oneLine(m[1]));
   return { model: tier, ...(EFFORTS.includes(level) ? { effort: level } : {}) };
 }
@@ -135,7 +158,9 @@ export function journalFromComments(comments, owner) {
 export function viewFromIssues({ mine, open, owner }) {
   const active = mine.map((issue) => {
     const entries = journalFromComments(issue.comments, owner);
-    const task = { id: `#${issue.number}`, title: oneLine(issue.title), status: STATUS[labelValue(issue, 'status:')] ?? 'in progress' };
+    const task = { id: `#${issue.number}`, title: oneLine(issue.title), status: issueStatus(issue) ?? 'in progress' };
+    const priority = issuePriority(issue);
+    if (priority) task.priority = priority;
     const brief = /^\*\*Acceptance:\*\* (.+)$/m.exec(issue.body ?? '')?.[1] ?? firstLine(issue.body);
     if (brief) task.brief = brief;
     const hint = issueModel(issue);
@@ -150,7 +175,7 @@ export function viewFromIssues({ mine, open, owner }) {
   }).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
   const mineNumbers = new Set(mine.map((i) => i.number));
   const rank = (i) => {
-    const p = /^P(\d)$/.exec(labelValue(i, 'priority:') ?? '');
+    const p = /^P(\d)$/.exec(issuePriority(i) ?? '');
     return p ? Number(p[1]) : 9;
   };
   const backlog = open
@@ -159,7 +184,9 @@ export function viewFromIssues({ mine, open, owner }) {
     .slice(0, BACKLOG_MAX)
     .map((i) => {
       const item = { id: `#${i.number}`, title: oneLine(i.title) };
-      const note = [labelValue(i, 'priority:'), labelValue(i, 'estimate:')].filter(Boolean).join(' · ');
+      const priority = issuePriority(i);
+      if (priority) item.priority = priority;
+      const note = labelValue(i, 'estimate:');
       if (note) item.note = note;
       Object.assign(item, issueModel(i));
       for (const [key, label] of [['spec', 'Spec'], ['acceptance', 'Acceptance']]) {

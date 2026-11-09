@@ -20,7 +20,8 @@ async function init(text = ANSWERS_YAML) {
 }
 
 test('AGENTS.md is assembled from the core frame and agentsMd, well below the budget', async () => {
-  const root = await init(answers('  user.language: en\n  user.autonomy: act-and-report\n'));
+  // T-027: chat language and autonomy reach AGENTS.md only when the project switches them to team.
+  const root = await init(`${answers('  user.language: en\n  user.autonomy: act-and-report\n')}scopes:\n  user.language: team\n  user.autonomy: team\n`);
   const md = read(root, 'AGENTS.md');
   assert.ok(lines(md) <= 30, `${lines(md)} lines`);
   assert.match(md, /^# AGENTS\.md\n/);
@@ -34,7 +35,7 @@ test('AGENTS.md is assembled from the core frame and agentsMd, well below the bu
 });
 
 test('questions the answers file does not hold take their defaults', async () => {
-  const md = read(await init(), 'AGENTS.md');
+  const md = read(await init(`${ANSWERS_YAML}scopes:\n  user.language: team\n  user.autonomy: team\n`), 'AGENTS.md');
   assert.match(md, /Chat in "de"/);
   assert.match(md, /Ask before risky steps; otherwise act\./);
 });
@@ -132,7 +133,7 @@ test('the AGENTS.md budget is enforced at render time and the error names the co
   const over = tmp('yaw-proj-');
   await assert.rejects(
     initProject({ root: over, kitRoot: kit(fits + 1), answersFile: writeAnswers(tmp('yaw-ans-')) }),
-    /AGENTS\.md would have 81 lines, the budget is 80 \(core frame 76, core rules 2\)/,
+    /AGENTS\.md would have 91 lines, the budget is 90 \(core frame 86, core rules 2\)/,
   );
   assert.deepEqual(readTree(over), {}, 'nothing is written when the budget is exceeded');
 });

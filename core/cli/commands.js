@@ -73,9 +73,11 @@ export async function apply({ values, positionals, io }) {
     prompter: io.prompter,
     restore: new Set(values.restore ?? []),
     forget: new Set(values.forget ?? []),
+    env: io.env ?? process.env,
   });
   io.stdout.write(`yaw apply (kit ${before} -> ${result.manifest.kit})\n`);
   printReport(io.stdout, result);
+  if (result.personalWarning) io.stderr.write(`${result.personalWarning}\n`);
   return result.conflicts.length > 0 ? 1 : 0;
 }
 
@@ -89,8 +91,8 @@ export async function add({ values, positionals, io }) {
   const { enabled, definition } = planAdd({ root: io.cwd, kitRoot: io.kitRoot, module });
   const interactive = !values.yes && io.prompter.interactive;
   if (!values.yes && !io.prompter.interactive) throw new UsageError('no terminal for the questions: run again with --yes (defaults are used)');
-  const answersDoc = readAnswers(io.cwd);
-  const questions = moduleQuestions({ root: io.cwd, definition });
+  const answersDoc = readAnswers(io.cwd, { env: io.env ?? process.env, kitRoot: io.kitRoot });
+  const questions = moduleQuestions({ root: io.cwd, definition, env: io.env ?? process.env });
   let newAnswers = {};
   let defaulted = [];
   if (questions.length > 0) {
@@ -125,8 +127,9 @@ export async function add({ values, positionals, io }) {
       return 1;
     }
   }
-  const result = await addModule({ root: io.cwd, kitRoot: io.kitRoot, module, newAnswers, strategy, interactive, prompter: io.prompter });
+  const result = await addModule({ root: io.cwd, kitRoot: io.kitRoot, module, newAnswers, strategy, interactive, prompter: io.prompter, env: io.env ?? process.env });
   printReport(io.stdout, result);
+  if (result.personalWarning) io.stderr.write(`${result.personalWarning}\n`);
   printToolHints(io.stdout, [module]);
   return result.conflicts.length > 0 ? 1 : 0;
 }
@@ -156,7 +159,7 @@ export async function remove({ values, positionals, io }) {
     }
   }
   const result = await removeModule({
-    root: io.cwd, kitRoot: io.kitRoot, module, strategy, interactive: !values.yes && io.prompter.interactive, prompter: io.prompter,
+    root: io.cwd, kitRoot: io.kitRoot, module, strategy, interactive: !values.yes && io.prompter.interactive, prompter: io.prompter, env: io.env ?? process.env,
   });
   printReport(io.stdout, result);
   if (module === 'code-map') await dropMapCache(io);

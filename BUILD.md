@@ -38,7 +38,8 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
    - *Evaluation/metrics hooks* print nothing, return nothing, exit 0, detach, fail open. Test asserts empty stdout.
    - *Comfort hooks* may return a **synchronous** `systemMessage` / `terminalSequence` (user-visible only); never `additionalContext`, never from async hooks. Test asserts no `additionalContext`.
    - *Status line* scripts are exempt (rendered by the agent UI, not sent to the model).
-   - Only allowed model-visible output: `SessionStart` re-injection of the active task (doc 11), a few lines once per session, and — the only other allowed model-visible output — `SessionStart` re-injection of critical decisions, one short line each (ID and title), no record bodies, nothing when none is critical; how many is the user's choice, default 0, maximum 10 (a larger value is rejected: "too many: the maximum is 10"; ADR-0028). The active task is capped by a few lines, the critical decisions by the user's number and the dispatcher's policy cap (ADR-0007); nothing else is model-visible.
+   - *Compress hooks* (ADR-0007 amendment, doc 16 §5) run on `PostToolUse` only and may return only `updatedToolOutput`, a shorter version of the tool's output in the tool's own shape; the dispatcher drops any result that is not smaller than the original, and the result may end with one re-run hint line. They replace output and add none (`tokenCost: none`). Tool output reaches compress handlers only, in memory, never a log. Test asserts "never worse".
+   - Only allowed model-visible output: `SessionStart` re-injection of the active task (doc 11), a few lines once per session, and — the only other allowed model-visible output — `SessionStart` re-injection of critical decisions, one short line each (ID and title), no record bodies, nothing when none is critical; how many is the user's choice, default 0, maximum 10 (a larger value is rejected: "too many: the maximum is 10"; ADR-0028). The active task is capped by a few lines, the critical decisions by the user's number and the dispatcher's policy cap (ADR-0007); nothing else is model-visible (a compress hook only shortens tool output the model reads anyway).
 6. **Secrets never pass through the model.** No secret values in logs, fixtures, prompts or test snapshots.
 7. **Tests with every change.** `node --test`; adapter tests use recorded hook payloads as fixtures (`test/fixtures/<agent>/<event>.json`).
 8. **Scope discipline.** Build only what the step asks for. Ideas for later go into an issue labelled `later`.
@@ -55,7 +56,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 | 2 | `github.yaml` / `taxonomy.json` | `github.yaml` stays YAML (user edits labels/rules). `taxonomy.json` stays JSON (managed through `yaw decisions` commands, as in the blueprint). |
 | 3 | `yaw.db`, release plan, `pr-policy` | Phase 1 defines only the tables it uses (session registry). The `decisions` table (discovery index for the decisions module) is approved by the user (ADR-0028). Evaluation tables and `release-plan.yaml` come in phase 2. Phase-1 `pr-policy` enforces only "PR links an open issue"; phase gating comes with the launch plan in phase 2. |
 | 4 | Tasks source of truth | Local mode: `TASKS.md` is the source of truth, IDs `T-NNN`. GitHub-only and team mode: issues are the source, IDs are issue numbers (`#123`), `TASKS.md` is a generated read-only view. Both mode: `T-NNN` with linked issue number. |
-| 5 | Presets | "Lean" = **Quick** (one name, docs updated). Quick = `core`, `communication`, `standards`, `devenv`, `tasks`, `security` (minimal; doc 04, ADR-0009). Setup depths are Quick and Full; Standard is merged into Full and `standard` stays an alias (ADR-0032). Step 3 builds `core` only; Quick is complete after 5.3. No reordering. |
+| 5 | Presets | "Lean" = **Quick** (one name, docs updated). Quick = `core`, `communication`, `devenv`, `tasks`, `security` (minimal; doc 04, ADR-0009). Setup depths are Quick and Full; Standard is merged into Full and `standard` stays an alias (ADR-0032). Step 3 builds `core` only; Quick is complete after 5.3. No reordering. |
 | 6 | `security` / `quality-code` | Minimal `security` joins phase 1: deny reading `.env*`/secret files, guard destructive commands (`rm -rf`, force push, prod deploy). This is the blocking hook that proves step 4. `quality-code` reviewer subagent stays phase 2; `just check` gates come from the profiles. |
 | 7 | Dogfooding profile, ADR location | Add 9th profile **`node-cli`** (Node ≥ 22, `node --test`, no deps) and use it for this repo. ADRs live in `docs/adr/` until step 5.6, then move into `.decisions/` via the decisions module. |
 | 8 | Gemini CLI | Phase 3, together with Antigravity (Gemini CLI is enterprise/API-key only now). Phase 1 agents: Claude, Codex, Copilot. |
@@ -124,7 +125,7 @@ Effort: `low` / `medium` / `high`. Use **plan mode** for every step marked "plan
 | # | Module | Docs | Model / effort |
 |---|---|---|---|
 | 5.0 | Minimal `security`: `.env*`/secret read deny, destructive-command guard (built together with step 4) | 04, 08 | **A, `high`** |
-| 5.1 | `communication`, `standards` | 04 | B, `low` |
+| 5.1 | `communication` (the former `standards` module was merged into core's docs/engineering.md, T-030) | 04 | B, `low` |
 | 5.2 | `devenv` | 04, 05 | B, `medium` |
 | 5.3 | `tasks` (local / GitHub / both) | 10 | B, `medium` |
 | 5.4 | `git-hooks` (lefthook, gitleaks) | 04 | B, `low` |

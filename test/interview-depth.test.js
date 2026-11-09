@@ -42,14 +42,14 @@ test('Quick asks only project essentials and architecture; Basic adds GitHub/rev
   assert.ok(optionIds.includes('arch.node-app-framework') && optionIds.includes('arch.php-serverless-hosting'));
   assert.deepEqual(ids('quick').filter((id) => !optionIds.includes(id)), ['user.agents', 'idea.text', 'tasks.use-github', 'arch.language', 'arch.runs-on']);
   for (const id of optionIds) assert.ok(ids('quick').includes(id), `${id} is asked in Quick`);
-  for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit']) {
+  for (const id of ['arch.framework', 'arch.hosting-control', 'arch.libraries', 'arch.services', 'arch.cost', 'arch.cost-limit', 'quality.error-detail', 'quality.log-output', 'quality.documentation']) {
     assert.ok(!ids('basic').includes(id), `${id} belongs to Pro`);
     assert.ok(!ids('pro').includes(id), `${id} is retained only for legacy answers`);
   }
   assert.ok(ids('basic').includes('tasks.use-github'));
   assert.ok(ids('basic').includes('quality.review-quality'));
   assert.equal(ids('pro').length, questions.filter((q) => !RETIRED_ARCHITECTURE.has(q.id)).length);
-  for (const id of ['arch.library-strategy', 'arch.docker', 'quality.error-detail', 'quality.log-output', 'quality.documentation', 'quality.review-security']) assert.ok(ids('basic').includes(id), id);
+  for (const id of ['arch.library-strategy', 'arch.docker', 'quality.unit-tests', 'quality.review-security']) assert.ok(ids('basic').includes(id), id);
   const bootstrap = createFormModel(f()).bootstrap();
   const proVisible = visibleQuestions(bootstrap.questions, {}, 'pro', ['core']);
   assert.ok(proVisible.some((q) => q.id === 'user.comfort'));
@@ -107,5 +107,7 @@ test('Quick terminal and browser both reuse a saved review trigger without a red
   const stderr = capture();
   const code = await main(['init', '--skip-verify'], { ...fixture, cwd: fixture.root, stdout: capture(), stderr, prompter: p });
   assert.equal(code, 0, stderr.text());
-  assert.deepEqual(readAnswers(fixture.root), browser.doc);
+  // T-027: the repository keeps the team answers; read over ~/.yaw/user-profile.yaml they match the browser.
+  assert.equal(Object.keys(readAnswers(fixture.root).answers).some((id) => id.startsWith('user.')), false);
+  assert.deepEqual(readAnswers(fixture.root, { env: fixture.env }), browser.doc);
 });

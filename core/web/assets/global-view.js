@@ -1,10 +1,15 @@
 import { renderOverviewMetrics, summarizeOverview } from './overview-metrics.js';
 // Global Overview, Analytics (also Workspace → Analytics, locked to the open project) and Global Tasks.
 // One column browser drives every card, chart and table; filters, split and table state live in the URL. It
-// also holds Refresh / Auto / Classify, scoped to all workspaces (Global) or the open one (Workspace).
+// also holds Refresh / Auto, scoped to all workspaces (Global) or the open one (Workspace). Classification starts from
+// the separate controller above the Profiling filter bar.
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
 import { createInsights } from './insights-view.js';
+import { toolOutputTable } from './tool-output.js';
+import { abTable, savingsTable } from './savings.js';
+import { DEFAULT_PAGE_SIZE, paginate, renderPager, resizePage } from './pagination.js';
+import { featureOn } from './ui-state.js';
 const $ = (id) => document.getElementById(id);
 function h(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
@@ -37,13 +42,13 @@ const metric = (label, value, note) => h('div', { class: 'metric' }, h('span', {
 const measured = (r) => r.prompts !== null;
 const syncedNote = (n) => `${fmt(n)} synced session${n === 1 ? '' : 's'} · project paths unavailable`;
 
-const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'projects', improveFocus: 'attention' };
+const DEFAULTS = { path: '', project: [], device: [], folder: [], agent: [], model: [], language: [], period: '90', from: '', to: '', split: 'agent', table: 'sessions', improveView: 'folders', improveAt: '', improveFocus: 'attention' };
 const FILTERS = ['path', ...FACET_KEYS, 'period', 'from', 'to', 'split'];
-const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], 'global-tasks': ['path', 'project'] };
+const KEYS = { 'global-improve': [...FILTERS, 'device', 'improveView', 'improveAt', 'improveFocus'], global: [...FILTERS, 'device'], 'global-analytics': [...FILTERS, 'device', 'table'], analytics: ['agent', 'model', 'period', 'from', 'to', 'split', 'table'], profiling: ['agent', 'model', 'period', 'from', 'to', 'split', 'improveView', 'improveAt', 'improveFocus'], 'global-tasks': ['path', 'project'] };
 const DIMS = [['none', 'None'], ['agent', 'Agent'], ['model', 'Model'], ['folder', 'Folder'], ['project', 'Project']];
 const PALETTE = ['#2154c7', '#49b8cc', '#cf713d', '#7455ac', '#ca5c54', '#42846b', '#142d46', '#8b9cab'];
 const AGENT_COLOR = { claude: '#cc6b3e', codex: '#2154c7', copilot: '#297c68', gemini: '#7455ac' };
-const TABLES = [['sessions', 'Sessions'], ['lengths', 'Lengths & timing'], ['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Outcomes']];
+const TABLES = [['sessions', 'Sessions'],['agents', 'Agents'], ['models', 'Models'], ['folders', 'Folders'], ['projects', 'Projects'], ['outcomes', 'Classification'], ['tooloutput', 'Tool output'], ['savings', 'Savings'], ['savingsab', 'Savings on/off']];
 const TABLE_IDS = { folders: 'folders-s' };
 
 export function createGlobal({ get, api, report, openProject, replace, onData, afterCollect }) {
@@ -52,7 +57,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   let prefs = null, improvePrefs = null;
   let route = null, data = null, loading = null, NOW = Date.now();
   let ROOT = '/', ROOTP = '', PROJECTS = [], DEVICES = [], S;
-  const locked = () => route === 'analytics';
+  // Workspace pages (Analytics, Profiling) share the Global components; `locked` limits them to the open workspace.
+  const locked = () => route === 'analytics' || route === 'profiling';
+  const profilingPage = () => route === 'global-improve' || route === 'profiling';
   const rel = (p) => p === ROOTP ? base(p) : p.startsWith(ROOT) ? p.slice(ROOT.length) : p;
   const path = () => state.path ? ROOT + state.path : ROOTP;
   const inPath = (p) => !state.path || (`${p}/`).startsWith(`${path()}/`);
@@ -97,14 +104,15 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     Object.assign(state, readFacets(p, locked() ? 'workspace' : 'global'));
     for (const k of Object.keys(tables)) delete tables[k];
     for (const [k, v] of p) {
-      const m = /^(q|sort|page)\.([\w-]+)$/.exec(k); if (!m) continue;
+      const m = /^(q|sort|page|size)\.([\w-]+)$/.exec(k); if (!m) continue;
       const t = tables[m[2]] ??= {};
-      if (m[1] === 'sort') { [t.sort, t.dir] = v.split('.'); t.sortSet = true; } else t[m[1]] = m[1] === 'page' ? Number(v) || 1 : v;
+      if (m[1] === 'sort') { [t.sort, t.dir] = v.split('.'); t.sortSet = true; } else t[m[1]] = m[1] === 'q' ? v : Number(v) || 1;
     }
+    if (state.improveView === 'projects') state.improveView = 'folders'; // the former Projects button
     if (!['7', '30', '90', 'all'].includes(state.period)) state.period = DEFAULTS.period;
     if (!DIMS.some(([d]) => d === state.split) || (locked() && ['folder', 'project'].includes(state.split))) state.split = DEFAULTS.split;
   }
-  const visibleTables = () => route === 'global-improve' ? [`improve-${state.improveView}`] : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
+  const visibleTables = () => profilingPage() ? (state.improveView === 'sessions' ? ['improve-sessions'] : ['improve-folders', 'improve-folder-sessions']) : route === 'global' ? ['folders'] : route === 'global-tasks' ? ['tasks'] : [TABLE_IDS[state.table] ?? state.table];
   function writeUrl() {
     if (!route) return;
     const p = new URLSearchParams();
@@ -117,6 +125,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (t.q) p.set(`q.${id}`, t.q);
       if (t.sort && t.sortSet) p.set(`sort.${id}`, `${t.sort}.${t.dir}`);
       if (t.page > 1) p.set(`page.${id}`, t.page);
+      if (t.size && t.size !== DEFAULT_PAGE_SIZE) p.set(`size.${id}`, t.size);
     }
     const url = `#${route}${p.size ? `?${p.toString().replaceAll('%2F', '/')}` : ''}`;
     replace(url);
@@ -247,12 +256,12 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   const chart = (title, sub, body, wide = false) => h('article', { class: `card${wide ? ' wide' : ''}` }, h('div', { class: 'chart-head' }, h('h2', {}, title), sub ? h('span', { class: 'small muted' }, sub) : null), body);
 
   // ---------- tables: filter, sort, page ----------
-  function dataTable(id, cols, rows, { pageSize = 20, sort, dir = 'desc', note } = {}) {
+  function dataTable(id, cols, rows, { sort, dir = 'desc', note } = {}) {
     const t = tables[id] ??= {};
     if (t.sort && !cols.some((c) => c.key === t.sort && c.sortable !== false)) { t.sort = undefined; t.sortSet = false; }
     t.sort ??= sort; t.dir = t.dir === 'asc' || t.dir === 'desc' ? t.dir : dir; t.page ??= 1;
     const input = h('input', { type: 'search', placeholder: 'Filter rows…', value: t.q ?? '', 'aria-label': 'Filter table rows' });
-    const info = h('span', { class: 'small muted' }), body = h('div'), pager = h('div', { class: 'pager' });
+    const info = h('span', { class: 'small muted' }), body = h('div'), pager = h('div');
     const text = (c, r) => c.text ? c.text(r) : String(c.value(r) ?? '');
     const draw = () => {
       const q = (t.q ?? '').toLowerCase();
@@ -265,8 +274,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         const d = typeof x === 'number' ? x - y : String(x).localeCompare(String(y));
         return t.dir === 'asc' ? d : -d;
       });
-      const pages = Math.max(1, Math.ceil(list.length / pageSize)); t.page = Math.min(Math.max(1, t.page), pages);
-      const slice = list.slice((t.page - 1) * pageSize, t.page * pageSize);
+      const w = paginate(list.length, t.page, t.size); t.page = w.page; t.size = w.size;
+      const slice = list.slice(w.start, w.end);
       fill(body, h('div', { class: 'table-scroll' }, h('table', { class: 'dt' },
         h('thead', {}, h('tr', {}, cols.map((x) => h('th', { scope: 'col', 'aria-sort': t.sort === x.key ? (t.dir === 'asc' ? 'ascending' : 'descending') : null, class: x.num ? 'num' : '' },
           x.sortable === false ? x.label : h('button', { type: 'button', class: 'sort', on: { click: () => { t.dir = t.sort === x.key && t.dir === 'desc' ? 'asc' : 'desc'; t.sort = x.key; t.sortSet = true; t.page = 1; writeUrl(); draw(); } } },
@@ -274,9 +283,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         h('tbody', {}, slice.length ? slice.map((r) => h('tr', {}, cols.map((x) => h('td', { class: x.num ? 'num' : '' }, x.show ? x.show(r) : text(x, r)))))
           : h('tr', {}, h('td', { colspan: cols.length, class: 'muted' }, 'No matching rows.'))))));
       info.textContent = `${list.length === rows.length ? fmt(rows.length) : `${fmt(list.length)} of ${fmt(rows.length)}`} rows`;
-      fill(pager, h('span', { class: 'small muted' }, `Page ${t.page}/${pages}`),
-        h('button', { type: 'button', disabled: t.page <= 1, on: { click: () => { t.page--; writeUrl(); draw(); } } }, '← Previous'),
-        h('button', { type: 'button', disabled: t.page >= pages, on: { click: () => { t.page++; writeUrl(); draw(); } } }, 'Next →'));
+      fill(pager, renderPager({ ...w,
+        onPage: (n) => { t.page = n; writeUrl(); draw(); },
+        onSize: (n) => { t.page = resizePage(w.page, w.size, n); t.size = n; writeUrl(); draw(); } }));
     };
     input.addEventListener('input', () => { t.q = input.value; t.page = 1; writeUrl(); draw(); });
     draw();
@@ -348,29 +357,38 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     return bar;
   }
 
-  // ---------- Refresh / Auto / Classify ----------
+  // ---------- Refresh / Auto, and the Profiling Classify controller ----------
   const scopeText = () => locked() ? 'this workspace' : 'all discovered workspaces';
   const periodText = () => state.from || state.to ? 'all history (a custom date range scans everything)' : state.period === 'all' ? 'all history' : `the last ${state.period} days`;
   const improveEligible = () => filtered().filter((r) => r.source !== 'synced' && r.prompts !== null);
+  // Unclassified local sessions of the current filters; when all are classified, the filtered local sessions (Reclassify).
   const improveToClassify = () => { const rows = improveEligible(), pending = rows.filter((r) => !r.evaluation); return pending.length ? pending : rows; };
+  // The controller caps that selection at 5 or 10 (newest first) or takes all of it. The server runs one job per request.
+  const CLASSIFY_SIZES = [[5, '5'], [10, '10'], [Infinity, 'All']];
+  let classifySize = 5;
+  const classifySelection = () => [...improveToClassify()].sort((a, b) => (b.started ?? 0) - (a.started ?? 0)).slice(0, classifySize);
+  function classifyController() {
+    const rows = classifySelection(), pending = improveToClassify().some((r) => !r.evaluation), busy = Boolean(job.busy);
+    return h('section', { class: 'classify-controller card', 'aria-label': 'Classify sessions' },
+      h('strong', {}, 'Classify sessions'),
+      h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Sessions to classify' },
+        ...CLASSIFY_SIZES.map(([size, label]) => h('button', { type: 'button', 'aria-pressed': String(classifySize === size), disabled: busy,
+          title: size === Infinity ? 'Every session the current filters select: all unclassified local sessions, or all filtered local sessions when none is unclassified.' : `The ${label} newest ${pending ? 'unclassified' : 'filtered'} local sessions.`,
+          on: { click: () => { classifySize = size; render(); } } }, label))),
+      h('button', { type: 'button', class: 'primary', disabled: busy || !rows.length, on: { click: () => run(true) },
+        title: `Send each prompt/answer turn of these sessions to your local Laya service at ${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}. Experimental and slow; asks before reading messages. Only the counts are saved.` },
+      job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} session${rows.length === 1 ? '' : 's'}`),
+      h('a', { href: '#global-settings/improve', class: 'small' }, 'Profiling Settings'));
+  }
   function collectControls() {
-    if (route === 'global-improve') {
-      const rows = improveToClassify(), pending = rows.some((r) => !r.evaluation);
-      return h('div', { class: 'collect-actions' },
-        h('button', { type: 'button', disabled: Boolean(job.busy), on: { click: () => run(false) }, title: 'Refresh saved metadata from configured local histories.' }, '↻ Refresh'),
-        h('button', { type: 'button', class: 'primary', disabled: Boolean(job.busy) || !rows.length, on: { click: () => run(true) } }, job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} sessions`),
-        h('a', { href: '#global-settings/classification', class: 'small' }, 'Classification settings'));
-    }
-    const busy = Boolean(job.busy), endpoint = prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000';
-    return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' },
-      h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
-        title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
-      job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh'),
+    const busy = Boolean(job.busy);
+    const refresh = h('button', { type: 'button', disabled: busy, on: { click: () => run(false) },
+      title: `Refresh: read the local Claude Code, Codex and Copilot CLI transcripts of ${scopeText()} for ${periodText()} and save aggregate counts, lengths and timing. No message text is stored and no model runs; unchanged transcripts are reused, so repeat runs are fast. If the request fails, an ad blocker may have blocked this local dashboard request.` },
+    job.busy === 'refresh' ? 'Refreshing…' : '↻ Refresh');
+    if (profilingPage()) return h('div', { class: 'collect-actions' }, refresh);
+    return h('div', { class: 'collect-actions', role: 'group', 'aria-label': 'Collect session data' }, refresh,
       h('label', { class: 'auto-check', title: `Auto: run Refresh by itself when Analytics opens (once per page load, ${locked() ? 'this workspace here, all workspaces on Global → Analytics' : 'all workspaces here, only the open one on Workspace → Analytics'}). A personal setting; it never classifies.` },
-        h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'),
-      h('button', { type: 'button', disabled: busy, on: { click: () => run(true) },
-        title: `Classify: send each prompt/answer turn of ${scopeText()} in ${periodText()} to your local Laya service at ${endpoint} to estimate outcome, sentiment, assistant behaviour and failure type. Experimental and slow; asks before reading messages. Only the counts are saved. Set Laya up under Global → Settings → Classification.` },
-      job.busy === 'classify' ? 'Classifying…' : 'Classify'));
+        h('input', { type: 'checkbox', checked: prefs?.autoRefresh, disabled: !prefs || busy, on: { change: (e) => saveAuto(e.target.checked) } }), 'Auto'));
   }
   function collectStatus() {
     const last = data?.history?.collected ? `Last refresh ${new Date(data.history.collected).toLocaleString()} · pages read saved results${prefs?.autoRefresh ? ' · Auto is on' : ''}.` : 'No saved scan yet: press Refresh to read local session history.';
@@ -446,8 +464,8 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   async function run(classify) {
     if (job.busy) return;
     const all = !locked();
-    const ids = classify && route === 'global-improve' ? improveToClassify().map((r) => r.id) : undefined;
-    if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Narrow the project, date or agent filters.', error: true }); render(); return; }
+    const ids = classify && profilingPage() ? classifySelection().map((r) => r.id) : undefined;
+    if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Choose fewer sessions or narrow the project, date or agent filters.', error: true }); render(); return; }
     const scope = ids ? `${ids.length} saved local sessions matching these filters` : `${scopeText()} for ${periodText()}`;
     if (classify && !confirm(`Classify ${scope}?\n\nYAW reads these conversations and sends eligible turns to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Only aggregate counts are saved. Pause and Stop remain available while it runs.`)) return;
     Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, skipped: 0, classify,
@@ -520,7 +538,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       str('last', 'Last active', last, (k) => last(k) ? day(last(k)) : '—'),
       { key: 'share', label: `Sessions by ${state.split === 'none' ? 'total' : state.split}`, sortable: false, value: () => null, text: () => '', show: (k) => h('div', { class: 'bar' }, S.keys.map((key) => { const v = k.rows.filter((r) => S.keyOf(r) === key).length; return v ? h('span', { style: { width: `${v / max * 100}%`, background: S.color(key) }, title: `${key}: ${v}` }) : null; })) },
       { key: 'open', label: '', sortable: false, value: () => null, text: () => '', show: (k) => k.project ? openButton(k.full, 'overview') : null },
-    ], list, { sort: 'sessions', pageSize: 15 }));
+    ], list, { sort: 'sessions' }));
     const t = timeBuckets(rows);
     fill($('ov-charts'),
       chart(`Sessions per ${t.unit}`, 'UTC', [legend(), columns(t.buckets, undefined, { wide: true })], true),
@@ -568,8 +586,9 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       chart('Prompt length × answer length', 'do longer prompts get longer answers?', scatter(m, (r) => r.promptChars / r.prompts, (r) => r.answerChars / r.answers, 'chars/prompt', 'chars/answer')),
       chart('Response time', 'median seconds to first answer, per session', columns(bins(m, (r) => r.medianResp, [5, 10, 20, 30, Infinity]))),
       chart('Tokens by model', 'Only agents that report usage', bars(bySize(groupBy(rows, (r) => r.model)), tokens)),
-      chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))));
-    const tabs = locked() ? TABLES.filter(([k]) => !['folders', 'projects'].includes(k)) : TABLES;
+      featureOn('profiling') ? chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))) : null);
+    // Profiling off hides the Classification block: its chart, its table and Classify.
+    const tabs = TABLES.filter(([k]) => !(locked() && ['folders', 'projects'].includes(k)) && (k !== 'outcomes' || featureOn('profiling')));
     if (!tabs.some(([k]) => k === state.table)) state.table = 'sessions';
     const sub = h('div', { class: 'subtabs', role: 'group', 'aria-label': 'Tables' }, tabs.map(([k, l]) =>
       h('button', { type: 'button', 'aria-pressed': String(state.table === k), on: { click: () => { state.table = k; writeUrl(); sessions(); } } }, l)));
@@ -584,11 +603,14 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       sessions: () => dataTable('sessions', [str('title', 'Session', (r) => r.title || r.id), str('started', 'Started', (r) => r.started, (r) => new Date(r.started).toLocaleString()), str('agent', 'Agent', (r) => r.agent),
         ...(locked() ? [] : [project, str('device', 'Device', (r) => deviceLabel(r.deviceId))]), str('language', 'Language', (r) => r.language), str('model', 'Model', (r) => r.model), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
         num('tin', 'Tokens in', (r) => r.tokensIn), num('tout', 'Tokens out', (r) => r.tokensOut), num('minutes', 'Elapsed', (r) => r.minutes, (r) => dur(r.minutes)),
-        num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`)], rows, { sort: 'started' }),
-      lengths: () => dataTable('lengths', [str('title', 'Session', (r) => r.title || r.id), num('prompts', 'Prompts', (r) => r.prompts), num('answers', 'Answers', (r) => r.answers),
-        num('cpp', 'Chars / prompt', (r) => r.prompts ? Math.round(r.promptChars / r.prompts) : null), num('med', 'Answer chars median', (r) => r.medianAnswer), num('p95', 'Answer chars p95', (r) => r.p95Answer),
-        num('rmed', 'Response s median', (r) => r.medianResp), num('rp95', 'Response s p95', (r) => r.p95Resp), num('total', 'Answer chars total', (r) => r.answerChars),
-        str('partial', 'Coverage', (r) => r.partial ? 'partial' : 'complete')], m, { sort: 'total', note: 'Transcripts of any size are read completely; oversized single lines are skipped and marked partial.' }),
+        num('cost', 'Cost', (r) => r.cost, (r) => r.cost === null ? '—' : `$${r.cost.toFixed(2)}`),
+        // Lengths & timing columns, merged in. Sessions without a scanned transcript stay listed and are marked, not dropped.
+        num('cpp', 'Chars / prompt', (r) => measured(r) && r.prompts ? Math.round(r.promptChars / r.prompts) : null),
+        num('med', 'Answer chars median', (r) => measured(r) ? r.medianAnswer : null), num('p95', 'Answer chars p95', (r) => measured(r) ? r.p95Answer : null),
+        num('rmed', 'Response s median', (r) => measured(r) ? r.medianResp : null), num('rp95', 'Response s p95', (r) => measured(r) ? r.p95Resp : null),
+        num('total', 'Answer chars total', (r) => measured(r) ? r.answerChars : null),
+        str('partial', 'Coverage', (r) => !measured(r) ? 'not measured' : r.partial ? 'partial' : 'complete')], rows,
+      { sort: 'started', note: 'Lengths and timing come from scanned transcripts; sessions not scanned show not measured. Oversized single lines are skipped and marked partial.' }),
       agents: () => dataTable('agents', groupCols('Agent'), groupBy(rows, (r) => r.agent), { sort: 'sessions' }),
       models: () => dataTable('models', groupCols('Model'), groupBy(rows, (r) => r.model), { sort: 'sessions' }),
       folders: () => dataTable('folders-s', groupCols('Folder'), groupBy(rows, folderOf), { sort: 'sessions' }),
@@ -596,21 +618,25 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]), str('language', 'Language', (r) => r.language),
         str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
         num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),
+      tooloutput: () => toolOutputTable(rows, { table: dataTable, num, str, short }),
+      savings: () => savingsTable(data.savings, { table: dataTable, num, str, short }),
+      savingsab: () => abTable(rows, { table: dataTable, num, str, short }),
     }[state.table]();
     fill($('ss-browse'), sub, h('article', { class: 'card' }, body), data.limited ? h('p', { class: 'small muted' }, `Showing the newest ${fmt(data.rows.length)} of ${fmt(data.total)} sessions.`) : null,
       data.undated ? h('p', { class: 'small muted' }, `${fmt(data.undated)} session${data.undated === 1 ? ' has' : 's have'} no start time and cannot be charted. For synced sessions, update YAW on the other device and sync there again.`) : null);
   }
 
-  // ---------- Improve: shared metadata filters and sorting; explicit conversation reads ----------
+  // ---------- Profiling: shared metadata filters and sorting; explicit conversation reads ----------
   function improve() {
+    $('improve-intro').textContent = locked() ? `This workspace · ${data.current ?? ''}` : 'Find a difficult session. Make the next one better.';
+    fill($('improve-classify'), classifyController());
     fill($('improve-filter'), filterBar('improve'));
     const rows = filtered(), [from, to] = bounds();
-    if (!['projects', 'sessions'].includes(state.improveView)) state.improveView = 'projects';
+    if (!['folders', 'sessions'].includes(state.improveView)) state.improveView = DEFAULTS.improveView;
     if (!['attention', 'classified', 'all'].includes(state.improveFocus)) state.improveFocus = 'attention';
     insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set,
-      onConversation: (open) => { $('improve-filter').hidden = open; },
-      settings: improvePrefs, view: state.improveView, focus: state.improveFocus,
-      scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView]),
+      settings: improvePrefs, view: state.improveView, at: state.improveAt, root: ROOTP, focus: state.improveFocus,
+      scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView, state.improveAt]),
       period: `${day(from)} through ${day(to - 1)} UTC; ${rows.length} filtered saved sessions${data.limited ? '; list capped at 20,000' : ''}` });
   }
 
@@ -631,7 +657,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   function render() {
     if (!data || !route) return;
     try {
-      if (route === 'global-improve') improve();
+      if (profilingPage()) improve();
       else if (route === 'global') overview();
       else if (route === 'global-tasks') tasksView();
       else sessions();
@@ -639,11 +665,11 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
   }
   return {
     async show(name, query = '') {
-      if (route !== name || name !== 'global-improve') insights.reset();
+      if (route !== name || !['global-improve', 'profiling'].includes(name)) insights.reset();
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
-      if (['analytics', 'global-analytics', 'global-improve', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
-      if (name === 'global-improve') improvePrefs = await get('improve/settings').catch(() => null);
+      if (['analytics', 'global-analytics', 'global-improve', 'profiling', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
+      if (['global-improve', 'profiling'].includes(name)) improvePrefs = await get('improve/settings').catch(() => null);
       if (route !== name) return;
       render();
       // Auto refresh once per page load and scope; all workspaces cover the open one too.

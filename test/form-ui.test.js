@@ -82,9 +82,9 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.match(app, /\$\('diff'\)\.hidden = !catalog\.editing/);
   assert.match(workspace, /if \(name === 'setup' && setup\) setInterviewFocus\(true\)/);
   const communication = readFileSync(join(KIT_ROOT, 'modules/communication/module.yaml'), 'utf8');
-  assert.match(communication, /label: Should the agent use examples and analogies\?/);
-  assert.match(communication, /Only when useful/);
-  assert.match(communication, /Examples and analogies in agent explanations/);
+  assert.match(communication, /label: "Depth: How long should answers be\?"/);
+  assert.match(communication, /label: "Response: Should the agent explain its actions\?"/);
+  assert.doesNotMatch(communication, /user\.register|user\.examples/);
 });
 async function serverFixture(t, extra = {}) {
   const f = fixture();
@@ -103,6 +103,29 @@ async function serverFixture(t, extra = {}) {
   });
   return { ...f, server, origin, cookie, token, headers, post, api, errors };
 }
+
+test('comfort help: each feature says what it does, the benefit and the technical change (T-033)', () => {
+  const help = readFileSync(join(KIT_ROOT, 'interview', 'help', 'comfort.md'), 'utf8');
+  const bullet = (name) => help.split('\n').find((l) => l.startsWith(`- ${name}`)) ?? '';
+  const hygiene = bullet('Session hygiene'), status = bullet('Status line'), notify = bullet('Notifications after long runs'), cache = bullet('Cache reminder');
+  assert.match(hygiene, /new topic or task.*switched branch/);
+  assert.match(hygiene, /Benefit: .*costs less.*keeps answers sharp/);
+  assert.match(hygiene, /Technically: .*~\/\.yaw.*no prompt text.*at most every 20 prompts/);
+  assert.match(status, /active task from TASKS\.md/);
+  assert.match(status, /Benefit: you see the task/);
+  assert.match(status, /Technically: Claude Code runs `yaw statusline`/);
+  assert.match(notify, /at least 3 minutes/);
+  assert.match(notify, /Benefit: you can leave the chat/);
+  assert.match(notify, /never code, diffs, tool output/);
+  assert.match(notify, /separate background process/);
+  assert.match(cache, /expires after 5 minutes idle/);
+  assert.match(cache, /Benefit: before a long break/);
+  assert.match(cache, /Technically: no keep-alive ping/);
+  assert.match(cache, /about one minute before expiry/);
+  for (const old of ['Hygiene hints: when to hand off', 'Status line: context and recent checks', 'Notifications: when a long run finishes', 'Cache reminder: before Claude\'s prompt cache goes cold (ntfy or Telegram), or what it cost']) {
+    assert.ok(!help.includes(old), `old wording removed: ${old}`);
+  }
+});
 
 test('web model: schema catalogue, local help, ownership and phase-3 choices', () => {
   const f = fixture(), m = createFormModel(f), c = m.bootstrap();
@@ -158,7 +181,7 @@ test('web model: normalization and browser defaults match the CLI interview', as
         },
       });
       assert.deepEqual(normalized.doc.answers, cli.answers, `${mode}/${expertise}`);
-      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || isPreference(q) || q.id === 'tasks.use-github'), input.answers, mode);
+      const browser = effectiveAnswers(c.questions.filter((q) => normalized.modules.includes(q.owner) || isPreference(q) || q.id === 'tasks.use-github' || q.id.startsWith('compact.') && mode !== 'quick'), input.answers, mode);
       assert.deepEqual(browser, normalized.doc.answers);
       assert.deepEqual(defaultModules(c.modules, c.questions, input.answers, mode),
         selectModules({ kitRoot: KIT_ROOT, mode, facts: deriveFacts(effectiveAnswers(c.questions, input.answers, mode)) }));
@@ -168,8 +191,8 @@ test('web model: normalization and browser defaults match the CLI interview', as
 
 test('web state: toggles add dependencies, cascade removal and immediately hide questions', () => {
   const m = createFormModel(fixture()), c = m.bootstrap();
-  const repaired = toggleModules(c.modules, ['core', 'security'], 'security', true);
-  assert.ok(repaired.includes('standards'), 'repair dependencies of an already selected module');
+  const repaired = toggleModules(c.modules, ['core', 'ci'], 'ci', true);
+  assert.ok(repaired.includes('github'), 'repair dependencies of an already selected module');
   const enabled = toggleModules(c.modules, ['core'], 'team', true);
   for (const n of ['core', 'team', 'tasks', 'github', 'git-hooks']) assert.ok(enabled.includes(n));
   const questions = visibleQuestions(c.questions, { 'idea.team': 'team', 'tasks.use-github': true }, 'full', enabled);
@@ -315,7 +338,7 @@ test('web API: entered secrets go only to a private .env, never answers, logs or
   assert.equal(readFileSync(join(f.root, '.env'), 'utf8'), `API_KEY=${JSON.stringify(canary)}\nDATABASE_URL=\n`);
   assert.equal(statSync(join(f.root, '.env')).mode & 0o777, 0o600);
   assert.doesNotMatch(f.errors.text(), /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
-  assert.deepEqual(readTree(f.home), {});
+  assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('web API: existing .env is never read, overwritten or returned', async (t) => {
@@ -503,7 +526,7 @@ test('web API: apply streams logs, runs CLI verification, closes only after deli
   assert.equal(f.server.server.listening, false);
   assert.ok(readManifest(f.root));
   assert.equal(parse(readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8')).proposal.profiles[0], 'node-cli');
-  assert.deepEqual(readTree(f.home), {});
+  assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('web API: failed verification reports files written, not success', async (t) => {
@@ -544,7 +567,7 @@ test('CLI: --web works without a terminal, skip-verify is explicit, no user save
   assert.equal(await done, 0); await browserWork;
   assert.ok(opened); assert.equal(stderr.text(), '');
   assert.match(stdout.text(), /one-time link/);
-  assert.ok(readManifest(f.root)); assert.deepEqual(readTree(f.home), {});
+  assert.ok(readManifest(f.root)); assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('CLI: --web verifies via just setup and just check; invalid combinations fail', async () => {
@@ -657,4 +680,50 @@ test('web API: console file previews return full text through authenticated, rea
   assert.equal(outside.status, 404);
   const protectedFile = await f.post('file-preview', { setup: setup(), path: '.env' });
   assert.equal(protectedFile.status, 403);
+});
+
+test('review cards: the push gate is a full-width card before the agent cards; Feature fit stays (no duplicate check)', () => {
+  const cards = readFileSync(join(KIT_ROOT, 'core/web/assets/setup-cards.js'), 'utf8');
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  const fn = cards.slice(cards.indexOf('function reviewerCards'));
+  const gate = fn.indexOf("class: 'module-card push-gate wide'");
+  assert.ok(gate > 0, 'push gate card is full width');
+  assert.ok(gate < fn.indexOf('for (const [k, title, what, example] of REVIEWERS)'), 'push gate is built before the agent cards');
+  assert.ok(!/\.module-card\.push-gate[^{]*\{[^}]*grid-column: auto/.test(css), 'css does not undo the full width');
+  assert.deepEqual(cards.match(/\['(quality|logic|ux|security|feature)', '/g).map((s) => s.slice(2, -4)), ['quality', 'logic', 'ux', 'security', 'feature']);
+});
+
+test('knowledge UI: Knowledge and Decision Categories tabs, sticky filter bar that stays under the sidebar', () => {
+  const dir = join(KIT_ROOT, 'core/web/assets');
+  for (const name of ['index.html', 'dashboard.html']) {
+    const page = readFileSync(join(dir, name), 'utf8');
+    assert.match(page, /id="knowledge-tabs"[^>]*>.*data-tab="records">Knowledge<.*data-tab="categories">Decision Categories</s, `${name}: tabs`);
+    assert.match(page, /id="knowledge-records"/);
+    assert.match(page, /id="knowledge-category-panel"/);
+    assert.ok(!page.includes('id="knowledge-categories"'), `${name}: no separate categories button`);
+  }
+  const css = readFileSync(join(dir, 'app.css'), 'utf8');
+  const rule = css.match(/^\.knowledge-filters\s*\{[^}]*position:\s*sticky[^}]*\}/m);
+  assert.ok(rule, 'filter bar is sticky');
+  assert.match(rule[0], /top:\s*0/);
+  const z = Number(rule[0].match(/z-index:\s*(\d+)/)?.[1]), sidebarZ = Number(css.match(/^\.sidebar \{[^}]*z-index:\s*(\d+)/m)[1]);
+  assert.ok(z > 0 && z < sidebarZ, 'filter bar sits below the sidebar navigation');
+  assert.match(readFileSync(join(dir, 'workspace.js'), 'utf8'), /knowledge-tabs/);
+});
+
+// T-037: Settings | Interview is one segmented control; the Focus switch belongs to the Interview view only.
+test('settings page: one Settings | Interview segmented control, Focus switch only inside Interview', () => {
+  const view = readFileSync(join(KIT_ROOT, 'core/web/assets/settings-view.js'), 'utf8');
+  const workspace = readFileSync(join(KIT_ROOT, 'core/web/assets/workspace.js'), 'utf8');
+  const css = readFileSync(join(KIT_ROOT, 'core/web/assets/app.css'), 'utf8');
+  assert.match(view, /el\('div', null, 'segmented'\)/, 'one segmented control');
+  assert.match(view, /setAttribute\('role', 'radiogroup'\)/);
+  assert.match(view, /\[\['settings', 'Settings'\], \['interview', 'Interview'\]\]/);
+  assert.doesNotMatch(view, /settings-presentation/, 'no separate pressed buttons');
+  assert.match(view, /setAttribute\('role', 'radio'\)/);
+  assert.match(view, /b\.dataset\.presentation === mode; b\.setAttribute\('aria-checked', String\(on\)\)/, 'active segment follows the route');
+  assert.match(css, /\.segmented \[aria-checked=true\]/);
+  assert.ok(!view.includes('focus-toggle'), 'Focus switch is not part of the Settings view');
+  assert.match(workspace, /const interviewView = name === 'setup' \|\| name === 'settings' && sub === 'interview'/);
+  assert.match(workspace, /else if \(!interviewView\) setInterviewFocus\(false\)/, 'leaving Interview ends Focus');
 });

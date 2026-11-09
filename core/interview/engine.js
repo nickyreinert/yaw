@@ -23,6 +23,7 @@ const SECTION_TITLES = {
   quality: 'Quality',
   tasks: 'Tasks',
   team: 'Team',
+  compact: 'Compact output',
 };
 
 // Q is asked in every mode, S in standard and full, F only in full.

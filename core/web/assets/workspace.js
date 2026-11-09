@@ -4,7 +4,8 @@ import { attachPageSearch, attachSidebarSearch } from './search.js';
 import { createGlobal } from './global-view.js';
 import { createGlobalSettings } from './global-settings-view.js';
 import { pickFolder } from './folder-picker.js';
-import { settingsRoute } from './ui-state.js';
+import { routeHidden, setFeatures, settingsRoute } from './ui-state.js';
+import { DEFAULT_PAGE_SIZE, paged, renderPager, resizePage } from './pagination.js';
 // Text-node rendering only. Registry and Markdown content are never parsed as HTML or executed.
 const $ = (id) => document.getElementById(id);
 export function el(tag, text, cls) {
@@ -20,6 +21,11 @@ export function table(headers, rows) {
   const body = t.createTBody();
   for (const row of rows) { const tr = body.insertRow(); for (const value of row) tr.append(el('td', value ?? '—')); }
   wrap.append(t); return wrap;
+}
+// Paged table: the page and size per view survive the redraws that follow each data refresh.
+const pageStates = {};
+function pagedTable(key, headers, rows) {
+  return paged(pageStates[key] ??= {}, rows.length, (start, end) => table(headers, rows.slice(start, end)), countLabel(rows.length, 'row'));
 }
 const fmt = (n) => Number(n ?? 0).toLocaleString();
 const countLabel = (n, word) => `${fmt(n)} ${word}${n === 1 ? '' : 's'}`;
@@ -47,22 +53,22 @@ function activityChart(rows) {
   const labels = el('div', null, 'chart-labels'); labels.append(el('span', days[0]?.day || 'No activity'), el('span', days.at(-1)?.day || '')); wrap.append(labels); return wrap;
 }
 let active = 'overview', data, requestId = 0;
-let knowledgePage = 1, knowledgeKey = '', knowledgeRequest = 0, searchTimer, knowledgeLoaded = false, editable = [];
+let knowledgePage = 1, knowledgeSize = DEFAULT_PAGE_SIZE, knowledgeKey = '', knowledgeRequest = 0, searchTimer, knowledgeLoaded = false, editable = [];
 // The dashboard server can serve several projects; each tab names its own in every request.
 const TYPES = ['document', 'rule', 'preference', 'lesson', 'snippet'];
 let workspace = sessionStorage.getItem('yaw-workspace') ?? '';
 const scoped = (params) => { if (workspace) params.set('workspace', workspace); return params; };
 const setup = document.body.dataset.mode === 'setup';
 // Routes are `#name[/sub][?query]`. Workspace and Global Analytics share one section, both Knowledge pages another.
-const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
-const SECTIONS = { 'global-analytics': 'analytics', 'global-knowledge': 'knowledge' };
+const views = ['overview', 'setup', 'analytics', 'settings', 'knowledge', 'workspace-tasks', 'code-map', 'profiling', 'global', 'global-analytics', 'global-improve', 'global-tasks', 'global-knowledge', 'global-settings'];
+const SECTIONS = { 'global-analytics': 'analytics', profiling: 'global-improve', 'global-knowledge': 'knowledge' };
 const ALIASES = { sessions: 'analytics', 'global-sessions': 'global-analytics', decisions: 'knowledge/decisions', maintenance: 'settings/files', notifications: 'global-settings/notifications', 'settings/notifications': 'global-settings/notifications',
-  profiling: 'global-analytics', tasks: 'global-tasks', projects: 'global' };
+  tasks: 'global-tasks', projects: 'global' };
 const TITLES = { overview: 'Workspace overview', setup: 'Settings / Interview', analytics: 'Workspace analytics', settings: 'Workspace settings', knowledge: 'Workspace knowledge',
-  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-analytics': 'Global analytics', 'global-improve': 'Learn from sessions', 'global-tasks': 'Global tasks',
+  'workspace-tasks': 'Workspace tasks', 'code-map': 'Workspace code map', global: 'Global overview', 'global-analytics': 'Global analytics', profiling: 'Workspace profiling', 'global-improve': 'Global profiling', 'global-tasks': 'Global tasks',
   'global-knowledge': 'Global knowledge', 'global-settings': 'Global settings' };
-const GLOBAL_VIEWS = ['global', 'global-analytics', 'global-improve', 'global-tasks', 'analytics'];
-let settings, globalView, globalSettings, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
+const GLOBAL_VIEWS = ['global', 'global-analytics', 'global-improve', 'global-tasks', 'analytics', 'profiling'];
+let settings, globalView, globalSettings, sidebarSearch, pageSearch = {}, knowledgeScope = 'project', pendingType = null, shown = '';
 const replace = (url) => { if (url !== location.hash) history.replaceState(null, '', url); shown = location.hash; };
 function setInterviewFocus(on) {
   document.body.classList.toggle('interview-focus', on);
@@ -79,6 +85,8 @@ export function showView(hash, focus = true) {
   if (route.includes('?')) [route, query] = route.split('?');
   let [name, sub] = route.split('/');
   if (!views.includes(name) || name === 'setup' && !setup) { name = 'overview'; sub = undefined; query = ''; }
+  // A page of a feature that is off (Global → Settings → Features) opens the overview; its settings tab opens Defaults.
+  if (routeHidden(sub ? `${name}/${sub}` : name)) { if (name === 'global-settings') sub = undefined; else { name = 'overview'; sub = undefined; query = ''; } }
   const changed = name !== active;
   active = name;
   const section = SECTIONS[name] ?? name;
@@ -95,26 +103,42 @@ export function showView(hash, focus = true) {
   else if (!interviewView) setInterviewFocus(false);
   if (name === 'global-settings') sub = globalSettings.show(sub, query); else globalSettings?.hide();
   if (params.has('q') && pageSearch[name]) pageSearch[name].set(params.get('q'), { scroll: true });
-  if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && sub !== 'decisions') sub = undefined;
+  if (!['settings', 'knowledge', 'global-settings'].includes(name) || name === 'knowledge' && !['decisions', 'categories'].includes(sub)) sub = undefined;
   if (GLOBAL_VIEWS.includes(name)) globalView.show(name, query);
   else {
     globalView?.hide();
     replace(`#${['settings', 'global-settings'].includes(name) ? settingsRoute(name, sub, query) : sub ? `${name}/${sub}` : name}`);
   }
   if (focus && changed) { document.querySelector(`[data-view="${section}"] h1`)?.focus({ preventScroll: true }); window.scrollTo({ top: 0, behavior: 'instant' }); }
-  if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null);
+  if (name === 'knowledge' || name === 'global-knowledge') openKnowledge(name === 'knowledge' ? 'project' : 'user', sub === 'decisions' ? 'decision' : null, sub === 'categories');
   if (name === 'code-map') loadMap().catch(reportError);
 }
 // Nav clicks add a history entry; filter changes replace it. Back/forward fire popstate and hashchange: render once.
 function navigate(hash) { history.pushState(null, '', `#${hash}`); showView(hash); }
+// Optional features: the sidebar entries of a feature that is off are hidden and the sidebar search forgets them.
+function applyFeatures(next) {
+  setFeatures(next);
+  for (const b of document.querySelectorAll('#side-nav [data-route]')) {
+    if (routeHidden(b.dataset.route)) { b.hidden = true; b.dataset.featureOff = ''; }
+    else if ('featureOff' in b.dataset) { b.hidden = false; delete b.dataset.featureOff; }
+  }
+  sidebarSearch?.refresh();
+}
 function onHistory() { if (location.hash !== shown) showView(location.hash.slice(1), false); }
 function openProject(root, target) { sessionStorage.setItem('yaw-workspace', root); location.hash = `#${target}`; location.reload(); }
-function openKnowledge(scope, type) {
+// Knowledge | Decision Categories: two panels of one page; the category editor is project-only.
+function showKnowledgeTab(categories) {
+  $('knowledge-records').hidden = categories; $('knowledge-category-panel').hidden = !categories;
+  document.querySelectorAll('#knowledge-tabs [data-tab]').forEach((b) => b.setAttribute('aria-pressed', String(categories === (b.dataset.tab === 'categories'))));
+  if (categories) { knowledgeKey = ''; taxonomyEditor($('knowledge-category-panel'), { api, get }).catch((e) => $('knowledge-category-panel').replaceChildren(el('p', e.message, 'warn'))); }
+}
+function openKnowledge(scope, type, categories = false) {
   const changed = scope !== knowledgeScope || type;
   knowledgeScope = scope;
   $('knowledge-title').textContent = scope === 'project' ? 'Knowledge' : 'Global knowledge';
   $('knowledge-intro').textContent = scope === 'project' ? 'This workspace · Knowledge records and decisions' : 'Your personal records in ~/.yaw/knowledge · shared by all projects';
-  $('knowledge-categories').hidden = scope !== 'project';
+  $('knowledge-tabs').hidden = scope !== 'project';
+  showKnowledgeTab(scope === 'project' && categories);
   if (changed) { knowledgePage = 1; knowledgeKey = ''; $('knowledge-namespace').value = ''; $('knowledge-type').value = ''; pendingType = type; loadKnowledge(); }
   else if (!knowledgeLoaded) loadKnowledge();
 }
@@ -136,22 +160,17 @@ function overview(d) {
   activity.append(activityChart(mine ? Object.entries(mine.last30Days).sort().map(([day, sessions]) => ({ day, sessions })) : []));
   activity.append(action('Open workspace analytics →', 'analytics'), action('Browse knowledge →', 'knowledge'));
   $('workspace-actions').replaceChildren(project, activity);
-  $('workspace-sessions').replaceChildren(mine?.recent.length ? table(['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Analytics and press Refresh to read local history.'));
+  $('workspace-sessions').replaceChildren(mine?.recent.length ? pagedTable('sessions', ['Session', 'Agent', 'Started', 'Elapsed'], mine.recent.map((r) => [r.title || r.id, r.agent, date(r.started), duration(r.minutes)])) : el('p', 'No saved sessions for this workspace. Open Analytics and press Refresh to read local history.'));
   if (mine && mine.sessions > (mine.recent?.length ?? 0)) $('workspace-sessions').prepend(el('p', `Latest ${mine.recent.length} of ${mine.sessions} sessions. Browse workspace sessions for the complete paginated list.`));
   const t = d.tasks;
-  $('workspace-tasks').replaceChildren(t.available ? table(['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
-  $('workspace-task-list').replaceChildren(t.available ? table(['Task', 'Title', 'Status / note', 'Progress'], [...t.active, ...t.backlog].map((r) =>
+  $('workspace-tasks').replaceChildren(t.available ? pagedTable('overview-tasks', ['Task', 'Title', 'Status'], [...t.active, ...t.backlog].map((r) => [r.id, r.title, r.status ?? r.note])) : el('p', t.error || 'No workspace tasks.'));
+  $('workspace-task-list').replaceChildren(t.available ? pagedTable('tasks', ['Task', 'Title', 'Status / note', 'Progress'], [...t.active, ...t.backlog].map((r) =>
     [r.id, r.title, r.status ?? r.note, r.progress === undefined ? '—' : `${r.progress}%`])) : el('p', t.error || 'No task ledger (TASKS.md) in this workspace.', 'muted'));
 }
 function fillOptions(select, options, label) {
   const value = select.value; select.replaceChildren(); const all = el('option', label); all.value = ''; select.append(all);
   for (const name of options) { const option = el('option', name); option.value = name; select.append(option); }
   select.value = options.includes(value) ? value : '';
-}
-function pager(page, pages, note, change) {
-  const row = el('div', null, 'pager'), previous = button('← Previous', () => change(page - 1)), next = button('Next →', () => change(page + 1));
-  previous.disabled = page <= 1; next.disabled = page >= pages;
-  row.append(el('span', `${note} · Page ${page}/${pages}`, 'small muted'), previous, next); return row;
 }
 // Small safe Markdown display: headings, lists, paragraphs, fenced code. Raw HTML stays literal text.
 function inline(node, text) {
@@ -280,13 +299,13 @@ async function startProjects() {
 }
 async function loadKnowledge() {
   const id = ++knowledgeRequest; $('knowledge-error').hidden = true; $('knowledge-status').textContent = 'Reading records…';
-  const params = scoped(new URLSearchParams({ scope: knowledgeScope, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: pendingType ?? $('knowledge-type').value, page: String(knowledgePage) }));
+  const params = scoped(new URLSearchParams({ scope: knowledgeScope, q: $('knowledge-search').value, namespace: $('knowledge-namespace').value, type: pendingType ?? $('knowledge-type').value, page: String(knowledgePage), pageSize: String(knowledgeSize) }));
   if (knowledgeKey) params.set('record', knowledgeKey);
   try {
     const res = await fetch(`/api/knowledge?${params}`), body = await res.json();
     if (id !== knowledgeRequest) return;
     if (!res.ok) throw new Error(body.error || 'Knowledge unavailable');
-    knowledgeLoaded = true; editable = body.editable ?? [];
+    knowledgeLoaded = true; editable = body.editable ?? []; knowledgePage = body.page; knowledgeSize = body.pageSize;
     fillOptions($('knowledge-namespace'), body.options.namespaces, 'All namespaces'); fillOptions($('knowledge-type'), [...new Set([...body.options.types, ...(pendingType ? [pendingType] : [])])], 'All types');
     if (pendingType) { $('knowledge-type').value = pendingType; pendingType = null; }
     $('knowledge-status').textContent = `${countLabel(body.total, 'record')} · ${body.excluded} excluded${body.limited ? ' · Scan limit reached' : ''}`;
@@ -297,7 +316,10 @@ async function loadKnowledge() {
       b.append(el('strong', r.title), el('span', `${r.scope} / ${r.namespace} · ${r.type}${r.status ? ` · ${r.status}` : ''}`, 'small muted'), el('code', r.path)); root.append(b);
     }
     if (!body.entries.length) root.append(el('p', 'No matching records.', 'muted'));
-    root.append(pager(body.page, body.pages, countLabel(body.total, 'record'), (page) => { knowledgePage = page; knowledgeKey = ''; loadKnowledge(); }));
+    // Paging keeps the selection: the preview shows the chosen record even when its row is on another page.
+    root.append(renderPager({ page: body.page, pages: body.pages, size: body.pageSize, note: countLabel(body.total, 'record'),
+      onPage: (page) => { knowledgePage = page; loadKnowledge(); },
+      onSize: (size) => { knowledgePage = resizePage(body.page, body.pageSize, size); knowledgeSize = size; loadKnowledge(); } }));
     renderRecord(body.record);
     $('knowledge-sources').replaceChildren(table(['Scope', 'Source', 'State', 'Records'], body.sources.map((s) => [s.scope, s.path, s.state, s.records])));
   } catch (e) { if (id !== knowledgeRequest) return; $('knowledge-error').textContent = e.message; $('knowledge-error').hidden = false; $('knowledge-status').textContent = 'Read failed'; renderRecord(null); }
@@ -328,11 +350,12 @@ export function startWorkspace() {
     if (active === 'global-settings') { globalSettings.reset(); showView(location.hash.slice(1), false); }
   });
   $('map-refresh').addEventListener('click', () => loadMap().catch(reportError));
+  $('map-raw').addEventListener('toggle', (event) => { event.target.querySelector('summary').textContent = event.target.open ? 'Hide raw data' : 'Show raw data'; });
   for (const key of ['namespace', 'type']) $(`knowledge-${key}`).addEventListener('change', () => { knowledgePage = 1; knowledgeKey = ''; loadKnowledge(); });
-  $('knowledge-categories').addEventListener('click', () => { knowledgeKey = ''; taxonomyEditor($('knowledge-detail'), { api, get }).catch(knowledgeError); });
+  document.querySelectorAll('#knowledge-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.tab === 'categories' ? 'knowledge/categories' : 'knowledge')));
   settings = createSettings({ api, get, report: reportError, refresh: () => load(), go: (tab) => navigate(settingsRoute('settings', tab)), openSetup: setup ? () => navigate('setup') : null });
   globalView = createGlobal({ get, api, report: reportError, openProject, replace, afterCollect: () => load() });
-  globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications,
+  globalSettings = createGlobalSettings({ api, get, report: reportError, notifications: loadNotifications, onFeatures: applyFeatures,
     onFile: (path) => { if (path) navigate(`global-settings/files?file=${encodeURIComponent(path)}`); else replace('#global-settings/files'); } });
   document.querySelectorAll('#settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(settingsRoute('settings', b.dataset.tab))));
   document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => navigate(settingsRoute('global-settings', b.dataset.tab))));
@@ -342,11 +365,11 @@ export function startWorkspace() {
     settings: attachPageSearch({ input: $('settings-search'), root: $('settings-view'), status: $('settings-search-status') }),
     'global-settings': attachPageSearch({ input: $('gs-search'), root: $('global-settings-view'), status: $('gs-search-status') }),
   };
-  attachSidebarSearch({ input: $('side-search'), results: $('side-results'), nav: $('side-nav'), entries: searchEntries,
+  sidebarSearch = attachSidebarSearch({ input: $('side-search'), results: $('side-results'), nav: $('side-nav'), entries: searchEntries,
     open: (entry, q) => navigate(`${entry.route}${entry.route.includes('?') ? '&' : '?'}q=${encodeURIComponent(q)}`) });
   window.addEventListener('popstate', onHistory);
   window.addEventListener('hashchange', onHistory);
-  startProjects().finally(() => {
+  Promise.allSettled([startProjects(), get('preferences').then((p) => applyFeatures(p.features))]).finally(() => {
     showView(location.hash.slice(1) || (setup ? 'setup' : 'overview'), false);
     load();
   });
@@ -362,7 +385,7 @@ const SETTINGS_TABS = [
   ['global-settings', 'interview', 'Defaults', 'about you personal defaults new projects presets'],
   ['global-settings', 'files', 'Files', '~/.yaw presets profile read-only'],
   ['global-settings', 'notifications', 'Notifications', 'telegram ntfy terminal osc9 osc777 minimum run length comfort'],
-  ['global-settings', 'improve', 'Learn', 'review destination installed CLI agents claude codex browser chat'],
+  ['global-settings', 'improve', 'Profiling Settings', 'learn profiling review destination installed CLI agents claude codex browser chat'],
   ['global-settings', 'classification', 'Classification', 'laya classifier local model test connection'],
   ['global-settings', 'sessions', 'Data sources', 'session folders paths history claude codex copilot gemini cursor antigravity vs code flatpak scan sources'],
   ['global-settings', 'review', 'Review prompts', 'blueprint reviewers prompts all projects'],
@@ -386,7 +409,7 @@ async function searchEntries() {
   }
   for (const q of mine?.questions ?? []) out.push({ title: q.label.replace(' (comma-separated)', ''), trail: 'Global › Settings › Defaults', route: 'global-settings',
     text: [q.id, q.hint, ...(q.choices ?? []).map((c) => typeof c === 'object' ? `${c.value} ${c.label ?? ''}` : c)].filter(Boolean).join(' · ') });
-  return out;
+  return out.filter((entry) => !routeHidden(entry.route));
 }
 
 function reportError(e) {
@@ -411,7 +434,7 @@ async function api(path, input) {
 async function loadMap() {
   const map = await api('code-map');
   $('map-content').textContent = map.content || 'No saved code map. Enable it here with yaw add code-map, then run yaw map update.';
-  $('map-areas').replaceChildren(table(['Area', 'Paths', 'Entry points', 'Tests', 'Related areas', 'Decisions'], map.areas.map((a) =>
+  $('map-areas').replaceChildren(pagedTable('code-map', ['Area', 'Paths', 'Entry points', 'Tests', 'Related areas', 'Decisions'], map.areas.map((a) =>
     [a.title, a.paths.join(', '), a.entry.join(', '), a.tests.join(', '), a.relates.join(', '), a.adrs.join(', ')])));
 }
 async function loadNotifications() {

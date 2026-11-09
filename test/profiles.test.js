@@ -11,7 +11,7 @@ import { parse, parseDocument } from '../core/lib/yaml.js';
 import { formatError } from '../core/lib/schema.js';
 import { listProfiles, loadProfile, profileTools, schemas } from '../core/render/kit.js';
 import { profileForStack } from '../core/interview/suggest.js';
-import { KIT_ROOT, cleanEnv, hasTool, run, tmp } from './helpers/fixtures.js';
+import { KIT_ROOT, cleanEnv, gradleJdkProblem, hasTool, run, tmp } from './helpers/fixtures.js';
 
 const PROFILES = ['android-kotlin', 'browser-extension', 'cloudflare-workers', 'go-basic', 'go-cli', 'go-serverless', 'go-web', 'java-basic', 'java-cli', 'java-serverless', 'java-web', 'kotlin-cli', 'kotlin-serverless', 'kotlin-web', 'node-app', 'node-cli', 'node-static', 'node-ts-vercel', 'node-web', 'php-cli', 'php-serverless', 'php-web', 'python-basic', 'python-cli', 'python-vercel', 'python-web', 'rust-basic', 'rust-cli', 'rust-serverless', 'rust-web', 'static-site', 'swift-app', 'swift-cli', 'swift-web', 'wordpress-plugin'];
 const YAW = join(KIT_ROOT, 'bin', 'yaw');
@@ -963,6 +963,20 @@ test('go-web and go-serverless guards also block image pushes and remote Docker;
   }
   const cloud = goGuards('go-serverless');
   for (const cmd of ['aws lambda create-function --function-name x', 'sam deploy', 'gcloud run deploy', 'gcloud builds submit']) assert.ok(cloud.some((re) => re.test(cmd)), cmd);
+});
+
+// The Java, Kotlin and Android smoke gates need a working JAVA_HOME, not just `java` on PATH (gradlew checks JAVA_HOME first).
+// An invalid JAVA_HOME fails here with a message naming JAVA_HOME; it must not silently skip those smoke tests.
+test('Java/Kotlin/Android gate: an invalid JAVA_HOME fails with a message naming JAVA_HOME', () => {
+  if (!hasTool('java')) return; // no JDK at all: the smoke tests skip with "java is not installed"
+  const msg = gradleJdkProblem({ ...process.env, JAVA_HOME: join(tmp(), 'no-such-jdk') });
+  assert.match(msg || '', /JAVA_HOME/);
+  assert.equal(gradleJdkProblem({ ...process.env, JAVA_HOME: undefined }), null);
+});
+
+test('Java/Kotlin/Android gate: the JAVA_HOME of this run is a usable JDK (gradlew exits on an invalid one)', () => {
+  const msg = gradleJdkProblem();
+  assert.equal(msg, null, msg || '');
 });
 
 // kotlin-cli, kotlin-web, kotlin-serverless (ADR-0117..0119): Gradle wrapper with JDK 17+; the gate needs no Docker, AWS account or Android SDK.

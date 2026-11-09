@@ -361,7 +361,6 @@ Composable setup features and their templates, agent instructions, hooks and tes
   - `modules/review/`
   - `modules/security/`
   - `modules/sessions/`
-  - `modules/standards/`
   - `modules/tasks/`
   - `modules/team/`
 <!-- yaw:map:end area-modules -->

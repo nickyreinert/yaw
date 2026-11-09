@@ -128,7 +128,7 @@ test('yaw add git-hooks without lefthook and gitleaks on PATH prints the install
   const saved = process.env.PATH;
   process.env.PATH = tmp('yaw-empty-path-');
   try {
-    const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, stdout, stderr: capture(), prompter: scripted([]) });
+    const code = await main(['add', 'git-hooks', '--yes'], { cwd: root, kitRoot: KIT_ROOT, env: { ...process.env, HOME: tmp('yaw-home-') }, stdout, stderr: capture(), prompter: scripted([]) });
     assert.equal(code, 0);
   } finally {
     process.env.PATH = saved;

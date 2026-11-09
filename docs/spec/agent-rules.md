@@ -1,6 +1,6 @@
 # Module rules in AGENTS.md: full wording
 
-`AGENTS.md` has a hard limit of 80 lines (ADR-0009, ADR-0032). A module's `agentsMd` is one dense line where the module has more to say; this page keeps the full rules. The module's `just` recipes and skills carry the details at run time.
+`AGENTS.md` has a hard limit of 90 lines (ADR-0009, ADR-0032). A module's `agentsMd` is one dense line where the module has more to say; this page keeps the full rules. The module's `just` recipes and skills carry the details at run time.
 
 ## core
 
@@ -10,7 +10,7 @@
 
 ## github
 
-- Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status` and `just gh-issue`; they keep branch names, footers and PRs uniform.
+- Git and GitHub work goes through `just branch`, `just commit`, `just pr`, `just pr-status`, `just progress` and `just gh-issue`; they keep branch names, footers and PRs uniform.
 - Guarded: `gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release` and the first push in `just pr`. They run only when the user types `y` in a terminal; ask the user to run them and never try to work around that.
 - There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
 - Terminal checks cannot prove a human is answering: agents with PTY access can satisfy them (ADR-0048). Agents must never supply consent themselves; use host approval restrictions and scoped repository permissions as the actual authorization boundary. Claude's raw `gh api` prompt also covers reads so short-method flags and GraphQL mutations cannot fall between narrower prefixes.

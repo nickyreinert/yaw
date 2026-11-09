@@ -16,7 +16,7 @@ const env = () => ({ HOME: tmp('yaw-home-') });
 const adr = (category) => `# ADR-0001: Pick a format\n\n- **Date:** 2026-10-20\n- **Category:** ${category}\n- **Status:** Accepted\n- **Importance:** high\n\n## Context\n\nWhy.\n\n## Decision\n\n- JSON.\n\n## Consequences\n\n- Fine.\n`;
 
 test('settings files: YAW files grouped by purpose; secrets and records excluded; only listed paths readable', async () => {
-  const root = await makeProject({ modules: ['core', 'standards', 'security', 'decisions'] });
+  const root = await makeProject({ modules: ['core', 'security', 'decisions'] });
   const manifest = readManifest(root);
   manifest.files.push({ path: SECRET, module: 'core', managed: false, hash: hashContent('x') });
   writeManifest(root, manifest);
@@ -58,7 +58,7 @@ test('decision categories: save validates, refuses stale hashes and keeps pairs 
 });
 
 test('interview: preview lists changes without writing; apply needs the current answers hash', async () => {
-  const root = await makeProject({ modules: ['core', 'standards', 'security'] });
+  const root = await makeProject({ modules: ['core', 'security'] });
   const e = env(), i = interviewData({ root, kitRoot: KIT_ROOT, env: e });
   assert.equal(i.available, true);
   const answers = readFileSync(join(root, '.yaw', 'answers.yaml'), 'utf8');

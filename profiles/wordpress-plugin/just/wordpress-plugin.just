@@ -22,7 +22,7 @@ typecheck:
     vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
 test:
-    vendor/bin/phpunit
+    vendor/bin/phpunit --no-progress
 
 check: lint typecheck test audit sync-check
 

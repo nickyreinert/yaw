@@ -9,6 +9,7 @@ import { defaultQuestion } from '../interview/depth.js';
 import { tasksMode } from '../lib/tasks.js';
 import { validAnswer } from '../interview/engine.js';
 import { deriveFacts } from '../interview/facts.js';
+import { settingClass } from '../interview/policy.js';
 import { formatError } from '../lib/schema.js';
 import { loadSchemas } from '../schema/validate.js';
 import { render } from './template.js';
@@ -121,6 +122,7 @@ export function profileOptionQuestions(kitRoot) {
     default: def.default,
     when: { 'arch.language': p.stack.language, 'arch.runs-on': p.stack.runsOn },
     profileOption: p.name,
+    scope: 'team',
   })));
 }
 
@@ -182,28 +184,28 @@ const AUTONOMY = {
   'act-and-report': 'Act, then report what you did and why.',
 };
 
-// Communication style lines, rendered from the user profile (answers user.length ... user.expertise).
+// Communication style lines, rendered from the user profile (answers user.length, user.explain, user.expertise).
+// Wording and examples follow the experience level.
 const STYLE = {
   length: {
-    brief: 'Keep answers short and to the point.',
+    brief: 'Prefer bullet points, key points and direct answers. Avoid unnecessary explanations.',
     balanced: 'Give balanced answers: the result first, then the reasoning that matters.',
     extensive: 'Give thorough answers with full detail.',
   },
   register: {
-    plain: 'Use plain words; avoid jargon.',
-    professional: 'Use a professional tone.',
-    technical: 'Use precise technical terms.',
-    scientific: 'Use scientific precision and name the basis for claims.',
+    layperson: 'Use plain words; avoid jargon.',
+    intermediate: 'Use a professional tone.',
+    expert: 'Use precise technical terms.',
   },
   examples: {
-    'when-helpful': 'Use examples or analogies when they help.',
-    always: 'Illustrate every explanation with an example or analogy.',
-    never: 'Do not use examples or analogies unless asked.',
+    layperson: 'Illustrate every explanation with an example or analogy.',
+    intermediate: 'Use examples or analogies when they help.',
+    expert: 'Do not use examples or analogies unless asked.',
   },
   explain: {
-    'one-line': 'Explain why you chose something in one line.',
-    'short-paragraph': 'Explain why you chose something in a short paragraph.',
-    'on-request': 'Explain your reasoning only when asked.',
+    'one-line': 'After a change, confirm briefly what was done.',
+    'short-paragraph': 'After a change, report in detail what changed and why.',
+    'on-request': 'Explain your actions only when asked.',
   },
   expertise: {
     layperson: 'The user is new to software development: explain terms and steps.',
@@ -211,9 +213,9 @@ const STYLE = {
     expert: 'The user is an expert: skip the basics.',
   },
 };
-const STYLE_DEFAULTS = { length: 'balanced', register: 'professional' };
+const STYLE_DEFAULTS = { length: 'balanced', expertise: 'intermediate' };
 
-// ADR-0024: the stack overlay of the standards module (profiles/<p>/standards.md) has at most 20 lines.
+// ADR-0024: the stack overlay rendered in docs/engineering.md (profiles/<p>/standards.md) has at most 20 lines.
 export const OVERLAY_MAX_LINES = 20;
 
 export function profileOverlay(kitRoot, profiles) {
@@ -229,33 +231,18 @@ export function profileOverlay(kitRoot, profiles) {
   return parts.join('\n');
 }
 
-// ADR-0025: files a profile ships for the devenv module. env.example (variable names, comments) is joined over
-// all profiles; the container files are profiles/<p>/devenv/{Dockerfile,compose.yaml,devcontainer.json} and
-// a file that two profiles ship is an error (a container setup cannot be concatenated).
-export const DEVENV_FILES = { dockerfile: 'Dockerfile', compose: 'compose.yaml', devcontainer: 'devcontainer.json' };
-
+// ADR-0025: variable names a profile ships for the devenv module. env.example (variable names, comments) is joined
+// over all profiles. Docker is the Architecture switch and the profile scaffold, not part of devenv.
 export function profileDevenv(kitRoot, profiles) {
-  const out = { env: '', dockerfile: '', compose: '', devcontainer: '' };
   const env = [];
-  const from = {};
   for (const p of profiles) {
     if (!hasProfile(kitRoot, p)) continue;
-    const dir = profileDir(kitRoot, p);
-    const envFile = join(dir, 'env.example');
-    if (existsSync(envFile)) {
-      const text = readFileSync(envFile, 'utf8').trim();
-      if (text !== '') env.push(text);
-    }
-    for (const [key, name] of Object.entries(DEVENV_FILES)) {
-      const file = join(dir, 'devenv', name);
-      if (!existsSync(file)) continue;
-      if (from[key]) throw new KitError(`profiles "${from[key]}" and "${p}" both ship devenv/${name}; keep one of them`);
-      from[key] = p;
-      out[key] = readFileSync(file, 'utf8').trim();
-    }
+    const envFile = join(profileDir(kitRoot, p), 'env.example');
+    if (!existsSync(envFile)) continue;
+    const text = readFileSync(envFile, 'utf8').trim();
+    if (text !== '') env.push(text);
   }
-  out.env = env.join('\n\n');
-  return out;
+  return { env: env.join('\n\n') };
 }
 
 // ADR-0027: the toolchain steps of the profiles' ci/check.yml fragments for the ci module's workflow.
@@ -313,12 +300,12 @@ function taskFlags(mode) {
 
 export const COMFORT_DEFAULT = ['hygiene', 'status-line'];
 
-function comfortFlags(picked, agents, team) {
+function comfortFlags(picked, agents, shared) {
   const list = Array.isArray(picked) ? picked : COMFORT_DEFAULT;
   return {
     hygiene: list.includes('hygiene'),
     notifications: list.includes('notifications'),
-    statusLine: list.includes('status-line') && agents.includes('claude') && !team,
+    statusLine: list.includes('status-line') && agents.includes('claude') && shared,
   };
 }
 
@@ -327,7 +314,8 @@ function comfortFlags(picked, agents, team) {
 // answer take their default, so a template never sees a missing answer.
 export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   const flat = {};
-  for (const q of collectQuestions(kitRoot, [...modules, ...(!modules.includes('communication') && hasModule(kitRoot, 'communication') ? ['communication'] : [])], definitions)) {
+  const questions = collectQuestions(kitRoot, [...modules, ...(!modules.includes('communication') && hasModule(kitRoot, 'communication') ? ['communication'] : [])], definitions);
+  for (const q of questions) {
     if (Object.hasOwn(answersDoc.answers ?? {}, q.id) && !validAnswer(q, answersDoc.answers[q.id])) {
       throw new KitError(`invalid answer for ${q.id}: expected ${q.type}${q.choices ? ' from the available choices' : ''}`);
     }
@@ -336,8 +324,13 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
   Object.assign(flat, answersDoc.answers ?? {});
   // Preserve explicit GitHub task/module choices in older files without the newer on/off field.
   if (!Object.hasOwn(answersDoc.answers ?? {}, 'tasks.use-github') &&
-      (['team', 'external-reviewers'].includes(answersDoc.answers?.['idea.team']) || ['github', 'both'].includes(flat['tasks.mode']) || modules.some((name) => ['github', 'team'].includes(name)))) flat['tasks.use-github'] = true;
+      (answersDoc.answers?.['idea.team'] === 'team' || ['github', 'both'].includes(flat['tasks.mode']) || modules.some((name) => ['github', 'team'].includes(name)))) flat['tasks.use-github'] = true;
   const team = modules.includes('team') || deriveFacts(flat).team === true;
+  // T-027: a personal setting never reaches a committed file, solo or team; only a setting switched to team does.
+  const byId = new Map(questions.map((q) => [q.id, q]));
+  const shared = (id) => settingClass(byId.get(id) ?? id, answersDoc.scopes) === 'team';
+  const share = { language: shared('user.language'), autonomy: shared('user.autonomy'),
+    style: ['user.length', 'user.explain', 'user.expertise'].every(shared), comfort: shared('user.comfort') };
   const answers = {};
   for (const [id, value] of Object.entries(flat)) {
     const [group, name] = id.split('.');
@@ -366,24 +359,25 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     modules: [...modules],
     ideaLine: oneLine(flat['idea.text']),
     wrapper: { shell: flat['arch.wrapper'] === 'shell', make: flat['arch.wrapper'] === 'make' },
-    codingPractices: codingPractices(flat),
+    codingPractices: codingPractices(flat, { modules: [...modules] }),
     architecturePractices: architecturePractices(flat),
     stack,
     rules: {
       autonomy: AUTONOMY[flat['user.autonomy']] ?? '',
       length: STYLE.length[flat['user.length']] ?? '',
-      register: STYLE.register[flat['user.register']] ?? '',
-      examples: STYLE.examples[flat['user.examples']] ?? '',
+      register: STYLE.register[flat['user.expertise'] ?? STYLE_DEFAULTS.expertise] ?? '',
+      examples: STYLE.examples[flat['user.expertise'] ?? STYLE_DEFAULTS.expertise] ?? '',
       explain: STYLE.explain[flat['user.explain']] ?? '',
       expertise: STYLE.expertise[flat['user.expertise']] ?? '',
     },
-    // ADR-0013: the user profile is personal; a team repository does not commit it.
+    // ADR-0013, T-027: personal settings are not committed; `share` names the ones this project switched to team.
     team,
-    coreCommunication: !team && !modules.includes('communication'),
-    // Output style: Claude only, and only when length or register differ from the default (doc 04).
-    outputStyle: !team && (flat['user.agents'] ?? []).includes('claude')
+    share,
+    coreCommunication: share.style && !modules.includes('communication'),
+    // Output style: Claude only, and only when length or experience (wording) differ from the default (doc 04).
+    outputStyle: share.style && (flat['user.agents'] ?? []).includes('claude')
       && ((flat['user.length'] ?? STYLE_DEFAULTS.length) !== STYLE_DEFAULTS.length
-        || (flat['user.register'] ?? STYLE_DEFAULTS.register) !== STYLE_DEFAULTS.register),
+        || (flat['user.expertise'] ?? STYLE_DEFAULTS.expertise) !== STYLE_DEFAULTS.expertise),
     profileStandards: profileOverlay(kitRoot, profiles),
     devenv: profileDevenv(kitRoot, profiles),
     // ADR-0027: toolchain steps for the ci module.
@@ -395,11 +389,13 @@ export function templateContext({ kitRoot, answersDoc, modules, definitions }) {
     // Explicit GitHub team enforcement also overrides a solo project's local task default.
     tasks: taskFlags(tasksMode(flat, { teamModule: modules.includes('team') })),
     // ADR-0030: the comfort features the user picked. Only the status line is a committed setting, and it is
-    // personal, so a team repository never gets it (ADR-0013); hooks are registered for everyone and decide at
-    // run time, from the user's own configuration, what to do.
-    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], team),
+    // personal, so it is committed only when the project switched user.comfort to team (ADR-0013, T-027); hooks
+    // are registered for everyone and decide at run time, from the user's own configuration, what to do.
+    comfort: comfortFlags(flat['user.comfort'], flat['user.agents'] ?? [], share.comfort),
     // ADR-0031: the team module adds its pr-policy check to the required checks of .yaw/github.yaml.
     teamModule: modules.includes('team'),
+    // Approvals need other people: the workflow rules of a solo project ask for none (a ruleset without bypass would lock the author out).
+    teamPeople: deriveFacts(flat).team === true,
     // ADR-0033: git-hooks adds the code-map pre-commit job when the code-map module is installed.
     codeMapModule: modules.includes('code-map'),
     gitHooksModule: modules.includes('git-hooks'),
@@ -469,17 +465,35 @@ function composedJust(name, text) {
   return `# Composed (ADR-0041): runs in ${name}/.\nset working-directory := '../${name}'\n${text.replace(gate, '$1')}`;
 }
 
+// compact module (T-050, kickoff/16 §4 L1): the check steps run each body line through `yaw run --compact`,
+// which decides at run time (YAW_COMPACT, then the project answer). Without the kit the line runs
+// as before. Plain echo lines and lines with just interpolation ({{) stay as they are.
+const COMPACT_VERBS = ['lint', 'typecheck', 'test', 'build', 'audit'];
+const shellQuote = (s) => `'${s.replaceAll("'", `'\\''`)}'`;
+export function compactJust(text, { warnings } = {}) {
+  let recipe = null;
+  return text.split('\n').map((line) => {
+    if (/^\S/.test(line) && !line.startsWith('#')) recipe = line.match(/^([a-z][a-z0-9-]*)\b[^:]*:(?!=)/)?.[1] ?? null;
+    const body = line.match(/^ {4}@?(.*)$/)?.[1];
+    if (!COMPACT_VERBS.includes(recipe) || !body || /^echo\b/.test(body) || body.includes('{{')) return line;
+    const args = `run --compact --step ${recipe}${warnings ? ' --warn "$w"' : ''} -- sh -cu "$c"`;
+    const kit = '"${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw"';
+    return `    @c=${shellQuote(body)};${warnings ? ` w=${shellQuote(warnings)};` : ''} if command -v yaw >/dev/null 2>&1; then yaw ${args}; elif [ -f ${kit} ]; then node ${kit} ${args}; else sh -cu "$c"; fi`;
+  }).join('\n');
+}
+
 // Files of the given profiles (ADR-0004: owned by core; profiles are not modules).
 //   just/<p>.just   <- profiles/<p>/just/<p>.just          (plus `import` in the justfile)
 // With several profiles (ADR-0041) the plus is `mod <p> 'just/<p>.just'` and the scaffold goes to <p>/.
 //   .gitignore part <- profiles/<p>/gitignore
 //   scaffold        <- profiles/<p>/scaffold/**            (user-owned code, written once; `scaffold` is a
 //                      function rel -> boolean (file exists); one existing file skips the whole scaffold)
-// standards.md, guards.yaml and ci/check.yml are read by the modules that need them (standards, security, ci).
+// standards.md, guards.yaml and ci/check.yml are read by the modules that need them (core, security, ci).
 // Profiles missing from the kit are reported, not rendered.
 // -> { parts: [{ path, module, kind, content }], files: Map<path, { module, content, fragments, managed }>, missing }
 // A profile option with scaffold: true adds profiles/<p>/variants/<choice>/ to the scaffold (ADR-0105); `answers` picks the choice.
-export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {} }) {
+// With the compact module in `modules`, the check steps run through `yaw run --compact` (compactJust).
+export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {}, modules = [] }) {
   const parts = [];
   const files = new Map();
   const missing = [];
@@ -492,7 +506,8 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
     const dir = profileDir(kitRoot, name);
     const justFile = join(dir, 'just', `${name}.just`);
     if (existsSync(justFile)) {
-      const text = readFileSync(justFile, 'utf8');
+      const source = readFileSync(justFile, 'utf8');
+      const text = modules.includes('compact') ? compactJust(source, loadProfile(kitRoot, name).compact) : source;
       files.set(`just/${name}.just`, { module: 'core', content: composed ? Buffer.from(composedJust(name, text), 'utf8') : Buffer.from(text, 'utf8'), fragments: [], managed: true });
       parts.push({ path: 'justfile', module: name, kind: 'part', content: `${composed ? 'mod' : 'import'} ${composed ? `${name} ` : ''}'just/${name}.just'\n` });
     }
@@ -504,7 +519,7 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
       const variant = Object.entries(profile.options ?? {}).find(([, def]) => def.scaffold);
       const sources = [join(dir, 'scaffold'), ...(variant ? [join(dir, 'variants', picked[variant[0]])] : [])];
       const fromDir = new Map();
-      for (const source of sources) for (const rel of walk(source)) {
+      for (const source of sources) for (const rel of walk(source).filter((r) => !GENERATED.test(r))) {
         if (fromDir.has(rel)) throw new KitError(`profiles/${name}: ${rel} is in both scaffold/ and the variant`);
         fromDir.set(rel, source);
       }
@@ -521,6 +536,9 @@ export function renderProfiles({ kitRoot, profiles, scaffold = null, answers = {
   }
   return { parts, files, missing };
 }
+
+// Gradle writes its caches (.gradle/) and reports (build/) into the project; they are never scaffold files.
+const GENERATED = /(?:^|\/)(?:\.gradle|build)\//;
 
 function walk(dir, prefix = '') {
   if (!existsSync(dir)) return [];

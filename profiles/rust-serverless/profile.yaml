@@ -28,3 +28,6 @@ tools:
       macos: brew tap cargo-lambda/cargo-lambda && brew install cargo-lambda
       linux: pipx install cargo-lambda
     when: { hosting: lambda }
+# Warning lines a passing step still shows with the compact module: compiler and clippy warnings (not the "generated N warnings" summary), missing-tool notes.
+compact:
+  warnings: '^warning: (?!.*\bgenerated \d+ warnings?)|^[a-z-]+: .* is not installed'

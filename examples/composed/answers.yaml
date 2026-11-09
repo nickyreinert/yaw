@@ -13,4 +13,4 @@ proposal:
   status: confirmed
   summary: static-site + cloudflare-workers - a static front end with a Worker API.
   profiles: [static-site, cloudflare-workers]
-  modules: [core, standards, security]
+  modules: [core, security]

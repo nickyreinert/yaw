@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { main } from '../core/cli/main.js';
 import { parseDocument } from '../core/lib/yaml.js';
@@ -36,13 +36,18 @@ async function init(replies) {
   const prompter = byLabel(replies);
   const stdout = capture();
   const stderr = capture();
-  const code = await main(['init', '--skip-verify'], { stdout, stderr, cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter });
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
+  const code = await main(['init', '--skip-verify'], { stdout, stderr, cwd, env, kitRoot: KIT_ROOT, prompter });
   const text = code === 0 ? readFileSync(join(cwd, '.yaw/answers.yaml'), 'utf8') : '';
-  return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, doc: text ? parseDocument(text).value : null, text };
+  // T-027: personal answers are saved only to ~/.yaw/user-profile.yaml; `doc` is the repository file read over it.
+  const profileFile = join(env.HOME, '.yaw/user-profile.yaml');
+  const profile = existsSync(profileFile) ? parseDocument(readFileSync(profileFile, 'utf8')).value.answers : {};
+  const repo = text ? parseDocument(text).value : null;
+  return { code, out: stdout.text(), err: stderr.text(), prompter, cwd, repo, profile, doc: repo ? { ...repo, answers: { ...repo.answers, ...profile } } : null, text };
 }
 
 const IDEA = { 'Purpose/Idea': 'A small tool.', 'What language do you want': 'typescript', 'Where will it run': 'local' };
-const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.error-detail': 'concise', 'quality.log-output': 'console', 'quality.documentation': 'essential', 'quality.unit-tests': false };
+const CONSTRAINTS = { 'arch.library-strategy': 'prefer-built-in', 'arch.docker': false, 'arch.wrapper': 'just', 'quality.unit-tests': false };
 
 const SOLO_FULL = {
   'user.agents': ['claude'],
@@ -55,9 +60,8 @@ const SOLO_FULL = {
   'arch.runs-on': 'local',
   ...CONSTRAINTS,
   'user.comfort': [],
+  'compact.levers': [],
   'user.length': 'balanced',
-  'user.register': 'professional',
-  'user.examples': 'when-helpful',
   'user.explain': 'short-paragraph',
   'quality.review-quality': 'off',
   'quality.review-logic': 'off',
@@ -73,9 +77,9 @@ const QUICK = {
   'idea.text': 'A small tool.', 'idea.team': 'solo', 'tasks.use-github': false,
   'arch.language': 'typescript', 'arch.runs-on': 'local', ...CONSTRAINTS,
 };
-Object.assign(QUICK, { 'user.length': 'balanced', 'user.register': 'professional', 'user.examples': 'when-helpful', 'user.explain': 'short-paragraph' });
+Object.assign(QUICK, { 'user.length': 'balanced', 'user.explain': 'short-paragraph' });
 const QUICK_MODULES = ['core'];
-const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'standards', 'tasks'];
+const FULL_MODULES = ['core', 'ci', 'code-map', 'comfort', 'communication', 'decisions', 'devenv', 'git-hooks', 'github', 'review', 'security', 'sessions', 'tasks'];
 
 test('Quick: depth is the first question; answers.yaml holds the Q answers and the Quick modules', async () => {
   const r = await init({ depth: 'quick', ...IDEA });
@@ -83,6 +87,8 @@ test('Quick: depth is the first question; answers.yaml holds the Q answers and t
   assert.match(r.prompter.shown.join(''), /^\nSetup depth\n/);
   assert.deepEqual(r.doc.mode, 'quick');
   assert.deepEqual(r.doc.answers, QUICK);
+  for (const id of ['user.language', 'user.autonomy', 'user.expertise']) assert.equal(r.repo.answers[id], QUICK[id], `${id} is saved in answers.yaml (team default, T-027)`);
+  assert.deepEqual(r.repo.answers['user.agents'], ['claude']);
   assert.deepEqual(r.doc.proposal.modules, QUICK_MODULES);
   assert.equal(r.doc.proposal.profiles[0], 'node-cli');
 });
@@ -155,7 +161,7 @@ test('agents: Gemini is selectable in Quick without an obsolete phase gate', asy
 });
 
 test('expertise: a layperson is still asked the Q and S questions', async () => {
-  const r = await init({ depth: 'full', ...IDEA, 'Your experience with software': 'layperson', 'Answer length': '', 'Language for chat': 'en', 'Register': 'plain-words' });
+  const r = await init({ depth: 'full', ...IDEA, 'Your experience with software': 'layperson', 'Depth: How long': '', 'Language for chat': 'en' });
   assert.equal(r.code, 0, r.err);
   assert.equal(r.doc.answers['user.language'], 'en', 'Q question answered');
   const shown = r.prompter.shown.join('');
@@ -163,15 +169,16 @@ test('expertise: a layperson is still asked the Q and S questions', async () => 
   assert.ok(!r.out.includes('user.language  en  (default)'));
 });
 
-test('yaw add team on a solo project fits the budget without committing personal preferences', async () => {
+test('yaw add team on a solo project fits the budget with communication rules in AGENTS.md (team by default)', async () => {
   const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y' });
   const stdout = capture();
   const stderr = capture();
   const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
   assert.equal(code, 0, stderr.text());
   const agents = readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8');
-  assert.ok(agents.trimEnd().split('\n').length <= 80);
-  assert.doesNotMatch(agents, /## Communication|Chat in "|Ask before risky/);
+  assert.ok(agents.trimEnd().split('\n').length <= 90);
+  assert.match(agents, /Chat in "de"/);
+  assert.match(agents, /Ask before risky/);
   assert.equal(readManifest(r.cwd).modules.tasks.mode, 'github');
   assert.match(stdout.text(), /existing local tasks are not migrated/);
   assert.match(stdout.text(), /not asked team\.session-context: applies only when .*; the default is true {2}\(default\)/);
@@ -193,8 +200,8 @@ test('expertise: each level is recorded; the level changes how the interview is 
   assert.match(shown('intermediate'), /Tell the agent the active issue/);
   assert.match(shown('expert'), /Tell the agent the active issue/);
   // expert: hints collapsed
-  assert.match(shown('intermediate'), /Shared rules for collaborators/);
-  assert.doesNotMatch(shown('expert'), /Shared rules for collaborators/);
+  assert.match(shown('intermediate'), /Team settings are committed for everyone/);
+  assert.doesNotMatch(shown('expert'), /Team settings are committed for everyone/);
   // the summary lists the layperson default
   assert.doesNotMatch(runs.layperson.out, /team\.session-context +true +\(documented default\)/);
   assert.doesNotMatch(runs.expert.out, /team\.session-context +true +\(documented default\)/);

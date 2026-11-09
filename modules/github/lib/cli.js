@@ -1,6 +1,6 @@
 // `yaw gh <verb>` (Y-5.5, ADR-0027): the GitHub scripts behind the `just gh-*`, `branch`, `commit`, `pr`, ... recipes.
 //
-//   not guarded  branch, commit, pr-status, issue; pr (when the branch already has an upstream)
+//   not guarded  branch, commit, pr-status, progress, issue; pr (when the branch already has an upstream)
 //   guarded      init, labels, protect, project-add, release; pr (first push of a branch)
 //
 // A guarded action prints what it will do and then needs a person: stdin and stdout must both be a terminal
@@ -14,7 +14,7 @@ import { basename } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { GhError, defaultGh } from '../../../core/lib/gh.js';
 import { parseDocument } from '../../../core/lib/yaml.js';
-import { parseTasks } from '../../../core/lib/tasks.js';
+import { EFFORTS, modelEffort, parseTasks } from '../../../core/lib/tasks.js';
 import { formatError } from '../../../core/lib/schema.js';
 import { readProjectFile, resolveInside } from '../../../core/render/files.js';
 import { schemas } from '../../../core/render/kit.js';
@@ -22,7 +22,7 @@ import {
   ISSUE_TYPES, NameError, SLUG, branchName, checkCommitType, checkIdForMode, checkRepoName, checkSemver,
   commitMessage, parseTaskId, prBody, taskFromBranch,
 } from './names.js';
-import { planEpicMilestones, planProjectStatus, repository } from './workflow.js';
+import { planEpicMilestones, planProjectStatus, readProgress, repository } from './workflow.js';
 
 export { GhError, NameError };
 export class GhUsageError extends Error {
@@ -41,7 +41,7 @@ export const PR_POLICY_WORKFLOW = '.github/workflows/pr-policy.yml';
 export const RULESET = 'yaw-default-branch';
 // Verbs that change shared GitHub state (pr only on its first push); the Claude ask rules must cover each one.
 export const GUARDED = ['init', 'labels', 'protect', 'project-add', 'release', 'pr'];
-export const VERBS = ['init', 'labels', 'protect', 'branch', 'commit', 'pr', 'pr-status', 'release', 'project-add', 'issue'];
+export const VERBS = ['init', 'labels', 'protect', 'branch', 'commit', 'pr', 'pr-status', 'progress', 'release', 'project-add', 'issue'];
 export const USAGE = [
   'usage: yaw gh init [name] [--owner o] [--public] create the repository (private by default), push, labels',
   '       yaw gh labels                                                 create or update the labels of .yaw/github.yaml',
@@ -51,9 +51,10 @@ export const USAGE = [
   '       yaw gh commit <type> "subject" [--scope s] [--task id]       Conventional Commit with the task footer',
   '       yaw gh pr [--title t] [--ready]                       push the branch, open a draft pull request',
   '       yaw gh pr-status                                              checks and review state of this branch',
+  '       yaw gh progress                                               open milestones and epics: how much is done',
   '       yaw gh release <version>                              tag and GitHub release',
   '       yaw gh project-add <issue#> [--status "In progress"]  add an issue to the project board',
-  '       yaw gh issue <feature|bug|chore|spike|epic> "title" [--body text] [--priority P1] [--estimate S]',
+  '       yaw gh issue <feature|bug|chore|spike|epic> "title" [--body text] [--priority P1] [--estimate S] [--model tier] [--effort level]',
   'Guarded actions (init, labels, protect, release, project-add, the first push of pr) print their plan and run only when a person types y in a terminal; --yes does not exist.',
 ].join('\n');
 
@@ -191,6 +192,7 @@ export async function runGh({ verb, args = [], values = {}, mode, sessionTrailer
       case 'commit': return commit(ctx);
       case 'pr': return await pr(ctx);
       case 'pr-status': return prStatus(ctx);
+      case 'progress': return progress(ctx);
       case 'release': return await release(ctx);
       case 'project-add': return await projectAdd(ctx);
       case 'issue': return issue(ctx);
@@ -496,6 +498,24 @@ function prStatus(c) {
   return 0;
 }
 
+// ---- progress: read only; milestones from their issue counts, epics from their native sub-issues
+function progress(c) {
+  const { gh, stdout } = c;
+  const { milestones, epics } = readProgress({ gh, repo: repository(gh) });
+  const percent = (done, total) => `${Math.round((100 * done) / total)}%`;
+  stdout.write('Milestones\n');
+  if (milestones.length === 0) stdout.write('  no open milestones\n');
+  for (const m of milestones) {
+    stdout.write(`  ${m.title}: ${m.total === 0 ? 'no issues yet' : `${m.closed} of ${m.total} issues closed (${percent(m.closed, m.total)})`}${m.due ? `, due ${m.due}` : ''}\n`);
+  }
+  stdout.write('Epics\n');
+  if (epics.length === 0) stdout.write('  no open epics\n');
+  for (const e of epics) {
+    stdout.write(`  #${e.number} ${e.title}: ${e.total === 0 ? 'no sub-issues yet' : `${e.done} of ${e.total} sub-issues done (${percent(e.done, e.total)})`}${e.milestone ? `, milestone ${e.milestone}` : ''}\n`);
+  }
+  return 0;
+}
+
 // ---- release (guarded): annotated tag on the up-to-date default branch, GitHub release with generated notes
 async function release(c) {
   const { git, gh, values, args, stdout, root } = c;
@@ -556,7 +576,12 @@ function issue(c) {
   if (!ISSUE_TYPES.includes(type)) throw new GhUsageError(`unknown issue type "${args[0]}" (${ISSUE_TYPES.join(', ')})`);
   const title = args.slice(1).join(' ').replace(/\s+/g, ' ').trim();
   if (title === '') throw new GhUsageError('an issue needs a title');
-  const body = values.body ?? '';
+  const model = values.model === undefined ? undefined : values.model.replace(/\s+/g, ' ').trim();
+  if (model === '' || model?.includes('·')) throw new GhUsageError('--model needs a tier name, for example sonnet');
+  if (values.effort !== undefined && !EFFORTS.includes(values.effort)) throw new GhUsageError(`--effort is ${EFFORTS.join(', ')}`);
+  if (values.effort !== undefined && model === undefined) throw new GhUsageError('--effort needs --model');
+  // The recommended model and effort travel in the body line that `yaw task` reads; a new issue is todo.
+  const body = [values.body ?? '', model === undefined ? '' : `**Model / effort:** ${modelEffort(model, values.effort)}`].filter(Boolean).join('\n\n');
   const extra = [];
   if (values.priority !== undefined) {
     if (!/^P[0-3]$/.test(values.priority)) throw new GhUsageError('--priority is P0, P1, P2 or P3');
@@ -566,6 +591,7 @@ function issue(c) {
     if (!/^(XS|S|M|L|XL)$/.test(values.estimate)) throw new GhUsageError('--estimate is XS, S, M, L or XL');
     extra.push(`estimate:${values.estimate}`);
   }
+  extra.push('status:todo');
   const { slug } = repoInfo(gh);
   const native = nativeIssueTypes(gh, slug).has(type);
   let out;

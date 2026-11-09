@@ -7,6 +7,7 @@ import { yawHome } from '../hooks/dispatch.js';
 import { parse } from '../lib/yaml.js';
 import { loadRules, secretRule, secretValueRule } from '../../modules/security/lib/guards.js';
 import { FormError } from './form-model.js';
+import { paginate } from './assets/pagination.js';
 
 const MAX_FILES = 1000;
 export const MAX_BYTES = 128 * 1024;
@@ -112,12 +113,11 @@ export function knowledgeData({ root, kitRoot, env, params = new URLSearchParams
   const key = params.get('record');
   const detail = key ? selected.find((r) => r.key === key) : null;
   if (key && !detail) throw new FormError('Record unavailable in this scope or selection.', 404);
-  const pageSize = 50, pages = Math.max(1, Math.ceil(selected.length / pageSize));
-  const page = Math.min(pages, Math.max(1, Math.floor(Number(params.get('page')) || 1)));
+  const { size, pages, page, start, end } = paginate(selected.length, params.get('page'), params.get('pageSize'));
   return {
-    total: selected.length, page, pages, excluded, limited, sources: sourcesInfo,
+    total: selected.length, page, pages, pageSize: size, excluded, limited, sources: sourcesInfo,
     options: { namespaces: [...new Set(records.map((r) => r.namespace))].sort(), types: [...new Set(records.map((r) => r.type))].sort() },
-    entries: selected.slice((page - 1) * pageSize, page * pageSize).map(({ content, ...r }) => r),
+    entries: selected.slice(start, end).map(({ content, ...r }) => r),
     record: detail ? { ...detail, hash: createHash('sha256').update(detail.content).digest('hex') } : null,
     editable: KNOWLEDGE_SOURCES.map((x) => ({ key: x.key, scope: x.scope, path: x.label, create: x.key !== 'decisions' })),
   };

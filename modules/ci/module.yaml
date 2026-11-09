@@ -3,12 +3,19 @@ name: ci
 description: GitHub Actions workflow quality-gate.yml (installs the kit at the tag pinned in .yaw/manifest.json, runs `just check`; a second job scans the history with gitleaks) and Dependabot for pinned actions and profile dependency ecosystems.
 title: Checks on GitHub
 group: github
-short: "Same checks on every push and pull request"
-what: "Classic CI, no agent involved: GitHub runs the same `just check` on every push and pull request, plus Dependabot updates."
+short: "Same checks on every pull request, plus a secret scan"
+what: "No agent involved: GitHub runs `just check` and a gitleaks secret scan on every pull request and every push to main, and Dependabot proposes weekly updates."
+details:
+  - "quality-gate workflow: installs YAW at the version pinned in .yaw/manifest.json, then runs `just setup` and `just check`, as on your machine"
+  - "secret-scan workflow: gitleaks over the whole git history; any finding fails the run"
+  - "Runs on pull requests, pushes to main or master, and on demand; a new push cancels the older run of a pull request"
+  - "Dependabot: weekly pull requests for the pinned GitHub Actions and your stack's dependencies; it never merges them"
+  - "A failure shows a red cross on the commit or pull request, with the log in the Actions tab; the workflow fixes nothing"
+  - "A red check blocks merging only if the branch ruleset (`just gh-protect`) requires quality-gate and secret-scan"
 adds:
-  - "GitHub workflow that runs just check on every push and pull request"
-  - "Dependabot updates"
-example: { when: "You push a branch", then: "GitHub shows a red cross if a test fails." }
+  - "Workflows quality-gate (`just check`) and secret-scan (gitleaks, full history)"
+  - "Dependabot: weekly update pull requests for Actions and dependencies"
+example: { when: "You open a pull request", then: "GitHub runs `just check` and the secret scan; a failing step shows a red cross and its log." }
 depends: [github]
 default: { quick: false, standard: true, full: true }
 appliesTo: { usesGitHub: true }

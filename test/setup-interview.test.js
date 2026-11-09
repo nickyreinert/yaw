@@ -8,7 +8,7 @@ import { isPreference } from '../core/interview/policy.js';
 import { runInterview } from '../core/interview/engine.js';
 import { collectQuestions, hasModule } from '../core/render/kit.js';
 import { readAnswers } from '../core/render/project.js';
-import { saveSetup } from '../core/lib/user-store.js';
+import { readUserProfile, saveSetup } from '../core/lib/user-store.js';
 import { createFormModel } from '../core/web/form-model.js';
 import { createFormApi, DRAFT } from '../core/web/init.js';
 import { effectiveAnswers, visibleQuestions } from '../core/web/assets/ui-state.js';
@@ -17,7 +17,7 @@ import { kickoffPrompt } from '../core/lib/kickoff.js';
 import { foundationContext } from '../core/lib/foundations.js';
 
 const BASE = { 'idea.text': 'Rename photos safely for a local photographer.', 'arch.language': 'python', 'arch.runs-on': 'local' };
-const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief', 'user.register': 'technical' };
+const PERSONAL = { 'user.agents': ['codex'], 'user.expertise': 'expert', 'user.language': 'en', 'user.autonomy': 'act-and-report', 'user.length': 'brief' };
 const fixture = () => ({ root: tmp('yaw-quick-'), kitRoot: KIT_ROOT, env: { HOME: tmp('yaw-quick-home-'), PATH: [dirname(process.execPath), '/usr/bin', '/bin'].join(':') } });
 function save(f, answers = PERSONAL) {
   saveSetup({ ...f, answers, mode: 'quick', projectRoot: f.root, kit: '0.1.0', preset: false, profile: true });
@@ -27,19 +27,20 @@ function save(f, answers = PERSONAL) {
 test('project architecture constraints reach terminal, browser, kickoff and agent context independently of personal settings', async () => {
   const f = fixture();
   save(f);
-  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true, 'quality.log-output': 'file' };
+  const chosen = { ...BASE, 'arch.runs-on': 'self-hosted', 'arch.library-strategy': 'prefer-libraries', 'arch.docker': true };
   const result = await cli(f, prompts(chosen, 'pro'));
   assert.equal(result.code, 0, result.err);
-  const answers = readAnswers(f.root).answers;
+  // T-027: answers.yaml holds the team answers; read over ~/.yaw/user-profile.yaml they match the browser.
+  const answers = readAnswers(f.root, { env: f.env }).answers;
   for (const [key, value] of Object.entries(chosen)) assert.equal(answers[key], value);
   const browser = createFormModel({ ...f, root: tmp() }).normalize({ mode: 'pro', answers: chosen });
   assert.deepEqual(browser.doc.answers, answers);
   const prompt = kickoffPrompt({ answers });
   assert.match(prompt, /Use suitable maintained libraries/);
   assert.match(prompt, /Docker is required/);
-  assert.match(prompt, /structured log files/);
+  assert.match(prompt, /structured console logs/);
   assert.equal(foundationContext({ root: f.root }).constraints['arch.docker'], true);
-  assert.equal(foundationContext({ root: f.root }).constraints['quality.log-output'], 'file');
+  assert.ok(!Object.hasOwn(foundationContext({ root: f.root }).constraints, 'quality.log-output'));
 });
 
 test('unknown project constraints remain explicit and mockups include layout before visual polish', () => {
@@ -97,18 +98,21 @@ async function cli(f, prompter, args = ['init', '--skip-verify']) {
   return { code, out: stdout.text(), err: stderr.text() };
 }
 
-test('Quick CLI and browser reuse the same saved personal values without asking or saving them', async () => {
-  const f = fixture(), file = save(f), before = readFileSync(file, 'utf8');
+test('Quick CLI and browser reuse the same saved personal values without asking; the saved values stay unchanged', async () => {
+  const f = fixture();
+  save(f);
   const p = prompts(), r = await cli(f, p);
   assert.equal(r.code, 0, r.err);
-  const doc = readAnswers(f.root);
-  for (const [id, value] of Object.entries(PERSONAL).filter(([id]) => !['user.length', 'user.register'].includes(id))) assert.deepEqual(doc.answers[id], value);
+  const doc = readAnswers(f.root, { env: f.env });
+  for (const [id, value] of Object.entries(PERSONAL).filter(([id]) => id !== 'user.length')) assert.deepEqual(doc.answers[id], value);
   const shown = p.shown.join('');
   for (const label of ['Your experience with software', 'Language for chat', 'How often should the agent ask', 'How long should answers be']) assert.ok(!shown.includes(label));
   assert.match(shown, /What language do you want to use/);
   assert.match(shown, /Where will it run/);
   assert.match(r.out, /user\.language +en +\(saved personal setting\)/);
-  assert.equal(readFileSync(file, 'utf8'), before);
+  // T-027: the saved values are reused unchanged; the profile only gains the personal answers it did not hold.
+  const kept = readUserProfile(f.env).answers;
+  for (const [id, value] of Object.entries(PERSONAL)) assert.deepEqual(kept[id], value, id);
   assert.ok(!existsSync(join(f.env.HOME, '.yaw/history.jsonl')));
   const web = createFormModel({ ...f, root: tmp('yaw-quick-web-') });
   const input = { mode: 'quick', answers: BASE };
@@ -144,16 +148,20 @@ test('saved layperson expertise keeps Full F-question behavior in sync with the 
   assert.deepEqual(result.doc.answers, cli.answers);
 });
 
-test('editing keeps project preferences when global defaults change', async () => {
+// T-027 (ADR-0134): a personal setting lives only in ~/.yaw/user-profile.yaml, so editing shows the saved personal
+// value; only a setting switched to team keeps a project value of its own.
+test('editing reads personal settings from the profile; a setting switched to team keeps the project value', async () => {
   const f = fixture(); save(f, { 'user.language': 'en' });
   assert.equal((await cli(f, prompts())).code, 0);
   const before = readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8');
+  assert.doesNotMatch(before, /user\.language/);
   save(f, { 'user.language': 'de' });
   const model = createFormModel({ ...f, edit: true, sections: ['user'] });
-  const preview = model.preview(model.initial);
-  assert.equal(preview.answers['user.language'], 'en');
-  assert.equal(preview.sources['user.language'], 'saved project setting');
+  assert.equal(model.preview(model.initial).answers['user.language'], 'de');
   assert.equal(readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8'), before);
+  writeFileSync(join(f.root, '.yaw/answers.yaml'), before.replace('answers:\n', 'answers:\n  user.language: fr\n').replace(/^proposal:/m, 'scopes:\n  user.language: team\nproposal:'));
+  const shared = createFormModel({ ...f, edit: true, sections: ['user'] });
+  assert.equal(shared.preview(shared.initial).answers['user.language'], 'fr');
 });
 
 test('invalid saved preferences are ignored safely in both lanes and never overwritten', async () => {
@@ -227,7 +235,8 @@ test('init no longer offers a separate personal onboarding menu', async () => {
   assert.equal(r.code, 0, r.err);
   assert.doesNotMatch(p.shown.join(''), /u\) Review|Review and save personal settings/);
   assert.match(r.out, /No personal defaults set/);
-  assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), false);
+  // T-027: the personal answers of the setup are saved to the profile, never to the repository.
+  assert.equal(existsSync(join(f.env.HOME, '.yaw/user-profile.yaml')), true);
 });
 
 test('runtime context hides irrelevant hosting/cost answers and preserves valid Kotlin dependency choices', () => {

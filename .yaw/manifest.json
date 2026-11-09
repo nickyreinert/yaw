@@ -73,7 +73,7 @@
     {
       "path": ".gitignore",
       "module": "core",
-      "hash": "sha256:34ca36fd6036286b38a485eca5b87858c103c14b1883ea0ef751eef7832aa812",
+      "hash": "sha256:a32561fffcaadac62ba2e734b1aa69e1531d1b50d93570c5d04c13e174fc1709",
       "managed": true,
       "fragments": [
         {
@@ -91,13 +91,13 @@
     {
       "path": ".yaw/bin/yaw-hook",
       "module": "core",
-      "hash": "sha256:01febb1801037c0ef003a421071023a3b75920fb127977bdc4806d0dfb19e928",
+      "hash": "sha256:e2a78f5b741e89e15a959a7dd6a06a384f648dc355da68d8dde23cbff7ad100f",
       "managed": true
     },
     {
       "path": "AGENTS.md",
       "module": "core",
-      "hash": "sha256:de8d3aadb7d494dca296a3c16224e114169e6c1ec4a67a925835530a76f7c61f",
+      "hash": "sha256:1fcf73b2739a3a133393e072bbdf539c2caec507e3a6a8ce198a8ce1c3b04c91",
       "managed": true,
       "fragments": [
         {
@@ -127,6 +127,12 @@
       "managed": false
     },
     {
+      "path": "docs/engineering.md",
+      "module": "core",
+      "hash": "sha256:4ef0ecaff9e5f5a1d401800ca1404cd39d75c09653898c9a72d0a44d6a75a98c",
+      "managed": true
+    },
+    {
       "path": "just/code-map.just",
       "module": "code-map",
       "hash": "sha256:7b48aaab62ad2736d81faed75e21a23c8f67ed7beb7efd8077ecdfd332b25283",
@@ -141,7 +147,7 @@
     {
       "path": "just/node-cli.just",
       "module": "core",
-      "hash": "sha256:366546203498d9b2d5a276483832b16758079485c2bfae4c371b82aefc96da01",
+      "hash": "sha256:001fececaa114f5dee7e212bbef03c3b7c8776e91eb5ad161c925b2e9b9f3616",
       "managed": true
     },
     {

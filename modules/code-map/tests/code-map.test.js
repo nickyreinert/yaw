@@ -12,7 +12,7 @@ import { main } from '../../../core/cli/main.js';
 import { cacheFile, diffIndex, gitInfo, hashFile, listFiles, readCache, refresh } from '../lib/index.js';
 import { MapFormatError, parseMap, updateText } from '../lib/map.js';
 import { runMap } from '../lib/cli.js';
-import { KIT_ROOT, capture, cleanEnv, hasTool, read, readTree, run, scripted, tmp, writeAnswers, writeTree } from '../../../test/helpers/fixtures.js';
+import { KIT_ROOT, capture, cleanEnv, hasTool, pathWithout, read, readTree, run, scripted, tmp, writeAnswers, writeTree } from '../../../test/helpers/fixtures.js';
 
 const answers = (modules) => `mode: full\nanswers:\n  user.agents: [claude, codex, copilot]\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [${modules.join(', ')}]\n`;
 const SOURCES = { 'src/index.js': 'export const a = 1;\n', 'src/lib/util.js': 'export const b = 2;\n', 'test/a.test.js': '// test\n', 'README.md': '# demo\n' };
@@ -30,7 +30,7 @@ async function project({ modules = ['core', 'code-map'], files = SOURCES, git = 
   if (git) gitIn(root, home, 'init', '-q', '-b', 'main');
   writeTree(root, files);
   await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-ans-'), answers(modules)), modules });
-  const env = { ...cleanEnv(home), PATH: process.env.PATH, YAW_HOME: join(home, '.yaw') };
+  const env = { ...cleanEnv(home), PATH: pathWithout('yaw'), YAW_HOME: join(home, '.yaw') };
   const yaw = async (...args) => {
     const stdout = capture();
     const stderr = capture();
@@ -422,7 +422,7 @@ test('Quick plus yaw add code-map works without github, ci, git-hooks and any wa
   writeTree(root, SOURCES);
   const quick = `mode: quick\nanswers:\n  user.agents: [claude]\n  idea.text: A tiny command-line tool.\nproposal:\n  status: confirmed\n  summary: test project\n  profiles: [node-cli]\n  modules: [core]\n`;
   await initProject({ root, kitRoot: KIT_ROOT, answersFile: writeAnswers(tmp('yaw-ans-'), quick), modules: ['core'] });
-  const env = { ...cleanEnv(home), PATH: process.env.PATH, YAW_HOME: join(home, '.yaw') };
+  const env = { ...cleanEnv(home), PATH: pathWithout('yaw'), YAW_HOME: join(home, '.yaw') };
   const yaw = async (...args) => {
     const stdout = capture();
     const stderr = capture();

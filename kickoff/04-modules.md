@@ -11,7 +11,7 @@ Phase 1 (ADR-0009, amended by ADR-0032 and ADR-0047): two setup choices. **Quick
 | `core` | `AGENTS.md`, `CLAUDE.md`, `justfile`, manifest | ✔ (always) | ✔ | – |
 | `communication` | Speaking style from user profile into `AGENTS.md`; Claude output style | ✔ | ✔ | core |
 | `standards` | Baseline coding + review standards, stack overlay from profile | ✔ | ✔ | core |
-| `devenv` | `just setup/dev`, `.env.example`, Docker/devcontainer when the profile advises it | ✔ | ✔ | core |
+| `devenv` | `just setup/dev`, `.env.example`; Docker is the Architecture switch, not part of devenv | ✔ | ✔ | core |
 | `tasks` | Task ledger (local / GitHub / both) | ✔ | ✔ | core |
 | `security` | Phase 1: `.env*`/secret read deny and destructive-command guard (`security-reviewer`, `just audit`, secret scan later) | ✔ (minimal) | ✔ (minimal) | standards |
 | `git-hooks` | `lefthook`/`pre-commit`: format, lint-staged, `gitleaks` | – | ✔ | core |
@@ -74,7 +74,7 @@ lastVerified: 2026-10-20
 
 Each output item (hook, skill, agent) can override `agents` and `tokenCost`. Full format: `core/schema/module.schema.json`, reference in `docs/spec/formats.md`. The form uses both: unsupported items are greyed out with the reason, and the live summary shows the expected per-turn token overhead of the selection.
 
-`AGENTS.md` is assembled from the `core` frame and each enabled module's `agentsMd`, with a hard budget of 80 lines in every mode: rendering fails, naming the contributors, when it is exceeded (ADR-0009). Detail goes into `docs/spec/` or the skill.
+`AGENTS.md` is assembled from the `core` frame and each enabled module's `agentsMd`, with a hard budget of 90 lines in every mode: rendering fails, naming the contributors, when it is exceeded (ADR-0009). Detail goes into `docs/spec/` or the skill.
 
 ## 3. Module notes
 

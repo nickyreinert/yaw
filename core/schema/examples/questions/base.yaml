@@ -64,7 +64,7 @@ questions:
     type: choice
     label: Solo or team?
     hint: Team mode makes issues and PRs mandatory (doc 14).
-    choices: [solo, team, external-reviewers]
+    choices: [solo, team]
     default: solo
   - id: arch.runs-on
     ref: "3.2"

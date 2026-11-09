@@ -42,7 +42,7 @@ export function runHygiene({ args, values, io }) {
   }
   if (verb !== 'status') throw new ComfortUsageError(`unknown verb "${verb}"`);
 
-  const { features, source, team } = resolveFeatures({ root: io.root, personal: personal.config });
+  const { features, source, team } = resolveFeatures({ root: io.root, personal: personal.config, env: io.env });
   const cfg = settings(personal.config).hygiene;
   const muted = hygieneMuted(env, project);
   const state = !features.includes('hygiene') ? 'off (not selected; see user.comfort or features in ~/.yaw/comfort.yaml)' : muted ? 'off (yaw hygiene off)' : 'on';
@@ -75,7 +75,7 @@ export async function runNotify({ args, values, io }) {
   const configured = ntfy ? ntfyRequest(buildPayload({ project: 'x', status: 'done' }), ntfy) !== null : false;
 
   if (verb === 'status') {
-    const { features } = resolveFeatures({ root: io.root, personal: personal.config });
+    const { features } = resolveFeatures({ root: io.root, personal: personal.config, env: io.env });
     say(io, `notifications: ${features.includes('notifications') ? 'on' : 'off'}; only after runs of at least ${cfg.minutes} min`);
     say(io, `terminal: ${cfg.terminal}`);
     say(io, `ntfy: ${configured ? `configured (${new URL(ntfy.server ?? 'https://ntfy.sh').host})` : ntfy ? 'configured but invalid (topic or server)' : 'not configured'}`);

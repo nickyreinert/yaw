@@ -4,7 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { main } from '../core/cli/main.js';
+import { verifyProject } from '../core/cli/init.js';
 import { readManifest } from '../core/render/manifest.js';
 import { parseDocument } from '../core/lib/yaml.js';
 import { saveSetup } from '../core/lib/user-store.js';
@@ -53,7 +55,9 @@ test('init: p loads a saved setup as editable defaults, asks before writing and 
   const doc = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
   assert.equal(doc.mode, 'quick');
   assert.equal(doc.answers['idea.text'], 'A new project idea.');
-  assert.deepEqual(doc.answers['user.agents'], ['codex']);
+  // T-027: the agents are personal; they are saved in ~/.yaw/user-profile.yaml, not in the repository.
+  assert.equal(Object.hasOwn(doc.answers, 'user.agents'), false);
+  assert.deepEqual(parseDocument(readFileSync(join(env.HOME, '.yaw/user-profile.yaml'), 'utf8')).value.answers['user.agents'], ['codex']);
   assert.equal(readFileSync(file, 'utf8'), source);
   assert.match(prompter.shown.join(''), /p\) Load a previous setup/);
   assert.match(prompter.shown.join(''), /Saved answers are defaults/);
@@ -136,7 +140,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     if (/Write these files/.test(question)) seen.push(readdirSync(dir));
     return ask(question);
   };
-  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter });
+  const env = { PATH: NODE_ONLY, HOME: tmp('yaw-home-') };
+  const r = await yaw(['init', '--skip-verify'], { cwd: dir, prompter, env });
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(seen, [[]], 'empty folder when the question is asked');
   assert.match(r.out, /profile: node-cli \(typescript on local\)/);
@@ -144,7 +149,8 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
   assert.match(r.out, /user\.language +de +\(documented default\)/);
   assert.match(r.out, /verification skipped/);
   const answers = parseDocument(readFileSync(join(dir, '.yaw/answers.yaml'), 'utf8')).value;
-  assert.deepEqual(answers.answers['user.agents'], ['claude']);
+  assert.equal(Object.keys(answers.answers).some((id) => id.startsWith('user.')), false, 'personal answers stay out of the repository (T-027)');
+  assert.deepEqual(parseDocument(readFileSync(join(env.HOME, '.yaw/user-profile.yaml'), 'utf8')).value.answers['user.agents'], ['claude']);
   assert.equal(answers.answers['idea.text'], 'Rename photos by EXIF date.');
   assert.deepEqual(answers.proposal, {
     status: 'confirmed',
@@ -153,7 +159,7 @@ test('interview: nothing is written before the confirmation; yes writes, verify 
     modules: ['core'],
   });
   assert.match(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose: Rename photos by EXIF date\./);
-  // Quick = core + communication + standards + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
+  // Quick = core + communication + devenv + tasks + security + sessions (ADR-0009, ADR-0054): security adds .claude/settings.json and the hook shim, sessions the handoff skill (Claude only, no .codex/)
   assert.deepEqual(readManifest(dir).files.map((f) => f.path).filter((p) => p.startsWith('.claude/') || p.startsWith('.yaw/bin/') || p.startsWith('.codex/')), []);
   assert.equal(readManifest(dir).files.length, 11);
   assert.match(r.out, /README\.md {2}\(your idea; an existing README gets an "Idea" section\)/);
@@ -202,8 +208,8 @@ test('non-interactive: the same answers give identical files and hashes', async 
   assert.deepEqual(readTree(a.cwd), readTree(b.cwd));
   assert.deepEqual(readManifest(a.cwd), readManifest(b.cwd));
   assert.equal(a.out, b.out.replace(b.cwd, a.cwd));
-  // the answers file is copied byte for byte (comments kept)
-  assert.equal(readFileSync(join(a.cwd, '.yaw/answers.yaml'), 'utf8'), readFileSync(EXAMPLE, 'utf8'));
+  // the answers file is copied byte for byte (comments kept), without the personal answers (T-027)
+  assert.equal(readFileSync(join(a.cwd, '.yaw/answers.yaml'), 'utf8'), readFileSync(EXAMPLE, 'utf8').replace(/^ {2}user\.[a-z-]+: .*\n/gm, ''));
 });
 
 test('core-only footprint: a handful of files (Y-3 done-when)', async () => {
@@ -238,7 +244,7 @@ test('answers without a proposal: the stack picks the profile and it is written 
   assert.match(r.out, /user\.language +de +\(documented default\)/, 'questions missing from the file are listed as default');
   const doc = parseDocument(readFileSync(join(r.cwd, '.yaw/answers.yaml'), 'utf8')).value;
   assert.deepEqual(doc.proposal.profiles, ['python-cli']);
-  assert.match(readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8'), /Chat in "de"/);
+  assert.doesNotMatch(readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8'), /Chat in "de"/, 'the chat language is personal (T-027)');
   assert.deepEqual(readManifest(r.cwd).agents, ['codex']);
 });
 
@@ -304,8 +310,59 @@ test('verify without just: files stay, exit 1, install hint', async () => {
   assert.ok(existsSync(join(r.cwd, '.yaw/manifest.json')));
 });
 
+// A `just` stand-in whose recipe never ends: the shell and a background grandchild hold the output pipe.
+function hangingJust(dir) {
+  const pids = join(dir, 'pids');
+  writeFileSync(join(dir, 'just'), `#!/bin/sh\necho $$ >> '${pids}'\nsleep 60 &\necho $! >> '${pids}'\nwait\n`, { mode: 0o755 });
+  return pids;
+}
+const started = async (pids) => { while (!existsSync(pids) || readFileSync(pids, 'utf8').trim().split('\n').length < 2) await new Promise((r) => setTimeout(r, 20)); return readFileSync(pids, 'utf8').trim().split('\n').map(Number); };
+// A zombie (state Z) has already ended; elsewhere signal 0 tells whether the process exists.
+const alive = (pid) => {
+  try { return !/^\S+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8')); } catch (e) { if (e.code !== 'ENOENT' || process.platform === 'linux') return false; }
+  try { process.kill(pid, 0); return true; } catch { return false; }
+};
+const gone = async (pids) => { const until = Date.now() + 3000; while (pids.some(alive) && Date.now() < until) await new Promise((r) => setTimeout(r, 20)); return pids.filter(alive); };
+const within = (promise, ms) => { let timer; return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`still running after ${ms} ms`)), ms); })]).finally(() => clearTimeout(timer)); };
+
+test('verify stops a recipe at its deadline and terminates its whole process tree', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids'), out = capture();
+  hangingJust(bin);
+  const ok = await within(verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: out, stderr: out }, timeoutMs: 300 }), 10000);
+  assert.equal(ok, false);
+  assert.match(out.text(), /just setup did not finish within 300 ms and was stopped/);
+  assert.deepEqual(await gone(await started(pids)), []);
+});
+
+test('verify cancellation stops the running recipe and its descendants; a cancelled verify starts nothing', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids'), out = capture();
+  hangingJust(bin);
+  const controller = new AbortController();
+  const verifying = verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: out, stderr: out }, signal: controller.signal });
+  const tree = await started(pids);
+  controller.abort();
+  assert.equal(await within(verifying, 10000), false);
+  assert.match(out.text(), /just setup was cancelled/);
+  assert.deepEqual(await gone(tree), []);
+  const later = capture();
+  assert.equal(await verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: later, stderr: later }, signal: controller.signal }), false);
+  assert.equal(readFileSync(pids, 'utf8').trim().split('\n').length, 2, 'no recipe ran after cancellation');
+});
+
+test('an interrupt during verify stops the recipe tree and still ends yaw by that signal', { skip: process.platform === 'win32' }, async () => {
+  const bin = tmp('yaw-bin-'), pids = join(bin, 'pids');
+  hangingJust(bin);
+  const script = `import { verifyProject } from ${JSON.stringify(new URL('../core/cli/init.js', import.meta.url).href)};\nawait verifyProject({ root: process.cwd(), io: { env: process.env, stdout: process.stdout, stderr: process.stderr } });\n`;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: tmp('yaw-proj-'), env: { PATH: `${bin}:${NODE_ONLY}` }, stdio: 'ignore' });
+  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+  const tree = await started(pids);
+  child.kill('SIGINT');
+  assert.deepEqual(await within(exited, 10000), { code: null, signal: 'SIGINT' });
+  assert.deepEqual(await gone(tree), []);
+});
+
 test('init ends with next steps: agent start, Codex hook trust, data locations, tools (#167, #176)', async () => {
-  const text = readFileSync(EXAMPLE, 'utf8').replace('user.agents: [claude]', 'user.agents: [codex]').replace('modules: [core]', 'modules: [core, standards, security, tasks, sessions, decisions]');
+  const text = readFileSync(EXAMPLE, 'utf8').replace('user.agents: [claude]', 'user.agents: [codex]').replace('modules: [core]', 'modules: [core, security, tasks, sessions, decisions]');
   const r = await yaw(['init', '--answers', writeAnswers(tmp('yaw-ans-'), text), '--yes', '--skip-verify']);
   assert.equal(r.code, 0, r.err);
   const steps = r.out.slice(r.out.indexOf('\nNext steps\n'));

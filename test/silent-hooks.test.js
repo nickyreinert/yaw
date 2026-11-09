@@ -93,7 +93,8 @@ test('every hook of every kit module is token-free by kind (real modules)', asyn
   const project = await makeProject({ modules: ['core', 'security'] });
   for (const m of modules) {
     for (const h of loadModule(KIT_ROOT, m).outputs?.hooks ?? []) {
-      assert.ok(['guard', 'context', 'comfort', 'evaluation'].includes(h.kind), `${m}/${h.name}`);
+      assert.ok(['guard', 'context', 'comfort', 'evaluation', 'compress'].includes(h.kind), `${m}/${h.name}`);
+      if (h.kind === 'compress') assert.equal(h.event, 'PostToolUse', `${m}/${h.name}: compress only on PostToolUse (ADR-0007)`);
       if (h.kind === 'context') {
         assert.equal(h.event, 'SessionStart', `${m}/${h.name}: context only on SessionStart (ADR-0007)`);
         assert.notEqual(h.tokenCost ?? loadModule(KIT_ROOT, m).tokenCost, 'none', `${m}/${h.name}: a context hook costs tokens`);

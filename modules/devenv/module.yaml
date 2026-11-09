@@ -1,21 +1,19 @@
-# modules/devenv/module.yaml (Y-5.2, ADR-0025): one-command setup, env template, optional container files.
+# modules/devenv/module.yaml (Y-5.2, ADR-0025): one-command setup and env template; Docker is the Architecture switch.
 name: devenv
-description: .env.example, git-ignored .env files, `just setup` creating .env from the example, and Dockerfile / compose.yaml / devcontainer.json only when the profile ships them.
+description: .env.example, git-ignored .env files and `just setup` creating .env from the example.
 title: Local settings & secrets
 group: basics
-short: "Env template, private .env, Docker if the stack has it"
-what: ".env.example with the names your project needs, a git-ignored .env, and `just setup` to create it. Docker files only when the stack ships them."
+short: "Env template and private .env"
+what: ".env.example with the names your project needs, a git-ignored .env, and `just setup` to create it."
 adds:
   - ".env.example with the names your project needs"
   - "Git-ignored .env, created by just setup"
-  - "Dockerfile and compose.yaml when the stack ships them"
 example: { when: "New computer", run: "just setup", then: ".env is created from the example; you fill in the values." }
 depends: [core]
 default: { quick: true, standard: true, full: true }
 questions: []
 outputs:
-  # .env.example and .gitignore always; the three container files only render when the profile has a devenv/ folder.
-  templates: [.env.example, .gitignore, Dockerfile, compose.yaml, .devcontainer/devcontainer.json]
+  templates: [.env.example, .gitignore]
 agentsMd: |
   - Set up with `just setup`, run with `just dev`. `.env` is git-ignored; put new variable names (never values) in `.env.example` and ask the user for the values.
 agents:

@@ -1,7 +1,7 @@
 // Test helpers: temp dirs, file trees, fixture kits and a scripted prompter.
 // Not a test file (npm test only runs *.test.js).
 
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, symlinkSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -182,6 +182,38 @@ export function capture() {
 export function hasTool(name, env = process.env) {
   const r = spawnSync(name, ['--version'], { encoding: 'utf8', env });
   return !r.error && r.status === 0;
+}
+
+// Gradle reads JAVA_HOME before it looks at PATH. Returns a message naming JAVA_HOME when `java` is
+// installed but the Gradle wrapper would exit on a bad JAVA_HOME; null when the JDK is usable or absent.
+export function gradleJdkProblem(env = process.env) {
+  if (!hasTool('java', env)) return null;
+  const home = env.JAVA_HOME;
+  if (!home) return null;
+  if (existsSync(join(home, 'bin', 'java'))) return null;
+  return `JAVA_HOME is invalid: ${home} has no bin/java, so gradlew exits even though java is on PATH. Set JAVA_HOME to a JDK 17+ or unset it.`;
+}
+
+// A PATH like the host's, minus the named tools: a folder of links to every other executable on the
+// host PATH. Keeps "kit absent" cases from running an installed `yaw` (or `gh`).
+const pathsWithout = new Map();
+export function pathWithout(...names) {
+  const key = `${process.env.PATH}|${names.join(',')}`;
+  if (!pathsWithout.has(key)) pathsWithout.set(key, buildPathWithout(names));
+  return pathsWithout.get(key);
+}
+
+function buildPathWithout(names) {
+  const bin = tmp('yaw-path-');
+  for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
+    let entries = [];
+    try { entries = readdirSync(dir); } catch { continue; }
+    for (const name of entries) {
+      if (names.includes(name)) continue;
+      try { symlinkSync(join(dir, name), join(bin, name)); } catch { /* first one on the PATH wins */ }
+    }
+  }
+  return bin;
 }
 
 // A folder with an executable `just` stand-in that logs "<cwd> <args>" and exits with `code`.

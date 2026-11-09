@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lstatSync, readFileSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
+import { lstatSync, readFileSync, renameSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary, userOutcome } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
@@ -11,8 +11,10 @@ import { buildPayload } from '../modules/comfort/lib/notify.js';
 import { readPersonal, resolveFeatures } from '../modules/comfort/lib/config.js';
 import { readUserData, writeUserData } from '../core/lib/user-store.js';
 import { realRoot } from '../modules/sessions/lib/registry.js';
+import { saveSources } from '../core/lib/session-sources.js';
 import { KIT_ROOT, capture, tmp, writeTree } from './helpers/fixtures.js';
 import { makeProject } from './helpers/hooks.js';
+import { longLineFile, peakDuring } from './helpers/long-line.js';
 
 const environment = () => { const home = tmp('yaw-analysis-home-'); return { HOME: home, CODEX_HOME: join(home, '.codex'), CLAUDE_CONFIG_DIR: join(home, '.claude') }; };
 const messages = [
@@ -108,7 +110,7 @@ test('long transcripts are read in full; rows from the older capped reader are r
   const data = readAnalysis(env); delete data.rows[0].reader; data.rows[0].metrics.limited = true; writeUserData(env, 'session-analysis.json', data);
   result = await collectAnalysis({ root, env });
   assert.equal(result.reused, 0); row = readAnalysis(env).rows[0];
-  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 2);
+  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 3);
 });
 
 test('message extraction ignores tools and non-text blocks; Unicode lengths and response timing are measured', () => {
@@ -125,6 +127,14 @@ test('transcript reader refuses symlinks and records malformed-line coverage', a
   const data = await readTurns(file, 'copilot'); assert.equal(data.limited, true); assert.equal(data.messages.length, 1);
   symlinkSync(file, join(dir, 'link.jsonl'));
   await assert.rejects(readTurns(join(dir, 'link.jsonl'), 'copilot'), /ELOOP|symbolic/);
+});
+
+test('transcript reader skips an oversized line without buffering it (T-016)', () => {
+  const line = (text) => ({ type: 'user', timestamp: messages[0].time, message: { role: 'user', content: text } });
+  const file = longLineFile(tmp(), line('before'), line('PAD'), line('after'));
+  const { grewMiB, result } = peakDuring(join(KIT_ROOT, 'core/lib/session-analysis.js'), "mod.readTurns(file, 'claude')", file);
+  assert.deepEqual(result.messages.map((m) => m.text), ['before', 'after']); assert.equal(result.limited, true);
+  assert.ok(grewMiB < 48, `peak RSS grew ${grewMiB.toFixed(1)} MiB while skipping a 64 MiB line`);
 });
 
 test('Laya classification uses verified local protocol and strict probabilities, rejects truncation and hosted URLs', async () => {
@@ -235,7 +245,7 @@ test('UNKNOWN reasons distinguish model abstention from threshold rejection with
   }
 });
 
-test('saved UNKNOWN diagnostics reach Learn as metadata without conversation text', async () => {
+test('saved UNKNOWN diagnostics reach Profiling as metadata without conversation text', async () => {
   const env = environment(), root = tmp(); fixture(env, root);
   const response = responseFor();
   response.answers.outcome = { choice: 'fulfilled', probabilities: { fulfilled: 0.6, partially: 0, not_fulfilled: 0, abandoned: 0, unknown: 0.4 } };
@@ -445,4 +455,33 @@ test('private JSON state honors YAW_HOME, replaces atomically and rejects linked
   symlinkSync(outside, join(env.YAW_HOME, 'linked-state.json'));
   assert.throws(() => writeUserData(env, 'linked-state.json', {}), /regular file/);
   assert.equal(readFileSync(outside, 'utf8'), '{"untouched":true}');
+});
+
+test('rescans keep saved rows and classifications when a history file or folder is unavailable, and report them', async () => {
+  const env = environment(), root = tmp(), file = fixture(env, root);
+  await collectAnalysis({ root, env });
+  const saved = readAnalysis(env);
+  saved.rows[0].evaluation = { classified: 1, skipped: 0, counts: { outcome: { fulfilled: 1 } } };
+  writeUserData(env, 'session-analysis.json', saved);
+  renameSync(file, join(tmp(), 'moved.jsonl'));
+  let result = await collectAnalysis({ root, env });
+  assert.deepEqual(readAnalysis(env).rows, saved.rows);
+  assert.deepEqual([result.sessions, result.missing], [0, 1]);
+  assert.match(scanSummary(result), /1 saved session\(s\) not found.*kept/);
+  renameSync(env.CODEX_HOME, join(tmp(), 'moved-home'));
+  result = await collectAnalysis({ root, env, all: true });
+  assert.deepEqual(readAnalysis(env).rows, saved.rows);
+  assert.equal(result.missing, 1);
+});
+
+test('rescans keep saved rows when their history source is disabled', async () => {
+  const env = environment(), root = tmp();
+  fixture(env, root);
+  await collectAnalysis({ root, env });
+  const before = readAnalysis(env).rows;
+  saveSources(env, [{ agent: 'codex', path: env.CODEX_HOME, enabled: false }]);
+  const result = await collectAnalysis({ root, env });
+  assert.deepEqual(readAnalysis(env).rows, before);
+  assert.equal(result.missing, 1);
+  assert.doesNotMatch(scanSummary({ sessions: 1, missing: 0 }), /not found/);
 });

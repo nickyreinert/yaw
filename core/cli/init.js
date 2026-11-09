@@ -15,7 +15,7 @@ import { loadSetupDefaults } from '../lib/setup-defaults.js';
 import { DEPTHS, depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
-import { missingAnswers, isPersonal, isPreference, questionApplies } from '../interview/policy.js';
+import { missingAnswers, isPersonal, isPreference, migrateAnswers, questionApplies } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles, loadModule, profileTools } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -183,21 +183,63 @@ function printSummary(out, { kitRoot, mode, profile, how, modules, skippedModule
   }
 }
 
-function run(cmd, args, { cwd, env, io }) {
+// Each recipe runs in its own process group so a deadline or cancellation stops everything it started:
+// SIGTERM to the group, SIGKILL after a grace period. A terminal interrupt is passed on to the group; when
+// nothing else handles it, yaw then ends by that signal as it would have without the recipe running.
+const isolated = process.platform !== 'win32';
+const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+function run(cmd, args, { cwd, env, io, signal, timeoutMs }) {
   return new Promise((resolveRun) => {
-    const child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (signal?.aborted) { resolveRun({ code: null, stopped: 'cancelled' }); return; }
+    let child, stopped = null, reraise = null, kill;
+    const send = (name) => { try { if (isolated && child.pid) process.kill(-child.pid, name); else child.kill(name); } catch (e) { if (e.code !== 'ESRCH') child.kill(name); } };
+    const stop = (reason) => {
+      if (stopped) return;
+      stopped = reason; send('SIGTERM');
+      kill = setTimeout(() => { send('SIGKILL'); child.stdout.destroy(); child.stderr.destroy(); }, 5000);
+    };
+    const timer = setTimeout(() => stop('timeout'), timeoutMs);
+    const onAbort = () => stop('cancelled');
+    const onSignal = (name) => { if (process.listenerCount(name) === 1) reraise = name; stop('interrupted'); };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    // Listen before spawning: an interrupt that arrives while the recipe starts is handled after `child` is set.
+    if (isolated) for (const name of FORWARDED) process.on(name, onSignal);
+    child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: isolated });
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); clearTimeout(kill); signal?.removeEventListener('abort', onAbort);
+      if (isolated) for (const name of FORWARDED) process.off(name, onSignal);
+      resolveRun(stopped ? { ...result, stopped } : result);
+      if (reraise) process.kill(process.pid, reraise);
+    };
     child.stdout.on('data', (d) => io.stdout.write(d));
     child.stderr.on('data', (d) => io.stderr.write(d));
-    child.on('error', (e) => resolveRun({ code: null, error: e }));
-    child.on('close', (code) => resolveRun({ code }));
+    child.on('error', (e) => finish({ code: null, error: e }));
+    child.on('close', (code) => finish({ code }));
   });
 }
 
+// One deadline for the whole verification; `just setup` may install dependencies.
+export const VERIFY_TIMEOUT_MS = 30 * 60000;
+
 // `just setup && just check`; stops at the first failure. -> true when both passed.
-export async function verifyProject({ root, io }) {
+// `signal` (an AbortSignal) cancels it; on a deadline or cancellation the recipe's process tree is stopped.
+export async function verifyProject({ root, io, signal, timeoutMs = VERIFY_TIMEOUT_MS }) {
+  const deadline = Date.now() + timeoutMs;
   for (const recipe of ['setup', 'check']) {
+    if (signal?.aborted) {
+      io.stderr.write(`just ${recipe} was cancelled; the files are written, run: just setup && just check\n`);
+      return false;
+    }
     io.stdout.write(`\n$ just ${recipe}\n`);
-    const r = await run('just', [recipe], { cwd: root, env: io.env, io });
+    const r = await run('just', [recipe], { cwd: root, env: io.env, io, signal, timeoutMs: Math.max(0, deadline - Date.now()) });
+    if (r.stopped) {
+      io.stderr.write(r.stopped === 'timeout'
+        ? `just ${recipe} did not finish within ${timeoutMs % 60000 ? `${timeoutMs} ms` : `${timeoutMs / 60000} minutes`} and was stopped; the files are written, run: just setup && just check\n`
+        : `just ${recipe} was cancelled; the files are written, run: just setup && just check\n`);
+      return false;
+    }
     if (r.error) {
       io.stderr.write(r.error.code === 'ENOENT'
         ? 'just is not installed, so the project could not be verified (macOS: brew install just; see https://just.systems). Install it, then run: just setup && just check\n'
@@ -292,7 +334,7 @@ export async function init({ values, positionals, io }) {
       if (previous === WEB) return handOff({ io, values, mode: 'quick' });
       if (!previous) continue;
       mode = previous.mode;
-      defaults = { ...preferences.answers, ...previous.answers };
+      defaults = { ...preferences.answers, ...migrateAnswers(previous.answers) };
       defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, isPersonal({ id, scope: 'user' }) ? 'saved personal setting' : 'proposed — needs confirmation']));
       break;
     }
@@ -405,12 +447,13 @@ export async function init({ values, positionals, io }) {
       io.stdout.write(git.created ? 'created a git repository (git init)\n' : `git init failed: ${git.error}; run git init yourself\n`);
     } else io.stdout.write('no git repository: run git init (or yaw edit) later for commit checks and the push gate\n');
   }
-  const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules });
+  const result = await initProject({ root, kitRoot, answers: { text, doc: answersDoc }, modules, env: io.env });
   io.stdout.write(`\nyaw init (kit ${result.manifest.kit}, ${modules.join(' + ')}, profile ${chosen.join(', ')})\n`);
   printReport(io.stdout, result);
   printToolHints(io.stdout, modules);
   printProfileTools(io.stdout, profileTools(profile, answersDoc.answers));
-  io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST}\n`);
+  io.stdout.write(`  wrote ${ANSWERS} and ${MANIFEST} (team settings); personal settings stay in ~/.yaw/user-profile.yaml\n`);
+  if (result.personalWarning) io.stderr.write(`${result.personalWarning}\n`);
   if (result.manifest.files.some((f) => f.path === CODEX_HOOKS)) io.stdout.write(`  note: ${codexTrustNote()}\n`);
 
   const secretNames = envNames(readProjectFile(root, '.env.example')?.toString('utf8') ?? '');

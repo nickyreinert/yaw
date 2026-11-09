@@ -7,7 +7,7 @@ questions:
     scope: user
     mode: Q
     type: multi
-    label: Which coding agents should this setup support? (comma-separated)
+    label: "Agents: Which coding agents should this setup support? (comma-separated)"
     help: agents
     choices:
       - { value: claude, label: Claude Code }
@@ -20,7 +20,7 @@ questions:
     scope: user
     mode: Q
     type: choice
-    label: Your experience with software development?
+    label: "Experience: Your experience with software development?"
     help: expertise
     choices: [layperson, intermediate, expert]
     default: intermediate
@@ -29,14 +29,14 @@ questions:
     scope: user
     mode: Q
     type: text
-    label: Language for chat with the agent?
+    label: "Chat: Language for chat with the agent?"
     default: de
   - id: user.autonomy
     ref: "0.7"
     scope: user
     mode: Q
     type: choice
-    label: How often should the agent ask before acting?
+    label: "Frequency: How often should the agent ask before acting?"
     help: autonomy
     choices:
       - { value: ask-often, label: Ask often }
@@ -49,9 +49,10 @@ questions:
       copilot: { support: fallback, via: AGENTS.md rule }
   - id: idea.text
     ref: "1.1"
+    scope: team
     mode: Q
     type: text
-    label: Purpose/Idea
+    label: "Purpose/Idea: What should the project do?"
     maxWords: 500
     help: idea
     hint: Include the intended users, their main task, and important data or interface constraints.
@@ -59,29 +60,30 @@ questions:
     default: ""
   - id: idea.team
     ref: "1.5"
+    scope: team
     mode: Q
     type: choice
-    label: Who works on this project?
-    hint: Shared rules for collaborators. GitHub remains optional.
+    label: "Team: Who works on this project?"
+    hint: "Team settings are committed for everyone; personal settings stay in ~/.yaw on your machine. GitHub remains optional."
     choices:
       - { value: solo, label: Solo }
       - { value: team, label: Team }
-      - { value: external-reviewers, label: External reviewers }
     default: solo
   - id: tasks.use-github
     ref: "10.2"
     mode: Q
     type: boolean
-    label: Use GitHub for the repo?
+    label: "GitHub: Use GitHub for the repo?"
     hint: "GitHub is optional; off keeps development local. This does not create a remote repository."
     default: false
   # The stack is language x runs-on (ADR-0054): together they pick exactly one profile, tailored or basic.
   # A pair no profile covers is rejected with the hosting targets covered by this kit.
   - id: arch.language
     ref: "3.1"
+    scope: team
     mode: Q
     type: choice
-    label: What language do you want to use?
+    label: "Language: What language do you want to use?"
     help: stack
     required: true
     choices:
@@ -97,9 +99,10 @@ questions:
     default: ""
   - id: arch.runs-on
     ref: "3.2"
+    scope: team
     mode: Q
     type: choice
-    label: Where will it run?
+    label: "Destination: Where will it run?"
     help: stack
     required: true
     choices:
@@ -113,18 +116,20 @@ questions:
       - { value: browser-extension, label: "browser extension: Chrome, Edge, Firefox" }
     default: ""
   - id: arch.library-strategy
+    scope: team
     mode: S
     type: choice
-    label: Build or reuse?
+    label: "Libraries: Build or reuse?"
     hint: Prefer built-in tools and your own code, or suitable external libraries.
     choices:
       - { value: prefer-built-in, label: Prefer built-in and own code }
       - { value: prefer-libraries, label: Use suitable libraries }
     default: prefer-built-in
   - id: arch.wrapper
+    scope: team
     mode: S
     type: choice
-    label: Wrapper
+    label: "Wrapper: How should common commands run?"
     hint: Common project commands.
     choices:
       - { value: off, label: Off }
@@ -133,51 +138,55 @@ questions:
       - { value: make, label: Make }
     default: just
   - id: arch.docker
+    scope: team
     mode: S
     type: boolean
     label: Support Docker
     hint: Tells the agent to set up Docker support.
     default: false
   - id: quality.unit-tests
+    scope: team
     mode: S
     type: boolean
     label: Unit Tests
-    hint: Require a non-empty unit-test suite in just check and Quality reviews.
+    hint: "Part of `just check`: it needs a non-empty, passing unit-test suite. Off: unit tests stay optional."
     default: false
+  # Legacy project answers remain readable; these questions are no longer asked.
+  # Error, log and documentation rules are generated from language, destination and modules (T-031).
   - id: quality.error-detail
-    mode: S
+    scope: team
+    mode: F
     type: choice
     label: User-facing errors
     hint: Recovery detail for users; internal traces stay private.
-    help: engineering
     choices:
       - { value: concise, label: Concise }
       - { value: detailed, label: Detailed guidance }
     default: concise
   - id: quality.log-output
-    mode: S
+    scope: team
+    mode: F
     type: choice
     label: Diagnostic logs
     hint: Structured diagnostics with redaction and bounded retention.
-    help: engineering
     choices:
       - { value: console, label: Console }
       - { value: file, label: Files }
       - { value: both, label: Console and files }
     default: console
   - id: quality.documentation
-    mode: S
+    scope: team
+    mode: F
     type: choice
     label: Internal documentation
     hint: Setup and contracts, or fuller maintenance guides.
-    help: engineering
     choices:
       - { value: essential, label: Essential }
       - { value: detailed, label: Detailed }
     default: essential
-  # Legacy project answers remain readable; these questions are no longer asked.
   - id: arch.framework
     ref: "3.12"
+    scope: team
     mode: F
     type: text
     label: Required framework (optional)
@@ -185,6 +194,7 @@ questions:
     default: ""
   - id: arch.hosting-control
     ref: "3.7"
+    scope: team
     mode: F
     type: choice
     label: Who manages hosting?
@@ -198,6 +208,7 @@ questions:
     default: undecided
   - id: arch.libraries
     ref: "3.8"
+    scope: team
     mode: F
     type: choice
     label: Libraries
@@ -211,6 +222,7 @@ questions:
     default: undecided
   - id: arch.services
     ref: "3.9"
+    scope: team
     mode: F
     type: choice
     label: External services
@@ -224,6 +236,7 @@ questions:
     default: undecided
   - id: arch.cost
     ref: "3.10"
+    scope: team
     mode: F
     type: choice
     label: Budget
@@ -237,6 +250,7 @@ questions:
     default: undecided
   - id: arch.cost-limit
     ref: "3.11"
+    scope: team
     mode: F
     type: text
     label: Budget cap (amount, currency, period)

@@ -8,7 +8,7 @@ import { cacheFile, readCache } from '../lib/sync.js';
 
 export default function sessionIssue(event, { root, env }) {
   try {
-    if (readAnswers(root).answers['team.session-context'] === false) return null;
+    if (readAnswers(root, { env }).answers['team.session-context'] === false) return null;
   } catch { /* no answers file: the default (on) */ }
   const state = branchState(root, makeGit(root, env), { local: true });
   if (!state?.issue) return null;

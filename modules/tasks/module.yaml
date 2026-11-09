@@ -1,12 +1,12 @@
 # modules/tasks/module.yaml (Y-5.3, ADR-0010): task ledger, local / GitHub / both (doc 10, BD4).
 name: tasks
 description: Task ledger in TASKS.md (local), GitHub issues with a generated read-only TASKS.md (GitHub), or both linked; `just task` recipes, session-start re-injection of the active task and a resume-point reminder.
-title: Task list
-group: memory
-short: "Task list the agent sees at session start"
-what: "TASKS.md (or GitHub issues). The agent is told the active task at every session start."
+title: Task List
+group: tasks
+short: "Backlog, in-progress and done tasks with priorities for coding agents"
+what: "Manages tasks in TASKS.md (or GitHub issues): backlog, in progress, done. Every task has a priority, status, recommended model and reasoning effort; the agent is told the active task at every session start."
 adds:
-  - "TASKS.md task list (or GitHub issues)"
+  - "TASKS.md task list (or GitHub issues) with priority, status, model and effort per task"
   - "just task recipes"
   - "Active task shown to the agent at session start"
 example: { when: "TASKS.md has", run: "- [ ] Add CSV export", then: "the next session starts with \"Active task: Add CSV export\"." }
@@ -19,7 +19,7 @@ questions:
     ref: "10.1"
     mode: Q
     type: choice
-    label: Task tracking
+    label: "Task tracking: Where do tasks live?"
     hint: Where tasks live; local works without GitHub.
     help: task-modes
     when: { idea.team: solo, tasks.use-github: true }

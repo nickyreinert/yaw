@@ -1,15 +1,25 @@
 # modules/github/module.yaml (Y-5.5, ADR-0027): GitHub scripts as `just` recipes (doc 10 §3).
 name: github
-description: GitHub recipes, issue forms and planning skills, a PR template and .yaw/github.yaml; configured task Project and epic milestone updates need guarded confirmation.
+description: GitHub recipes (including `just progress`), issue forms and planning skills, a PR template and .yaw/github.yaml; configured task Project and epic milestone updates need guarded confirmation.
 title: GitHub workflow
 group: github
-short: "Issue forms, PR template, planning skills"
-what: "Issue forms, a pull-request template and planning skills, so the agent can turn a plan into issues."
+short: "Project management: issue forms, epics, milestones, progress"
+what: "Project-management support on GitHub: structured issues, epics with sub-issues and milestones, a pull-request template, and agent skills that turn a plan into issues."
+details:
+  - "Issue forms ask for acceptance criteria, priority, estimate, recommended model, reasoning effort and milestone; status starts as todo"
+  - "Form answers stay in the issue text; `just gh-issue --priority P1 --model sonnet --effort medium` also sets labels the task view reads"
+  - "Epics: epic form plus native sub-issues; map an epic to a milestone in .yaw/github.yaml, `just task sync` applies it after you confirm"
+  - "Skills: issue-create (interview), issue-triage (find missing fields), epic-plan (split an epic, compare with milestone capacity)"
+  - "`just progress` shows closed vs open issues per milestone and finished sub-issues per epic; read only"
+  - "`just branch`, `commit`, `pr` (draft that closes the issue) and `pr-status` keep work linked to its issue"
+  - "Optional Project board: Status follows `just task start` and `done` (project.number in .yaw/github.yaml)"
+  - "Repository creation, labels, ruleset, releases and board changes ask you to type y; nothing merges or force-pushes"
 adds:
   - "Issue forms: feature, bug, chore, spike, epic"
   - "Pull-request template"
   - "Planning skills: issue-create, issue-triage, epic-plan"
-example: { when: "You ask", run: "\"split this plan into issues\"", then: "5 issues with labels, ready to review." }
+  - "`just progress`: milestone and epic progress"
+example: { when: "You ask", run: "\"split this plan into issues\"", then: "5 issues with priority, estimate and milestone, ready to review." }
 depends: [core]
 default: { quick: false, standard: true, full: true }
 # Off when the user does not use GitHub, including teams with a local Git remote.
@@ -19,7 +29,7 @@ outputs:
   templates: [.yaw/github.yaml, .github/pull_request_template.md, .claude/settings.json, .github/ISSUE_TEMPLATE/feature.yml, .github/ISSUE_TEMPLATE/bug.yml, .github/ISSUE_TEMPLATE/chore.yml, .github/ISSUE_TEMPLATE/spike.yml, .github/ISSUE_TEMPLATE/epic.yml, just/github.just, justfile]
   skills: [issue-create, issue-triage, epic-plan]
 agentsMd: |
-  - Git and GitHub work goes through `just branch`, `commit`, `pr`, `pr-status`, `gh-issue`; guarded recipes (`gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release`, first push) run only when the user types `y`, so ask the user and never work around it. There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
+  - Git and GitHub work goes through `just branch`, `commit`, `pr`, `pr-status`, `progress`, `gh-issue`; guarded recipes (`gh-init`, `gh-labels`, `gh-protect`, `project-add`, `release`, first push) run only when the user types `y`, so ask the user and never work around it. There is no recipe to merge, force-push, delete a branch or change repo visibility: the user does those.
 agents:
   claude:  { support: native, via: "just recipes + AGENTS.md rules + permissions.ask in .claude/settings.json (the user confirms guarded commands)" }
   codex:   { support: partial, via: "just recipes + AGENTS.md rules", note: "no permission prompt from the kit; Codex approval settings apply" }

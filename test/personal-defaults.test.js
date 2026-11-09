@@ -15,7 +15,7 @@ import { createStyle } from '../core/cli/style.js';
 import { KIT_ROOT, capture, cleanEnv, scripted, tmp } from './helpers/fixtures.js';
 
 const BASE = { 'idea.text': 'A local note organizer.', 'arch.language': 'typescript', 'arch.runs-on': 'local' };
-const PERSONAL = { 'user.expertise': 'layperson', 'user.language': 'en', 'user.autonomy': 'ask-often', 'user.length': 'brief', 'user.register': 'plain', 'user.examples': 'always', 'user.explain': 'one-line' };
+const PERSONAL = { 'user.expertise': 'layperson', 'user.language': 'en', 'user.autonomy': 'ask-often', 'user.length': 'brief', 'user.explain': 'one-line' };
 const fixture = () => ({ root: tmp(), kitRoot: KIT_ROOT, env: cleanEnv(tmp()) });
 const profile = (f) => join(f.env.HOME, '.yaw/user-profile.yaml');
 function prompts({ mode = 'basic', answers = PERSONAL, apply = true, offer = true, save = true } = {}) {
@@ -57,36 +57,38 @@ test('install onboarding asks first, can be declined, and saves only reviewed pe
   assert.equal(again.asked.length, 0, 'install reruns do not prompt when personal defaults exist');
 });
 
-test('Quick uses factory or saved preferences without personal prompts or implicit profile writes', async () => {
+// T-027 (ADR-0134, amends ADR-0079): personal answers are saved only to ~/.yaw/user-profile.yaml and never committed;
+// the profile is read over the project answers, and the last saved personal answers apply to every project.
+test('Quick uses factory or saved preferences without personal prompts; they stay out of the repository', async () => {
   for (const saved of [false, true]) {
     const f = fixture();
     if (saved) saveSetup({ ...f, answers: PERSONAL, mode: 'pro', projectRoot: f.root, kit: '', preset: false, profile: true });
-    const p = prompts({ mode: 'quick' }), before = saved ? readFileSync(profile(f), 'utf8') : null;
+    const p = prompts({ mode: 'quick' });
     const result = await cli(f, ['init', '--skip-verify'], p);
     assert.doesNotMatch(p.shown.join(''), /Your experience with software|How long should answers|Review and save personal/);
-    const answers = readAnswers(f.root).answers;
+    assert.equal(Object.keys(readAnswers(f.root).answers).some((id) => id.startsWith('user.')), false);
+    const answers = readAnswers(f.root, { env: f.env }).answers;
     assert.equal(answers['user.expertise'], saved ? 'layperson' : 'intermediate');
     assert.equal(answers['user.length'], saved ? 'brief' : 'balanced');
     const instructions = readFileSync(join(f.root, 'AGENTS.md'), 'utf8');
-    assert.match(instructions, saved ? /Keep answers short and to the point/ : /Give balanced answers/);
-    assert.equal(existsSync(profile(f)), saved);
-    if (saved) assert.equal(readFileSync(profile(f), 'utf8'), before);
+    assert.doesNotMatch(instructions, /Prefer bullet points, key points and direct answers|Give balanced answers/, 'the answer style is personal');
+    if (saved) assert.deepEqual(preferences(f), PERSONAL, 'the saved preferences are reused, not changed');
     else assert.match(result.out, /No personal defaults set/);
   }
 });
 
-test('Basic and Pro seed only personal preferences once; later overrides remain project-specific', async () => {
+const preferences = (f) => Object.fromEntries(PERSONAL_PREFERENCES.map((id) => [id, loadPreferences(f).answers[id]]));
+
+test('Basic and Pro save the personal answers to the profile; a later project changes them for every project', async () => {
   for (const mode of ['basic', 'pro']) {
     const first = fixture();
-    const result = await cli(first, ['init', '--skip-verify'], prompts({ mode }));
-    assert.match(result.out, /Saved your first personal defaults/);
-    assert.deepEqual(loadPreferences(first).answers, PERSONAL);
-    assert.deepEqual(Object.keys(loadPreferences(first).answers).sort(), [...PERSONAL_PREFERENCES].sort());
-    const before = readFileSync(profile(first), 'utf8');
+    await cli(first, ['init', '--skip-verify'], prompts({ mode }));
+    assert.deepEqual(preferences(first), PERSONAL);
+    assert.equal(Object.keys(readAnswers(first.root).answers).some((id) => id.startsWith('user.')), false);
     const next = { ...first, root: tmp() };
     await cli(next, ['init', '--skip-verify'], prompts({ mode, answers: { ...PERSONAL, 'user.length': 'extensive', 'user.expertise': 'expert' } }));
-    assert.equal(readAnswers(next.root).answers['user.length'], 'extensive');
-    assert.equal(readFileSync(profile(first), 'utf8'), before);
+    assert.equal(readAnswers(next.root, { env: next.env }).answers['user.length'], 'extensive');
+    assert.equal(readAnswers(first.root, { env: first.env }).answers['user.length'], 'extensive', 'one personal file for all projects');
   }
 });
 
@@ -104,13 +106,12 @@ test('Basic browser questions and Apply match terminal defaults without enabling
     const prepared = api.prepareApply({ mode: 'basic', answers: { ...BASE, ...PERSONAL, 'tasks.use-github': false } });
     assert.deepEqual(prepared.modules, ['core']);
     await api.apply(prepared, () => {});
-    assert.deepEqual(loadPreferences(f).answers, PERSONAL);
-    const before = readFileSync(profile(f), 'utf8');
+    assert.deepEqual(preferences(f), PERSONAL);
     const another = { ...f, root: tmp() }, api2 = createFormApi({ ...another, skipVerify: true });
     try { await api2.apply(api2.prepareApply({ mode: 'basic', answers: { ...BASE, ...PERSONAL, 'user.length': 'extensive' } }), () => {}); }
     finally { api2.close(); }
-    assert.equal(readAnswers(another.root).answers['user.length'], 'extensive');
-    assert.equal(readFileSync(profile(f), 'utf8'), before);
+    assert.equal(Object.hasOwn(readAnswers(another.root).answers, 'user.length'), false);
+    assert.equal(readAnswers(another.root, { env: another.env }).answers['user.length'], 'extensive');
   } finally { api.close(); }
 });
 
@@ -121,18 +122,21 @@ test('notice respects terminal colour and missing defaults never add another men
   assert.doesNotMatch(p.shown.join(''), /u\)/);
 });
 
-test('cancelled setups and unreviewed browser values cannot establish defaults; invalid profiles survive', async () => {
+test('cancelled setups write no personal settings; invalid profiles survive', async () => {
   const f = fixture(), p = prompts({ apply: false });
   const code = await main(['init', '--skip-verify'], { ...f, cwd: f.root, stdout: capture(), stderr: capture(), prompter: p });
   assert.equal(code, 1); assert.equal(existsSync(profile(f)), false);
-  const api = createFormApi({ ...f, skipVerify: true });
-  try { await api.apply(api.prepareApply({ mode: 'basic', answers: BASE }), () => {}); } finally { api.close(); }
-  assert.equal(existsSync(profile(f)), false);
   saveSetup({ ...f, answers: { 'user.agents': ['claude'] }, mode: 'quick', projectRoot: f.root, kit: '', preset: false, profile: true });
   seedPersonalPreferences({ ...f, mode: 'basic', answers: PERSONAL, reviewed: PERSONAL_PREFERENCES });
   assert.equal(loadPreferences(f).answers['user.length'], 'brief', 'legacy agent-only profiles can acquire personal defaults');
   writeFileSync(profile(f), 'answers: { user.expertise: invalid }\n');
   const before = readFileSync(profile(f), 'utf8');
   assert.equal(seedPersonalPreferences({ ...f, mode: 'basic', answers: PERSONAL, reviewed: PERSONAL_PREFERENCES }).saved, false);
+  assert.equal(readFileSync(profile(f), 'utf8'), before);
+  // T-027: an apply does not repair an invalid profile either; it warns and keeps the personal answers out of the repository.
+  const api = createFormApi({ ...f, root: tmp(), skipVerify: true });
+  const log = [];
+  try { await api.apply(api.prepareApply({ mode: 'basic', answers: { ...BASE, ...PERSONAL } }), (e) => log.push(e)); } finally { api.close(); }
+  assert.match(log.map((e) => e.text ?? '').join(''), /Personal settings were not saved/);
   assert.equal(readFileSync(profile(f), 'utf8'), before);
 });

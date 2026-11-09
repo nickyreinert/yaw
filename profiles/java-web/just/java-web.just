@@ -20,22 +20,22 @@ fmt:
 
 lint:
     @command -v java >/dev/null 2>&1 || { echo "lint: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew spotlessCheck
+    ./gradlew --console=plain spotlessCheck
 
 typecheck:
     @command -v java >/dev/null 2>&1 || { echo "typecheck: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew compileJava compileTestJava
+    ./gradlew --console=plain compileJava compileTestJava
 
 test:
     @command -v java >/dev/null 2>&1 || { echo "test: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew test
+    ./gradlew --console=plain test
 
 check: lint typecheck test build sync-check
 
 # Runs the Gradle build and installs the launcher in build/install/app/bin/app. The image comes from the Dockerfile (docker build -t app ., needs Docker); pushing and deploying need your approval.
 build:
     @command -v java >/dev/null 2>&1 || { echo "build: install JDK 17 or newer" >&2; exit 1; }
-    ./gradlew build installDist
+    ./gradlew --console=plain build installDist
 
 
 audit:

@@ -68,7 +68,7 @@ const nextStep = (manifest) => (manifest?.modules?.sessions?.enabled ? 'Suggest:
 // for state problems (no state = no hint); the dispatcher catches anything else.
 export function onPrompt({ event, root, env, manifest, prompt, transcript, now = new Date(event.ts) }) {
   const personal = readPersonal(env).config;
-  const { features } = resolveFeatures({ root, personal });
+  const { features } = resolveFeatures({ root, personal, env });
   const hygieneOn = features.includes('hygiene');
   // Notifications need the turn start, hygiene needs everything; with neither there is no reason to keep state.
   const cacheOn = features.includes('cache-reminder') && event.agent === 'claude';

@@ -23,7 +23,7 @@ questions:
     scope: user
     mode: S
     type: multi
-    label: Which comfort features do you want?
+    label: "Comfort: Which comfort features do you want?"
     hint: All run on your machine and cost no model tokens.
     help: comfort
     choices:

@@ -1,4 +1,4 @@
-// Session start in a team (doc 14 §3, ADR-0031): fetch, the safe sync policy, and my issues and pull requests.
+// Session start with the workflow rules (doc 14 §3, ADR-0031): fetch, the safe sync policy, and my issues and pull requests.
 //
 //   1. git fetch --prune origin (time-limited; a failure means offline)
 //   2. fast-forward only when it is safe: the tree is clean, the branch is behind its upstream and not ahead.
@@ -200,7 +200,7 @@ export async function sessionStart({ root, env = process.env, now = new Date(), 
   }
   if (state.behindDefault > 0) notes.push(`${plural(state.behindDefault, 'commit')} behind ${state.defaultBranch}: rebase or merge when it suits you (never automatic)`);
   if (state.branch !== '' && (state.branch === state.defaultBranch || state.issue === null)) notes.push('edits need an issue branch: just task start <#>');
-  lines.push(`YAW team · ${where}: ${notes.join('; ')}`);
+  lines.push(`YAW workflow · ${where}: ${notes.join('; ')}`);
 
   // GitHub, cached for 5 minutes; offline the last result is shown with its time.
   const file = cacheFile(root, env);

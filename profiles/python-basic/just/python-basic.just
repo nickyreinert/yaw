@@ -25,7 +25,7 @@ typecheck:
 test:
     @command -v uv >/dev/null 2>&1 || { echo "test: install uv" >&2; exit 1; }
     @uv run --no-sync pytest --version >/dev/null 2>&1 || { echo "test: run 'just setup' to install pytest" >&2; exit 1; }
-    uv run pytest
+    uv run pytest -q
 
 check: lint typecheck test sync-check
 

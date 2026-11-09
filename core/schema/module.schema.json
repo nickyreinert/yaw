@@ -9,7 +9,7 @@
     "name": { "$ref": "common.schema.json#/$defs/name" },
     "description": { "type": "string", "minLength": 1 },
     "title": { "description": "Friendly name in the setup (ADR-0054), e.g. Safety guard.", "type": "string", "minLength": 1, "maxLength": 40 },
-    "group": { "description": "Setup group of the module card.", "enum": ["basics", "memory", "quality", "github", "comfort"] },
+    "group": { "description": "Setup group of the module card.", "enum": ["basics", "memory", "quality", "github", "tasks", "comfort"] },
     "what": { "description": "What you get, in plain words (one or two sentences).", "type": "string", "minLength": 1, "maxLength": 300 },
     "short": { "description": "One short line for the card (what it is).", "type": "string", "minLength": 1, "maxLength": 70 },
     "details": {
@@ -103,8 +103,8 @@
         "event": { "$ref": "hook-event.schema.json#/$defs/event" },
         "matcher": { "type": "string", "minLength": 1 },
         "kind": {
-          "description": "Token-free class (B rule 5): guard blocks, context is model-visible (needs tokenCost), comfort talks to the user only, evaluation is silent.",
-          "enum": ["guard", "context", "comfort", "evaluation"]
+          "description": "Token-free class (B rule 5): guard blocks, context is model-visible (needs tokenCost), comfort talks to the user only, evaluation is silent, compress replaces PostToolUse output with a smaller one (ADR-0007).",
+          "enum": ["guard", "context", "comfort", "evaluation", "compress"]
         },
         "agents": { "$ref": "common.schema.json#/$defs/agentsMap" },
         "tokenCost": { "$ref": "common.schema.json#/$defs/tokenCost" }

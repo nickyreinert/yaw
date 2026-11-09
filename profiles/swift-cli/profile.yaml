@@ -9,3 +9,6 @@ stack:
 defaults:
   modules: { devenv: false, ui-design: false, backup: false }
 requires: [swift>=5.9, just]
+# Warning lines a passing step still shows with the compact module: Swift compiler warnings, missing-tool notes.
+compact:
+  warnings: ': warning: |^warning: |^[a-z-]+: .* is not installed'

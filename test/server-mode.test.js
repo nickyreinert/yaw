@@ -77,7 +77,9 @@ test('host provisioning shares the interview, contains paths, rejects duplicate 
     const result = await f.request(route + '/apply', input); assert.equal(result.status, 200); assert.equal(result.body.ok, true);
     assert.equal(existsSync(join(preview.body.destination, '.yaw/manifest.json')), true);
     const saved = readFileSync(join(preview.body.destination, '.yaw/answers.yaml'), 'utf8');
-    assert.match(saved, new RegExp(`user.language: ${languageDefault}`));
+    // T-027: the hosted interview's personal answers are not committed; they are saved to the host's ~/.yaw/user-profile.yaml.
+    assert.doesNotMatch(saved, /user\.language/);
+    assert.match(readFileSync(join(f.env.HOME, '.yaw/user-profile.yaml'), 'utf8'), new RegExp(`user.language: ${languageDefault}`));
     assert.equal(f.spawned.plans.length, 1); assert.ok(['python3', '/usr/bin/script'].includes(f.spawned.plans[0].command));
     assert.match(f.spawned.plans[0].args.join(' '), /remote-control.*--spawn=session/);
     assert.equal(f.spawned.plans[0].options.env.YAW_REMOTE_TELEGRAM_TOKEN, undefined);
@@ -128,6 +130,43 @@ test('host refuses symlinked language folders and preserves failed verification 
     const result = await f.request(`/api/interviews/${t.id}/apply`, python);
     assert.equal(result.body.project.state, 'verification-failed'); assert.equal(f.spawned.plans.length, 0);
   } finally { await f.close(); }
+});
+
+const within = (promise, ms) => { let timer; return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`still running after ${ms} ms`)), ms); })]).finally(() => clearTimeout(timer)); };
+const hostedProjects = (env) => readUserData(env, 'remote-state.json').projects;
+
+test('host shutdown cancels a running verification and records the partial project as interrupted', async () => {
+  let started, cancelled = false;
+  const verifying = new Promise((resolve) => { started = resolve; });
+  const f = await setup({ verify: ({ signal }) => new Promise((resolve) => { started(); signal?.addEventListener('abort', () => { cancelled = true; resolve(false); }); }) });
+  let applying;
+  try {
+    const created = (await f.request('/api/interviews', { slug: 'stopping' })).body;
+    applying = f.request(`/api/interviews/${created.id}/apply`, input).catch(() => null);
+    await within(verifying, 10000);
+  } finally { await within(f.close(), 10000); }
+  await applying;
+  assert.equal(cancelled, true);
+  assert.deepEqual(hostedProjects(f.env).map((p) => [p.slug, p.state]), [['stopping', 'interrupted']]);
+  assert.equal(f.spawned.plans.length, 0, 'nothing is launched for an interrupted project');
+  assert.ok(existsSync(join(f.settings.workspaceRoot, 'typescript', 'stopping', 'AGENTS.md')), 'partial files stay on the host');
+});
+
+test('host shutdown is bounded when an accepted init does not settle', async () => {
+  let started, release;
+  const verifying = new Promise((resolve) => { started = resolve; });
+  const f = await setup({ verify: () => new Promise((resolve) => { started(); release = resolve; }) });
+  let applying;
+  try {
+    const created = (await f.request('/api/interviews', { slug: 'stuck' })).body;
+    applying = f.request(`/api/interviews/${created.id}/apply`, input).catch(() => null);
+    await within(verifying, 10000);
+    await within(f.service.projects.close({ grace: 100 }), 5000);
+    assert.deepEqual(hostedProjects(f.env).map((p) => [p.slug, p.state]), [['stuck', 'interrupted']]);
+  } finally { await within(f.close(), 10000); }
+  release(true); await applying; await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(hostedProjects(f.env).map((p) => [p.slug, p.state]), [['stuck', 'interrupted']], 'a late result does not overwrite the recorded status');
+  assert.equal(f.spawned.plans.length, 0);
 });
 
 test('native lifecycle notifications distinguish response completion and task completion and deduplicate', async () => {

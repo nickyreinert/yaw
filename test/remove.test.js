@@ -165,7 +165,7 @@ test('yaw remove needs --yes without a terminal and prints the plan', async () =
   const root = await setup(kitRoot);
   await applyModules({ root, kitRoot, modules: ['core', 'extra'] });
   const out = [];
-  const io = { cwd: root, kitRoot, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: { interactive: false } };
+  const io = { cwd: root, kitRoot, env: { HOME: tmp('yaw-home-') }, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => out.push(s) }, prompter: { interactive: false } };
   assert.equal(await main(['remove', 'extra'], io), 1);
   assert.match(out.join(''), /delete: extra\/notes\.md/);
   assert.match(out.join(''), /remove its part from: AGENTS\.md/);

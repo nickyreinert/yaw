@@ -1,19 +1,26 @@
-// Shared project rules for generated AGENTS.md, standards and the local-agent kickoff.
-export function codingPractices(answers = {}) {
-  const errors = answers['quality.error-detail'] === 'detailed'
-    ? 'Give users clear error context, impact and recovery steps.'
-    : 'Keep user-facing errors concise, actionable and consistent.';
-  const output = { console: 'structured console logs', file: 'structured log files', both: 'structured console and file logs' }[answers['quality.log-output']] ?? 'structured console logs';
-  const documentation = answers['quality.documentation'] === 'detailed'
-    ? 'Maintain internal architecture, contracts, decisions, setup and troubleshooting documentation as behavior changes.'
+// Shared project rules for generated docs/engineering.md and the local-agent kickoff (T-030: the former Coding standards
+// card is merged in here, so these rules are always on).
+// Error, logging and documentation rules are not user options (T-031): they follow the language, the destination
+// and the enabled modules. context.modules is known only where files are rendered.
+export function codingPractices(answers = {}, { modules = [] } = {}) {
+  const page = answers['arch.language'] === 'html' || answers['arch.runs-on'] === 'static';
+  const errors = 'Keep user-facing errors concise, actionable and consistent. Never swallow errors silently; keep stack traces out of public errors.';
+  const logging = page
+    ? 'No logging infrastructure: no logger, log files or log retention; show failures in the page and keep console output out of production code.'
+    : 'Use structured console logs (stdout/stderr), no log files unless the platform requires them; redact secrets and personal data.';
+  const documentation = modules.includes('code-map')
+    ? 'Keep setup, public contracts, non-obvious decisions and recovery instructions current; docs/code-map.md describes what each part of the code does, so do not restate the file layout elsewhere.'
     : 'Keep setup, public contracts, non-obvious decisions and recovery instructions current; explain intent rather than restating code.';
   return [
     answers['quality.unit-tests'] === true
       ? 'Unit tests are required: maintain a non-empty suite with meaningful assertions for project behavior and run it as part of just check. The Quality reviewer must report an empty, missing or failing unit-test suite as findings.'
       : 'Unit tests are optional: the Quality reviewer must not require a unit-test suite or report its absence as findings.',
     'Test changed behavior, boundaries, failure paths and security-sensitive checks; add regression tests for bugs. Report what could not be tested.',
-    `${errors} Never swallow errors silently; keep stack traces out of public errors. Use ${output}; redact secrets and personal data.`,
+    `${errors} ${logging}`,
     `${documentation} Follow the stack formatter, linter and type checks; validate external inputs and use parameterized queries.`,
+    'Write small, focused units with clear names; no dead code or speculative abstraction; comment only what the code cannot say.',
+    'Avoid N+1 queries; bound loops and queries and paginate; cache only where measured; keep assets within a size budget.',
+    'Use Conventional Commits and small pull requests.',
   ];
 }
 

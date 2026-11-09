@@ -15,7 +15,7 @@ export const INDEX = `${DIR}/decisions.index.json`;
 export const TAXONOMY = `${DIR}/taxonomy.json`;
 export const INDEX_VERSION = 2;
 
-export const STATUSES = ['proposed', 'accepted', 'provisional', 'superseded', 'deprecated'];
+export const STATUSES = ['proposed', 'accepted', 'provisional', 'superseded', 'deprecated', 'rejected'];
 export const IMPORTANCE = ['critical', 'high', 'normal', 'low'];
 export const KINDS = ['security', 'business-logic', 'privacy'];
 export const REF_TYPES = ['detail', 'spec', 'code', 'issue', 'commit', 'session'];
@@ -390,7 +390,7 @@ export function checkJournal(root, { today }) {
     if (taxonomy && !hasPair(taxonomy, r.category, r.subcategory)) errors.push(`${r.id}: "${r.category} / ${r.subcategory}" is not in ${TAXONOMY}`);
     for (const x of [...r.supersedes, ...r.supersededBy]) if (!known.has(x)) errors.push(`${r.id}: refers to ${x}, which does not exist`);
     if (r.status === 'superseded' && r.supersededBy.length === 0) warnings.push(`${r.id}: superseded, but no "Superseded by"`);
-    if (r.reviewBy && r.reviewBy < today && !['superseded', 'deprecated'].includes(r.status)) warnings.push(`${r.id}: review date ${r.reviewBy} has passed`);
+    if (r.reviewBy && r.reviewBy < today && !['superseded', 'deprecated', 'rejected'].includes(r.status)) warnings.push(`${r.id}: review date ${r.reviewBy} has passed`);
     for (const ref of r.refs.filter((x) => x.path)) {
       const problem = refProblem(root, ref.path);
       if (problem) warnings.push(`${r.id}: reference ${ref.type} ${ref.path} ${problem}`);

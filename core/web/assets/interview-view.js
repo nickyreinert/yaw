@@ -1,5 +1,5 @@
 import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation, focusStepStart, interviewDetailText } from './ui-state.js';
-import { isPreference, questionApplies } from '../../interview/policy.js';
+import { isPreference, questionApplies, switchable } from '../../interview/policy.js';
 
 import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderCommunicationCard, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
@@ -66,8 +66,7 @@ let phase = 'edit', reviewReturn = false;
 const visitedSteps = new Set();
 const sectionOf = (question) => {
   const id = typeof question === 'string' ? question : question.id;
-  if (id.startsWith('user.') && !['user.agents', 'user.expertise'].includes(id)) return 'communication';
-  if (['quality.error-detail', 'quality.log-output', 'quality.documentation'].includes(id)) return 'practices';
+  if (id.startsWith('user.') && id !== 'user.agents') return 'communication';
   return id.split('.')[0];
 };
 const belongs = (step, group) => step.groups === null ? !['user', 'communication', 'idea', 'arch'].includes(group) : step.groups.includes(group);
@@ -190,7 +189,7 @@ function stepHelp() {
   if (stepIndex === 2) return [helpText('Describe what your app does, its target users and its constraints.'), helpText('Will be stored as a global entry in `AGENTS.md`.')];
   if (stepIndex === STACK) {
     const tools = element('ul'); for (const tool of activeProfile?.requires ?? []) { const item = element('li'); item.append(element('code', tool)); tools.append(item); }
-    return [element('p', activeProfile ? 'Environment tools' : 'Choose a language and destination.'), tools, helpText('Agent instructions: `AGENTS.md` and `docs/engineering.md`.')];
+    return [...(activeProfile ? [element('p', 'Environment tools')] : []), tools, helpText('Agent instructions: `AGENTS.md` and `docs/engineering.md`.')];
   }
   if (stepIndex === REVIEW) return [helpText('Save draft: Continue later.'), helpText('Save preset: Save for future use.')];
   return [];
@@ -249,13 +248,13 @@ async function refreshPrompts() {
   }
 }
 function buildQuestions() {
-  const title = { user: 'About you', communication: 'Communication style', practices: 'Coding Practices', idea: 'Purpose/Idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
+  const title = { user: 'About you', communication: 'Communication style', idea: 'Purpose/Idea', arch: 'Architecture', quality: 'Quality', tasks: 'Tasks', team: 'Team' };
   for (const q of catalog.questions) {
     const sectionId = sectionOf(q);
     if (!sections.has(sectionId)) {
       const section = element('section', undefined, { id: `section-${sectionId}`, 'aria-labelledby': `title-${sectionId}`, class: 'settings-group', 'data-section': sectionId });
       const heading = element('h2', undefined, { id: `title-${sectionId}`, class: 'module-group-title' });
-      heading.append(decisionIcon(sectionId === 'practices' ? 'ruler' : 'file'), element('span', title[sectionId] ?? sectionId));
+      heading.append(decisionIcon('file'), element('span', title[sectionId] ?? sectionId));
       section.append(heading);
       $('questions').append(section);
       sections.set(sectionId, { node: section });
@@ -295,6 +294,7 @@ function buildQuestions() {
     if (q.status) node.append(element('p', q.status, { class: 'hint status', id: `${id}-status` }));
     const describedBy = [q.hint ? `${id}-hint` : '', q.status ? `${id}-status` : ''].filter(Boolean).join(' ');
     if (describedBy) inputs.forEach((i) => i.setAttribute('aria-describedby', describedBy));
+    if (switchable(q)) node.append(scopeSwitch(q, id, label));
     const showHelp = () => explain(label, questionHelp(q), { question: q.id });
     node.addEventListener('focusin', showHelp); node.addEventListener('mouseenter', showHelp);
     let capability, gitHolder;
@@ -318,12 +318,6 @@ function buildQuestions() {
   if (personal) {
     const holder = element('div', undefined, { class: 'module-grid communication-card-holder' });
     personal.append(holder);
-  }
-  const practices = sections.get('practices')?.node;
-  if (practices) {
-    const grid = element('div', undefined, { class: 'module-grid practice-grid' });
-    grid.append(...[...controls.values()].filter((c) => sectionOf(c.q) === 'practices').map((c) => c.node));
-    practices.append(grid);
   }
   // Choose the kit profile first; optional planning constraints follow it.
   sections.get('arch')?.node.before($('stack'));
@@ -405,8 +399,8 @@ function renderCommunication() {
   const answers = effectiveAnswers(catalog.questions, state.answers, state.mode);
   renderCommunicationCard(section.node.querySelector('.communication-card-holder'), {
     modules: catalog.modules, selected: selectedModules(), answers, questions: catalog.questions, compact,
-    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onExplain: () => explain('Communication style', [helpText('Answer length, wording, examples and decision explanations.')], { module: 'communication' }),
-    questionNodes: (name, on) => [...controls.values()].filter((c) => isPreference(c.q) && c.q.id !== 'user.expertise' && !c.node.hidden)
+    gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false, readOnly: sectionEditing(), onExplain: () => explain('Communication style', [helpText('Language, experience, how often the agent asks, answer depth and responses.')], { module: 'communication' }),
+    questionNodes: (name, on) => [...controls.values()].filter((c) => isPreference(c.q) && !c.node.hidden)
       .map((c) => { c.inputs.forEach((input) => { input.disabled = sectionEditing(); }); return c.node; }),
     onToggle: (name, on) => { state.modules = toggleModules(catalog.modules, selectedModules(), name, on); update(); $('module-communication')?.focus(); },
   });
@@ -437,7 +431,6 @@ function renderModules() {
     onCompact: (on) => { compact = on; localStorage.setItem('yaw.setup.compact', on ? '1' : '0'); renderModules(); renderCommunication(); scopeIds(); $('compact-modules')?.focus(); },
     gitRepo: catalog.gitRepo, gitInit: state.gitInit !== false && !catalog.gitRepo, usesGitHub: answers['tasks.use-github'] !== false,
     readOnly: sectionEditing(), onExplain: explain, compactRoot: $('module-tools'),
-    afterGroup: (group) => group === 'basics' ? sections.get('practices')?.node : null,
     groupNodes: (group) => [...controls.values()].filter((c) => GROUP_INTRO.get(c.q.id) === group && !c.node.hidden).map((c) => c.node),
     // Options are always there so a card keeps its size; they are greyed out while the module is off.
     questionNodes: (name, on) => {
@@ -642,9 +635,41 @@ function applyFacts() {
   if (!options.persistent) facts.push('The local server stops afterwards; yaw web starts it again');
   $('apply-facts').replaceChildren(...facts.map((f) => element('li', f)));
 }
+// Personal or team (T-027): a personal value stays in ~/.yaw/user-profile.yaml, a team value is committed in
+// .yaw/answers.yaml. Default is team; only communication-like preferences (switchable) have the switch.
+const scopeSyncs = [];
+const scopeOf = (q) => state.scopes?.[q.id] === 'personal' ? 'personal' : 'team';
+function scopeSwitch(q, id, label) {
+  const wrap = element('div', undefined, { class: 'scope-toggle' });
+  const toggle = element('input', undefined, { id: `${id}-scope`, type: 'checkbox', role: 'switch', class: 'module-switch scope-switch', 'aria-describedby': `${id}-scope-note` });
+  const note = element('p', '', { class: 'hint scope-note', id: `${id}-scope-note`, 'aria-live': 'polite' });
+  wrap.append(toggle, element('label', 'Personal', { for: `${id}-scope` }), note);
+  const sync = () => {
+    const personal = scopeOf(q) === 'personal';
+    toggle.checked = personal;
+    note.textContent = !personal ? 'Team: committed in .yaw/answers.yaml for everyone.'
+      : 'Personal: only on your machine (~/.yaw/user-profile.yaml). Teammates no longer see this setting.';
+  };
+  toggle.addEventListener('change', () => {
+    if (toggle.checked && scopeOf(q) === 'team' && !window.confirm(`Make "${label}" personal? Teammates will stop seeing it: the value leaves .yaw/answers.yaml and is kept only in your ~/.yaw/user-profile.yaml.`)) {
+      toggle.checked = false;
+      return;
+    }
+    const next = toggle.checked ? 'personal' : 'team';
+    const scopes = { ...(state.scopes ?? {}) };
+    if (next === 'team') delete scopes[q.id]; else scopes[q.id] = next;
+    state.scopes = scopes;
+    sync();
+    update();
+  });
+  scopeSyncs.push(sync);
+  sync();
+  return wrap;
+}
 function loadState(next) {
   const { profile: _ignored, ...rest } = next;
   state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: rest.gitInit ?? !catalog.gitRepo };
+  scopeSyncs.forEach((sync) => sync());
   if (state.modules) for (const name of [...state.modules]) state.modules = toggleModules(catalog.modules, state.modules, name, true);
   visitedSteps.clear();
 
