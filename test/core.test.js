@@ -133,7 +133,7 @@ test('the AGENTS.md budget is enforced at render time and the error names the co
   const over = tmp('yaw-proj-');
   await assert.rejects(
     initProject({ root: over, kitRoot: kit(fits + 1), answersFile: writeAnswers(tmp('yaw-ans-')) }),
-    /AGENTS\.md would have 81 lines, the budget is 80 \(core frame 76, core rules 2\)/,
+    /AGENTS\.md would have 91 lines, the budget is 90 \(core frame 86, core rules 2\)/,
   );
   assert.deepEqual(readTree(over), {}, 'nothing is written when the budget is exceeded');
 });

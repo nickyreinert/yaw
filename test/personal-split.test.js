@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { addModule, initProject, readAnswers, updateProject } from '../core/render/project.js';
 import { collectQuestions, loadModule } from '../core/render/kit.js';
+import { settingClass, switchable } from '../core/interview/policy.js';
 import { resolveCompact } from '../modules/compact/lib/settings.js';
 import { deriveFacts } from '../core/interview/facts.js';
 import { stringify } from '../core/lib/yaml.js';
@@ -12,6 +13,8 @@ import { KIT_ROOT, read, tmp } from './helpers/fixtures.js';
 
 const MODULES = ['core', 'communication'];
 const profileFile = (env) => join(env.HOME, '.yaw/user-profile.yaml');
+// Every setting is team by default; these preferences are switched to personal.
+const PERSONAL = { 'user.language': 'personal', 'user.length': 'personal', 'user.expertise': 'personal', 'user.autonomy': 'personal', 'user.comfort': 'personal' };
 
 function doc(extra = {}, scopes) {
   return {
@@ -22,7 +25,7 @@ function doc(extra = {}, scopes) {
   };
 }
 
-async function project(d = doc()) {
+async function project(d = doc({}, PERSONAL)) {
   const root = tmp('yaw-split-');
   const env = { HOME: tmp('yaw-home-') };
   await initProject({ root, kitRoot: KIT_ROOT, answers: { text: stringify(d), doc: d }, modules: MODULES, env });
@@ -32,11 +35,12 @@ async function project(d = doc()) {
 test('personal answers go to ~/.yaw/user-profile.yaml, never into .yaw/answers.yaml', async () => {
   const { root, env } = await project();
   const committed = read(root, '.yaw/answers.yaml');
-  assert.doesNotMatch(committed, /user\./);
+  for (const id of ['user.language', 'user.length', 'user.expertise']) assert.equal(Object.hasOwn(readAnswers(root).answers, id), false, id);
   assert.match(committed, /idea\.text/);
+  assert.match(committed, /user\.agents/, 'the agent list generates committed files: team only');
   const profile = readFileSync(profileFile(env), 'utf8');
   assert.match(profile, /user\.language: fr/);
-  assert.match(profile, /user\.agents/);
+  assert.doesNotMatch(profile, /user\.agents/);
   // Read path: the profile is merged over the project answers.
   assert.equal(readAnswers(root, { env }).answers['user.length'], 'brief');
   assert.equal(readAnswers(root).answers['user.length'], undefined);
@@ -51,17 +55,36 @@ test('personal style never reaches a committed file in a solo project', async ()
   assert.equal(existsSync(join(root, '.codex')) || /codex/i.test(read(root, '.yaw/manifest.json')), true);
 });
 
-test('a setting switched to team is committed and rendered; one switched to personal leaves the repository', async () => {
-  const scopes = { 'user.length': 'team', 'user.explain': 'team', 'user.expertise': 'team', 'user.language': 'team', 'tasks.use-github': 'personal' };
-  const { root, env } = await project(doc({ 'tasks.use-github': false }, scopes));
+test('default is team: without a switch every setting is committed and rendered', async () => {
+  const { root, env } = await project(doc({ 'tasks.use-github': false }));
   const committed = readAnswers(root).answers;
   assert.equal(committed['user.length'], 'brief');
   assert.equal(committed['user.language'], 'fr');
-  assert.equal(Object.hasOwn(committed, 'tasks.use-github'), false);
-  assert.equal(Object.hasOwn(committed, 'user.agents'), false);
-  assert.match(readFileSync(profileFile(env), 'utf8'), /tasks\.use-github: false/);
+  assert.equal(committed['tasks.use-github'], false);
+  assert.deepEqual(committed['user.agents'], ['claude', 'codex']);
+  assert.equal(existsSync(profileFile(env)), false);
   assert.match(read(root, 'AGENTS.md'), /Chat in "fr"/);
   assert.match(read(root, 'AGENTS.md'), /Prefer bullet points/);
+});
+
+test('only communication-like preferences offer personal; security, Unit Tests and other settings are team only', () => {
+  const questions = new Map(collectQuestions(KIT_ROOT, ['communication', 'comfort', 'review', 'security', 'tasks', 'compact']).map((q) => [q.id, q]));
+  for (const id of ['user.length', 'user.explain', 'user.language', 'user.expertise', 'user.autonomy', 'user.comfort']) {
+    assert.equal(switchable(questions.get(id)), true, id);
+    assert.equal(settingClass(questions.get(id)), 'team', `${id} defaults to team`);
+    assert.equal(settingClass(questions.get(id), { [id]: 'personal' }), 'personal', id);
+  }
+  for (const id of ['quality.unit-tests', 'quality.review-security', 'compact.levers', 'idea.team', 'arch.language', 'tasks.mode', 'tasks.use-github', 'user.agents']) {
+    assert.equal(switchable(questions.get(id)), false, id);
+    assert.equal(settingClass(questions.get(id), { [id]: 'personal' }), 'team', id);
+  }
+  assert.equal(settingClass('user.length'), 'team', 'an unknown or bare id defaults to team');
+});
+
+test('setup view: the Personal switch follows switchable(), default team', () => {
+  const view = readFileSync(join(KIT_ROOT, 'core/web/assets/interview-view.js'), 'utf8');
+  assert.match(view, /if \(switchable\(q\)\) node\.append\(scopeSwitch\(q, id, label\)\)/);
+  assert.doesNotMatch(view, /defaultScope/);
 });
 
 test('hooks and project rules cannot be switched to personal', async () => {
@@ -80,7 +103,7 @@ test('an older answers.yaml with user.* keys still reads and is cleaned on the n
   assert.equal(readAnswers(root, { env }).answers['user.autonomy'], 'act-and-report');
   assert.equal(readAnswers(root, { env }).answers['user.length'], 'brief', 'the saved profile wins');
   await updateProject({ root, kitRoot: KIT_ROOT, env });
-  assert.doesNotMatch(read(root, '.yaw/answers.yaml'), /user\./);
+  for (const id of ['user.autonomy', 'user.length']) assert.equal(Object.hasOwn(readAnswers(root).answers, id), false, id);
   const profile = readFileSync(profileFile(env), 'utf8');
   assert.match(profile, /user\.autonomy: act-and-report/);
   assert.match(profile, /user\.length: brief/);
@@ -89,7 +112,7 @@ test('an older answers.yaml with user.* keys still reads and is cleaned on the n
 test('yaw add writes a personal module answer to the profile only', async () => {
   const { root, env } = await project();
   await addModule({ root, kitRoot: KIT_ROOT, module: 'comfort', newAnswers: { 'user.comfort': ['hygiene'] }, env });
-  assert.doesNotMatch(read(root, '.yaw/answers.yaml'), /user\./);
+  assert.equal(Object.hasOwn(readAnswers(root).answers, 'user.comfort'), false);
   assert.match(readFileSync(profileFile(env), 'utf8'), /user\.comfort:\n\s+- hygiene/);
 });
 
@@ -121,10 +144,11 @@ test('setup form: the Personal switch is validated, saved as scopes and personal
   const answers = { 'idea.text': 'A tiny tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local', 'user.language': 'fr' };
   assert.throws(() => model.normalize({ mode: 'quick', answers, scopes: { 'idea.team': 'personal' } }), /Invalid personal or team setting/);
   assert.throws(() => model.normalize({ mode: 'quick', answers, scopes: { 'user.language': 'mine' } }), /Invalid personal or team setting/);
+  assert.throws(() => model.normalize({ mode: 'quick', answers, scopes: { 'tasks.use-github': 'personal' } }), /Invalid personal or team setting/);
   const shared = model.normalize({ mode: 'quick', answers, scopes: { 'user.language': 'team' } });
   assert.deepEqual(shared.doc.scopes, { 'user.language': 'team' });
   const input = { mode: 'quick', answers };
-  const preview = model.filePreview(input, '.yaw/answers.yaml').content;
-  assert.doesNotMatch(preview, /user\./, 'personal answers are not shown as committed');
-  assert.match(model.filePreview({ ...input, scopes: { 'user.language': 'team' } }, '.yaw/answers.yaml').content, /user\.language: fr/);
+  assert.match(model.filePreview(input, '.yaw/answers.yaml').content, /user\.language: fr/, 'default team: committed');
+  const preview = model.filePreview({ ...input, scopes: { 'user.language': 'personal' } }, '.yaw/answers.yaml').content;
+  assert.doesNotMatch(preview, /user\.language: fr/, 'personal answers are not shown as committed');
 });

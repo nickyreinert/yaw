@@ -7,14 +7,14 @@ export function orderSetupQuestions(questions) {
   return [...questions].sort((a, b) => rank(a) - rank(b));
 }
 export const isPersonal = (q) => q.scope === 'user' && q.id !== 'user.agents';
-// Personal or team (T-027): `scope: user` questions are personal, the others team; `scope: team` (hooks, project
-// rules) cannot be switched. `scopes` is the project's per-setting switch from .yaw/answers.yaml. A personal value
-// lives only in ~/.yaw/user-profile.yaml, a team value in the repository.
-export const switchable = (q) => typeof q !== 'string' && q.scope !== 'team';
+// Personal or team (T-027): every setting is team by default, committed in .yaw/answers.yaml. Only the
+// communication-like preferences (isPersonal) can be switched to personal, kept only in ~/.yaw/user-profile.yaml;
+// all others (security, Unit Tests, hooks, project rules, settings that generate committed files) are team only.
+// `scopes` is the project's per-setting switch from .yaw/answers.yaml.
+export const switchable = (q) => typeof q !== 'string' && isPersonal(q);
 export function settingClass(q, scopes = {}) {
-  const user = typeof q === 'string' ? q.startsWith('user.') : q.scope === 'user';
   if (typeof q !== 'string' && !switchable(q)) return 'team';
-  return ['personal', 'team'].includes(scopes?.[typeof q === 'string' ? q : q.id]) ? scopes[typeof q === 'string' ? q : q.id] : user ? 'personal' : 'team';
+  return scopes?.[typeof q === 'string' ? q : q.id] === 'personal' ? 'personal' : 'team';
 }
 // "Who works on this project?" is Solo or Team (T-027); a saved `external-reviewers` reads as `team`.
 export const migrateAnswers = (answers = {}) => answers['idea.team'] === 'external-reviewers' ? { ...answers, 'idea.team': 'team' } : answers;

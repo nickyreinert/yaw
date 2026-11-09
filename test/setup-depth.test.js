@@ -1,4 +1,4 @@
-// Setup depth Quick / Full (Y-5.10, ADR-0032): selection, relevance, dependency closure, the 80-line AGENTS.md budget.
+// Setup depth Quick / Full (Y-5.10, ADR-0032): selection, relevance, dependency closure, the 90-line AGENTS.md budget.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

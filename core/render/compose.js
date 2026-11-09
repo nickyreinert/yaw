@@ -9,7 +9,7 @@
 import { hashContent } from './files.js';
 
 // M16: hard line budget for the assembled AGENTS.md (ADR-0009).
-export const AGENTS_MAX_LINES = 80;
+export const AGENTS_MAX_LINES = 90;
 
 export const SHARED_FILES = {
   'AGENTS.md': { owner: 'core', style: 'markdown' },

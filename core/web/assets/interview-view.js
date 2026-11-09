@@ -1,5 +1,5 @@
 import { asksIn, effectiveAnswers, visibleQuestions, defaultModules, toggleModules, installDialogCancellation, focusStepStart, interviewDetailText } from './ui-state.js';
-import { isPreference, questionApplies } from '../../interview/policy.js';
+import { isPreference, questionApplies, switchable } from '../../interview/policy.js';
 
 import { CARD_QUESTIONS, GROUP_INTRO, choiceField, decisionIcon, gitInitControl, isInline, renderModuleGroups, renderCommunicationCard, renderStack } from './setup-cards.js';
 import { createPlanCard } from './plan-card.js';
@@ -294,7 +294,7 @@ function buildQuestions() {
     if (q.status) node.append(element('p', q.status, { class: 'hint status', id: `${id}-status` }));
     const describedBy = [q.hint ? `${id}-hint` : '', q.status ? `${id}-status` : ''].filter(Boolean).join(' ');
     if (describedBy) inputs.forEach((i) => i.setAttribute('aria-describedby', describedBy));
-    if (q.scope !== 'team') node.append(scopeSwitch(q, id, label));
+    if (switchable(q)) node.append(scopeSwitch(q, id, label));
     const showHelp = () => explain(label, questionHelp(q), { question: q.id });
     node.addEventListener('focusin', showHelp); node.addEventListener('mouseenter', showHelp);
     let capability, gitHolder;
@@ -636,10 +636,9 @@ function applyFacts() {
   $('apply-facts').replaceChildren(...facts.map((f) => element('li', f)));
 }
 // Personal or team (T-027): a personal value stays in ~/.yaw/user-profile.yaml, a team value is committed in
-// .yaw/answers.yaml. Hooks, the security module and project rules (`scope: team`) have no switch.
+// .yaw/answers.yaml. Default is team; only communication-like preferences (switchable) have the switch.
 const scopeSyncs = [];
-const defaultScope = (q) => q.scope === 'user' ? 'personal' : 'team';
-const scopeOf = (q) => state.scopes?.[q.id] ?? defaultScope(q);
+const scopeOf = (q) => state.scopes?.[q.id] === 'personal' ? 'personal' : 'team';
 function scopeSwitch(q, id, label) {
   const wrap = element('div', undefined, { class: 'scope-toggle' });
   const toggle = element('input', undefined, { id: `${id}-scope`, type: 'checkbox', role: 'switch', class: 'module-switch scope-switch', 'aria-describedby': `${id}-scope-note` });
@@ -649,8 +648,7 @@ function scopeSwitch(q, id, label) {
     const personal = scopeOf(q) === 'personal';
     toggle.checked = personal;
     note.textContent = !personal ? 'Team: committed in .yaw/answers.yaml for everyone.'
-      : defaultScope(q) === 'team' ? 'Personal: only on your machine (~/.yaw/user-profile.yaml). Teammates no longer see this setting.'
-        : 'Personal: only on your machine (~/.yaw/user-profile.yaml), never committed.';
+      : 'Personal: only on your machine (~/.yaw/user-profile.yaml). Teammates no longer see this setting.';
   };
   toggle.addEventListener('change', () => {
     if (toggle.checked && scopeOf(q) === 'team' && !window.confirm(`Make "${label}" personal? Teammates will stop seeing it: the value leaves .yaw/answers.yaml and is kept only in your ~/.yaw/user-profile.yaml.`)) {
@@ -659,7 +657,7 @@ function scopeSwitch(q, id, label) {
     }
     const next = toggle.checked ? 'personal' : 'team';
     const scopes = { ...(state.scopes ?? {}) };
-    if (next === defaultScope(q)) delete scopes[q.id]; else scopes[q.id] = next;
+    if (next === 'team') delete scopes[q.id]; else scopes[q.id] = next;
     state.scopes = scopes;
     sync();
     update();

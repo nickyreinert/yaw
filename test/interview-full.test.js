@@ -176,7 +176,7 @@ test('yaw add team on a solo project fits the budget without committing personal
   const code = await main(['add', 'team', '--yes'], { stdout, stderr, cwd: r.cwd, env: { PATH: NODE_ONLY, HOME: tmp('yaw-home-') }, kitRoot: KIT_ROOT, prompter: { ...scripted(), interactive: false } });
   assert.equal(code, 0, stderr.text());
   const agents = readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8');
-  assert.ok(agents.trimEnd().split('\n').length <= 80);
+  assert.ok(agents.trimEnd().split('\n').length <= 90);
   assert.doesNotMatch(agents, /## Communication|Chat in "|Ask before risky/);
   assert.equal(readManifest(r.cwd).modules.tasks.mode, 'github');
   assert.match(stdout.text(), /existing local tasks are not migrated/);

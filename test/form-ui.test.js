@@ -17,8 +17,6 @@ import { main } from '../core/cli/main.js';
 import { verifyProject } from '../core/cli/init.js';
 import { KIT_ROOT, capture, fakeJust, readTree, tmp } from './helpers/fixtures.js';
 
-// T-027: personal answers are always saved here, never to the repository; presets need consent.
-const PROFILE = '.yaw/user-profile.yaml';
 const setup = (extra = {}) => ({ mode: 'quick', ...extra, answers: { 'idea.text': 'A tiny tool.', 'arch.language': 'typescript', 'arch.runs-on': 'local', ...extra.answers } });
 const fixture = () => {
   const root = tmp('yaw-form-project-'), home = tmp('yaw-form-home-');
@@ -340,7 +338,7 @@ test('web API: entered secrets go only to a private .env, never answers, logs or
   assert.equal(readFileSync(join(f.root, '.env'), 'utf8'), `API_KEY=${JSON.stringify(canary)}\nDATABASE_URL=\n`);
   assert.equal(statSync(join(f.root, '.env')).mode & 0o777, 0o600);
   assert.doesNotMatch(f.errors.text(), /YAW_SECRET_CANARY_9f3a|quoted|punctuation/);
-  assert.deepEqual(Object.keys(readTree(f.home)), [PROFILE], 'only the personal settings (T-027), no preset');
+  assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('web API: existing .env is never read, overwritten or returned', async (t) => {
@@ -528,7 +526,7 @@ test('web API: apply streams logs, runs CLI verification, closes only after deli
   assert.equal(f.server.server.listening, false);
   assert.ok(readManifest(f.root));
   assert.equal(parse(readFileSync(join(f.root, '.yaw/answers.yaml'), 'utf8')).proposal.profiles[0], 'node-cli');
-  assert.deepEqual(Object.keys(readTree(f.home)), [PROFILE], 'only the personal settings (T-027), no preset');
+  assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('web API: failed verification reports files written, not success', async (t) => {
@@ -569,7 +567,7 @@ test('CLI: --web works without a terminal, skip-verify is explicit, no user save
   assert.equal(await done, 0); await browserWork;
   assert.ok(opened); assert.equal(stderr.text(), '');
   assert.match(stdout.text(), /one-time link/);
-  assert.ok(readManifest(f.root)); assert.deepEqual(Object.keys(readTree(f.home)), [PROFILE], 'only the personal settings (T-027), no preset');
+  assert.ok(readManifest(f.root)); assert.deepEqual(Object.keys(readTree(f.home)), [], 'settings default to team (T-027): no personal file, no preset');
 });
 
 test('CLI: --web verifies via just setup and just check; invalid combinations fail', async () => {
