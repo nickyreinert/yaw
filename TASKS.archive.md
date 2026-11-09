@@ -1,5 +1,6 @@
 # Archive
 
+- T-057 Decide on L3 command rewrite — done 2026-11-09: decided not to build now (permission-rule bypass risk, small benefit); revisit after real Savings on/off data
 - T-045 Investigate Safe Verdicts — done 2026-11-08: panel removed by decision (read-only feature), commit bb85255
 - T-021 Add a cheap automatic CI gate — done 2026-11-08
   model: middle tier (Sonnet) · effort: medium
