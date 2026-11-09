@@ -36,7 +36,7 @@ export function previewImprovement({ root, env, kitRoot, input }) {
   const path = project ? 'AGENTS.md' : scope === 'global' ? '~/.yaw/review/rules.md' : '.yaw/review/rules.md';
   const addition = `\n\n## Reviewed improvement\n\n${snippet}\n`;
   const after = current + addition;
-  if (project && after.trimEnd().split('\n').length > 80) throw new ImproveError('This addition exceeds the AGENTS.md 80-line budget. Shorten it or choose review rules.');
+  if (project && after.trimEnd().split('\n').length > 90) throw new ImproveError('This addition exceeds the AGENTS.md 90-line budget. Shorten it or choose review rules.');
   safe(after, kitRoot);
   return { target: input.target, path, instruction: snippet, layerExpected, expected: hashContent(current), afterHash: hashContent(after), diff: fullFileDiff(path, current, after) };
 }

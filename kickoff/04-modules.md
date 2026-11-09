@@ -74,7 +74,7 @@ lastVerified: 2026-10-20
 
 Each output item (hook, skill, agent) can override `agents` and `tokenCost`. Full format: `core/schema/module.schema.json`, reference in `docs/spec/formats.md`. The form uses both: unsupported items are greyed out with the reason, and the live summary shows the expected per-turn token overhead of the selection.
 
-`AGENTS.md` is assembled from the `core` frame and each enabled module's `agentsMd`, with a hard budget of 80 lines in every mode: rendering fails, naming the contributors, when it is exceeded (ADR-0009). Detail goes into `docs/spec/` or the skill.
+`AGENTS.md` is assembled from the `core` frame and each enabled module's `agentsMd`, with a hard budget of 90 lines in every mode: rendering fails, naming the contributors, when it is exceeded (ADR-0009). Detail goes into `docs/spec/` or the skill.
 
 ## 3. Module notes
 

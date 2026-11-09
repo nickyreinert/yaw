@@ -169,7 +169,7 @@ test('expertise: a layperson is still asked the Q and S questions', async () => 
   assert.ok(!r.out.includes('user.language  en  (default)'));
 });
 
-test('yaw add team on a solo project fits the budget without committing personal preferences', async () => {
+test('yaw add team on a solo project fits the budget with communication rules in AGENTS.md (team by default)', async () => {
   const r = await init({ depth: 'full', ...IDEA, 'Use GitHub for the repo': 'y' });
   const stdout = capture();
   const stderr = capture();
@@ -177,7 +177,8 @@ test('yaw add team on a solo project fits the budget without committing personal
   assert.equal(code, 0, stderr.text());
   const agents = readFileSync(join(r.cwd, 'AGENTS.md'), 'utf8');
   assert.ok(agents.trimEnd().split('\n').length <= 90);
-  assert.doesNotMatch(agents, /## Communication|Chat in "|Ask before risky/);
+  assert.match(agents, /Chat in "de"/);
+  assert.match(agents, /Ask before risky/);
   assert.equal(readManifest(r.cwd).modules.tasks.mode, 'github');
   assert.match(stdout.text(), /existing local tasks are not migrated/);
   assert.match(stdout.text(), /not asked team\.session-context: applies only when .*; the default is true {2}\(default\)/);

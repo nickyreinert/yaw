@@ -1,6 +1,6 @@
 # Module rules in AGENTS.md: full wording
 
-`AGENTS.md` has a hard limit of 80 lines (ADR-0009, ADR-0032). A module's `agentsMd` is one dense line where the module has more to say; this page keeps the full rules. The module's `just` recipes and skills carry the details at run time.
+`AGENTS.md` has a hard limit of 90 lines (ADR-0009, ADR-0032). A module's `agentsMd` is one dense line where the module has more to say; this page keeps the full rules. The module's `just` recipes and skills carry the details at run time.
 
 ## core
 

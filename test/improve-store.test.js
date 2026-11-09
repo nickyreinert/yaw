@@ -28,7 +28,7 @@ test('instruction targets are bounded, refuse symlinks/markers and preserve the 
   const f = fixture();
   writeTree(f.root, { 'other.md': '# Instructions\n', 'AGENTS.md': '# AGENTS.md\n' + 'Existing rule.\n'.repeat(78) });
   const input = { target: 'project-instructions', instruction: 'One more rule.' };
-  assert.throws(() => previewImprovement({ ...f, input }), /80-line/);
+  assert.throws(() => previewImprovement({ ...f, input }), /90-line/);
   assert.throws(() => previewImprovement({ ...f, input: { ...input, target: '../outside' } }), /Choose/);
   assert.throws(() => previewImprovement({ ...f, input: { ...input, instruction: '<!-- yaw:core -->\nBad rule.' } }), /markers/);
   const linked = tmp(); symlinkSync(join(f.root, 'other.md'), join(linked, 'AGENTS.md'));

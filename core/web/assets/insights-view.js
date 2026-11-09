@@ -162,7 +162,7 @@ export function createInsights({ api, get }) {
   }
   function instructionEditor(record) {
     const box = el('section', { className: 'improve-instruction' }, el('h3', {}, 'Review an instruction addition'),
-      el('p', { className: 'small muted' }, 'Applies only after reviewing the exact diff. Existing rules stay intact; project instructions keep the 80-line budget.'));
+      el('p', { className: 'small muted' }, 'Applies only after reviewing the exact diff. Existing rules stay intact; project instructions keep the 90-line budget.'));
     const addition = el('textarea', { rows: '4', maxlength: '4000', 'aria-label': 'Candidate instruction addition', value: record.instruction ?? '' });
     const target = el('select', { 'aria-label': 'Instruction target' }, el('option', { value: 'project-instructions' }, 'Current project: AGENTS.md'), el('option', { value: 'project-review-rules' }, 'Current project: reviewer rules'), el('option', { value: 'personal-review-rules' }, 'Personal reviewer defaults'));
     target.value = instructionPreview?.target ?? 'project-instructions';
