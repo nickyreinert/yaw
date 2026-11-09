@@ -87,8 +87,8 @@ test('Quick: depth is the first question; answers.yaml holds the Q answers and t
   assert.match(r.prompter.shown.join(''), /^\nSetup depth\n/);
   assert.deepEqual(r.doc.mode, 'quick');
   assert.deepEqual(r.doc.answers, QUICK);
-  assert.equal(Object.keys(r.repo.answers).some((id) => id.startsWith('user.')), false, 'personal answers stay out of answers.yaml (T-027)');
-  assert.deepEqual(r.profile['user.agents'], ['claude']);
+  for (const id of ['user.language', 'user.autonomy', 'user.expertise']) assert.equal(r.repo.answers[id], QUICK[id], `${id} is saved in answers.yaml (team default, T-027)`);
+  assert.deepEqual(r.repo.answers['user.agents'], ['claude']);
   assert.deepEqual(r.doc.proposal.modules, QUICK_MODULES);
   assert.equal(r.doc.proposal.profiles[0], 'node-cli');
 });

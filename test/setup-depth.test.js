@@ -55,7 +55,8 @@ test('Full: team projects default to GitHub but can use local Git instead', () =
   for (const m of ['github', 'ci', 'team']) assert.ok(!modules.includes(m));
   for (const path of desired.keys()) assert.ok(!path.startsWith('.github/'), path);
   assert.doesNotMatch(desired.get('TASKS.md').content.toString(), /Read-only/);
-  assert.doesNotMatch(desired.get('AGENTS.md').content.toString(), /Chat in "|Ask before risky|just pr|gh-protect/);
+  assert.match(desired.get('AGENTS.md').content.toString(), /Chat in "/, 'communication defaults to team: rendered into AGENTS.md (T-027)');
+  assert.doesNotMatch(desired.get('AGENTS.md').content.toString(), /just pr|gh-protect/);
 });
 
 test('external reviewers use the same team facts and GitHub opt-out as teams', () => {
@@ -118,7 +119,7 @@ test('expanding a real Quick project preserves its mode, answers and edited inst
   assert.equal(code, 0, stderr.text());
   assert.equal(readAnswers(root).mode, 'quick');
   // T-027: yaw add moves the personal answers to ~/.yaw/user-profile.yaml; read over it they are unchanged.
-  assert.equal(Object.keys(readAnswers(root).answers).some((id) => id.startsWith('user.')), false);
+  for (const id of ['user.language', 'user.autonomy', 'user.expertise']) assert.equal(readAnswers(root).answers[id], doc.answers[id], `${id} stays in answers.yaml (team default)`);
   assert.deepEqual(readAnswers(root, { env }).answers, doc.answers);
   assert.deepEqual(readAnswers(root).proposal.modules, [...modules, 'git-hooks']);
   assert.equal(read(root, 'AGENTS.md'), edited);
