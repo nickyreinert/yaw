@@ -15,7 +15,7 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
   spec: kickoff/16-compact-output.md §4 L2 and §8
   acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts
   model: middle tier (Sonnet) · effort: medium
-  status: blocked · resume: Bash, Bash-failure (exit 3), Grep, Read fixtures committed in test/fixtures/claude/ (see README-posttooluse.md); still needed: a SUCCESSFUL WebFetch PostToolUse capture (needs network egress to a fetchable host) and a Copilot CLI `modifiedResult` check.
+  status: blocked · resume: Bash, Bash-failure, Grep, Read and WebFetch fixtures committed in test/fixtures/claude/ (WebFetch: 0edf9e0). Still needed: a Copilot CLI `modifiedResult` check (Copilot not installed here).
 
 ## Backlog
 
