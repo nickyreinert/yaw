@@ -25,3 +25,5 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 
 ## Done → TASKS.archive.md
+
+- T-058 [P3] Personal presets repo (later) — decide whether presets and defaults live in a separate settings-only git repo. Today: `yaw sync` pushes settings and presets to a git target manually; presets and profile always live in HOME, so YAW_HOME does not move them (core/lib/user-store.js:17-23). Open: live store or snapshot, shared vs project-specific presets, automatic pull on new projects.
