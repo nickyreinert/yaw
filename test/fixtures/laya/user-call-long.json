@@ -1,0 +1,186 @@
+{
+  "request": {
+    "state": "{\"prompt\":\"The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. \",\"answerTail\":\"The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. The function parses each line, validates the header and returns the rows. \",\"reaction\":\"That is not what I asked, please revert.\"}",
+    "questions": {
+      "verdict": {
+        "type": "choice",
+        "instructions": "What does reaction say about the result of prompt? prompt and answerTail (the last part of the reply) are context only.",
+        "criteria": {
+          "accepted": "confirms success or accepts the result",
+          "partial": "accepts some, names a remaining gap",
+          "corrected": "says it is wrong, asks for a fix",
+          "abandoned": "cancels or gives up",
+          "new_topic": "moves on without a verdict",
+          "unknown": "no clear verdict"
+        }
+      },
+      "frustration": {
+        "type": "choice",
+        "instructions": "How frustrated is the user in reaction?",
+        "criteria": {
+          "1": "positive or appreciative",
+          "2": "neutral",
+          "3": "impatient or terse correction",
+          "4": "clearly frustrated: complains, repeats",
+          "5": "hostile: insults, profanity, shouting"
+        }
+      },
+      "complaint": {
+        "type": "choice",
+        "instructions": "What does the user complain about in reaction?",
+        "criteria": {
+          "none": "no complaint",
+          "misunderstood_intent": "the assistant misunderstood the intent",
+          "wrong_scope": "changed too much or too little",
+          "broke_something": "something that worked is broken",
+          "ignored_instruction": "an instruction or rule was ignored",
+          "invented_fact_or_api": "a fact, file or API was invented",
+          "incomplete": "the work is unfinished",
+          "other": "another complaint"
+        }
+      },
+      "repeats_request": {
+        "type": "noul",
+        "instructions": "Does reaction repeat an earlier request?"
+      },
+      "cites_ignored_instruction": {
+        "type": "noul",
+        "instructions": "Does reaction point to an instruction the assistant ignored?"
+      },
+      "stops_or_reverts": {
+        "type": "noul",
+        "instructions": "Does reaction stop the work or ask to revert it?"
+      },
+      "profanity_or_shouting": {
+        "type": "noul",
+        "instructions": "Does reaction contain profanity or shouting (capitals, many exclamation marks)?"
+      },
+      "sarcasm": {
+        "type": "noul",
+        "instructions": "Does reaction use sarcasm?"
+      }
+    },
+    "model": "multilingual"
+  },
+  "status": 200,
+  "response": {
+    "model": "laya-rl-agent",
+    "answers": {
+      "verdict": {
+        "type": "choice",
+        "choice": "new_topic",
+        "probabilities": {
+          "accepted": 0.0005,
+          "partial": 0.0008,
+          "corrected": 0.0061,
+          "abandoned": 0.0229,
+          "new_topic": 0.9661,
+          "unknown": 0.0037
+        },
+        "confidence": 0.8989,
+        "answer_confidence": 0.9661,
+        "action": {
+          "act_probability": 1
+        },
+        "x_jev_confidence": 0.9592
+      },
+      "frustration": {
+        "type": "choice",
+        "choice": "3",
+        "probabilities": {
+          "1": 0.1879,
+          "2": 0.2664,
+          "3": 0.3468,
+          "4": 0.1477,
+          "5": 0.0511
+        },
+        "confidence": 0.0877,
+        "answer_confidence": 0.3468,
+        "action": {
+          "act_probability": 1
+        },
+        "x_jev_confidence": 0.1835
+      },
+      "complaint": {
+        "type": "choice",
+        "choice": "none",
+        "probabilities": {
+          "none": 0.9913,
+          "misunderstood_intent": 0.0011,
+          "wrong_scope": 0.0009,
+          "broke_something": 0.0039,
+          "ignored_instruction": 0,
+          "invented_fact_or_api": 0,
+          "incomplete": 0.0023,
+          "other": 0.0005
+        },
+        "confidence": 0.97,
+        "answer_confidence": 0.9913,
+        "action": {
+          "act_probability": 1
+        },
+        "x_jev_confidence": 0.9901
+      },
+      "repeats_request": {
+        "type": "noul",
+        "noul": 0.0216,
+        "confidence": 0.9784,
+        "answer_confidence": 0.9784,
+        "action": {
+          "act_probability": 1
+        }
+      },
+      "cites_ignored_instruction": {
+        "type": "noul",
+        "noul": 0.0288,
+        "confidence": 0.9712,
+        "answer_confidence": 0.9712,
+        "action": {
+          "act_probability": 1
+        }
+      },
+      "stops_or_reverts": {
+        "type": "noul",
+        "noul": 0.0252,
+        "confidence": 0.9748,
+        "answer_confidence": 0.9748,
+        "action": {
+          "act_probability": 1
+        }
+      },
+      "profanity_or_shouting": {
+        "type": "noul",
+        "noul": 0.0432,
+        "confidence": 0.9568,
+        "answer_confidence": 0.9568,
+        "action": {
+          "act_probability": 1
+        }
+      },
+      "sarcasm": {
+        "type": "noul",
+        "noul": 0.05,
+        "confidence": 0.95,
+        "answer_confidence": 0.95,
+        "action": {
+          "act_probability": 1
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 5382,
+      "output_tokens": 0,
+      "state_tokens": 621,
+      "state_tokens_dropped": 0,
+      "truncated": false,
+      "truncated_questions": []
+    },
+    "routing": {
+      "model": "multilingual",
+      "repo": "convaiinnovations/laya/multilingual",
+      "reason": "explicit model='multilingual'",
+      "detection": null,
+      "workflow": null
+    }
+  }
+}

@@ -10,6 +10,7 @@ class Element {
   setAttribute(key, value) { this.attrs[key] = value; }
   addEventListener(name, fn) { (this.events[name] ??= []).push(fn); }
   querySelectorAll() { return []; }
+  get firstChild() { return this.children[0]; }
   get lastChild() { return this.children.at(-1); }
   get text() { return [this.textContent ?? '', ...this.children.map((n) => n instanceof Element ? n.text : String(n))].join(''); }
   all(test) { return [...(test(this) ? [this] : []), ...this.children.flatMap((n) => n instanceof Element ? n.all(test) : [])]; }
@@ -31,6 +32,7 @@ test('Classification tab renders without a temporal dead zone error on the link 
   const get = async (name) => {
     if (name === 'preferences') return { classifier: { ...defaults }, defaults, limits };
     if (name === 'classifier-samples') return [];
+    if (name === 'improve/settings') return { enabledAgents: [], defaultTarget: 'browser:ChatGPT', agents: [] };
     throw new Error(`unexpected ${name}`);
   };
   const reported = [];

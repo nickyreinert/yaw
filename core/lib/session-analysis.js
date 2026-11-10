@@ -13,7 +13,7 @@ export const LABELS = {
 };
 // Transcripts are streamed in full; only single lines over MAX_LINE bytes (usually huge tool output) are skipped unbuffered.
 // READER marks rows read this way, so rows from the older capped reader are read once more.
-const MAX_LINE = 4 * 1024 * 1024, READER = 3;
+const MAX_LINE = 4 * 1024 * 1024, READER = 4;
 const textOf = (content) => typeof content === 'string' ? content : Array.isArray(content)
   ? content.filter((p) => ['text', 'input_text', 'output_text'].includes(p?.type) && typeof p.text === 'string').map((p) => p.text).join('\n') : '';
 
@@ -64,10 +64,22 @@ function toolScan() {
   };
 }
 
+// Text Claude Code itself adds to user lines (slash commands, shell escapes, IDE context, reminders, background-task
+// notices). Seen in recorded transcripts; a user line that holds nothing else is not a human prompt.
+const CLAUDE_WRAPPERS = /<(command-name|command-message|command-args|local-command-stdout|local-command-stderr|local-command-caveat|bash-input|bash-stdout|bash-stderr|ide_opened_file|ide_selection|system-reminder|browser_instruction|task-notification)>[\s\S]*?<\/\1>/g;
+const INTERRUPTED = /^\[Request interrupted by user[^\]]*\]$/;
+export function claudePromptText(text) {
+  const rest = text.replace(CLAUDE_WRAPPERS, '').trim();
+  return INTERRUPTED.test(rest) ? '' : rest;
+}
+
 export function messageOf(agent, o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if (agent === 'claude' && ['user', 'assistant'].includes(o.type)) {
-    return { role: o.type, text: textOf(o.message?.content), time: o.timestamp, id: o.message?.id ?? o.uuid };
+    // isMeta and compact summaries are written by Claude Code (hook feedback, skill bodies, caveats), not typed by a person.
+    if (o.type === 'user' && (o.isMeta || o.isCompactSummary)) return null;
+    const text = textOf(o.message?.content);
+    return { role: o.type, text: o.type === 'user' ? claudePromptText(text) : text, time: o.timestamp, id: o.message?.id ?? o.uuid };
   }
   if (agent === 'codex' && o.type === 'response_item' && o.payload?.type === 'message' && ['user', 'assistant'].includes(o.payload.role)) {
     return { role: o.payload.role, text: textOf(o.payload.content), time: o.timestamp, id: o.payload.id };

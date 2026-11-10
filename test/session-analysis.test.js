@@ -17,6 +17,14 @@ import { makeProject } from './helpers/hooks.js';
 import { longLineFile, peakDuring } from './helpers/long-line.js';
 
 const environment = () => { const home = tmp('yaw-analysis-home-'); return { HOME: home, CODEX_HOME: join(home, '.codex'), CLAUDE_CONFIG_DIR: join(home, '.claude') }; };
+
+test('Claude lines written by Claude Code itself are not human prompts (recorded line shapes)', async () => {
+  const { messages: read } = await readTurns(join(KIT_ROOT, 'test/fixtures/claude/transcript-user-lines.jsonl'), 'claude');
+  assert.deepEqual(read.map((m) => [m.role, m.text]), [
+    ['user', 'Fix the parser'], ['assistant', 'Fixed the parser.'], ['user', 'That is not what I asked'], ['assistant', 'Sorry, corrected.']]);
+  assert.equal(messageMetrics(read).prompts, 2);
+});
+
 const messages = [
   { role: 'user', text: 'Fix the parser', time: '2026-10-24T08:00:00Z' },
   { role: 'assistant', text: 'Parser fixed.', time: '2026-10-24T08:00:02Z' },
@@ -110,7 +118,7 @@ test('long transcripts are read in full; rows from the older capped reader are r
   const data = readAnalysis(env); delete data.rows[0].reader; data.rows[0].metrics.limited = true; writeUserData(env, 'session-analysis.json', data);
   result = await collectAnalysis({ root, env });
   assert.equal(result.reused, 0); row = readAnalysis(env).rows[0];
-  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 3);
+  assert.equal(row.metrics.limited, false); assert.equal(row.reader, 4);
 });
 
 test('message extraction ignores tools and non-text blocks; Unicode lengths and response timing are measured', () => {

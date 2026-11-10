@@ -11,6 +11,13 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 
 ## Active
 
+### T-073 Session classification v2: per-exchange labels — in progress
+- **Brief:** Implement kickoff/17-session-classification.md (ADR-0135): per-exchange assistant and user labels saved locally without text, so Profiling can filter a conversation's turns by admitted error, frustration and the other labels.
+- **Priority:** P2
+- **Model / effort:** middle tier (Sonnet) · effort: high
+- **Spec:** kickoff/17-session-classification.md §13 T1–T8
+- **Resume point:** T1 done (non-human Claude user lines filtered, reader version 4, test/fixtures/claude/transcript-user-lines.jsonl). T2 done: fixtures and findings in test/fixtures/laya/README.md; zero-shot quality is poor on obvious cases. Waiting for the user's decision on how to continue before T3.
+
 ### T-047 Record Claude Code fixtures for output replacement — blocked
 - **Brief:** Capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048. Acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts.
 - **Priority:** P2
