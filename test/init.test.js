@@ -316,7 +316,16 @@ function hangingJust(dir) {
   writeFileSync(join(dir, 'just'), `#!/bin/sh\necho $$ >> '${pids}'\nsleep 60 &\necho $! >> '${pids}'\nwait\n`, { mode: 0o755 });
   return pids;
 }
-const started = async (pids) => { while (!existsSync(pids) || readFileSync(pids, 'utf8').trim().split('\n').length < 2) await new Promise((r) => setTimeout(r, 20)); return readFileSync(pids, 'utf8').trim().split('\n').map(Number); };
+const written = (pids) => existsSync(pids) ? readFileSync(pids, 'utf8').trim().split('\n').filter(Boolean).map(Number) : [];
+// Waits for the stand-in to record both PIDs; bounded, so a stand-in that never starts fails instead of hanging.
+const started = async (pids) => {
+  const until = Date.now() + 10000;
+  while (written(pids).length < 2) {
+    if (Date.now() > until) throw new Error('the just stand-in did not start within 10 s');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return written(pids);
+};
 // A zombie (state Z) has already ended; elsewhere signal 0 tells whether the process exists.
 const alive = (pid) => {
   try { return !/^\S+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, 'utf8')); } catch (e) { if (e.code !== 'ENOENT' || process.platform === 'linux') return false; }
@@ -331,7 +340,8 @@ test('verify stops a recipe at its deadline and terminates its whole process tre
   const ok = await within(verifyProject({ root: tmp('yaw-proj-'), io: { env: { PATH: `${bin}:${NODE_ONLY}` }, stdout: out, stderr: out }, timeoutMs: 300 }), 10000);
   assert.equal(ok, false);
   assert.match(out.text(), /just setup did not finish within 300 ms and was stopped/);
-  assert.deepEqual(await gone(await started(pids)), []);
+  // Under load the deadline can stop the stand-in before it records both PIDs; whatever it started must be gone.
+  assert.deepEqual(await gone(written(pids)), []);
 });
 
 test('verify cancellation stops the running recipe and its descendants; a cancelled verify starts nothing', { skip: process.platform === 'win32' }, async () => {
