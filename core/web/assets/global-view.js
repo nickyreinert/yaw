@@ -378,7 +378,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       h('button', { type: 'button', class: 'primary', disabled: busy || !rows.length, on: { click: () => run(true) },
         title: `Send each prompt/answer turn of these sessions to your local Laya service at ${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}. Experimental and slow; asks before reading messages. Only the counts are saved.` },
       job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} session${rows.length === 1 ? '' : 's'}`),
-      h('a', { href: '#global-settings/improve', class: 'small' }, 'Profiling Settings'));
+      h('a', { href: '#global-settings/classification', class: 'small' }, 'Profiling settings'));
   }
   function collectControls() {
     const busy = Boolean(job.busy);
@@ -397,7 +397,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
         ? ' If the browser blocked the request, check your ad blocker (for example uBlock Origin), allow this local dashboard, then retry.'
         : null,
       job.skipped && job.busy === null ? [' ', h('a', { href: '#global-settings/sessions' }, 'Session history folders →')] :
-        job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Classification settings →')] : null);
+        job.error && job.busy === null && job.classify ? [' ', h('a', { href: '#global-settings/classification' }, 'Profiling settings →')] : null);
   }
   let classifierPoll = 0;
   function drawClassifierJob(jobState) {

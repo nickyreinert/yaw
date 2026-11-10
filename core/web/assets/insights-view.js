@@ -1,4 +1,4 @@
-import { automaticExamples, correctionCount, folderLevel, folderParent, frustrationCount, hasFriction, insightCoverage, reviewPrompt } from './insights-model.js';
+import { automaticExamples, correctionCount, folderLevel, folderParent, frustrationCount, hasFriction, insightCoverage, labelCount, reviewPrompt, unresolvedCount } from './insights-model.js';
 import { CHATS } from './chat-services.js';
 import { createSessionPreview } from './session-preview.js';
 
@@ -17,11 +17,15 @@ const date = (n) => new Date(n).toLocaleString(undefined, { dateStyle: 'medium',
 const labels = (counts) => Object.entries(counts ?? {}).filter(([, n]) => n > 0).map(([label, n]) => `${label.replaceAll('_', ' ')}: ${n}`).join(' · ') || 'Not classified';
 const metric = (title, value, note) => el('div', { className: 'metric' }, el('span', { className: 'eyebrow' }, title), el('strong', {}, value), el('span', { className: 'muted' }, note));
 const rate = (row, count) => row.evaluation?.classified ? count(row) / row.evaluation.classified : null;
+// Saved per-session label counts, so a session list can be narrowed to one kind of difficulty.
+const SIGNALS = [['any', 'Any', () => true], ['error', 'Admitted error', (r) => correctionCount(r) > 0],
+  ['frustrated', 'Frustrated', (r) => labelCount(r, 'sentiment', ['frustrated']) > 0], ['aggressive', 'Aggressive', (r) => labelCount(r, 'sentiment', ['aggressive']) > 0],
+  ['unresolved', 'Unresolved', (r) => unresolvedCount(r) > 0]];
 const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${row.evaluation.classified} turns` : '—';
 
 export function createInsights({ api, get }) {
   let host, context, scope, version = 0, message = '', draft = '', target = null, job = null, poll = 0;
-  let instructionPreview = null;
+  let instructionPreview = null, signal = 'any';
   const report = (error) => say(error.message);
   // Drops everything tied to the open conversation: the review draft, a running review.
   function discard() {
@@ -39,10 +43,16 @@ export function createInsights({ api, get }) {
   const read = (row) => { discard(); return preview.open(row); };
   function say(text) { message = text; draw(); }
   const classified = () => context.rows.filter((r) => r.evaluation);
-  function visibleRows() {
+  function focusRows() {
     if (context.focus === 'all') return context.rows;
     if (context.focus === 'classified') return classified();
     return context.rows.filter(hasFriction);
+  }
+  const visibleRows = () => focusRows().filter(SIGNALS.find(([key]) => key === signal)[2]);
+  function signalFilter() {
+    const rows = focusRows();
+    return el('div', { className: 'subtabs improve-signal', role: 'group', 'aria-label': 'Signal' }, el('span', { className: 'eyebrow' }, 'Signal'),
+      ...SIGNALS.map(([key, label, test]) => button(`${label} (${rows.filter(test).length})`, () => { signal = key; draw(); }, { 'aria-pressed': String(signal === key) })));
   }
   function chart(title, dimension, selectedLabels, kind) {
     const coverage = insightCoverage(context.rows), counts = coverage.counts[dimension];
@@ -108,11 +118,12 @@ export function createInsights({ api, get }) {
     const rows = visibleRows();
     const browse = context.workspace || context.view === 'sessions' ? sessionTable('improve-sessions', rows) : folderBrowser(rows);
     const empty = !rows.length ? el('div', { className: 'improve-empty' }, el('strong', {}, context.focus === 'attention' ? 'No matching friction labels yet' : 'No matching sessions'),
-      el('p', {}, 'Try All classified, choose another project, or classify the sessions in your current filters.'), button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' }))) : browse;
+      el('p', {}, signal === 'any' ? 'Try All classified, choose another project, or classify the sessions in your current filters.' : 'No session here has this signal. Choose Any to see the others.'),
+      signal === 'any' ? button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' })) : button('Show any signal', () => { signal = 'any'; draw(); })) : browse;
     return [metrics, el('div', { className: 'improve-charts' }, chart('Did the task get done?', 'outcome', null, 'outcome'),
       chart('Where did collaboration get difficult?', 'behaviour', ['admits_error', 'apology_loop', 'sycophantic_admission'], 'admission'),
       chart('How did the user react?', 'sentiment', ['frustrated', 'aggressive', 'positive', 'neutral'], 'correction')),
-      el('article', { className: 'card improve-browser' }, tabs, options, el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript beside the list. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), preview.layout(empty))];
+      el('article', { className: 'card improve-browser' }, preview.isOpen() ? null : tabs, preview.isOpen() ? null : options, preview.isOpen() ? null : signalFilter(), preview.isOpen() ? null : el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), preview.layout(empty))];
   }
   function prepare() {
     if (job?.status === 'running') return;
@@ -195,7 +206,7 @@ export function createInsights({ api, get }) {
       el('p', { className: 'improve-notice', role: 'alert' }, el('strong', {}, 'Warning: this prompt can contain sensitive data. Handle with absolute care.'), ' Inspect and redact it before copying or sending it anywhere.'),
       el('p', {}, 'The prompt includes highlighted exchanges and nearby context. The reviewer returns one verdict and up to three actions.'),
       text, actions,
-      el('p', { className: 'small muted' }, 'Instruction changes require a separate diff review and Apply. ', el('a', { href: '#global-settings/improve' }, 'Configure CLI agents'), target.startsWith('browser:') ? ' Copy first, then paste into the new chat; the link contains no conversation text.' : ''),
+      el('p', { className: 'small muted' }, 'Instruction changes require a separate diff review and Apply. ', el('a', { href: '#global-settings/classification' }, 'Configure CLI agents'), target.startsWith('browser:') ? ' Copy first, then paste into the new chat; the link contains no conversation text.' : ''),
       el('div', { 'data-verdict': '' }, ...verdict()));
   }
   // The review options and call to action shown at the top of the open conversation.

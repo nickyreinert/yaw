@@ -9,7 +9,7 @@ import { depthLabel } from '../../interview/depth.js';
 import { CHATS } from './chat-services.js';
 
 const $ = (id) => document.getElementById(id);
-const TABS = ['interview', 'files', 'notifications', 'classification', 'improve', 'sessions', 'review', 'sync', 'features'];
+const TABS = ['interview', 'files', 'notifications', 'classification', 'sessions', 'review', 'sync', 'features'];
 const code = (t) => el('code', t);
 const size = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${Math.round(n / 1024)} KiB` : `${n} B`;
 const day = (s) => Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—';
@@ -49,14 +49,15 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
   const tabHidden = (id) => routeHidden(settingsRoute('global-settings', id));
   const drawTabs = () => document.querySelectorAll('#global-settings-tabs [data-tab]').forEach((b) => { b.hidden = tabHidden(b.dataset.tab); b.setAttribute('aria-pressed', String(b.dataset.tab === tab)); });
   function show(sub, query = '') {
+    if (sub === 'improve') sub = 'classification'; // former Profiling Settings tab, merged into Profiling
     tab = TABS.includes(sub) && !tabHidden(sub) ? sub : 'interview';
     drawTabs();
     for (const id of TABS) $(`gs-${id}`).hidden = id !== tab;
+    $('gs-improve').hidden = tab !== 'classification';
     for (const id of ['sync', 'sessions']) $(`gs-${id}`).classList.add('card', 'settings-panel');
     if (tab === 'interview') (profile ? Promise.resolve(renderInterview()) : loadInterview()).catch(report);
     if (tab === 'notifications') loadNotifications().catch(report);
-    if (tab === 'classification') loadClassifier().catch(report);
-    if (tab === 'improve') loadImprove().catch(report);
+    if (tab === 'classification') { loadClassifier().catch(report); loadImprove().catch(report); }
     if (tab === 'review') loadReview().catch(report);
     if (tab === 'sessions') loadSessions().catch(report);
     if (tab === 'sync') loadSync().catch(report);
@@ -164,7 +165,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
       el('p', 'Browser chats open empty: paste the reviewed prompt yourself. CLI reviews run on the computer running yaw web (normally this computer), in a separate temporary folder, using your existing sign-in and model provider. They may use paid hosted models. YAW shows the response here; it does not apply suggestions automatically.', 'small muted'),
       el('p', 'Install and sign in to Claude Code or Codex separately. YAW does not install them or store credentials. Codex user config is excluded for this restricted review; provider retention still applies.', 'small muted'));
     const actions = el('div', null, 'interview-actions');
-    root.firstChild.append(el('h2', 'Profiling Settings · reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
+    root.firstChild.append(el('h2', 'Reviewers'), el('p', 'Get a diagnosis of selected sessions and suggested improvements to your project instructions. Reviews run only when you request them.'), flow, help,
       el('h3', 'CLI reviewers'), el('p', 'Allow these tools as review choices. Availability is checked on the computer running yaw web.', 'small muted'), choices,
       label, actions);
     actions.append(button('Save review destinations', async () => {

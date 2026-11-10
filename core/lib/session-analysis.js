@@ -183,7 +183,7 @@ export function localEndpoint(value = 'http://127.0.0.1:8000') {
   return url.origin;
 }
 
-// Personal classifier settings (Global → Settings → Classification, `yaw sessions evaluate`). The checkpoint is fixed to
+// Personal classifier settings (Global → Settings → Profiling, `yaw sessions evaluate`). The checkpoint is fixed to
 // multilingual because sessions mix languages; the limits keep every turn inside the token budget, so nothing is truncated.
 export const CLASSIFIER_DEFAULTS = Object.freeze({
   endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120,

@@ -88,7 +88,7 @@ test('Profiling pages show a controller with 5 / 10 / All, a start button and a 
     assert.deepEqual(sizes.map((n) => n.text), ['5', '10', 'All'], route);
     assert.equal(sizes.filter((n) => n.attrs['aria-pressed'] === 'true').length, 1, `${route}: one size is selected`);
     assert.ok(buttons(controller).some((n) => /^Classify /.test(n.text)), `${route}: start button`);
-    assert.ok(controller.all((n) => n.tag === 'a' && n.attrs.href === '#global-settings/improve').length === 1, `${route}: link to Profiling Settings`);
+    assert.ok(controller.all((n) => n.tag === 'a' && n.attrs.href === '#global-settings/classification').length === 1, `${route}: link to Profiling Settings`);
   }
 });
 

@@ -159,27 +159,50 @@ test('Folder Browser and All Sessions show the same sessions for the same filter
   assert.match(host.text, /Needs attention/); assert.match(flat, /Needs attention/);
 });
 
-test('Read Conversation opens a preview beside the table; its X restores full width without changing the page', async (t) => {
+test('Read Conversation drills down into the conversation in place of the list; Back returns without changing the page', async (t) => {
   const { host, context } = environment(t);
   let sets = 0;
   const view = createInsights({ api: async () => response });
-  const ctx = { ...context, set: () => { sets++; } };
-  view.render(host, ctx);
-  const layout = () => host.all((n) => n.className?.startsWith?.('session-split'))[0];
-  assert.doesNotMatch(layout().className, /has-preview/);
+  view.render(host, { ...context, set: () => { sets++; } });
   assert.equal(host.all((n) => n.tag === 'aside').length, 0);
   await button(host, 'Read conversation →').fire('click');
-  assert.match(layout().className, /has-preview/);
   const aside = host.all((n) => n.tag === 'aside' && n.attrs['aria-label'] === 'Conversation preview')[0];
-  assert.ok(aside, 'right-hand preview');
-  assert.ok(layout().all((n) => n.tag === 'table').length === 1, 'the table is still shown beside it');
-  assert.match(host.text, /Where did work get difficult\?/, 'the page did not change');
+  assert.ok(aside, 'conversation level');
+  assert.equal(host.all((n) => n.tag === 'table').length, 0, 'the list is replaced');
+  assert.equal(field(host, 'Signal'), undefined, 'list filters are hidden on the conversation level');
   assert.match(aside.text, /I changed the renderer/);
-  await field(host, 'Close conversation preview').fire('click');
-  assert.doesNotMatch(layout().className, /has-preview/);
+  await button(host, '← Back to sessions').fire('click');
   assert.equal(host.all((n) => n.tag === 'aside').length, 0);
-  assert.equal(sets, 0, 'closing never navigates');
+  assert.equal(sets, 0, 'Back never navigates');
   assert.match(host.text, /Fix parser/);
+});
+
+test('the Signal filter narrows the session list to one saved label', (t) => {
+  const { host, context } = environment(t);
+  const calm = { ...row, id: 'codex:calm', title: 'Calm session', evaluation: { classified: 1, skipped: 0, counts: { sentiment: { aggressive: 1 } } } };
+  const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
+  view.render(host, { ...context, rows: [row, calm], focus: 'all' });
+  assert.match(host.text, /Fix parser/); assert.match(host.text, /Calm session/);
+  button(host, 'Aggressive (1)').fire('click');
+  assert.doesNotMatch(host.text, /Fix parser/); assert.match(host.text, /Calm session/);
+  button(host, 'Admitted error (1)').fire('click');
+  assert.match(host.text, /Fix parser/); assert.doesNotMatch(host.text, /Calm session/);
+});
+
+test('the conversation Show filter keeps matching turns with one turn of context and counts the hidden messages', async (t) => {
+  const { host, context } = environment(t);
+  const messages = [1, 2, 3, 4, 5].flatMap((turn) => [
+    { index: (turn - 1) * 2, turn, role: 'user', text: `ask ${turn}`, highlights: [] },
+    { index: (turn - 1) * 2 + 1, turn, role: 'assistant', text: turn === 5 ? 'Sorry, my mistake' : `answer ${turn}`, highlights: turn === 5 ? [{ start: 0, end: 5, kind: 'admission', reason: 'Possible admission' }] : [] }]);
+  const view = createInsights({ api: async () => ({ sessions: [{ id: row.id, turns: 5, candidates: [], messages }] }) });
+  view.render(host, context);
+  await button(host, 'Read conversation →').fire('click');
+  await button(host, 'Apology / mistake (1)').fire('click');
+  assert.doesNotMatch(host.text, /ask 3/); assert.match(host.text, /ask 4/); assert.match(host.text, /my mistake/);
+  assert.match(host.text, /… 6 messages hidden …/);
+  assert.equal(button(host, 'Corrections (0)').disabled, true);
+  await button(host, 'All (10)').fire('click');
+  assert.match(host.text, /ask 1/); assert.doesNotMatch(host.text, /hidden/);
 });
 
 test('the session preview is a reusable component for any session list', async (t) => {

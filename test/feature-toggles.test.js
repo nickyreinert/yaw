@@ -82,7 +82,7 @@ test('features: the toggles are personal preferences, default on, validated and 
 });
 
 test('features: the Features card has Settings Sync and Profiling checkboxes; off hides their Settings tabs', async (t) => {
-  const tabs = ['interview', 'classification', 'improve', 'sync', 'features'].map((tab) => { const b = new Element('button'); b.dataset.tab = tab; return b; });
+  const tabs = ['interview', 'classification', 'sync', 'features'].map((tab) => { const b = new Element('button'); b.dataset.tab = tab; return b; });
   const byId = withDom(t, tabs);
   const { setFeatures } = await import('../core/web/assets/ui-state.js');
   t.after(() => setFeatures({}));
@@ -107,10 +107,10 @@ test('features: the Features card has Settings Sync and Profiling checkboxes; of
   assert.deepEqual(calls[0], ['features-save', { sync: true, profiling: false }]);
   assert.deepEqual(applied, [{ sync: true, profiling: false }]);
   assert.equal(calls[1][0], 'remote-settings', 'Server Mode is still saved as before');
-  // Profiling off: Classification and Profiling Settings tabs are hidden and cannot be opened by route.
+  // Profiling off: the Profiling settings tab is hidden and cannot be opened by route.
   assert.equal(ui.show('features'), 'features');
   const hidden = Object.fromEntries(tabs.map((b) => [b.dataset.tab, b.hidden]));
-  assert.deepEqual(hidden, { interview: false, classification: true, improve: true, sync: false, features: false });
+  assert.deepEqual(hidden, { interview: false, classification: true, sync: false, features: false });
   assert.equal(ui.show('classification'), 'interview');
   assert.equal(ui.show('improve'), 'interview');
   setFeatures({ sync: false, profiling: true });
@@ -127,7 +127,7 @@ test('features: links to a hidden page are not shown anywhere', async (t) => {
   assert.equal(link('Edit in Classification', 'global-settings/classification').hidden, false);
   setFeatures({ profiling: false });
   assert.equal(link('Edit in Classification', 'global-settings/classification').hidden, true);
-  assert.equal(link('Edit in Profiling Settings', 'global-settings/improve').hidden, true);
+  assert.equal(link('Edit in Profiling', 'global-settings/improve').hidden, true);
   assert.equal(link('Analytics', 'global-analytics').hidden, false);
 });
 

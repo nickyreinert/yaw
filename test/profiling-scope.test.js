@@ -57,8 +57,8 @@ test('Learn is gone as a feature name from menus, labels, settings, docs and the
     const page = asset(name);
     assert.match(page, /data-route="global-improve">[\s\S]{0,400}<\/svg><\/span> Profiling<\/button>/, `${name}: global menu entry`);
     assert.match(page, /<h1 tabindex="-1">Profiling<\/h1>/, `${name}: page heading`);
-    assert.match(page, /data-tab="improve">Profiling Settings</, `${name}: settings tab`);
-    assert.match(page, /data-tab="classification">Classification</, `${name}: Classification stays the process`);
+    assert.match(page, /data-tab="classification">Profiling</, `${name}: one Profiling settings tab`);
+    assert.doesNotMatch(page, /data-tab="improve"/, `${name}: Profiling Settings is merged into Profiling`);
   }
 });
 
