@@ -14,47 +14,166 @@
     "core": {
       "enabled": true
     },
-    "security": {
+    "code-map": {
+      "enabled": true
+    },
+    "comfort": {
+      "enabled": true
+    },
+    "communication": {
+      "enabled": true
+    },
+    "compact": {
       "enabled": true
     },
     "decisions": {
       "enabled": true
     },
-    "code-map": {
+    "review": {
       "enabled": true
+    },
+    "security": {
+      "enabled": true
+    },
+    "sessions": {
+      "enabled": true
+    },
+    "tasks": {
+      "enabled": true,
+      "mode": "local"
     }
   },
   "mcpServers": [],
   "files": [
     {
+      "path": ".agents/skills/handoff/SKILL.md",
+      "module": "sessions",
+      "hash": "sha256:701f6ccf037077ff3f7d511b1da812c076c72fd17e4d931ab6282954207b5eda",
+      "managed": true
+    },
+    {
+      "path": ".agents/skills/review/SKILL.md",
+      "module": "review",
+      "hash": "sha256:0f651ff0cdcbafd8986cedb37f012a9437f77273db3378bce6aaeae1d2aac29e",
+      "managed": true
+    },
+    {
+      "path": ".claude/agents/review-feature.md",
+      "module": "review",
+      "hash": "sha256:d76ceb478297a07d4e5b35bbec93b53c8e03ee2342c49862bf8b5238486314a7",
+      "managed": true
+    },
+    {
+      "path": ".claude/agents/review-logic.md",
+      "module": "review",
+      "hash": "sha256:1fcc82e34e711706ee022b3c2ffb4fb16d44a55bad955f9e908edbdc9a1400a1",
+      "managed": true
+    },
+    {
+      "path": ".claude/agents/review-quality.md",
+      "module": "review",
+      "hash": "sha256:37cb2c6616441c8aee8c08ba2f4bebd2b20c9e2a7c865e2044d48dce9e4763b6",
+      "managed": true
+    },
+    {
+      "path": ".claude/agents/review-security.md",
+      "module": "review",
+      "hash": "sha256:c4f56d9d2a1be01de9ac2d78e6b20ab030355a1f162b8c46b8ad582c92787646",
+      "managed": true
+    },
+    {
+      "path": ".claude/agents/review-ux.md",
+      "module": "review",
+      "hash": "sha256:e4fa3e50b87fe691800643158475b7420ca5e688d7046f9f3f1b666d613bb859",
+      "managed": true
+    },
+    {
+      "path": ".claude/output-styles/yaw.md",
+      "module": "communication",
+      "hash": "sha256:ef5730824bbf1f0471c785883386fa17c5be5df775230ee61cba4c00256e05e8",
+      "managed": true
+    },
+    {
       "path": ".claude/settings.json",
       "module": "core",
-      "hash": "sha256:b01b90dd7d75cedae087287ae0065dd3e52f5277bf33c747a09e043646857545",
+      "hash": "sha256:7a396614590e9a4fa3753dcf73bfdd1f4fde4761fe0aabf6518c90837a0668a3",
       "managed": true,
       "fragments": [
+        {
+          "module": "comfort",
+          "hash": "sha256:f87798089ba080d047340c3458c089cdf689b8d0547321948c7c3de0def4835e"
+        },
+        {
+          "module": "communication",
+          "hash": "sha256:91ec5482ceac9b83a8ed46a513712c482fef425483df2fa7c7c91c7f55233508"
+        },
+        {
+          "module": "compact",
+          "hash": "sha256:32d35bea52a0214b25224f0677bd4c28cb94eb5cb82b1f138cbb1fadc405ec43"
+        },
         {
           "module": "decisions",
           "hash": "sha256:c4920facde38e4a5caa5b5bd24e6480740ddca867e78c78281f8c99dd1e6810f"
         },
         {
+          "module": "review",
+          "hash": "sha256:7836f388a3e544085b404a16d3de718eb8f1ed61156a930759d404590fc7f322"
+        },
+        {
           "module": "security",
           "hash": "sha256:a9a83820fb3934d78bfdd5b7bed2d2d6e35de5f7af835f0390cc698cb826b875"
+        },
+        {
+          "module": "sessions",
+          "hash": "sha256:2e6e9e2001e0b1f3422d42d0b468b550f28765d36e112e89427f53de4e423e42"
+        },
+        {
+          "module": "tasks",
+          "hash": "sha256:bed91d5d874aec38b22f75e73e3726615f1c7d051e0d8f32f7af9c5a61cfb0cc"
         }
       ]
     },
     {
+      "path": ".claude/skills/handoff/SKILL.md",
+      "module": "sessions",
+      "hash": "sha256:701f6ccf037077ff3f7d511b1da812c076c72fd17e4d931ab6282954207b5eda",
+      "managed": true
+    },
+    {
+      "path": ".claude/skills/review/SKILL.md",
+      "module": "review",
+      "hash": "sha256:0f651ff0cdcbafd8986cedb37f012a9437f77273db3378bce6aaeae1d2aac29e",
+      "managed": true
+    },
+    {
       "path": ".codex/hooks.json",
       "module": "core",
-      "hash": "sha256:69f6cc3d3905bbeb19088422f03b2e59f4fdeca8571062631d66f22b14ca5004",
+      "hash": "sha256:36f5bfd72dfafcffa062467f5c2b3ce856fcc0c3c4ac7be0c01c2d8413e7ff81",
       "managed": true,
       "fragments": [
+        {
+          "module": "comfort",
+          "hash": "sha256:388faa47d6990b1bb33e5c8183288cdda61eb297bb7d0c5f3cbf8d3338fdf348"
+        },
         {
           "module": "decisions",
           "hash": "sha256:a5f5511fb9fca858a532e3c5590b99c2660a27236827b14f7b2f62ce6fca2c4b"
         },
         {
+          "module": "review",
+          "hash": "sha256:8e6c3a86c0f2f475fa05d322d30019b6dc70e996f126fecac21acfd920c598f4"
+        },
+        {
           "module": "security",
           "hash": "sha256:e55db31849e8e584bc3b96e20b4f15fb790a95aa1a52f6699525c4f20ac540ad"
+        },
+        {
+          "module": "sessions",
+          "hash": "sha256:5a3878e0c396283be4712bc3aca21bbbbac20afe12407bbeea50f4cc98e9af92"
+        },
+        {
+          "module": "tasks",
+          "hash": "sha256:8affbb14be6f54fba0c47b970c81844cb2e625518107191bdb59892c25ff4faa"
         }
       ]
     },
@@ -71,21 +190,55 @@
       "managed": true
     },
     {
+      "path": ".github/agents/review-feature.agent.md",
+      "module": "review",
+      "hash": "sha256:840195b2066d87664e7f76965ee55f0981bec14d9f377f8efacc99c8258cf809",
+      "managed": true
+    },
+    {
+      "path": ".github/agents/review-logic.agent.md",
+      "module": "review",
+      "hash": "sha256:8679af1d2def1736b722a23accf4b91e7bc0c7caa627cb53efd9ce5bc98b66ba",
+      "managed": true
+    },
+    {
+      "path": ".github/agents/review-quality.agent.md",
+      "module": "review",
+      "hash": "sha256:599d5f4a0b11ddfdfa1067e12c28497366e234b7d3d0e17709981df3955d3be2",
+      "managed": true
+    },
+    {
+      "path": ".github/agents/review-security.agent.md",
+      "module": "review",
+      "hash": "sha256:dbbb09123a88581d3277282eea7d8d5e0b16e56b3cd176edfd0c32adf7451cba",
+      "managed": true
+    },
+    {
+      "path": ".github/agents/review-ux.agent.md",
+      "module": "review",
+      "hash": "sha256:f0d24b7bffdb63cf7271276795662e5b98c749c2a8fac2e27c1ed3354f0ebe06",
+      "managed": true
+    },
+    {
       "path": ".gitignore",
       "module": "core",
-      "hash": "sha256:a32561fffcaadac62ba2e734b1aa69e1531d1b50d93570c5d04c13e174fc1709",
+      "hash": "sha256:82a03c6a338dac4024d40491cb9ad2009bdef27d08ff4f0676045a1888943553",
       "managed": true,
       "fragments": [
         {
           "module": "node-cli",
           "hash": "sha256:4d56952b0fb13bf8f9b6c13a6d4c34a075bac3af447636a1df4335d7576e2f97"
+        },
+        {
+          "module": "sessions",
+          "hash": "sha256:c10e24fdf41910e5e6d0ceb3f6beba44f6a03efa4c23bfe3dcc1a8d07f28fd17"
         }
       ]
     },
     {
       "path": ".yaw/answers.yaml",
       "module": "core",
-      "hash": "sha256:e183f7b845a515b3ea82f451933d4f347dc5c06aeb1e0e0fc33b5809f211a206",
+      "hash": "sha256:4f5f745fee65d46eb0b803b08194332cb244bbc6e45fb14af1c425de66192773",
       "managed": false
     },
     {
@@ -97,7 +250,7 @@
     {
       "path": "AGENTS.md",
       "module": "core",
-      "hash": "sha256:1fcf73b2739a3a133393e072bbdf539c2caec507e3a6a8ce198a8ce1c3b04c91",
+      "hash": "sha256:4cc4914a1bbcdd9aa4355eac838ecb143bf3642198ef2c8a1dc37f07d56750d0",
       "managed": true,
       "fragments": [
         {
@@ -105,12 +258,32 @@
           "hash": "sha256:ddfc58cc4d8db665b88197af4aa47c538977732d449ccc4f298ec741b1c14422"
         },
         {
+          "module": "comfort",
+          "hash": "sha256:84261ba4cf79a9ce723888939da861bef71fa30ec04ea73abfd6b1686f9d5cb7"
+        },
+        {
+          "module": "communication",
+          "hash": "sha256:949f55b0db2d4e028d7128410fcabcc678aa811a77ea63ab7b8df2d3fc8b1bd7"
+        },
+        {
           "module": "decisions",
           "hash": "sha256:48d242bdc7e46914c90365c444585699551414b8b42cbca51aa0550a80f1acdf"
         },
         {
+          "module": "review",
+          "hash": "sha256:03df2ca4b660e947ff2c2920847b3ca8b211d6899b0742816e05d8f6cb12141a"
+        },
+        {
           "module": "security",
           "hash": "sha256:a2c57948947a88958e2860c98fedbfb40e05a636afa3b280a94a07b5102aed72"
+        },
+        {
+          "module": "sessions",
+          "hash": "sha256:40c5c2ef0e2bdf1c26b8648567685e8a7cf63238b1a0bd21d09dfb1f56deaabe"
+        },
+        {
+          "module": "tasks",
+          "hash": "sha256:bca0e9ecb54d89323da31e47b59e57702ebea3719a6a38aa2c8f38a0f60555c7"
         }
       ]
     },
@@ -118,6 +291,12 @@
       "path": "CLAUDE.md",
       "module": "core",
       "hash": "sha256:336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
+      "managed": true
+    },
+    {
+      "path": "TASKS.md",
+      "module": "tasks",
+      "hash": "sha256:d8558a99118037437274d6eb58fa67b67ab2d725b761c73c13e4d834564d8936",
       "managed": true
     },
     {
@@ -129,7 +308,7 @@
     {
       "path": "docs/engineering.md",
       "module": "core",
-      "hash": "sha256:4ef0ecaff9e5f5a1d401800ca1404cd39d75c09653898c9a72d0a44d6a75a98c",
+      "hash": "sha256:d407eda9857879eb31f8e4d80fd1d3ebfda6f496e9160bb461006eb1c2f77942",
       "managed": true
     },
     {
@@ -147,13 +326,31 @@
     {
       "path": "just/node-cli.just",
       "module": "core",
-      "hash": "sha256:001fececaa114f5dee7e212bbef03c3b7c8776e91eb5ad161c925b2e9b9f3616",
+      "hash": "sha256:2e149e765b808813d9c9a1876919c1250cf440bea9c0594d04cd266d9b53356f",
+      "managed": true
+    },
+    {
+      "path": "just/review.just",
+      "module": "review",
+      "hash": "sha256:7f8c47cfc3b9ae561de7ab3ea758dbfebc177de4b69ee7a715d8ad6da6663a90",
+      "managed": true
+    },
+    {
+      "path": "just/sessions.just",
+      "module": "sessions",
+      "hash": "sha256:8d7e1ef2d7851e551716dafdd9fea44552cd86535d0ec96406f49de799442bff",
+      "managed": true
+    },
+    {
+      "path": "just/tasks.just",
+      "module": "tasks",
+      "hash": "sha256:60fa2744cc75d35129e5968f12780d76f7a1789e036ff14a802633225b46f73a",
       "managed": true
     },
     {
       "path": "justfile",
       "module": "core",
-      "hash": "sha256:9dbab4295461a09885d6d1b20d2500e063d0bf6263d1c714827ca08fe82a9114",
+      "hash": "sha256:74e6df471c4b0363221d82c7023d40720f331f20146ae2b33c0fdda88aad110f",
       "managed": true,
       "fragments": [
         {
@@ -167,6 +364,18 @@
         {
           "module": "node-cli",
           "hash": "sha256:780b9f7f882af30b8bb8dd3c79dd6c2eb235dc1f2059f9627cda19442db29e4b"
+        },
+        {
+          "module": "review",
+          "hash": "sha256:74c8bba5de2f386b66a8deed5fb29bb4aa0a7487013012863c3a825359d6ac9d"
+        },
+        {
+          "module": "sessions",
+          "hash": "sha256:fbed4c95ca03fa5823fbfab771223654fa9c86edc76af424d3063933c338f831"
+        },
+        {
+          "module": "tasks",
+          "hash": "sha256:1ac8bd522a8bfcf57a30624e499b3be0aa9993ae194e8ced94d605040a00a0fb"
         }
       ]
     }

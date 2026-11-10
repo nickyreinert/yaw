@@ -72,6 +72,27 @@ test('Improve starts from saved classified sessions and opens the actual highlig
   assert.equal(field(host, 'Review prompt'), undefined); assert.doesNotMatch(host.text, /My mistake/);
 });
 
+test('changing Review with keeps the page and shows a sensitive-data warning', async (t) => {
+  const { host, context } = environment(t);
+  const view = createInsights({ api: async () => response });
+  view.render(host, context);
+  await button(host, 'Read conversation →').fire('click');
+  await button(host, 'Review this conversation →').fire('click');
+  assert.match(host.text, /sensitive data/); assert.doesNotMatch(host.text, /Actionable review options/);
+  const before = host.children, select = field(host, 'Review destination');
+  select.value = 'browser:Claude'; await select.fire('change');
+  assert.equal(host.children, before, 'no full redraw, so the page does not jump to the top');
+  assert.ok(host.all((n) => n.tag === 'a' && n.text === 'Open Claude ↗').length);
+});
+
+test('a workspace profiling view lists sessions without folder navigation', (t) => {
+  const { host, context } = environment(t);
+  const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
+  view.render(host, { ...context, view: 'folders', workspace: true });
+  assert.equal(field(host, 'View'), undefined); assert.equal(button(host, '← Back'), undefined);
+  assert.match(host.text, /Fix parser/);
+});
+
 test('discarded reviews ignore in-flight conversation results after changing filters', async (t) => {
   const { host, context } = environment(t);
   let release;

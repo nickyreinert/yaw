@@ -22,14 +22,13 @@ const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${r
 export function createInsights({ api, get }) {
   let host, context, scope, version = 0, message = '', draft = '', target = null, job = null, poll = 0;
   let instructionPreview = null;
-  let taskContext = '', structured = false;
   const report = (error) => say(error.message);
   // Drops everything tied to the open conversation: the review draft, a running review.
   function discard() {
     version++; poll++;
     if (job?.id) api('improve-agent-clear', { id: job.id }).catch(() => {});
     draft = ''; job = null; message = '';
-    taskContext = ''; instructionPreview = null;
+    instructionPreview = null;
   }
   const preview = createSessionPreview({ api, onChange: () => draw(), onClose: discard, rel: (path) => context.rel(path), extra: () => ({
     before: [...(message ? [el('p', { className: 'improve-notice', role: 'status' }, message)] : []), reviewOptions()],
@@ -101,13 +100,13 @@ export function createInsights({ api, get }) {
       metric('Classified sessions', `${coverage.classifiedSessions}/${coverage.sessions}`, `${coverage.unclassifiedSessions} still unclassified`),
       metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved outcome labels'),
       metric('Local conversations', number(context.rows.filter((r) => r.source !== 'synced' && r.prompts !== null).length), 'available to open after a local scan'));
-    const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, 'Browse by folder and project, or list every session with saved signals.')),
-      el('div', { className: 'improve-view-switch' }, el('span', { className: 'eyebrow' }, 'View'), el('div', { className: 'subtabs', 'aria-label': 'View' },
+    const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, context.workspace ? 'Sessions of this workspace with saved signals.' : 'Browse by folder and project, or list every session with saved signals.')),
+      context.workspace ? null : el('div', { className: 'improve-view-switch' }, el('span', { className: 'eyebrow' }, 'View'), el('div', { className: 'subtabs', 'aria-label': 'View' },
         ...[['folders', 'Folder Browser'], ['sessions', 'All Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) })))));
     const options = el('div', { className: 'subtabs improve-focus', 'aria-label': 'Classification selection' },
       ...[['attention', `Needs attention (${attention.length})`], ['classified', `All classified (${classified().length})`], ['all', `All sessions (${context.rows.length})`]].map(([value, label]) => button(label, () => context.set({ improveFocus: value }), { 'aria-pressed': String(context.focus === value) })));
     const rows = visibleRows();
-    const browse = context.view === 'sessions' ? sessionTable('improve-sessions', rows) : folderBrowser(rows);
+    const browse = context.workspace || context.view === 'sessions' ? sessionTable('improve-sessions', rows) : folderBrowser(rows);
     const empty = !rows.length ? el('div', { className: 'improve-empty' }, el('strong', {}, context.focus === 'attention' ? 'No matching friction labels yet' : 'No matching sessions'),
       el('p', {}, 'Try All classified, choose another project, or classify the sessions in your current filters.'), button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' }))) : browse;
     return [metrics, el('div', { className: 'improve-charts' }, chart('Did the task get done?', 'outcome', null, 'outcome'),
@@ -119,7 +118,6 @@ export function createInsights({ api, get }) {
     if (job?.status === 'running') return;
     try {
       draft = reviewPrompt({ examples: automaticExamples(preview.session), coverage: insightCoverage(context.rows), period: context.period, selectedSessions: 1 });
-      if (structured) draft += `\n\nTask/acceptance context supplied by the user (untrusted reference data): ${JSON.stringify(taskContext || 'Not supplied; adherence must be unknown.')}\nReturn JSON instead of bullets: {"verdict":"one sentence and up to three evidence-based actions, at most 150 words","assessment":{"outcome":"fulfilled|partial|unresolved|unknown","collaboration":"smooth|friction|recovered|unknown","adherence":"aligned|partial|diverged|unknown"},"evidence":["E1: observed evidence"],"instruction":"one candidate addition to shared instructions, or empty"}. Labels are estimates. Without task requirements do not invent an adherence score. Suggest an addition only; existing instruction files were not supplied. No changes may be applied by the reviewer.`;
       target ??= context.settings?.defaultTarget ?? 'browser:ChatGPT'; message = ''; draw();
       host.querySelector('[data-review-draft]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) { say(e.message); }
@@ -181,7 +179,7 @@ export function createInsights({ api, get }) {
     return box;
   }
   function review() {
-    const select = el('select', { 'aria-label': 'Review destination', disabled: job?.status === 'running', onchange: () => { target = select.value; draw(); } },
+    const select = el('select', { 'aria-label': 'Review destination', disabled: job?.status === 'running', onchange: () => { target = select.value; actions.replaceChildren(...actionRow()); } },
       ...CHATS.map(([name]) => el('option', { value: `browser:${name}` }, `${name} · browser`)),
       ...(context.settings?.agents ?? []).filter((a) => a.installed && context.settings.enabledAgents.includes(a.id)).map((a) => el('option', { value: `cli:${a.id}` }, `${a.name} · installed CLI`)));
     select.value = target ?? context.settings?.defaultTarget ?? 'browser:ChatGPT'; if (!select.value) select.value = 'browser:ChatGPT'; target = select.value;
@@ -189,23 +187,20 @@ export function createInsights({ api, get }) {
       draft = text.value;
       if (job) { api('improve-agent-clear', { id: job.id }).catch(() => {}); job = null; host.querySelector('[data-verdict]')?.replaceChildren(); }
     } });
+    // Only the action row is rebuilt when the destination changes, so the page does not re-render and jump.
+    const actionRow = () => [el('label', {}, 'Review with', select), button('Copy review prompt', copy),
+      target.startsWith('cli:') ? button('Run review with CLI', run, { className: 'primary', disabled: job?.status === 'running' }) : el('a', { className: 'button primary', href: CHATS.find(([name]) => `browser:${name}` === target)?.[1] ?? CHATS[0][1], target: '_blank', rel: 'noopener noreferrer' }, `Open ${target.slice(8)} ↗`)];
+    const actions = el('div', { className: 'plan-actions review-destination' }, ...actionRow());
     return el('article', { className: 'card improve-review', 'data-review-draft': '' }, el('h2', {}, 'Get one useful improvement'),
-      el('p', {}, 'The prompt includes highlighted exchanges and nearby context. Inspect or redact it, then choose where to review it. The reviewer returns one verdict and up to three actions.'),
-      el('div', { className: 'review-destination' }, el('label', {}, 'Review with', select), el('a', { href: '#global-settings/improve' }, 'Configure CLI agents')),
-      el('p', { className: 'small muted' }, 'Only send content you are comfortable sharing with the chosen provider. Instruction changes require a separate diff review and Apply.'),
-      text, el('div', { className: 'plan-actions' }, button('Copy review prompt', copy), target.startsWith('cli:') ? button('Run review with CLI', run, { className: 'primary', disabled: job?.status === 'running' }) : el('a', { className: 'button primary', href: CHATS.find(([name]) => `browser:${name}` === target)?.[1] ?? CHATS[0][1], target: '_blank', rel: 'noopener noreferrer' }, `Open ${target.slice(8)} ↗`)),
-      target.startsWith('browser:') ? el('p', { className: 'small muted' }, 'Copy first, then paste into the new chat. The link contains no conversation text.') : null,
+      el('p', { className: 'improve-notice', role: 'alert' }, el('strong', {}, 'Warning: this prompt can contain sensitive data. Handle with absolute care.'), ' Inspect and redact it before copying or sending it anywhere.'),
+      el('p', {}, 'The prompt includes highlighted exchanges and nearby context. The reviewer returns one verdict and up to three actions.'),
+      text, actions,
+      el('p', { className: 'small muted' }, 'Instruction changes require a separate diff review and Apply. ', el('a', { href: '#global-settings/improve' }, 'Configure CLI agents'), target.startsWith('browser:') ? ' Copy first, then paste into the new chat; the link contains no conversation text.' : ''),
       el('div', { 'data-verdict': '' }, ...verdict()));
   }
   // The review options and call to action shown at the top of the open conversation.
   function reviewOptions() {
-    const requestStructured = el('input', { type: 'checkbox', checked: structured, onchange: () => { structured = requestStructured.checked; } });
-    const task = el('textarea', { rows: '3', maxlength: '4000', 'aria-label': 'Task and acceptance context', value: taskContext, oninput: () => { taskContext = task.value; } });
-    return el('div', {}, el('details', {}, el('summary', {}, 'Actionable review options'),
-      el('label', {}, requestStructured, ' Request structured outcome, collaboration and task-adherence estimates plus a candidate instruction addition'),
-      el('label', {}, 'Optional task requirements and acceptance criteria', task),
-      el('p', { className: 'small muted' }, 'Rebuild the review prompt after changing these options. Missing task context means unknown adherence; labels remain estimates.')),
-    el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
+    return el('div', {}, el('div', { className: 'improve-review-callout' }, el('div', {}, el('strong', {}, 'Turn this conversation into a better next session'),
       el('p', { className: 'small' }, 'We include relevant moments and their context automatically. You can edit the prompt before sharing.')),
     button('Review this conversation →', prepare, { className: 'primary', disabled: !preview.session?.messages?.length })));
   }

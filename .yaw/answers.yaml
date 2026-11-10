@@ -1,16 +1,50 @@
-# .yaw/answers.yaml: this repo is set up with YAW itself (dogfooding, BUILD.md rule 9, BD7: profile node-cli).
+# Written by yaw. Comments are not preserved when yaw rewrites this file (yaw config set and similar commands).
 mode: quick
 answers:
-  user.agents: [claude, codex, copilot]
+  user.agents:
+    - claude
+    - codex
+    - copilot
   user.expertise: expert
   user.language: en
-  user.autonomy: ask-risky
+  user.autonomy: act-and-report
   idea.text: YAW (Yet Another Wrapper), a project setup kit for coding agents; zero-dependency Node CLI.
   idea.team: solo
   arch.language: typescript
   arch.runs-on: local
+  tasks.use-github: true
+  arch.library-strategy: prefer-built-in
+  arch.wrapper: just
+  arch.docker: false
+  quality.unit-tests: true
+  user.comfort:
+    - hygiene
+    - status-line
+    - notifications
+    - cache-reminder
+  user.length: brief
+  user.explain: one-line
+  compact.levers: []
+  quality.review-quality: suggest
+  quality.review-logic: suggest
+  quality.review-ux: suggest
+  quality.review-feature: suggest
+  quality.review-security: suggest
+  quality.review-gate: warn
+  tasks.mode: local
 proposal:
   status: confirmed
   summary: node-cli - Node CLI or tool, zero dependencies where possible; node --test, no Docker.
-  profiles: [node-cli]
-  modules: [core, security, decisions, code-map]
+  profiles:
+    - node-cli
+  modules:
+    - core
+    - code-map
+    - comfort
+    - communication
+    - compact
+    - decisions
+    - review
+    - security
+    - sessions
+    - tasks

@@ -9,3 +9,7 @@
 # yaw:node-cli
 node_modules/
 # /yaw:node-cli
+
+# yaw:sessions
+.yaw/sessions/
+# /yaw:sessions

@@ -17,3 +17,15 @@ import 'just/decisions.just'
 # yaw:node-cli
 import 'just/node-cli.just'
 # /yaw:node-cli
+
+# yaw:review
+import 'just/review.just'
+# /yaw:review
+
+# yaw:sessions
+import 'just/sessions.just'
+# /yaw:sessions
+
+# yaw:tasks
+import 'just/tasks.just'
+# /yaw:tasks

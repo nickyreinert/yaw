@@ -634,7 +634,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     const rows = filtered(), [from, to] = bounds();
     if (!['folders', 'sessions'].includes(state.improveView)) state.improveView = DEFAULTS.improveView;
     if (!['attention', 'classified', 'all'].includes(state.improveFocus)) state.improveFocus = 'attention';
-    insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set,
+    insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set, workspace: locked(),
       settings: improvePrefs, view: state.improveView, at: state.improveAt, root: ROOTP, focus: state.improveFocus,
       scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView, state.improveAt]),
       period: `${day(from)} through ${day(to - 1)} UTC; ${rows.length} filtered saved sessions${data.limited ? '; list capped at 20,000' : ''}` });

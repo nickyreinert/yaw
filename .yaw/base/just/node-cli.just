@@ -14,14 +14,14 @@ fmt:
 
 # Syntax check of every .js/.mjs file; shell scripts through shellcheck when it is installed.
 lint:
-    @find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o \( -name '*.js' -o -name '*.mjs' \) -type f -print | while read -r f; do node --check "$f" || exit 1; done
-    @if [ -n "$(find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o -name '*.sh' -type f -print)" ]; then if command -v shellcheck >/dev/null 2>&1; then find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o -name '*.sh' -type f -print | while read -r f; do shellcheck "$f" || exit 1; done; else echo "lint: shellcheck is not installed, shell scripts were not checked"; fi; fi
+    @c='find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o \( -name '\''*.js'\'' -o -name '\''*.mjs'\'' \) -type f -print | while read -r f; do node --check "$f" || exit 1; done'; w='^npm (warn|WARN) |^\(node:\d+\) \w*Warning: |^[a-z-]+: .* is not installed'; if command -v yaw >/dev/null 2>&1; then yaw run --compact --step lint --warn "$w" -- sh -cu "$c"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" run --compact --step lint --warn "$w" -- sh -cu "$c"; else sh -cu "$c"; fi
+    @c='if [ -n "$(find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o -name '\''*.sh'\'' -type f -print)" ]; then if command -v shellcheck >/dev/null 2>&1; then find . \( -name .git -o -name node_modules -o -name .yaw \) -prune -o -name '\''*.sh'\'' -type f -print | while read -r f; do shellcheck "$f" || exit 1; done; else echo "lint: shellcheck is not installed, shell scripts were not checked"; fi; fi'; w='^npm (warn|WARN) |^\(node:\d+\) \w*Warning: |^[a-z-]+: .* is not installed'; if command -v yaw >/dev/null 2>&1; then yaw run --compact --step lint --warn "$w" -- sh -cu "$c"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" run --compact --step lint --warn "$w" -- sh -cu "$c"; else sh -cu "$c"; fi
 
 typecheck:
     @echo "typecheck: not applicable for node-cli (tsc --checkJs is optional and needs a dependency)"
 
 test:
-    npm test
+    @c='npm test'; w='^npm (warn|WARN) |^\(node:\d+\) \w*Warning: |^[a-z-]+: .* is not installed'; if command -v yaw >/dev/null 2>&1; then yaw run --compact --step test --warn "$w" -- sh -cu "$c"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" run --compact --step test --warn "$w" -- sh -cu "$c"; else sh -cu "$c"; fi
 
 check: lint typecheck test audit sync-check
 
@@ -30,4 +30,4 @@ build:
 
 # npm audit only when there are dependencies (needs network then).
 audit:
-    @if [ "$(node -p 'const p = require("./package.json"); Object.keys({ ...p.dependencies, ...p.devDependencies }).length')" != "0" ]; then npm audit; else echo "audit: no dependencies, nothing to audit"; fi
+    @c='if [ "$(node -p '\''const p = require("./package.json"); Object.keys({ ...p.dependencies, ...p.devDependencies }).length'\'')" != "0" ]; then npm audit; else echo "audit: no dependencies, nothing to audit"; fi'; w='^npm (warn|WARN) |^\(node:\d+\) \w*Warning: |^[a-z-]+: .* is not installed'; if command -v yaw >/dev/null 2>&1; then yaw run --compact --step audit --warn "$w" -- sh -cu "$c"; elif [ -f "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" ]; then node "${YAW_KIT:-$HOME/.yaw/kit}/bin/yaw" run --compact --step audit --warn "$w" -- sh -cu "$c"; else sh -cu "$c"; fi
