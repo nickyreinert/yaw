@@ -73,6 +73,32 @@ export function claudePromptText(text) {
   return INTERRUPTED.test(rest) ? '' : rest;
 }
 
+// Transcript facts for the classification signals (spec 17, section 6): tool calls in a reply, tool errors, denied tool
+// calls and interrupts. A denied call is also written with is_error, so it is counted as denied only.
+const DENIED = "The user doesn't want to proceed with this tool use";
+export function claudeEvents(o) {
+  const content = o?.message?.content;
+  const blocks = Array.isArray(content) ? content : [];
+  const events = { tools: [], toolErrors: 0, toolDenied: 0, interrupted: false };
+  if (o?.type === 'assistant') for (const b of blocks) { if (b?.type === 'tool_use' && typeof b.name === 'string') events.tools.push(word(b.name)); }
+  if (o?.type === 'user' && !o.isMeta) {
+    for (const b of blocks) {
+      if (b?.type !== 'tool_result') continue;
+      const text = typeof b.content === 'string' ? b.content : textOf(b.content);
+      if (text.startsWith(DENIED)) events.toolDenied++;
+      else if (b.is_error === true) events.toolErrors++;
+    }
+    events.interrupted = INTERRUPTED.test(textOf(content).replace(CLAUDE_WRAPPERS, '').trim());
+  }
+  return events.tools.length || events.toolErrors || events.toolDenied || events.interrupted ? events : null;
+}
+function addEvents(message, events) {
+  if (!message || !events) return;
+  const e = message.events ??= { tools: [], toolErrors: 0, toolDenied: 0, interrupted: false };
+  e.tools.push(...events.tools); e.toolErrors += events.toolErrors; e.toolDenied += events.toolDenied;
+  e.interrupted ||= events.interrupted;
+}
+
 export function messageOf(agent, o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if (agent === 'claude' && ['user', 'assistant'].includes(o.type)) {
@@ -133,18 +159,23 @@ export async function readTurns(file, agent, { maxUserTurns = Infinity, maxBytes
       let o;
       try { o = JSON.parse(line); } catch { limited = true; continue; }
       scan?.line(o);
+      // Tool results and interrupts belong to the reply before them; tool calls follow the text of their own line.
+      const events = agent === 'claude' ? claudeEvents(o) : null;
+      if (o.type === 'user') addEvents(messages.at(-1), events);
       const m = messageOf(agent, o);
-      if (!m?.text) continue;
+      if (!m?.text) { if (o.type === 'assistant') addEvents(messages.at(-1), events); continue; }
       const key = m.id ? `${m.role}:${m.id}` : null;
       const existing = key && seen.get(key);
       if (existing) {
         if (m.text !== existing.text) existing.text = m.text.startsWith(existing.text) ? m.text : `${existing.text}\n${m.text}`;
+        if (o.type === 'assistant') addEvents(existing, events);
         continue;
       }
       if (messages.length >= maxMessages) { limited = true; break; }
       const message = { role: m.role, text: m.text, time: m.time };
       if (key) seen.set(key, message);
       messages.push(message);
+      if (o.type === 'assistant') addEvents(message, events);
       if (m.role === 'user' && ++userTurns > maxUserTurns) break;
     }
   } finally {
@@ -246,16 +277,14 @@ export function userOutcome(feedback) {
   return null;
 }
 
-// One verified request: loopback only, no redirects, untruncated multilingual inference and valid probabilities.
-async function askLaya(state, settings, fetchFn, signal) {
+// One verified request: loopback only, no redirects, untruncated multilingual inference.
+export async function postLaya(body, settings, fetchFn, signal) {
   let response;
   try {
     response = await fetchFn(`${settings.endpoint}/v1/systemone`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, redirect: 'error',
       signal: signal ? AbortSignal.any([AbortSignal.timeout(settings.timeoutSeconds * 1000), signal]) : AbortSignal.timeout(settings.timeoutSeconds * 1000),
-      body: JSON.stringify({ state, questions: Object.fromEntries(Object.entries(QUESTIONS).map(([key, question]) => [key, {
-        ...question, instructions: `${settings.prompt} ${question.instructions}`,
-      }])), model: 'multilingual', max_len: settings.maxLen }),
+      body: JSON.stringify({ ...body, model: 'multilingual', max_len: settings.maxLen }),
     });
   } catch {
     if (signal?.aborted) throw new Error('Classification stopped; unfinished results were not saved');
@@ -269,17 +298,27 @@ async function askLaya(state, settings, fetchFn, signal) {
   if (result.usage?.truncated !== false || result.routing?.model !== 'multilingual') {
     throw new Error('Laya did not confirm untruncated multilingual inference; no classification result was saved');
   }
+  return result;
+}
+
+// A choice answer with one probability per label, summing to 1, whose choice has the highest probability.
+export function validChoice(a, labels) {
+  const probabilities = a?.probabilities;
+  return Boolean(a && labels.includes(a.choice) && probabilities && Object.keys(probabilities).length === labels.length &&
+    labels.every((l) => Number.isFinite(probabilities[l]) && probabilities[l] >= 0 && probabilities[l] <= 1) &&
+    labels.every((l) => probabilities[l] <= probabilities[a.choice]) &&
+    Math.abs(Object.values(probabilities).reduce((n, v) => n + v, 0) - 1) <= 0.02);
+}
+
+async function askLaya(state, settings, fetchFn, signal) {
+  const result = await postLaya({ state, questions: Object.fromEntries(Object.entries(QUESTIONS).map(([key, question]) => [key, {
+    ...question, instructions: `${settings.prompt} ${question.instructions}`,
+  }])) }, settings, fetchFn, signal);
   const choices = {};
   for (const [key, labels] of Object.entries(LABELS)) {
     const a = result.answers?.[key];
-    const probabilities = a?.probabilities;
-    if (!a || !labels.includes(a.choice) || !probabilities || Object.keys(probabilities).length !== labels.length ||
-      labels.some((l) => !Number.isFinite(probabilities[l]) || probabilities[l] < 0 || probabilities[l] > 1) ||
-      labels.some((l) => probabilities[l] > probabilities[a.choice]) ||
-      Math.abs(Object.values(probabilities).reduce((n, v) => n + v, 0) - 1) > 0.02) {
-      throw new Error('Local Laya service returned invalid label probabilities; no classification result was saved');
-    }
-    choices[key] = { choice: a.choice, p: probabilities[a.choice] };
+    if (!validChoice(a, labels)) throw new Error('Local Laya service returned invalid label probabilities; no classification result was saved');
+    choices[key] = { choice: a.choice, p: a.probabilities[a.choice] };
   }
   return choices;
 }

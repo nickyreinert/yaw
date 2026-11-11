@@ -1,0 +1,9 @@
+{"type":"user","uuid":"u1","timestamp":"2026-11-11T10:00:00Z","message":{"role":"user","content":"Rename x to count in utils.js."}}
+{"type":"assistant","uuid":"a1","timestamp":"2026-11-11T10:00:04Z","message":{"id":"m1","role":"assistant","content":[{"type":"text","text":"My mistake earlier, I will fix it."}]}}
+{"type":"assistant","uuid":"a2","timestamp":"2026-11-11T10:00:05Z","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{}}]}}
+{"type":"user","uuid":"u2","timestamp":"2026-11-11T10:00:06Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"<tool_use_error>File has not been read yet.</tool_use_error>","is_error":true}]}}
+{"type":"assistant","uuid":"a3","timestamp":"2026-11-11T10:00:07Z","message":{"id":"m2","role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{}}]}}
+{"type":"user","uuid":"u3","timestamp":"2026-11-11T10:00:09Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file).","is_error":true}]}}
+{"type":"user","uuid":"u4","timestamp":"2026-11-11T10:00:09Z","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
+{"type":"user","uuid":"u5","timestamp":"2026-11-11T10:01:00Z","message":{"role":"user","content":"I SAID ONLY rename x!!! Revert the refactor, again."}}
+{"type":"assistant","uuid":"a4","timestamp":"2026-11-11T10:01:03Z","message":{"id":"m3","role":"assistant","content":[{"type":"text","text":"Sorry about that."}]}}

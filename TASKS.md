@@ -8,14 +8,15 @@ Audit: 2026-11-02, Node 22.21.1. Findings below come from source review, isolate
 Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAVA_HOME; 7: repository/test issues). Schema examples: 28/28 valid. Shellcheck passed. Optional Claude adapter npm audit: 0 reported vulnerabilities. Live provider/Telegram services and Linux isolation were not exercised.
 
 ## Active
-### T-073 Session classification v2: per-exchange labels — in progress (25 %)
+### T-073 Session classification v2: per-exchange labels — in progress (40 %)
 - **Brief:** Implement kickoff/17-session-classification.md (ADR-0135): per-exchange assistant and user labels saved locally without text, so Profiling can filter a conversation's turns by admitted error, frustration and the other labels.
 - **Priority:** P2
 - **Model / effort:** middle tier (Sonnet) · effort: high
 - **Spec:** kickoff/17-session-classification.md §13 T1–T8
-- **Resume point:** Start T3 per revised spec sections 3-6 and 6.1
+- **Resume point:** Commit T3, then T4: roll-up, schema 2 storage, wire classifyExchanges into collectAnalysis
 - **Journal:**
   - 2026-11-11 User chose rules first (ADR-0136 supersedes ADR-0135); spec revised 2026-11-11: section 6.1 rules, source per value, JSON-object states, reaction first, calibration optional
+  - 2026-11-11 T3 done (uncommitted): reader keeps tool calls/errors/denials/interrupts per message (claudeEvents); core/lib/session-classification.js (exchanges, taxonomy, JSON states, scale/choice/tag parsing, section 6.1 rules, source precedence, classifyExchanges); postLaya/validChoice shared with v1; test/session-classification.test.js + test/fixtures/claude/transcript-events.jsonl; just check 53 failures, all pre-existing (smoke, T-027, T-061, dogfood manifest)
 
 ### T-047 Record Claude Code fixtures for output replacement — blocked
 - **Brief:** Capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048. Acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts.
@@ -84,5 +85,7 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - T-058 Personal presets repo (later) — decide whether presets and defaults live in a separate settings-only git repo; today `yaw sync` pushes them to a git target manually and presets and profile always live in HOME, so YAW_HOME does not move them (core/lib/user-store.js:17-23); open: live store or snapshot, shared vs project-specific presets, automatic pull on new projects
   priority: P3
   model: middle tier (Sonnet) · effort: medium
+- T-074 Custom additions to AGENTS.md
+  priority: P2
 
 ## Done → TASKS.archive.md
