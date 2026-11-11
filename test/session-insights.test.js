@@ -8,6 +8,7 @@ import { insightCoverage, redactPaths, reviewPrompt, REVIEW_LIMITS } from '../co
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { startDashboard } from '../core/web/dashboard.js';
 import { writeUserData } from '../core/lib/user-store.js';
+import { layaV2 } from './helpers/laya-v2.js';
 import { KIT_ROOT, tmp, writeTree } from './helpers/fixtures.js';
 
 const time = '2026-10-24T08:00:00Z';
@@ -69,17 +70,17 @@ test('classification from Improve touches only the filtered session IDs and pres
   await collectAnalysis({ ...f, all: true });
   const before = JSON.stringify(readAnalysis(f.env).rows.find((r) => r.id === 'codex:other'));
   let calls = 0;
-  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async () => {
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async (_url, options) => {
     calls++;
-    return Response.json({ answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((label, i) => [label, i === 0 ? 1 : 0])) }])), usage: { truncated: false }, routing: { model: 'multilingual' } });
+    return layaV2(options);
   } });
   await api.action('evaluate', { all: true, ids: [f.id], confirm: true });
-  assert.equal(calls, 3);
+  assert.equal(calls, 5);
   const after = readAnalysis(f.env);
   assert.equal(JSON.stringify(after.rows.find((r) => r.id === 'codex:other')), before);
   assert.equal(after.rows.find((r) => r.id === f.id).evaluation.classified, 3);
   await assert.rejects(api.action('evaluate', { all: true, ids: ['invented'], confirm: true }), /saved local sessions/);
-  assert.equal(calls, 3);
+  assert.equal(calls, 5);
 });
 
 test('filtered classification skips missing transcripts, classifies available ones and retains saved results', async () => {
@@ -92,13 +93,13 @@ test('filtered classification skips missing transcripts, classifies available on
   writeUserData(f.env, 'session-analysis.json', saved);
   renameSync(join(f.env.CODEX_HOME, other), join(tmp(), 'moved.jsonl'));
   let calls = 0;
-  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async () => {
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async (_url, options) => {
     calls++;
-    return Response.json({ answers: Object.fromEntries(Object.entries(LABELS).map(([key, labels]) => [key, { choice: labels[0], probabilities: Object.fromEntries(labels.map((label, i) => [label, i === 0 ? 1 : 0])) }])), usage: { truncated: false }, routing: { model: 'multilingual' } });
+    return layaV2(options);
   } });
   const result = await api.action('evaluate', { all: true, ids: [f.id, missing.id], confirm: true });
   assert.equal(result.sessions, 1); assert.equal(result.skipped, 1); assert.equal(result.unavailable, 1);
-  assert.equal(calls, 3);
+  assert.equal(calls, 5);
   assert.deepEqual(readAnalysis(f.env).rows.find((r) => r.id === missing.id), missing);
   assert.equal(readAnalysis(f.env).rows.find((r) => r.id === f.id).evaluation.classified, 3);
   const job = api.get['/api/classification-job']();

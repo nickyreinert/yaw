@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { readTurns } from '../core/lib/session-analysis.js';
 import {
   TAXONOMY, admissionRule, answerTail, assistantState, buildExchanges, classifyExchanges, isShouting, labelExchange,
-  questionsFor, reactionRules, repeatsRequest, scaleValue, userState,
+  questionsFor, reactionRules, repeatsRequest, rollup, scaleValue, userState,
 } from '../core/lib/session-classification.js';
 import { KIT_ROOT } from './helpers/fixtures.js';
 
@@ -142,4 +142,31 @@ test('invalid or truncated Laya answers fail the run without partial results', a
   await assert.rejects(classifyWith(messages, { assistant: laya('assistant-call'), user: { response: broken } }), /invalid label probabilities/);
   await assert.rejects(classifyWith(messages, { assistant: { response: truncated }, user: laya('user-call') }), /untruncated/);
   assert.deepEqual(Object.keys(TAXONOMY), ['assistant', 'user']);
+});
+
+test('rollup: final verdict, success, escalation and apology loop (section 7)', () => {
+  const ex = (i, verdict, frustration, admission) => ({ i, assistant: admission ? { admission: { label: admission, source: 'rule' } } : {},
+    user: { verdict: { label: verdict, source: 'rule' }, ...(frustration ? { frustration: { score: frustration, level: Math.round(frustration), source: 'model' } } : {}), tags: [{ key: 'repeats_request', source: 'rule' }] } });
+  const r = rollup([ex(1, 'corrected', 2, 'admits_error'), ex(2, 'corrected', 3.2, 'apology_without_fix'), ex(3, 'new_topic', 4.4, 'none'), ex(4, 'accepted', null), ex(5, 'none', null)]);
+  assert.equal(r.finalVerdict, 'accepted');
+  assert.equal(r.success, 3);
+  assert.equal(r.acceptance, 0.33);
+  assert.equal(r.frustrationPeak, 4.4);
+  assert.equal(r.escalation, true);
+  assert.equal(r.apologyLoop, true);
+  assert.equal(r.counts.user.verdict.corrected, 2);
+  assert.equal(r.counts.user.tags.repeats_request, 5);
+  assert.equal(r.unknown.verdict.noReaction, 1);
+  assert.equal(rollup([]).finalVerdict, null);
+});
+
+test('classifyExchanges stores schema 2 with a roll-up and no message text', async () => {
+  const { result } = await classifyWith([
+    { role: 'user', text: 'Rename x to count in utils.js.' }, { role: 'assistant', text: 'Done: I renamed x to count.' },
+    { role: 'user', text: 'Thanks, perfect.' },
+  ], { assistant: laya('assistant-call'), user: laya('user-call') });
+  assert.equal(result.schema, 2);
+  assert.match(result.taxonomy, /^[a-f0-9]{64}$/);
+  assert.equal(result.calibration, null);
+  assert.ok(result.session && result.exchanges.length);
 });

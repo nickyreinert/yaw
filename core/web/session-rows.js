@@ -15,6 +15,14 @@ const outcomeOf = (counts) => {
   return ranked[0]?.[0] ?? null;
 };
 
+// Schema 2 rows send the roll-up and counts only; exchange indices and fingerprints stay on the device (spec 17, section 8).
+// Rows without a schema are legacy classifications.
+function evaluationOf(e) {
+  if (!e) return null;
+  if (e.schema === 2) return { schema: 2, classified: e.classified, skipped: e.skipped, taxonomy: e.taxonomy, session: e.session, counts: e.session?.counts, evaluated: e.evaluated };
+  return { legacy: true, classified: e.classified, skipped: e.skipped, counts: e.counts, outcomeUnknown: e.outcomeUnknown, outcomeFeedback: e.outcomeFeedback, evaluated: e.evaluated };
+}
+
 function compact(r) {
   const m = r.metrics, e = r.evaluation;
   return {
@@ -28,8 +36,8 @@ function compact(r) {
     medianAnswer: m?.medianAnswerChars ?? null, p95Answer: m?.p95AnswerChars ?? null,
     medianResp: seconds(m?.medianResponseMs), p95Resp: seconds(m?.p95ResponseMs), partial: Boolean(m?.limited),
     toolOutput: r.toolOutput ?? null, compressed: r.compressed === true,
-    outcome: e ? outcomeOf(e.counts?.outcome) : null,
-    evaluation: e ? { classified: e.classified, skipped: e.skipped, counts: e.counts, outcomeUnknown: e.outcomeUnknown, outcomeFeedback: e.outcomeFeedback, evaluated: e.evaluated } : null,
+    outcome: e?.schema === 2 ? e.session?.finalVerdict ?? null : e ? outcomeOf(e.counts?.outcome) : null,
+    evaluation: evaluationOf(e),
   };
 }
 

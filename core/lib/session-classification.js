@@ -208,6 +208,53 @@ export function labelExchange(exchange, { assistant: am, user: um } = {}, thresh
   return { i: exchange.i, fp: exchange.fp, assistant, user, signals };
 }
 
+// Session roll-up (section 7): computed from the exchange labels, no model call.
+const VERDICT_SCORE = { accepted: 5, partial: 3, corrected: 2, abandoned: 1 };
+const mean = (list) => list.length ? Math.round(list.reduce((n, v) => n + v, 0) / list.length * 10) / 10 : null;
+const bump = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
+export function rollup(exchanges, threshold = 0.65) {
+  const counts = { assistant: {}, user: {} }, unknown = {};
+  const tags = {};
+  const note = (category, value, key) => {
+    const reason = value.unknown === 'notApplicable' ? 'model' : value.unknown === 'lowConfidence' ? 'lowConfidence'
+      : value.label === 'unknown' ? (value.p >= threshold ? 'model' : 'lowConfidence') : null;
+    if (reason) { unknown[category] ??= { model: 0, lowConfidence: 0, noReaction: 0 }; unknown[category][reason]++; }
+    if (value.label !== undefined) bump(counts[key][category] ??= {}, value.label);
+    else if (value.level !== undefined) bump(counts[key][category] ??= {}, String(value.level));
+  };
+  for (const e of exchanges) {
+    for (const [category, value] of Object.entries(e.assistant)) note(category, value, 'assistant');
+    for (const [category, value] of Object.entries(e.user)) {
+      if (category === 'tags') for (const t of value) bump(tags, t.key);
+      else note(category, value, 'user');
+    }
+    if (e.user.verdict?.label === 'none') for (const category of ['verdict', 'frustration', 'complaint']) {
+      unknown[category] ??= { model: 0, lowConfidence: 0, noReaction: 0 };
+      unknown[category].noReaction++;
+    }
+  }
+  counts.user.tags = tags;
+  const verdicts = exchanges.map((e) => e.user.verdict?.label);
+  const mapped = verdicts.filter((v) => VERDICT_SCORE[v]);
+  const score = (value) => Number.isFinite(value?.score) ? value.score : null;
+  const frustration = exchanges.map((e) => score(e.user.frustration)).filter((v) => v !== null);
+  const rising = exchanges.some((_, k) => k >= 2 && [0, 1, 2].every((n) => score(exchanges[k - n].user.frustration) !== null)
+    && score(exchanges[k - 2].user.frustration) < score(exchanges[k - 1].user.frustration) && score(exchanges[k - 1].user.frustration) < score(exchanges[k].user.frustration)
+    && score(exchanges[k].user.frustration) >= 4);
+  const admits = (e) => e.assistant.admission && !['none', 'unknown'].includes(e.assistant.admission.label);
+  return {
+    finalVerdict: [...verdicts].reverse().find((v) => v && !['new_topic', 'unknown', 'none'].includes(v)) ?? null,
+    success: mean(mapped.map((v) => VERDICT_SCORE[v])),
+    acceptance: mapped.length ? Math.round(mapped.filter((v) => v === 'accepted').length / mapped.length * 100) / 100 : null,
+    adherence: mean(exchanges.map((e) => score(e.assistant.adherence)).filter((v) => v !== null)),
+    frustrationPeak: frustration.length ? Math.max(...frustration) : null, frustrationMean: mean(frustration),
+    escalation: rising,
+    apologyLoop: exchanges.some((e, k) => k > 0 && exchanges[k - 1].i === e.i - 1 && admits(e) && admits(exchanges[k - 1])),
+    counts, unknown,
+  };
+}
+export const taxonomyHash = (taxonomy = TAXONOMY) => createHash('sha256').update(JSON.stringify(taxonomy)).digest('hex');
+
 // Classify every exchange of one conversation; nothing partial is returned when a request fails.
 export async function classifyExchanges(messages, { agent, fetchFn = fetch, signal, waitIfPaused, onProgress, taxonomy = TAXONOMY, ...options } = {}) {
   const settings = classifierSettings(options);
@@ -230,5 +277,6 @@ export async function classifyExchanges(messages, { agent, fetchFn = fetch, sign
     results.push(labelExchange(exchange, model, settings.threshold));
     onProgress?.({ exchange: exchange.i, exchanges: exchanges.length, complete: true });
   }
-  return { backend: 'laya-multilingual', classified, skipped, threshold: settings.threshold, exchanges: results, evaluated: new Date().toISOString() };
+  return { schema: 2, backend: 'laya-multilingual', taxonomy: taxonomyHash(taxonomy), calibration: null, evaluated: new Date().toISOString(), classified, skipped,
+    threshold: settings.threshold, exchanges: results, session: rollup(results, settings.threshold) };
 }

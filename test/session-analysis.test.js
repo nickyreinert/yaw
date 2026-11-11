@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lstatSync, readFileSync, renameSync, writeFileSync, symlinkSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
+import { layaV2 } from './helpers/laya-v2.js';
 import { classifierSettings, classifyMessages, collectAnalysis, LABELS, localEndpoint, probeClassifier, messageMetrics, messageOf, readAnalysis, readTurns, scanSummary, userOutcome } from '../core/lib/session-analysis.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { dashboardData, sessionsData, startDashboard } from '../core/web/dashboard.js';
@@ -253,14 +254,17 @@ test('UNKNOWN reasons distinguish model abstention from threshold rejection with
   }
 });
 
-test('saved UNKNOWN diagnostics reach Profiling as metadata without conversation text', async () => {
+test('saved schema 2 results reach Profiling as roll-ups without conversation text or turn locations', async () => {
   const env = environment(), root = tmp(); fixture(env, root);
-  const response = responseFor();
-  response.answers.outcome = { choice: 'fulfilled', probabilities: { fulfilled: 0.6, partially: 0, not_fulfilled: 0, abandoned: 0, unknown: 0.4 } };
-  await collectAnalysis({ root, env, classify: true, fetchFn: async () => Response.json(response) });
+  await collectAnalysis({ root, env, classify: true, fetchFn: async (_url, options) => layaV2(options) });
   const saved = readAnalysis(env), data = await sessionsData({ root, kitRoot: KIT_ROOT, env });
-  assert.deepEqual(saved.rows[0].evaluation.outcomeUnknown, { model: 0, lowConfidence: 1, noVerdict: 0 });
-  assert.deepEqual(data.rows[0].evaluation.outcomeUnknown, saved.rows[0].evaluation.outcomeUnknown);
+  const evaluation = saved.rows[0].evaluation;
+  assert.equal(evaluation.schema, 2);
+  assert.equal(evaluation.exchanges.length, 1);
+  assert.ok(evaluation.session.counts.user.verdict);
+  assert.equal(data.rows[0].evaluation.schema, 2);
+  assert.equal('exchanges' in data.rows[0].evaluation, false, 'turn locations stay on the device');
+  assert.deepEqual(data.rows[0].evaluation.counts, evaluation.session.counts);
   assert.doesNotMatch(JSON.stringify([saved, data]), /Fix the parser|Parser fixed|Thanks, works/);
 });
 
@@ -325,23 +329,23 @@ test('classifier job pauses between turns, resumes, and reports progress', async
   let calls = 0;
   const api = createWorkspaceApi({
     root, kitRoot: KIT_ROOT, env,
-    fetchFn: async () => {
+    fetchFn: async (_url, options) => {
       calls++;
-      if (calls === 1) { announceFirst(); return firstResponse; }
-      return Response.json(responseFor());
+      if (calls === 1) { announceFirst(); await firstResponse; }
+      return layaV2(options);
     },
   });
   const run = api.action('evaluate', { confirm: true, all: false });
   await firstStarted;
   assert.equal((await api.action('classifier-pause', {})).status, 'pausing');
-  finishFirst(Response.json(responseFor()));
+  finishFirst();
   for (let i = 0; i < 100 && api.get['/api/classification-job']()?.status !== 'paused'; i++) await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(api.get['/api/classification-job']().status, 'paused');
-  assert.equal(calls, 1, 'the next Laya request waits while paused');
+  assert.equal(calls, 2, 'the next exchange waits while paused');
   await api.action('classifier-resume', {});
   const result = await run;
   assert.equal(result.classified, true);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
   assert.equal(api.get['/api/classification-job']().status, 'completed');
   assert.equal(readAnalysis(env).rows[0].evaluation.classified, 2);
 });

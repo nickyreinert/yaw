@@ -4,6 +4,7 @@ import { boundedLines, findSessions, transcriptFiles } from '../../modules/sessi
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
 import { effectiveSources } from './session-sources.js';
+import { classifyExchanges } from './session-classification.js';
 
 export const LABELS = {
   outcome: ['fulfilled', 'partially', 'not_fulfilled', 'abandoned', 'unknown'],
@@ -478,9 +479,9 @@ export async function collectAnalysis({ root, env, all = false, classify = false
     if (!row.id) continue;
     if (s.transcript && s.stamp) Object.assign(row, { file_key: sourceKey(s.transcript), stamp: s.stamp });
     if (turns.limited) limited++;
-    if (classify) row.evaluation = await classifyMessages(turns.messages, {
-      ...classifier, fetchFn, signal, waitIfPaused,
-      onProgress: ({ turn, turns: total, complete }) => onProgress?.({ session: index + 1, sessions: sessions.length, turn, turns: total, complete }),
+    if (classify) row.evaluation = await classifyExchanges(turns.messages, {
+      ...classifier, agent: s.agent, fetchFn, signal, waitIfPaused,
+      onProgress: ({ exchange, exchanges, complete }) => onProgress?.({ session: index + 1, sessions: sessions.length, turn: exchange, turns: exchanges, complete }),
     });
     if (classify) onProgress?.({ session: index + 1, sessions: sessions.length, turn: turns.messages.filter((m) => m.role === 'user').length,
       turns: turns.messages.filter((m) => m.role === 'user').length, complete: true, sessionComplete: true });
