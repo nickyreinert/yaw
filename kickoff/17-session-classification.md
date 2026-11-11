@@ -2,6 +2,8 @@
 
 **Status: concept, 2026-11-10.** Replaces the label set and storage of the current local Laya classification (`core/lib/session-analysis.js`, ADR-0050, ADR-0068). The decision record for this spec is proposed; implementing it supersedes ADR-0068. Laya facts marked *(verify)* come from the Laya README summary and must be confirmed against a running `laya-serve` before implementation (section 12).
 
+**Revision 2026-11-11 (rules first).** Section 12 showed that zero-shot Laya mislabels obvious cases with high confidence (`test/fixtures/laya/README.md`), and temperature calibration cannot change the winning label. Obvious cases are therefore labelled by transcript signals and phrase rules (section 6); Laya fills only what no rule decides and its values are shown as estimates. No user training is required.
+
 ## 1. Why
 
 The current pipeline sends one state per user turn (`prompt`, `answer`, `nextPrompt`, optional previous pair) with four questions and saves only label counts per session. Defects:
@@ -25,8 +27,9 @@ Goals:
 - Classify per **exchange**, roll up per session, keep per-exchange results (labels and scores, no text).
 - Judge the **assistant reply** and the **user reaction** separately, with separate states.
 - Use **1–5 scales** where a degree matters (adherence, frustration), choice labels where a kind matters, yes/no tags for frustration markers.
+- Label obvious cases (reverts, shouting, repeated or cited instructions, admitted errors, explicit verdicts) by signals and rules, not by the model; every value carries its `source` (`signal`, `rule`, `model`) and model values are marked "estimate".
 - Make every category, label, level description and instruction visible and editable in Settings.
-- Let the user calibrate on their own labelled exchanges.
+- Let the user optionally label exchanges to measure agreement; nothing requires labelling or training.
 
 Non-goals:
 
@@ -46,7 +49,7 @@ Non-goals:
 
 ## 4. Taxonomy (fixed set, editable texts)
 
-Two Laya calls per exchange, one per subject. Each call is one state and several questions in one forward pass.
+Two Laya calls per exchange, one per subject. Each call is one state and several questions in one forward pass. The state is sent as a JSON object, not a string (section 12 finding 5: right `scope` and `admission` labels only as an object).
 
 ### 4.1 Assistant reply
 
@@ -62,7 +65,7 @@ Dropped: `sycophantic_admission` (needs to know the earlier answer was right; no
 
 ### 4.2 User reaction
 
-State: `{ prompt, answerTail, reaction }`. `prompt` and `answerTail` are context; `answerTail` is the last 1,500 bytes of the reply, labelled as an excerpt in the field name and instructions. The full reply is not needed to judge the reaction, and this keeps long replies from causing a skip (an explicit, named excerpt, not silent truncation).
+State: `{ reaction, prompt, answerTail }`, reaction first (section 12: a short reaction after a long prompt and reply was lost). `prompt` and `answerTail` are context; `answerTail` is the last 1,500 bytes of the reply, labelled as an excerpt in the field name and instructions. The full reply is not needed to judge the reaction, and this keeps long replies from causing a skip (an explicit, named excerpt, not silent truncation).
 
 | Key | Type | Labels / levels |
 |---|---|---|
@@ -88,9 +91,9 @@ Laya's `score` type is its weakest primitive (README: SST-5 0.372) and the multi
 
 All scales run 1–5. Direction is stated per category (adherence: higher = better; frustration: higher = worse) and shown in the UI.
 
-## 6. Deterministic signals (no model)
+## 6. Deterministic signals and rules (no model)
 
-Facts from the transcript, recorded per exchange and preferred over model estimates where they overlap:
+Facts from the transcript, recorded per exchange and preferred over model estimates where they overlap. Precedence per value: `signal` > `rule` > `model`.
 
 | Signal | Source (Claude; others when their format is known) |
 |---|---|
@@ -101,6 +104,22 @@ Facts from the transcript, recorded per exchange and preferred over model estima
 | phrase verdict | ADR-0068 rules (section 4.2) |
 
 `interrupted` or `tool_denied` also sets the `stops_or_reverts` tag to yes with `source: signal`.
+
+### 6.1 Phrase and text rules
+
+Rules favour precision: they fire only on explicit wording, in English and German. When no rule fires, the model estimate is used. Text inside code spans and fenced blocks is ignored. Phrase lists live in code and are shown read-only in Settings (section 9).
+
+| Value | Rule (`source: rule`) |
+|---|---|
+| `verdict` | ADR-0068 whole-message rules (section 4.2), plus `corrected` when the reaction contains a revert phrase or "not what I asked" / "nicht was ich wollte" |
+| tag `stops_or_reverts` | revert phrase: revert, undo, roll back, "put it back"; rückgängig, zurücksetzen, "mach das weg" |
+| tag `profanity_or_shouting` | `!!` or more, or three or more consecutive all-caps words of two or more letters, or a word from the profanity list |
+| tag `repeats_request` | reaction and exchange prompt share at least 60 % of their word set (Jaccard, at least 4 words each) |
+| tag `cites_ignored_instruction` | "I (already) said", "I told you", "as I said", "I asked for"; "ich (hab doch) gesagt", "wie gesagt", "ich wollte nur" |
+| `admission` | an error phrase in the reply ("my mistake", "I was wrong", "my bad", "you're right, I …"; "mein Fehler", "du hast recht"): `admits_error` when a file-changing tool call follows it in the reply, else `apology_without_fix` |
+| `frustration` floor | `profanity_or_shouting` by rule or signal → level at least 4; `verdict = corrected` by rule → at least 3. The stored level is max(model level, floor); `source: rule` when the floor decided it |
+
+`adherence`, `scope` and `complaint` have no rules and are always estimates.
 
 ## 7. Session roll-up (computed, no model call)
 
@@ -135,6 +154,7 @@ Insights moves from label counts to these fields: frustration = exchanges with f
 }
 ```
 
+- Every label, score and tag carries `source` (`signal`, `rule`, `model`); the example shows it on `verdict` only. Tags are stored as `{ "key": "…", "source": "…" }`.
 - No message text, excerpts or model prose are saved. New compared with today: exchange indices and fingerprints are saved. This changes the CONCEPT.md statement "saved counts contain no excerpts or turn locations" and needs the decision record.
 - Sync (`session-rows.js`) exports `session` and `counts` only, never `exchanges`, so turn locations stay on the device.
 - Size: about 300 bytes per exchange; a 300-exchange session adds about 90 KB to `session-analysis.json`. Acceptable; revisit if the file exceeds a few MB.
@@ -153,6 +173,8 @@ New **Categories** section below the existing settings:
 Saved in `~/.yaw/web-preferences.json` next to the current classifier settings; only changed texts are stored, defaults live in code. Validation: 1–1,000 characters per description, 1–2,000 per instruction, threshold 0.5–0.99.
 
 ## 10. Calibration
+
+Optional; never needed to use classification. Temperature scaling changes confidence, thresholds and derived scale scores, not the winning choice label; wrong labels are handled by section 6, not here.
 
 - The conversation reader (Global → Improve) and the preview offer **Label this exchange**: verdict, frustration level 1–5, adherence level 1–5 (the categories that matter most; others optional).
 - Labels are saved in `~/.yaw/classification-labels.json` as `{ session id, exchange index, fingerprint, labels }`, no text. A label whose fingerprint no longer matches the transcript is ignored.
@@ -186,7 +208,7 @@ Report deviations to the user before T3 starts.
 |---|---|---|
 | T1 | Fix D6: exclude non-human Claude user lines in `messageOf`/`readTurns`; regression test with recorded lines. Independent of the rest. | Sonnet · medium |
 | T2 | Section 12 verification and Laya fixtures. | Sonnet · medium |
-| T3 | Exchange builder, two states, taxonomy defaults, request builder, choice/scale/tag parsing, signals (sections 3–6). | Sonnet · high |
+| T3 | Exchange builder, two states (JSON objects), taxonomy defaults, request builder, choice/scale/tag parsing, signals and rules with precedence and `source` (sections 3–6); regression tests for the three section 12 cases. | Sonnet · high |
 | T4 | Roll-up, schema 2 storage, sync export limit, legacy handling (sections 7, 8, 11). | Sonnet · high |
 | T5 | Settings Categories section, taxonomy hash, preview per exchange (section 9). | Sonnet · medium |
 | T6 | Insights on v2 fields (section 7). | Sonnet · medium |
@@ -197,4 +219,5 @@ Report deviations to the user before T3 starts.
 
 - Should `scope` move into `adherence` level descriptions to save options, if section 12.2 shows budget pressure?
 - Is 1,500 bytes of `answerTail` enough context for `complaint`? Check on labelled data during T7.
+- Rules cover English and German only; other languages get model-only values for the rule-based categories.
 - Codex, Copilot and Gemini equivalents for the section 6 signals and the D6 filter are unknown; they get model-only results until their formats are recorded.
