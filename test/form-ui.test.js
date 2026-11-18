@@ -86,6 +86,33 @@ test('interview UI: concise setup, focus switch and final module review', () => 
   assert.match(communication, /label: "Response: Should the agent explain its actions\?"/);
   assert.doesNotMatch(communication, /user\.register|user\.examples/);
 });
+
+test('browser setup starts with a dedicated loading screen and hidden workspace chrome', () => {
+  const html = readFileSync(join(KIT_ROOT, 'core/web/assets/index.html'), 'utf8');
+  assert.match(html, /id="setup-loading" aria-labelledby="setup-loading-title"/);
+  assert.match(html, /role="status">Loading setup questions/);
+  assert.match(html, /<progress aria-label="Preparing the setup interview"><\/progress>/);
+  assert.match(html, /<aside class="sidebar" hidden>/);
+  assert.match(html, /<div class="workspace" hidden>/);
+});
+
+test('browser setup requires purpose only outside Git and keeps supplied purpose available', () => {
+  const f = fixture();
+  const input = { mode: 'quick', answers: { 'arch.language': 'typescript', 'arch.runs-on': 'local' } };
+  const purpose = (model) => model.bootstrap().questions.find((q) => q.id === 'idea.text');
+  const fresh = createFormModel(f);
+  assert.equal(purpose(fresh).required, true);
+  assert.deepEqual(fresh.preview(input).unresolved, ['idea.text']);
+  // Linked worktrees use a .git file.
+  writeFileSync(join(f.root, '.git'), 'gitdir: /worktrees/example\n');
+  const git = createFormModel(f);
+  assert.equal(purpose(git).required, false);
+  assert.deepEqual(git.preview(input).unresolved, []);
+  assert.equal(git.normalize(input).doc.proposal.status, 'confirmed');
+  const supplied = 'An existing tool for reviewing photos.';
+  assert.equal(git.normalize({ ...input, answers: { ...input.answers, 'idea.text': supplied } }).doc.answers['idea.text'], supplied);
+});
+
 async function serverFixture(t, extra = {}) {
   const f = fixture();
   const errors = capture();

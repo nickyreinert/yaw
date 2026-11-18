@@ -15,7 +15,7 @@ import { loadSetupDefaults } from '../lib/setup-defaults.js';
 import { DEPTHS, depthOf } from '../interview/depth.js';
 import { deriveFacts } from '../interview/facts.js';
 import { runInterview } from '../interview/engine.js';
-import { missingAnswers, isPersonal, isPreference, migrateAnswers, questionApplies } from '../interview/policy.js';
+import { missingAnswers, isPersonal, isPreference, migrateAnswers, questionApplies, withOptionalPurpose } from '../interview/policy.js';
 import { hostsFor, profileForStack, stackProfile } from '../interview/suggest.js';
 import { collectQuestions, hasModule, listProfiles, loadModule, profileTools } from '../render/kit.js';
 import { MANIFEST, readProjectFile } from '../render/files.js';
@@ -90,10 +90,10 @@ export async function confirmStack({ prompter, profiles, questions, answers }) {
 }
 
 // Setup depth, the first choice (BUILD.md step 7, ADR-0032; doc 03 question 1.3 maps to it). -> 'quick' | 'full' | 'previous' | WEB
-export async function chooseMode({ prompter }) {
+export async function chooseMode({ prompter, gitRepo = false }) {
   const s = prompter.style ?? PLAIN;
   prompter.show(`\n${s.bold('Setup depth')}\n`);
-  prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - agents, purpose, language, runtime and GitHub\n`);
+  prompter.show(`  ${s.cyan('1)')} ${s.green(s.bold('quick'))} - agents, purpose${gitRepo ? ' (optional)' : ''}, language, runtime and GitHub\n`);
   prompter.show(`  ${s.cyan('2)')} basic - Quick plus personal preferences and review gates\n`);
   prompter.show(`  ${s.cyan('3)')} all - every applicable question and optional tool\n`);
   prompter.show(`  ${s.cyan('p)')} Load a previous setup\n`);
@@ -296,6 +296,7 @@ export async function init({ values, positionals, io }) {
   if (!(await guardFolder({ root, io, force: values.force, yes: values.yes, ignore: fromFile ? [values.answers] : [] }))) return cancelled(io);
 
   const profiles = listProfiles(kitRoot);
+  const gitRepo = isGitRepo(root);
   let answersDoc;
   let fileText = null;
   let defaulted = new Set();
@@ -327,7 +328,7 @@ export async function init({ values, positionals, io }) {
     let defaults = { ...preferences.answers };
     let defaultSources = Object.fromEntries(Object.keys(defaults).map((id) => [id, 'saved personal setting']));
     for (;;) {
-      mode = await chooseMode({ prompter: io.prompter });
+      mode = await chooseMode({ prompter: io.prompter, gitRepo });
       if (mode === WEB) return handOff({ io, values, mode: 'quick' });
       if (mode !== 'previous') break;
       const previous = await choosePrevious(io);
@@ -344,7 +345,7 @@ export async function init({ values, positionals, io }) {
     const potential = readdirSync(resolve(kitRoot, 'modules')).filter((name) => hasModule(kitRoot, name)).sort();
     const reusedModules = selectModules({ kitRoot, mode, facts: deriveFacts(defaults), answers: defaults, defaults: moduleDefaults });
     const interviewModules = depthOf(mode) === 'pro' ? potential : depthOf(mode) === 'basic' ? [...new Set(['core', 'communication', 'tasks', 'review', ...moduleDefaults])] : [...new Set([...reusedModules, ...(hasModule(kitRoot, 'communication') ? ['communication'] : [])])];
-    const questions = withGitHubHint(collectQuestions(kitRoot, interviewModules), githubStatus({ root, env: io.env }));
+    const questions = withOptionalPurpose(withGitHubHint(collectQuestions(kitRoot, interviewModules), githubStatus({ root, env: io.env })), gitRepo);
     // Match the browser: personal choices, project, stack, then workflow/tools.
     const isFoundation = (q) => isPreference(q) || q.id === 'user.agents' || /^(idea|arch)\./.test(q.id);
     const rank = (q) => q.id.startsWith('user.') && isFoundation(q) ? 0 : q.id.startsWith('idea.') ? 1 : q.id.startsWith('arch.') ? 2 : 3;
@@ -409,7 +410,7 @@ export async function init({ values, positionals, io }) {
     how = stackProfile(profiles, r.answers).reason;
   }
   if (fromFile && !answersDoc.proposal) {
-    const missing = missingAnswers(collectQuestions(kitRoot, []), answersDoc.answers);
+    const missing = missingAnswers(withOptionalPurpose(collectQuestions(kitRoot, []), gitRepo), answersDoc.answers);
     if (missing.length) throw new ProjectError(`Essential project answers are missing: ${missing.join(', ')}; provide them or a confirmed project proposal. --yes does not choose project facts.`);
   }
   const facts = deriveFacts(answersDoc.answers);

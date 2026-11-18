@@ -131,10 +131,12 @@ function renderWizard(focus = false) {
 function advance() {
   if (stepIndex >= REVIEW) return;
   if (steps[stepIndex].ids.includes('stack') && !stackValid) return;
-  if (steps[stepIndex].groups?.includes('idea') && controls.get('idea.text')?.inputs[0]?.validity.valid === false) { controls.get('idea.text').inputs[0].reportValidity(); return; }
-  if (steps[stepIndex].groups?.includes('idea') && !state.answers['idea.text']?.trim()) {
+  const purpose = steps[stepIndex].groups?.includes('idea') ? controls.get('idea.text') : null;
+  const purposeInput = purpose?.inputs[0];
+  if (purposeInput?.validity.valid === false) { purposeInput.reportValidity(); return; }
+  if (purpose?.q.required && !state.answers['idea.text']?.trim()) {
     error('Describe this project before continuing. Include its users and their main task.');
-    controls.get('idea.text')?.inputs[0]?.focus();
+    purposeInput?.focus();
     return;
   }
   const modules = selectedModules();
@@ -186,7 +188,7 @@ const aboutHelp = () => [helpText('Creates one `AGENTS.md` as the global entry p
 function stepHelp() {
   if (stepIndex === 0) return [element('p', 'Can always be changed')];
   if (stepIndex === 1) return aboutHelp();
-  if (stepIndex === 2) return [helpText('Describe what your app does, its target users and its constraints.'), helpText('Will be stored as a global entry in `AGENTS.md`.')];
+  if (stepIndex === 2) return questionHelp(controls.get('idea.text').q);
   if (stepIndex === STACK) {
     const tools = element('ul'); for (const tool of activeProfile?.requires ?? []) { const item = element('li'); item.append(element('code', tool)); tools.append(item); }
     return [...(activeProfile ? [element('p', 'Environment tools')] : []), tools, helpText('Agent instructions: `AGENTS.md` and `docs/engineering.md`.')];
@@ -204,7 +206,7 @@ function questionHelp(q) {
   const details = interviewDetailText(q.id);
   if (details) return details.map(helpText);
   if (q.id.startsWith('user.')) return aboutHelp();
-  if (q.id === 'idea.text') return [helpText('Describe what your app does, its target users and its constraints.'), helpText('Will be stored as a global entry in `AGENTS.md`.')];
+  if (q.id === 'idea.text') return [helpText(q.hint), helpText('A supplied purpose is saved in `AGENTS.md`.')];
   if (q.id === 'arch.wrapper') return [helpText('Tells the agent to add a wrapper script for common commands like installing, running and checking the project.'), helpText('Shell: `sh project.sh setup`. Just: `just setup`. Make: `make setup`. Off: no additional wrapper. YAW’s checks use `just check`.')];
   if (q.id === 'arch.docker') return [helpText('Tells the agent to set up Docker support.')];
   return [helpText(q.hint || q.label)];
@@ -279,6 +281,7 @@ function buildQuestions() {
       input = element(q.type === 'text' && !shortText ? 'textarea' : 'input', undefined, { id, name: q.id });
       if (q.type === 'text') {
         input.maxLength = 8192;
+        if (q.id === 'idea.text' && q.required) input.setAttribute('aria-required', 'true');
         if (shortText) { input.type = 'text'; input.className = 'short-answer'; }
         if (q.id === 'arch.cost-limit') input.placeholder = 'e.g. EUR 20 / month';
         if (q.id === 'arch.framework') input.placeholder = 'e.g. keep Django — or leave blank';
@@ -493,7 +496,7 @@ function applySecretFields() {
     }));
   }
 }
-function update() {
+function update({ immediate = false } = {}) {
   const activeId = document.activeElement?.id;
   revision++;
   lastPreview = null; promptRevision++;
@@ -509,10 +512,10 @@ function update() {
   if (activeId && document.activeElement?.id !== activeId) $(activeId)?.focus({ preventScroll: true });
   clearTimeout(timer);
   const current = revision;
-  timer = setTimeout(async () => {
-    refreshPrompts();
+  const refresh = async () => {
+    if (!immediate) refreshPrompts();
     try {
-      const body = await (await request('diff')).json();
+      const body = await (await request('preview')).json();
       if (current !== revision) return;
       lastPreview = body; summary(body); actions(true);
       planReady = body.files.length > 0;
@@ -535,7 +538,10 @@ function update() {
         error(e.message); status('Nothing was saved or applied.');
       }
     }
-  }, 180);
+    if (immediate) refreshPrompts();
+  };
+  if (immediate) return refresh();
+  timer = setTimeout(refresh, 180);
 }
 
 async function perform(name, input = state) {
@@ -666,7 +672,7 @@ function scopeSwitch(q, id, label) {
   sync();
   return wrap;
 }
-function loadState(next) {
+function loadState(next, updateOptions) {
   const { profile: _ignored, ...rest } = next;
   state = { ...rest, ...(catalog.editing ? { modules: rest.modules ?? catalog.initial.modules } : {}), gitInit: rest.gitInit ?? !catalog.gitRepo };
   scopeSyncs.forEach((sync) => sync());
@@ -674,7 +680,7 @@ function loadState(next) {
   visitedSteps.clear();
 
   root.querySelectorAll('button[name=mode]').forEach((i) => { i.setAttribute('aria-pressed', String(i.value === depthOf(state.mode))); });
-  update();
+  return update(updateOptions);
 }
 // New setup always starts from global defaults. Presets remain an explicit choice.
 const prefillOptions = [{ value: 'new', label: 'New setup', description: 'From global defaults' }];
@@ -709,8 +715,15 @@ function renderPrefill() {
 }
 
 async function start() {
-  const body = options.bootstrap ?? await (await fetch('/api/bootstrap')).json();
-  catalog = body;
+  catalog = options.bootstrap;
+  if (!catalog) {
+    const response = await fetch('/api/bootstrap');
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error ?? 'Could not load setup questions. Reopen the setup link if the session has expired.');
+    }
+    catalog = await response.json();
+  }
   state.gitInit = !catalog.gitRepo;
   const depthCards = $('setup-depth').querySelector('.depth-options');
   depthCards.replaceChildren(...DEPTHS.map((depth) => {
@@ -777,14 +790,16 @@ async function start() {
     if ($('apply-dialog').returnValue === 'apply') apply();
     else $('secret-fields').replaceChildren();
   });
+  options.onInitialPreview?.();
+  const updateOptions = { immediate: Boolean(options.onInitialPreview) };
   if (catalog.editing) {
-    loadState(catalog.handoff ?? catalog.initial);
+    await loadState(catalog.handoff ?? catalog.initial, updateOptions);
     status('Editing the current project. Saved answers are prefilled; user-edited files will be kept.');
     showView('setup', false);
   } else if (catalog.handoff) {
-    loadState({ modules: null, ...catalog.handoff });
+    await loadState({ modules: null, ...catalog.handoff }, updateOptions);
     status('Continued from the terminal: your answers so far are filled in. Nothing is written until Apply.');
-  } else update();
+  } else await update(updateOptions);
 }
 function showSection(section) {
   const index = ({ start: 0, user: 1, idea: 2, stack: STACK, workflow: WORKFLOW })[section];

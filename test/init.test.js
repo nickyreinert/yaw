@@ -423,6 +423,29 @@ test('init refuses the home folder unless forced and asks before writing into a 
   assert.doesNotMatch(quiet.err, /not empty/);
 });
 
+test('init: Git repositories can leave purpose blank in the terminal or in an answers file', async () => {
+  const readme = '# Existing project\n\nProject documentation.\n';
+  for (const lane of ['terminal', 'answers']) {
+    const dir = tmp('yaw-proj-');
+    mkdirSync(join(dir, '.git'));
+    writeFileSync(join(dir, 'README.md'), readme);
+    const args = ['init', '--skip-verify'];
+    const prompter = scripted(['', '', '', 'typescript', 'local', 'n', 'y', 'n', 'n']);
+    if (lane === 'answers') {
+      const path = join(tmp('yaw-answers-'), 'answers.yaml');
+      writeFileSync(path, 'mode: quick\nanswers:\n  user.agents: [codex]\n  arch.language: typescript\n  arch.runs-on: local\n');
+      args.push('--answers', path, '--yes');
+    }
+    const result = await yaw(args, { cwd: dir, prompter });
+    assert.equal(result.code, 0, result.err);
+    assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), readme);
+    assert.doesNotMatch(readFileSync(join(dir, 'AGENTS.md'), 'utf8'), /- Purpose:/);
+    if (lane === 'terminal') assert.match(prompter.shown.join(''), /Optional for this Git repository/);
+    const edit = await yaw(['edit', 'idea.text', '--skip-verify'], { cwd: dir, prompter: scripted(['', '', 'y']) });
+    assert.equal(edit.code, 0, edit.err);
+  }
+});
+
 test('init puts the idea into README.md: a new file, or a section appended once to an existing one (#171)', async () => {
   const fresh = await yaw(['init', '--answers', EXAMPLE, '--yes', '--skip-verify']);
   assert.equal(fresh.code, 0, fresh.err);

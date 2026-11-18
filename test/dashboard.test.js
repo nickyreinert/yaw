@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dashboardData, startDashboard } from '../core/web/dashboard.js';
+import { startFormServer } from '../core/web/form-server.js';
 import { realRoot, registryFile, withRegistry } from '../modules/sessions/lib/registry.js';
 import { main } from '../core/cli/main.js';
 import { makeProject } from './helpers/hooks.js';
@@ -118,26 +119,28 @@ test('yaw web: the dashboard opens without a setup prompt in an uninitialized pr
   assert.match(help.text(), /^ {2}web {2,}open the local dashboard/m);
 });
 
-test('dashboard serves the complete browser module graph required to leave the loading screen', async (t) => {
-  const root = await makeProject({ modules: ['core'] });
-  const server = await startDashboard({ root, kitRoot: KIT_ROOT, env: home(), signals: false });
-  t.after(() => server.close());
-  const base = `http://127.0.0.1:${server.port}`;
-  const cookie = (await fetch(server.url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
-  const pending = ['/dashboard.js'], visited = new Set(), missing = [];
-  while (pending.length) {
-    const path = pending.pop();
-    if (visited.has(path)) continue;
-    visited.add(path);
-    const response = await fetch(`${base}${path}`, { headers: { cookie } });
-    if (!response.ok) { missing.push(path); continue; }
-    assert.match(response.headers.get('content-type'), /javascript/, path);
-    const source = await response.text();
-    for (const match of source.matchAll(/^\s*(?:import|export)\s+(?:[^;\n]*?\s+from\s+)?['"]([^'"]+)['"]/gm)) {
-      if (!match[1].startsWith('.')) continue;
-      pending.push(new URL(match[1], `${base}${path}`).pathname);
+for (const [view, entry] of [['dashboard', '/dashboard.js'], ['setup', '/app.js']]) {
+  test(`${view} serves the complete browser module graph required to leave the loading screen`, async (t) => {
+    const server = view === 'setup' ? await startFormServer({ signals: false })
+      : await startDashboard({ root: await makeProject({ modules: ['core'] }), kitRoot: KIT_ROOT, env: home(), signals: false });
+    t.after(() => server.close());
+    const base = `http://127.0.0.1:${server.port}`;
+    const cookie = (await fetch(server.url, { redirect: 'manual' })).headers.get('set-cookie').split(';')[0];
+    const pending = [entry], visited = new Set(), missing = [];
+    while (pending.length) {
+      const path = pending.pop();
+      if (visited.has(path)) continue;
+      visited.add(path);
+      const response = await fetch(`${base}${path}`, { headers: { cookie } });
+      if (!response.ok) { missing.push(path); continue; }
+      assert.match(response.headers.get('content-type'), /javascript/, path);
+      const source = await response.text();
+      for (const match of source.matchAll(/^\s*(?:import|export)\s+(?:[^;\n]*?\s+from\s+)?['"]([^'"]+)['"]/gm)) {
+        if (!match[1].startsWith('.')) continue;
+        pending.push(new URL(match[1], `${base}${path}`).pathname);
+      }
     }
-  }
-  assert.deepEqual(missing, [], `Missing startup modules: ${missing.join(', ')}`);
-  assert.ok(visited.has('/project-tree.js'), 'interview tree imported by workspace settings');
-});
+    assert.deepEqual(missing, [], `Missing startup modules: ${missing.join(', ')}`);
+    assert.ok(visited.has('/project-tree.js'), 'interview tree imported by workspace settings');
+  });
+}

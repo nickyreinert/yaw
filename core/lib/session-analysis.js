@@ -4,7 +4,7 @@ import { boundedLines, findSessions, transcriptFiles } from '../../modules/sessi
 import { realRoot, sessionId } from '../../modules/sessions/lib/registry.js';
 import { readUserData, writeUserData } from './user-store.js';
 import { effectiveSources } from './session-sources.js';
-import { classifyExchanges } from './session-classification.js';
+import { buildExchanges, classifyExchanges, taxonomyOverrides } from './session-classification.js';
 
 export const LABELS = {
   outcome: ['fulfilled', 'partially', 'not_fulfilled', 'abandoned', 'unknown'],
@@ -248,6 +248,7 @@ export function classifierSettings(input = {}) {
   }
   // UTF-8 bytes are a conservative token ceiling, so a turn that fits maxTurnBytes always fits maxLen tokens.
   if (out.maxTurnBytes > out.maxLen) throw new Error('maxTurnBytes must not exceed maxLen, or long turns would be truncated');
+  out.taxonomy = taxonomyOverrides(input.taxonomy ?? {});
   return out;
 }
 
@@ -392,6 +393,7 @@ export function classifierSamples(env, limit = 30) {
     }));
 }
 
+const excerpt = (text, max) => text === null ? null : [...text].slice(0, max).join('');
 export async function previewClassification({ env, root, ids, classifier, fetchFn = fetch }) {
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > CLASSIFIER_SAMPLE_LIMIT ||
     ids.some((id) => typeof id !== 'string' || !id || id.length > 512) || new Set(ids).size !== ids.length) {
@@ -410,12 +412,18 @@ export async function previewClassification({ env, root, ids, classifier, fetchF
     const sample = samples.get(id), session = found.get(id);
     if (!session?.transcript) throw new Error('A selected transcript is no longer available in the configured folders. Refresh the sample list and try again.');
     let read;
+    // One prompt more than the limit, so the last previewed exchange has its reaction.
     try { read = await readTurns(session.transcript, session.agent, { maxUserTurns: CLASSIFIER_SAMPLE_TURN_LIMIT + 1 }); }
     catch { throw new Error('Could not read a selected transcript. Check its session folder and file permissions; nothing was saved.'); }
-    const result = await classifyMessages(read.messages, { ...settings, fetchFn, includeTurns: true, maxTurns: CLASSIFIER_SAMPLE_TURN_LIMIT });
-    out.push({ agent: sample.agent, project: sample.project, started: sample.started, ...result });
+    const text = new Map(buildExchanges(read.messages, { agent: session.agent }).map((e) => [e.i, e]));
+    const result = await classifyExchanges(read.messages, { ...settings, agent: session.agent, fetchFn, maxExchanges: CLASSIFIER_SAMPLE_TURN_LIMIT });
+    out.push({
+      agent: sample.agent, project: sample.project, started: sample.started, classified: result.classified, skipped: result.skipped,
+      truncated: text.size > CLASSIFIER_SAMPLE_TURN_LIMIT,
+      exchanges: result.exchanges.map((e) => ({ ...e, prompt: excerpt(text.get(e.i).prompt, 500), answer: excerpt(text.get(e.i).answer, 800), reaction: excerpt(text.get(e.i).reaction, 500) })),
+    });
   }
-  return { sessions: out, message: `Previewed up to ${CLASSIFIER_SAMPLE_TURN_LIMIT} turns per selected session. Predictions and excerpts were not saved.` };
+  return { sessions: out, message: `Previewed up to ${CLASSIFIER_SAMPLE_TURN_LIMIT} exchanges per selected session. Labels and excerpts were not saved.` };
 }
 
 // Sends one fixed, made-up turn (never session text) to check address, model and response format.

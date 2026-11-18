@@ -19,6 +19,12 @@ export function settingClass(q, scopes = {}) {
 // "Who works on this project?" is Solo or Team (T-027); a saved `external-reviewers` reads as `team`.
 export const migrateAnswers = (answers = {}) => answers['idea.team'] === 'external-reviewers' ? { ...answers, 'idea.team': 'team' } : answers;
 export const asksIn =(q, mode) => q.reviewSelected || isPersonal(q) && q.reviewPersonal ? true : isPreference(q) && mode === 'basic' ? true : asksAtDepth(q, mode);
+export function withOptionalPurpose(questions, gitRepo) {
+  if (!gitRepo) return questions;
+  return questions.map((q) => q.id === 'idea.text' ? {
+    ...q, label: `${q.label} (optional)`, required: false, hint: 'Optional for this Git repository. Leave blank if the project’s purpose is already documented.',
+  } : q);
+}
 export const resolved = (q, value) => !q.required || (typeof value === 'string' && value.trim().length > 0);
 export const missingAnswers = (questions, answers) => questions.filter((q) => !resolved(q, answers[q.id])).map((q) => q.id);
 export const sourceOf = (q, used) => used ? 'answered' : q.defaultSource ?? 'documented default';

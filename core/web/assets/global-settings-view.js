@@ -502,7 +502,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
   // Classification -----------------------------------------------------------------------------------------
   const FIELDS = [
     ['endpoint', 'Laya address', 'text', 'Loopback only: http://127.0.0.1:<port> or http://[::1]:<port>. Hosted addresses and redirects are refused.'],
-    ['threshold', 'Confidence threshold', 'number', 'Predictions below this probability are counted as unknown. Higher is stricter.', 0.01],
+    ['threshold', 'Confidence threshold', 'number', 'Predictions below this probability are counted as unknown; used by every category without its own threshold. Higher is stricter.', 0.01],
     ['maxTurnBytes', 'Largest turn (bytes)', 'number', 'A prompt, its answers and the next prompt, as UTF-8. Larger turns are skipped, never shortened. Laya is most accurate up to about 4,000 tokens.', 100],
     ['maxLen', 'Token budget (max_len)', 'number', 'Sent to Laya per turn; must be at least the largest turn. Laya caps it with LAYA_MAX_TOKEN_BUDGET.', 256],
     ['timeoutSeconds', 'Timeout per turn (seconds)', 'number', 'How long to wait for one answer. The first call can be slow while Laya loads its checkpoint.', 10],
@@ -516,7 +516,7 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
     const root = $('gs-classification'); root.replaceChildren();
     const { classifier: saved, defaults, limits } = classifier;
     const card = el('section', null, 'card'); card.append(el('h2', 'Local classifier'));
-    card.append(hint('small muted', 'Classify (in the controller on ', link('Profiling', 'global-improve'), ', or yaw sessions evaluate) sends each prompt/answer turn to a Laya service running on this computer and counts the predicted outcome, sentiment, assistant behaviour and failure type per session. It is experimental, never runs automatically, and saves only the counts, never message text. YAW does not install or start Laya; see the steps below.'));
+    card.append(hint('small muted', 'Classify (in the controller on ', link('Profiling', 'global-improve'), ', or yaw sessions evaluate) labels each exchange (prompt, reply, your next prompt): the assistant reply and your reaction separately, with the categories below. Transcript signals and phrase rules decide what they can; a Laya service running on this computer estimates the rest. It is experimental, never runs automatically, and saves labels and scores per exchange, never message text. YAW does not install or start Laya; see the steps below.'));
     const form = el('div', null, 'classifier-form'), inputs = {};
     for (const [key, label, type, help, step] of FIELDS) {
       const wrap = el('label', label), input = el('input'), range = limits[key];
@@ -535,24 +535,96 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
     prompt.setAttribute('aria-describedby', promptHelp.id);
     promptLabel.append(prompt, promptHelp);
     form.append(promptLabel);
-    const values = () => ({ ...Object.fromEntries(FIELDS.map(([key, , type]) => [key, type === 'number' ? Number(inputs[key].value) : inputs[key].value.trim()])), prompt: prompt.value.trim() });
+    const categories = categoriesCard(saved.taxonomy ?? {}, classifier.categories);
+    const values = () => ({ ...Object.fromEntries(FIELDS.map(([key, , type]) => [key, type === 'number' ? Number(inputs[key].value) : inputs[key].value.trim()])), prompt: prompt.value.trim(), taxonomy: categories.overrides() });
     const s = el('p', '', 'small muted'); s.setAttribute('role', 'status');
     const say = (text, bad = false) => { s.textContent = text; s.className = `small ${bad ? 'error-text' : 'muted'}`; };
     const act = async (fn) => { buttons.forEach((b) => { b.disabled = true; }); try { await fn(); } catch (e) { say(e.message, true); } finally { buttons.forEach((b) => { b.disabled = false; }); } };
     const buttons = [
       button('Test connection', () => act(async () => { say('Sending one made-up test turn to Laya…'); say((await api('classifier-test', { classifier: values() })).message); }), ''),
-      button('Save', () => act(async () => { const r = await api('classifier-save', { classifier: values() }); classifier = { ...classifier, classifier: r.classifier }; say(r.message); }), 'primary'),
-      button('Reset to defaults', () => { for (const [key] of FIELDS) inputs[key].value = String(defaults[key]); prompt.value = defaults.prompt; say('Defaults restored in the form; press Save to keep them.'); }, ''),
+      button('Save', () => act(async () => {
+        const r = await api('classifier-save', { classifier: values() });
+        classifier = { ...classifier, classifier: r.classifier, categories: { ...classifier.categories, hash: r.hash } }; categories.version(r.hash); say(r.message);
+      }), 'primary'),
+      button('Reset to defaults', () => { for (const [key] of FIELDS) inputs[key].value = String(defaults[key]); prompt.value = defaults.prompt; say('Defaults restored in the form (categories keep their texts; reset them below); press Save to keep them.'); }, ''),
     ];
     buttons[0].title = 'Sends one fixed, made-up turn (no session text) with the values in this form and checks the answer format. Nothing is saved.';
     const actions = el('div', null, 'interview-actions'); actions.append(...buttons, s);
     card.append(form, actions);
-    root.append(card, sampleReview(values), setupCard(saved));
+    categories.card.append(el('p', 'Category changes are saved with Save above and used by the preview below right away.', 'small muted'));
+    root.append(card, categories.card, sampleReview(values), setupCard(saved));
   }
+  // Categories (spec 17 section 9): fixed set, editable texts and thresholds; only changes are sent and stored.
+  const SUBJECTS = [['assistant', 'Assistant reply', 'Judged from the prompt and the reply (the previous exchange is context); your reaction is not shown to Laya.'],
+    ['user', 'User reaction', 'Judged from your next prompt, with the prompt and the last part of the reply as context. The last exchange of a session has no reaction.']];
+  const TYPES = { scale: 'scale 1–5', choice: 'choice', tag: 'yes/no tag' };
+  function categoriesCard(overrides, info) {
+    const card = el('section', null, 'card'), fields = [];
+    card.append(el('h2', 'Categories'));
+    card.append(el('p', 'What each exchange is labelled with. The categories are fixed; their instructions, label or level descriptions and thresholds are yours to tune. Laya reads the descriptions as criteria. All categories are uncalibrated: their numbers are estimates.', 'small muted'));
+    const version = el('p', '', 'small muted');
+    const showVersion = (hash) => { version.textContent = `Criteria version ${hash.slice(0, 12)} (covers the shared prompt guidance and every category text). Results saved with another version are kept; nothing is reclassified automatically.`; };
+    showVersion(info.hash); card.append(version);
+    const area = (value, max, label) => { const t = document.createElement('textarea'); t.rows = 2; t.maxLength = max; t.value = value; t.setAttribute('aria-label', label); return t; };
+    for (const [subject, title, help] of SUBJECTS) {
+      const group = el('section', null, 'setup-step'); group.append(el('h3', title), el('p', help, 'small muted'));
+      for (const [key, q] of Object.entries(info.defaults[subject])) {
+        const change = overrides[subject]?.[key] ?? {};
+        const box = el('details'), summary = el('summary', `${key} · ${TYPES[q.type]}${q.direction ? ` · ${q.direction}` : ''} · uncalibrated`);
+        const form = el('div', null, 'classifier-form');
+        const instructionLabel = el('label', 'Instruction'); instructionLabel.className = 'classifier-prompt';
+        const instruction = area(change.instructions ?? q.instructions, info.limits.instructions, `${key} instruction`);
+        instructionLabel.append(instruction, el('span', `1–${info.limits.instructions.toLocaleString()} characters. The shared prompt guidance is put in front of it.`, 'small muted'));
+        form.append(instructionLabel);
+        const criteria = {};
+        for (const [label, text] of Object.entries(q.criteria ?? {})) {
+          const wrap = el('label', q.type === 'scale' && label !== 'not_applicable' ? `Level ${label}` : label), input = el('input');
+          input.type = 'text'; input.maxLength = info.limits.description; input.value = change.criteria?.[label] ?? text; input.setAttribute('aria-label', `${key} ${label} description`);
+          criteria[label] = input; wrap.append(input); form.append(wrap);
+        }
+        const thresholdLabel = el('label', 'Threshold'), threshold = el('input');
+        threshold.type = 'number'; threshold.step = '0.01'; threshold.min = String(info.limits.threshold[0]); threshold.max = String(info.limits.threshold[1]); threshold.inputMode = 'decimal';
+        threshold.value = change.threshold === undefined ? '' : String(change.threshold); threshold.placeholder = 'shared';
+        thresholdLabel.append(threshold, el('span', `Empty uses the shared confidence threshold; ${info.limits.threshold[0]}–${info.limits.threshold[1]}.${q.type === 'scale' ? ' For a scale it applies to the probability on two neighbouring levels.' : ''}`, 'small muted'));
+        form.append(thresholdLabel);
+        const reset = button('Reset', () => {
+          instruction.value = q.instructions; threshold.value = '';
+          for (const [label, input] of Object.entries(criteria)) input.value = q.criteria[label];
+        }, '');
+        reset.title = `Restore the default texts and threshold of ${key} in the form; press Save to keep them.`;
+        box.append(summary, form, reset); group.append(box);
+        fields.push({ subject, key, q, instruction, criteria, threshold });
+      }
+      card.append(group);
+    }
+    const signals = el('section', null, 'setup-step');
+    signals.append(el('h3', 'Signals and rules (read-only)'),
+      el('p', 'Facts from the transcript (source: signal) and explicit English or German wording (source: rule) win over Laya estimates (source: model). Text in code blocks is ignored. adherence, scope and complaint have no rules and are always estimates.', 'small muted'),
+      grid(['Signal', 'Source'], info.signals), grid(['Value', 'Rule'], info.rules));
+    card.append(signals);
+    const overridesOf = () => {
+      const out = {};
+      for (const { subject, key, q, instruction, criteria, threshold } of fields) {
+        const change = {};
+        if (instruction.value.trim() !== q.instructions) change.instructions = instruction.value;
+        const changed = Object.fromEntries(Object.entries(criteria).filter(([label, input]) => input.value.trim() !== q.criteria[label]).map(([label, input]) => [label, input.value]));
+        if (Object.keys(changed).length) change.criteria = changed;
+        if (threshold.value.trim() !== '') change.threshold = Number(threshold.value);
+        if (Object.keys(change).length) (out[subject] ??= {})[key] = change;
+      }
+      return out;
+    };
+    return { card, overrides: overridesOf, version: showVersion };
+  }
+  const SOURCES = { model: 'Laya (estimate)', rule: 'Phrase rule', signal: 'Transcript signal' };
+  const UNKNOWN = { notApplicable: 'unknown: not applicable', lowConfidence: 'unknown: below threshold' };
+  const shown = (v) => v.unknown ? `${UNKNOWN[v.unknown]}${v.mass === undefined ? '' : ` (mass ${v.mass})`}`
+    : v.score !== undefined ? `${v.score} (level ${v.level}${v.mass === undefined ? '' : `, mass ${v.mass}`})`
+    : `${v.label}${v.p === undefined ? '' : ` (p ${v.p})`}`;
   function sampleReview(values) {
     const card = el('section', null, 'card'), samples = classifierSamples ?? [];
     card.append(el('h2', 'Try Laya on saved sessions'));
-    card.append(el('p', 'Choose up to three sessions from your last scan. YAW sends up to three turns per session to local Laya, then shows model labels and confidence alongside applied labels, their source, UNKNOWN reasons, and short excerpts. Clear whole-message user verdicts can determine outcome; other categories use Laya. This preview is not saved and does not train Laya.', 'small muted'));
+    card.append(el('p', 'Choose up to three sessions from your last scan. YAW sends up to three exchanges per session to local Laya (two requests each: assistant reply and user reaction), then shows per exchange both subjects side by side: scores with mass, labels with probability, tags, signals, the source of each value and short excerpts. This preview is not saved and does not train Laya.', 'small muted'));
     const select = document.createElement('select'); select.multiple = true; select.size = Math.min(8, Math.max(3, samples.length)); select.setAttribute('aria-label', 'Sessions to preview');
     for (const sample of samples) {
       const option = document.createElement('option'); option.value = sample.id;
@@ -566,28 +638,30 @@ export function createGlobalSettings({ api, get, report, notifications, onFile, 
       const ids = [...select.selectedOptions].map((option) => option.value);
       if (!ids.length) { status.textContent = 'Choose at least one session.'; return; }
       if (ids.length > 3) { status.textContent = 'Choose no more than three sessions.'; return; }
-      if (!confirm(`Send up to three turns from ${ids.length} selected session(s) to Laya at ${values().endpoint}? The excerpts and predictions are shown here temporarily and are not saved.`)) return;
-      run.disabled = true; run.textContent = 'Previewing…'; status.className = 'small muted'; status.textContent = 'Sending selected turns to local Laya…'; output.replaceChildren();
+      if (!confirm(`Send up to three exchanges from ${ids.length} selected session(s) to Laya at ${values().endpoint}? The excerpts and labels are shown here temporarily and are not saved.`)) return;
+      run.disabled = true; run.textContent = 'Previewing…'; status.className = 'small muted'; status.textContent = 'Sending selected exchanges to local Laya…'; output.replaceChildren();
       try {
         const result = await api('classifier-preview', { ids, classifier: values(), confirm: true });
         status.textContent = result.message; status.className = 'small muted';
         output.replaceChildren(...result.sessions.map((session) => {
           const section = el('article', null, 'card'), started = new Date(session.started).toLocaleString();
           section.append(el('h3', `${session.agent} · ${started}`), el('p', session.project, 'small muted'),
-            el('p', `${session.classified} turn(s) classified · ${session.skipped} skipped`, 'small'));
-          for (const turn of session.turns) {
+            el('p', `${session.classified} exchange(s) classified · ${session.skipped} skipped`, 'small'));
+          for (const exchange of session.exchanges) {
             const detail = el('div', null, 'setup-step');
-            detail.append(el('h4', `Turn ${turn.turn}`), el('strong', 'Prompt excerpt'), el('pre', turn.prompt),
-              el('strong', 'Answer excerpt'), el('pre', turn.answer),
-              grid(['Category', 'Model label', 'Model confidence', 'Applied label', 'Source', 'Unknown reason'], Object.entries(turn.predictions).map(([key, prediction]) => [
-                key, prediction.choice, `${(prediction.confidence * 100).toFixed(1)}%`, prediction.prediction,
-                prediction.source === 'userFeedback' ? 'User feedback rule' : 'Laya',
-                prediction.unknownReason === 'model' ? 'Model uncertain' : prediction.unknownReason === 'lowConfidence' ? 'Below confidence threshold' : prediction.unknownReason === 'noVerdict' ? 'No user verdict' : '—',
-              ])));
+            detail.append(el('h4', `Exchange ${exchange.i}`), el('strong', 'Prompt excerpt'), el('pre', exchange.prompt),
+              el('strong', 'Reply excerpt'), el('pre', exchange.answer),
+              el('strong', 'Reaction excerpt'), exchange.reaction === null ? el('p', 'No reaction: last exchange of the session.', 'small muted') : el('pre', exchange.reaction),
+              grid(['Subject', 'Category', 'Value', 'Source'], [
+                ...Object.entries(exchange.assistant).map(([key, value]) => ['Assistant reply', key, shown(value), SOURCES[value.source]]),
+                ...Object.entries(exchange.user).filter(([key]) => key !== 'tags').map(([key, value]) => ['User reaction', key, shown(value), SOURCES[value.source]]),
+                ...exchange.user.tags.map((tag) => ['User reaction', tag.key, 'yes', SOURCES[tag.source]]),
+              ]),
+              el('p', `Signals: ${exchange.signals.interrupted ? 'interrupted' : 'not interrupted'} · ${exchange.signals.toolDenied ? 'a tool was denied' : 'no tool denied'} · ${exchange.signals.toolErrors} tool error(s) · response ${exchange.signals.responseMs === null ? 'time unknown' : `${(exchange.signals.responseMs / 1000).toFixed(1)} s`}`, 'small muted'));
             section.append(detail);
           }
-          if (session.truncated) section.append(el('p', 'Preview stopped at the three-turn limit for this session.', 'small muted'));
-          if (!session.turns.length) section.append(el('p', 'No eligible prompt/answer turns were found.', 'small muted'));
+          if (session.truncated) section.append(el('p', 'Preview stopped at the three-exchange limit for this session.', 'small muted'));
+          if (!session.exchanges.length) section.append(el('p', 'No eligible prompt/reply exchanges were found.', 'small muted'));
           return section;
         }));
       } catch (e) { status.textContent = e.message; status.className = 'small error-text'; }

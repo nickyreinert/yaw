@@ -8,16 +8,17 @@ Audit: 2026-11-02, Node 22.21.1. Findings below come from source review, isolate
 Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAVA_HOME; 7: repository/test issues). Schema examples: 28/28 valid. Shellcheck passed. Optional Claude adapter npm audit: 0 reported vulnerabilities. Live provider/Telegram services and Linux isolation were not exercised.
 
 ## Active
-### T-073 Session classification v2: per-exchange labels — in progress (55 %)
+### T-073 Session classification v2: per-exchange labels — in progress (70 %)
 - **Brief:** Implement kickoff/17-session-classification.md (ADR-0135): per-exchange assistant and user labels saved locally without text, so Profiling can filter a conversation's turns by admitted error, frustration and the other labels.
 - **Priority:** P2
 - **Model / effort:** middle tier (Sonnet) · effort: high
 - **Spec:** kickoff/17-session-classification.md §13 T1–T8
-- **Resume point:** Commit T4, then T5: Settings Categories section, taxonomy hash, preview per exchange
+- **Resume point:** Commit T5, then T6: Insights on v2 fields incl. 'classified with older criteria' + Reclassify
 - **Journal:**
   - 2026-11-11 User chose rules first (ADR-0136 supersedes ADR-0135); spec revised 2026-11-11: section 6.1 rules, source per value, JSON-object states, reaction first, calibration optional
   - 2026-11-11 T3 done (uncommitted): reader keeps tool calls/errors/denials/interrupts per message (claudeEvents); core/lib/session-classification.js (exchanges, taxonomy, JSON states, scale/choice/tag parsing, section 6.1 rules, source precedence, classifyExchanges); postLaya/validChoice shared with v1; test/session-classification.test.js + test/fixtures/claude/transcript-events.jsonl; just check 53 failures, all pre-existing (smoke, T-027, T-061, dogfood manifest)
   - 2026-11-11 T4 done (uncommitted): rollup + taxonomyHash + schema 2 result in classifyExchanges; collectAnalysis uses it; session-rows sends session/counts only (no exchanges), legacy flag for schema 1; data-sync whitelist already excludes evaluation; tests updated (test/helpers/laya-v2.js); just check 53 failures, same as before
+  - 2026-11-11 T5 done (uncommitted): taxonomyOverrides/effectiveTaxonomy (only changes stored in classifier.taxonomy, limits 1-1000/1-2000/0.5-0.99), per-category thresholds (empty = shared), taxonomyHash covers shared prompt + category texts (not thresholds), Settings Categories card (per category: instruction, label/level texts, threshold, Reset, uncalibrated; signals and rules read-only), preview on classifyExchanges per exchange with source; Insights 'older criteria' mark left for T6; just check 53 failures, same as before
 
 ### T-047 Record Claude Code fixtures for output replacement — blocked
 - **Brief:** Capture real PostToolUse payloads for Bash, Grep, WebFetch and Read under `test/fixtures/claude/`, including a Bash command that exits with a non-zero code. Confirm the `updatedToolOutput` shapes rtk assumes (Bash `stdout`/`stderr`, Read `file.content` + `numLines`/`totalLines`, Grep `content` + `numLines`, WebFetch `result`) and whether a non-zero Bash exit fires PostToolUse or PostToolUseFailure. Check Copilot CLI `modifiedResult`. First step, with T-048. Acceptance: recorded fixtures per tool; a short report to the user if replacement does not work as assumed, before T-052 starts.
@@ -25,6 +26,16 @@ Checks: npm test = 1,120 passed / 16 failed / 8 skipped (9 failures: invalid JAV
 - **Model / effort:** middle tier (Sonnet) · effort: medium
 - **Spec:** kickoff/16-compact-output.md §4 L2 and §8
 - **Resume point:** Bash, Bash-failure, Grep, Read and WebFetch fixtures committed in test/fixtures/claude/ (WebFetch: 0edf9e0). Still needed: a Copilot CLI `modifiedResult` check (Copilot not installed here).
+
+### T-075 Make Git repository purpose optional and clarify setup loading — in progress (95 %)
+- **Brief:** Existing Git projects can apply with blank purpose and keep their README. Browser setup shows its current preparation stage without menus until ready, and can recover from a startup error.
+- **Priority:** P2
+- **Model / effort:** sonnet · effort: medium
+- **Spec:** kickoff/02-setup-flow.md
+- **Resume point:** Rerun just check after the existing suite failures are resolved, then close T-075.
+- **Journal:**
+  - 2026-11-18 Implemented Git-optional purpose, isolated browser startup, and restored the missing browser module. Targeted tests and headless Chrome checks pass.
+  - 2026-11-18 Implementation and scoped review complete. Headless Chrome verified delayed startup, retry and blank-purpose Apply with the README preserved. just check reports 54 failures, including six surrounding tests reproduced on HEAD.
 
 ## Backlog
 - T-059 Update tests stale after "settings default to team" — assertions still expect personal-by-default (ADR-0013 / T-027): user.* keys now in answers.yaml, Communication section committed, status line in project settings; fails in add, cli, init (4), personal-defaults (4), edit, interview-depth, user-store and the status-line/communication tests; check whether ADR-0013 needs superseding

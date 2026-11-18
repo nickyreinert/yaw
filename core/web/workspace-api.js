@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readProjectFile } from '../render/files.js';
 import { readUserData, writeUserData } from '../lib/user-store.js';
+import { RULES, SIGNALS, TAXONOMY, TAXONOMY_LIMITS, currentTaxonomyHash } from '../lib/session-classification.js';
 import { CLASSIFIER_DEFAULTS, CLASSIFIER_LIMITS, classifierSamples, classifierSettings, collectAnalysis, previewClassification, probeClassifier, readAnalysis, scanSummary } from '../lib/session-analysis.js';
 import { resetSources, saveSources, sourcesData } from '../lib/session-sources.js';
 import { notificationSettings, saveNotifications, testNotifications } from '../../modules/comfort/lib/settings.js';
@@ -35,7 +36,8 @@ export function webPreferences(env) {
   const doc = readUserData(env, 'web-preferences.json') ?? {};
   let classifier;
   try { classifier = classifierSettings(doc.classifier ?? {}); } catch { classifier = { ...CLASSIFIER_DEFAULTS }; }
-  return { autoRefresh: doc.autoRefresh === true, classifier, defaults: CLASSIFIER_DEFAULTS, limits: CLASSIFIER_LIMITS, features: featureToggles(doc) };
+  return { autoRefresh: doc.autoRefresh === true, classifier, defaults: CLASSIFIER_DEFAULTS, limits: CLASSIFIER_LIMITS, features: featureToggles(doc),
+    categories: { defaults: TAXONOMY, limits: TAXONOMY_LIMITS, signals: SIGNALS, rules: RULES, hash: currentTaxonomyHash(classifier) } };
 }
 // Optional features (Global → Settings → Features): on unless switched off. The web pages hide what is off.
 const featureToggles = (doc) => ({ sync: doc.features?.sync !== false, profiling: doc.features?.profiling !== false });
@@ -238,7 +240,7 @@ export function createWorkspaceApi({ root: fixed, kitRoot, env, projects, fetchF
       if (name === 'classifier-save' || name === 'classifier-test') {
         let classifier;
         try { classifier = classifierSettings(input.classifier ?? {}); } catch (e) { throw new FormError(e.message); }
-        if (name === 'classifier-save') { savePreferences(env, { classifier }); return { classifier, message: 'Classification settings saved.' }; }
+        if (name === 'classifier-save') { savePreferences(env, { classifier }); return { classifier, hash: currentTaxonomyHash(classifier), message: 'Classification settings saved.' }; }
         try { return await probeClassifier(classifier); } catch (e) { throw new FormError(e.message, 502); }
       }
       if (name === 'classifier-preview') {

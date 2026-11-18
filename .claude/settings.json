@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "ClaudeInChromeDomain(4.1-1-1.de)"
+      "ClaudeInChromeDomain(4.1-1-1.de)",
+      "ClaudeInChromeDomain(127.0.0.1:59343)",
+      "ClaudeInChromeDomain(127.0.0.1:55822)"
     ]
   }
 }

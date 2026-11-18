@@ -1,3 +1,3 @@
 - Describe what it does, who uses it and key constraints.
-- Saved as the project purpose in AGENTS.md. Required before Apply.
+- A supplied purpose is saved in AGENTS.md. It is optional in a Git repository.
 - Example: a command-line tool that renames photos by EXIF date.

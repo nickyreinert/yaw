@@ -85,6 +85,7 @@ export function showView(hash, focus = true) {
   if (route.includes('?')) [route, query] = route.split('?');
   let [name, sub] = route.split('/');
   if (!views.includes(name) || name === 'setup' && !setup) { name = 'overview'; sub = undefined; query = ''; }
+  if (setup && name !== 'setup') loadWorkspaceData();
   // A page of a feature that is off (Global → Settings → Features) opens the overview; its settings tab opens Defaults.
   if (routeHidden(sub ? `${name}/${sub}` : name)) { if (name === 'global-settings') sub = undefined; else { name = 'overview'; sub = undefined; query = ''; } }
   const changed = name !== active;
@@ -336,10 +337,20 @@ async function load() {
     $('workspace-status').textContent = 'Refresh failed';
   }
 }
+let workspaceData;
+function loadWorkspaceData() {
+  workspaceData ??= Promise.allSettled([startProjects(), get('preferences').then((p) => applyFeatures(p.features))])
+    .then(() => { load(); });
+  return workspaceData;
+}
 export function startWorkspace() {
   // Settings mounts the shared interview after startup, so include its sidebar switch.
   document.addEventListener('click', (event) => {
-    if (event.target.closest('.focus-toggle')) setInterviewFocus(!document.body.classList.contains('interview-focus'));
+    if (event.target.closest('.focus-toggle')) {
+      const focus = !document.body.classList.contains('interview-focus');
+      setInterviewFocus(focus);
+      if (setup && !focus) loadWorkspaceData();
+    }
   });
   document.querySelectorAll('[data-route]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.route)));
   $('refresh').addEventListener('click', () => {
@@ -369,10 +380,12 @@ export function startWorkspace() {
     open: (entry, q) => navigate(`${entry.route}${entry.route.includes('?') ? '&' : '?'}q=${encodeURIComponent(q)}`) });
   window.addEventListener('popstate', onHistory);
   window.addEventListener('hashchange', onHistory);
-  Promise.allSettled([startProjects(), get('preferences').then((p) => applyFeatures(p.features))]).finally(() => {
-    showView(location.hash.slice(1) || (setup ? 'setup' : 'overview'), false);
-    load();
-  });
+  const initial = location.hash.slice(1) || (setup ? 'setup' : 'overview');
+  if (setup && initial === 'setup') {
+    showView(initial, false);
+    return;
+  }
+  return loadWorkspaceData().then(() => showView(location.hash.slice(1) || initial, false));
 }
 
 // What the sidebar search looks through: the pages, the settings tabs and, once the setup data has loaded, every

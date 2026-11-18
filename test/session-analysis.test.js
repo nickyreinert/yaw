@@ -178,7 +178,7 @@ test('Laya classification uses verified local protocol and strict probabilities,
 });
 
 test('classifier settings are validated, applied to requests and probed with a made-up turn only', async () => {
-  assert.deepEqual(classifierSettings(), { endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120, prompt: 'Classify the coding assistant response using only the supplied conversation.' });
+  assert.deepEqual(classifierSettings(), { endpoint: 'http://127.0.0.1:8000', threshold: 0.65, maxTurnBytes: 5000, maxLen: 8192, timeoutSeconds: 120, prompt: 'Classify the coding assistant response using only the supplied conversation.', taxonomy: {} });
   assert.throws(() => classifierSettings({ endpoint: 'http://example.com:8000' }), /hosted endpoints/);
   assert.throws(() => classifierSettings({ threshold: 0.2 }), /threshold/);
   assert.throws(() => classifierSettings({ maxTurnBytes: 9000, maxLen: 4096 }), /truncated/);
@@ -300,8 +300,8 @@ test('Laya sample preview uses selected saved sessions and does not persist tran
   const api = createWorkspaceApi({
     root, kitRoot: KIT_ROOT, env,
     fetchFn: async (_url, options) => {
-      assert.match(JSON.parse(options.body).questions.outcome.instructions, /Look for explicit completion/);
-      return Response.json(responseFor());
+      for (const q of Object.values(JSON.parse(options.body).questions)) assert.match(q.instructions, /^Look for explicit completion\./);
+      return layaV2(options);
     },
   });
   const samples = api.get['/api/classifier-samples'](), before = readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8');
@@ -309,8 +309,12 @@ test('Laya sample preview uses selected saved sessions and does not persist tran
   await assert.rejects(api.action('classifier-preview', { ids: [samples[0].id], classifier: {} }), /Confirm sending/);
   const preview = await api.action('classifier-preview', { ids: [samples[0].id], classifier: { prompt: 'Look for explicit completion.' }, confirm: true });
   assert.equal(preview.sessions.length, 1);
-  assert.equal(preview.sessions[0].turns.length, 1);
-  assert.equal(preview.sessions[0].turns[0].prompt, 'Fix the parser');
+  const [exchange] = preview.sessions[0].exchanges;
+  assert.equal(preview.sessions[0].exchanges.length, 1);
+  assert.equal(exchange.prompt, 'Fix the parser');
+  assert.equal(exchange.reaction, 'Thanks, works');
+  assert.deepEqual(exchange.user.verdict, { label: 'accepted', p: 1, source: 'model' });
+  assert.equal(exchange.assistant.adherence.level, 3);
   assert.match(preview.message, /were not saved/);
   assert.equal(readFileSync(join(env.HOME, '.yaw/session-analysis.json'), 'utf8'), before);
   await assert.rejects(api.action('classifier-preview', { ids: ['not-a-saved-session'], classifier: {}, confirm: true }), /no longer in the saved scan/);
@@ -410,6 +414,14 @@ test('dashboard scan and preference actions require session plus CSRF; GET never
   assert.equal(prefs.autoRefresh, true);
   assert.equal(prefs.classifier.endpoint, 'http://127.0.0.1:8123'); assert.equal(prefs.classifier.threshold, 0.8); assert.equal(prefs.classifier.maxLen, 8192);
   assert.equal(prefs.classifier.prompt, 'Prioritize explicit acceptance criteria.');
+  assert.match(prefs.categories.hash, /^[a-f0-9]{64}$/);
+  assert.ok(prefs.categories.defaults.user.verdict.criteria.accepted);
+  const saved = await post('classifier-save', { classifier: { taxonomy: { user: { verdict: { criteria: { accepted: 'says it works' }, threshold: 0.8 } } } } });
+  assert.equal(saved.status, 200);
+  const savedBody = await saved.json();
+  assert.notEqual(savedBody.hash, prefs.categories.hash);
+  assert.deepEqual(readUserData(env, 'web-preferences.json').classifier.taxonomy, { user: { verdict: { criteria: { accepted: 'says it works' }, threshold: 0.8 } } });
+  assert.equal((await post('classifier-save', { classifier: { taxonomy: { user: { verdict: { criteria: { accepted: '' } } } } } })).status, 400);
   // Nothing listens on port 9 on loopback, so the probe reports the failure instead of a 500.
   const probe = await post('classifier-test', { classifier: { endpoint: 'http://127.0.0.1:9' } });
   assert.equal(probe.status, 502); assert.match((await probe.json()).error, /not reachable/);

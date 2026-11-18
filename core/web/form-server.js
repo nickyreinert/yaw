@@ -38,6 +38,7 @@ const assets = new Map([
   ['/overview-metrics.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/overview-metrics.js', import.meta.url))]],
   ['/analytics-filters.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/analytics-filters.js', import.meta.url))]],
   ['/tool-output.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/tool-output.js', import.meta.url))]],
+  ['/savings.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/savings.js', import.meta.url))]],
   ['/global-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/global-view.js', import.meta.url))]],
   ['/insights-view.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/insights-view.js', import.meta.url))]],
   ['/session-preview.js', ['text/javascript; charset=utf-8', readFileSync(new URL('./assets/session-preview.js', import.meta.url))]],

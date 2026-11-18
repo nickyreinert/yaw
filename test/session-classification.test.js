@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readTurns } from '../core/lib/session-analysis.js';
 import {
-  TAXONOMY, admissionRule, answerTail, assistantState, buildExchanges, classifyExchanges, isShouting, labelExchange,
-  questionsFor, reactionRules, repeatsRequest, rollup, scaleValue, userState,
+  TAXONOMY, admissionRule, answerTail, assistantState, buildExchanges, classifyExchanges, currentTaxonomyHash, effectiveTaxonomy, isShouting, labelExchange,
+  questionsFor, reactionRules, repeatsRequest, rollup, scaleValue, taxonomyOverrides, userState,
 } from '../core/lib/session-classification.js';
 import { KIT_ROOT } from './helpers/fixtures.js';
 
@@ -169,4 +169,41 @@ test('classifyExchanges stores schema 2 with a roll-up and no message text', asy
   assert.match(result.taxonomy, /^[a-f0-9]{64}$/);
   assert.equal(result.calibration, null);
   assert.ok(result.session && result.exchanges.length);
+});
+
+test('category overrides keep only changes, validate limits and feed the effective taxonomy and thresholds', () => {
+  const overrides = taxonomyOverrides({
+    assistant: { scope: { instructions: TAXONOMY.assistant.scope.instructions, criteria: { too_broad: ' adds unasked changes ', as_requested: TAXONOMY.assistant.scope.criteria.as_requested } } },
+    user: { sarcasm: { threshold: 0.9 } },
+  });
+  assert.deepEqual(overrides, { assistant: { scope: { criteria: { too_broad: 'adds unasked changes' } } }, user: { sarcasm: { threshold: 0.9 } } });
+  const { taxonomy, thresholds } = effectiveTaxonomy(overrides, 0.7);
+  assert.equal(taxonomy.assistant.scope.criteria.too_broad, 'adds unasked changes');
+  assert.equal(taxonomy.assistant.scope.criteria.too_narrow, TAXONOMY.assistant.scope.criteria.too_narrow);
+  assert.deepEqual([thresholds.sarcasm, thresholds.verdict], [0.9, 0.7]);
+  assert.match(questionsFor('assistant', 'P', taxonomy).scope.criteria.too_broad, /adds unasked/);
+  assert.throws(() => taxonomyOverrides({ user: { mood: {} } }), /Unknown classification category/);
+  assert.throws(() => taxonomyOverrides({ user: { verdict: { criteria: { maybe: 'x' } } } }), /no label maybe/);
+  assert.throws(() => taxonomyOverrides({ user: { sarcasm: { criteria: { yes: 'x' } } } }), /no setting criteria/);
+  assert.throws(() => taxonomyOverrides({ user: { verdict: { criteria: { accepted: 'x'.repeat(1001) } } } }), /1–1,000/);
+  assert.throws(() => taxonomyOverrides({ user: { verdict: { instructions: ' ' } } }), /1–2,000/);
+  assert.throws(() => taxonomyOverrides({ user: { verdict: { threshold: 0.4 } } }), /0.5 to 0.99/);
+});
+
+test('the taxonomy hash covers the shared prompt and every category text, not thresholds', () => {
+  const base = currentTaxonomyHash({});
+  assert.notEqual(currentTaxonomyHash({ prompt: 'Other guidance.' }), base);
+  assert.notEqual(currentTaxonomyHash({ taxonomy: { user: { verdict: { criteria: { accepted: 'says it works' } } } } }), base);
+  assert.equal(currentTaxonomyHash({ taxonomy: { user: { verdict: { threshold: 0.9 } } } }), base);
+});
+
+test('a category threshold applies only to that category', async () => {
+  const p = { choice: 'as_requested', probabilities: { as_requested: 0.7, too_narrow: 0.1, too_broad: 0.1, not_applicable: 0.1 } };
+  const admission = { choice: 'none', probabilities: { none: 0.7, admits_error: 0.2, apology_without_fix: 0.1 } };
+  const adherence = { choice: '5', probabilities: { 1: 0, 2: 0, 3: 0, 4: 0.3, 5: 0.7, not_applicable: 0 } };
+  const exchange = buildExchanges([{ role: 'user', text: 'Rename x.' }, { role: 'assistant', text: 'Renamed.' }])[0];
+  const labelled = labelExchange(exchange, { assistant: { adherence, scope: p, admission } }, { scope: 0.8, admission: 0.65 });
+  assert.equal(labelled.assistant.scope.label, 'unknown');
+  assert.equal(labelled.assistant.admission.label, 'none');
+  assert.deepEqual(rollup([labelled], { scope: 0.8 }).unknown.scope, { model: 0, lowConfidence: 1, noReaction: 0 });
 });

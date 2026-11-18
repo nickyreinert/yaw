@@ -3,6 +3,7 @@ import { stackProfile } from '../interview/suggest.js';
 import { editProject } from '../render/project.js';
 import { depthLabel } from '../interview/depth.js';
 import { runInterview } from '../interview/engine.js';
+import { withOptionalPurpose } from '../interview/policy.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
 import { createFormModel } from '../web/form-model.js';
 import { initWeb } from '../web/init.js';
@@ -42,7 +43,8 @@ export async function edit({ values, positionals: sections, io }) {
       io.prompter.show('choose quick, basic, all or w\n');
     }
   }
-  const questions = withGitHubHint(collectQuestions(io.kitRoot, [...new Set([...state.modules, 'communication'])]), githubStatus({ root: io.cwd, env: io.env }))
+  const available = collectQuestions(io.kitRoot, [...new Set([...state.modules, 'communication'])]);
+  const questions = withGitHubHint(withOptionalPurpose(available, isGitRepo(io.cwd)), githubStatus({ root: io.cwd, env: io.env }))
     .filter((q) => !sections.length || sections.some((s) => q.id === s || q.id.startsWith(`${s}.`)))
     .map((q) => sections.length ? { ...q, reviewSelected: true } : q);
   const result = await runInterview({

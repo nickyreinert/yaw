@@ -2,7 +2,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseReply, validAnswer } from '../interview/engine.js';
-import { asksIn as asksQuestion, isPersonal, isPreference, migrateAnswers, missingAnswers, sourceOf, switchable, questionApplies, applicableArchitectureAnswers } from '../interview/policy.js';
+import { asksIn as asksQuestion, isPersonal, isPreference, migrateAnswers, missingAnswers, sourceOf, switchable, questionApplies, applicableArchitectureAnswers, withOptionalPurpose } from '../interview/policy.js';
+import { isGitRepo } from '../lib/git-init.js';
 import { readRegular, MAX_BYTES } from './knowledge.js';
 import { loadRules, secretRule } from '../../modules/security/lib/guards.js';
 import { githubStatus, withGitHubHint } from '../lib/github-status.js';
@@ -45,7 +46,8 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
   const preferences = edit ? { answers: {}, warning: null } : loadPreferences({ env, kitRoot });
   const setupPolicy = edit ? { answers: {}, modules: [] } : loadSetupDefaults({ env, kitRoot });
   preferences.answers = { ...setupPolicy.answers, ...preferences.answers };
-  const questions = collectQuestions(kitRoot, names).map((q) => Object.hasOwn(preferences.answers, q.id)
+  const gitRepo = isGitRepo(root);
+  const questions = withOptionalPurpose(collectQuestions(kitRoot, names), gitRepo).map((q) => Object.hasOwn(preferences.answers, q.id)
     ? { ...q, default: preferences.answers[q.id], defaultSource: 'saved personal setting' } : q);
   const byId = new Map(questions.map((q) => [q.id, q]));
   const profiles = listProfiles(kitRoot);
@@ -207,7 +209,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
     const { desired } = render(result);
     // Noninteractive init never overwrites an existing module output, even when its template differs.
     const files = [...desired].map(([path, d]) => {
-      const current = readProjectFile(root, path);
+      const current = edit ? readProjectFile(root, path) : null;
       const entry = manifest?.files.find((f) => f.path === path);
       const action = !edit ? (existsSync(resolveInside(root, path)) ? 'kept' : 'create')
         : current === null ? (entry ? 'missing' : 'create')
@@ -323,7 +325,7 @@ export function createFormModel({ root, kitRoot, env, edit = false, sections = [
       kit: kitVersion(kitRoot),
       profiles: profiles.map((p) => ({ name: p.name, title: p.title, summary: p.summary, stack: p.stack, requires: p.requires ?? [], tools: profileTools(p, null).map(({ name, install, when }) => ({ name, install, ...(when ? { when } : {}) })) })),
       modules: definitions.map(({ name, title, group, short, details, what, adds, agentsMd, description, example, cost, depends, default: defaults, appliesTo, outputs }) => ({ name, savedDefault: setupPolicy.modules.includes(name), title: title ?? name, group: group ?? 'basics', short: short ?? null, details: details ?? [], what: what ?? null, adds: adds ?? [], rules: ruleLines(agentsMd), description, example: example ?? null, cost: cost ?? null, depends: depends ?? [], defaults, appliesTo, plannedFiles: outputs?.templates ?? [] })),
-      gitRepo: existsSync(join(root, '.git')),
+      gitRepo,
       questions: withGitHubHint(questions, githubStatus({ root, env, verifyAuth: false })).map((q) => {
         let help = '';
         if (q.help) {
