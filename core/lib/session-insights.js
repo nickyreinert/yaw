@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { transcriptFiles } from '../../modules/sessions/lib/import.js';
 import { effectiveSources } from './session-sources.js';
 import { readAnalysis, readTurns } from './session-analysis.js';
+import { buildExchanges } from './session-classification.js';
 
 export const INSIGHTS_LIMITS = Object.freeze({ sessions: 5, bytes: 8 * 1024 * 1024, messages: 1000, candidates: 5, excerptChars: 6000, messageChars: 1200 });
 const hash = (s) => createHash('sha256').update(s).digest('hex');
@@ -29,6 +30,15 @@ export function conversationMessages(messages) {
     });
     return { index, turn, role: m.role, text, highlights };
   });
+}
+
+function conversationClassification(evaluation, messages) {
+  if (evaluation?.schema !== 2) return null;
+  const saved = evaluation.exchanges ?? [];
+  const fingerprints = new Map(buildExchanges(messages).map(({ i, fp }) => [i, fp]));
+  const exchanges = saved.filter(({ i, fp }) => fp && fingerprints.get(i) === fp)
+    .map(({ i, assistant, user }) => ({ i, assistant, user }));
+  return { exchanges, unmatched: saved.length - exchanges.length };
 }
 
 export function reviewCandidates(messages, { turn, limited = false } = {}) {
@@ -98,7 +108,7 @@ export async function reviewSessions({ env, ids, turn, conversation = false }) {
     try { read = await readTurns(file, row.agent, { maxBytes: INSIGHTS_LIMITS.bytes, maxMessages: INSIGHTS_LIMITS.messages }); }
     catch { sessions.push({ ...base, unavailable: 'Transcript could not be read safely or exceeds the read limit.', candidates: [] }); continue; }
     sessions.push({ ...base, ...reviewCandidates(read.messages, { turn, limited: read.limited }),
-      ...(conversation ? { messages: conversationMessages(read.messages) } : {}) });
+      ...(conversation ? { messages: conversationMessages(read.messages), classification: conversationClassification(row.evaluation, read.messages) } : {}) });
   }
   return { sessions, limits: INSIGHTS_LIMITS, message: 'Temporary phrase suggestions and manual examples only. No model was called and no excerpts were saved.' };
 }

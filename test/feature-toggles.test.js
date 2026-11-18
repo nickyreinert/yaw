@@ -138,8 +138,9 @@ test('features: Analytics names the table Classification; Profiling off hides th
   const { createGlobal } = await import('../core/web/assets/global-view.js');
   const row = { id: 's1', title: 'One', agent: 'claude', model: 'm', project: '/work/p', deviceId: 'local', deviceName: 'This device', language: 'javascript', started: Date.now() - 3600000,
     minutes: 5, prompts: 2, answers: 2, promptChars: 40, answerChars: 80, tokensIn: 10, tokensOut: 10, cost: null, medianResp: 2, p95Resp: 3, medianAnswer: 40, p95Answer: 50,
-    outcome: 'success', evaluation: { classified: 2, counts: { outcome: { success: 2 } } } };
-  const body = { available: true, rows: [row], projects: ['/work/p'], tasks: [], current: '/work/p', history: {}, savings: [] };
+    outcome: 'accepted', evaluation: { schema: 2, classified: 2, skipped: 0, session: { finalVerdict: 'accepted' } } };
+  const legacy = { ...row, id: 's2', title: 'Legacy session', outcome: 'fulfilled', evaluation: { legacy: true, classified: 2 } };
+  const body = { available: true, rows: [row, legacy], projects: ['/work/p'], tasks: [], current: '/work/p', history: {}, savings: [] };
   const get = async (name) => name === 'sessions' ? body : name === 'preferences' ? { autoRefresh: false, classifier: { endpoint: 'http://127.0.0.1:8000' } } : null;
   const reported = [];
   const view = createGlobal({ get, api: async () => ({}), report: (e) => reported.push(e), openProject() {}, replace() {} });
@@ -156,14 +157,17 @@ test('features: Analytics names the table Classification; Profiling off hides th
     assert.ok(!shown.tabs.includes('Outcomes'), `${route}: no Outcomes tab`);
     assert.ok(!shown.buttons.includes('Classify'), `${route}: Classify moved to the Profiling controller`);
     assert.match(shown.charts, /Experimental outcomes/);
-    assert.match(byId('ss-browse').text, /Classified turns/, 'the Classification table opens from its old URL');
+    assert.doesNotMatch(shown.charts, /fulfilled/);
+    assert.match(byId('ss-browse').text, /Model-classified exchanges/, 'the Classification table opens from its old URL');
+    assert.match(byId('ss-browse').text, /accepted/);
+    assert.doesNotMatch(byId('ss-browse').text, /Legacy session/);
     setFeatures({ profiling: false });
     await view.show(route, 'table=outcomes');
     assert.deepEqual(reported, []);
     shown = page();
     assert.ok(!shown.tabs.includes('Classification') && !shown.tabs.includes('Outcomes'), `${route}: tables ${shown.tabs}`);
     assert.doesNotMatch(shown.charts, /outcomes/i);
-    assert.doesNotMatch(byId('ss-browse').text, /Classified turns/, 'an old Classification URL falls back to Sessions');
+    assert.doesNotMatch(byId('ss-browse').text, /Model-classified exchanges/, 'an old Classification URL falls back to Sessions');
     setFeatures({});
   }
 });

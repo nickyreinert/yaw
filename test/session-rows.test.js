@@ -29,3 +29,19 @@ test('session rows: bounded list', () => {
   const out = sessionRows(many);
   assert.equal(out.rows.length, MAX_ROWS); assert.equal(out.limited, true); assert.equal(out.total, MAX_ROWS + 5);
 });
+
+test('early schema 2 rows get score-based counts without including exchange data', () => {
+  const exchange = (i, score, verdict) => ({ i, fp: `fingerprint-${i}`, assistant: {}, user: {
+    frustration: { score, level: 4, source: 'model' }, verdict: { label: verdict, source: 'rule' },
+    complaint: { label: 'wrong_scope', source: 'model' },
+  } });
+  const evaluation = { schema: 2, taxonomy: 'early', classified: 2, skipped: 0, session: { finalVerdict: 'accepted' },
+    exchanges: [exchange(1, 3.8, 'corrected'), exchange(2, 4.2, 'accepted')] };
+  const [row] = sessionRows([{ ...rows[0], evaluation }]).rows;
+  assert.equal(row.evaluation.session.frustrated, 1);
+  assert.deepEqual(row.evaluation.session.counts.user.complaint, { wrong_scope: 1 });
+  assert.equal(row.evaluation.taxonomy, 'early');
+  assert.equal(row.outcome, 'accepted');
+  assert.doesNotMatch(JSON.stringify(row), /fingerprint-|"exchanges"/);
+  assert.equal(sessionRows([rows[0]]).rows[0].evaluation.legacy, true);
+});

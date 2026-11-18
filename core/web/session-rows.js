@@ -1,5 +1,7 @@
 // Metadata-only session rows for the dashboard. The browser filters, splits, charts and sorts them; the server only
 // normalises and bounds the list. Message text is never part of a row (saved scans hold none).
+import { rollup } from '../lib/session-classification.js';
+
 export const MAX_ROWS = 20000;
 
 const known = (value) => value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
@@ -19,7 +21,11 @@ const outcomeOf = (counts) => {
 // Rows without a schema are legacy classifications.
 function evaluationOf(e) {
   if (!e) return null;
-  if (e.schema === 2) return { schema: 2, classified: e.classified, skipped: e.skipped, taxonomy: e.taxonomy, session: e.session, counts: e.session?.counts, evaluated: e.evaluated };
+  if (e.schema === 2) {
+    // Early schema 2 results did not count frustration by score or gate complaint counts by verdict.
+    const session = e.session?.frustrated === undefined && Array.isArray(e.exchanges) ? rollup(e.exchanges, e.thresholds) : e.session;
+    return { schema: 2, classified: e.classified, skipped: e.skipped, taxonomy: e.taxonomy, session, counts: session?.counts, evaluated: e.evaluated };
+  }
   return { legacy: true, classified: e.classified, skipped: e.skipped, counts: e.counts, outcomeUnknown: e.outcomeUnknown, outcomeFeedback: e.outcomeFeedback, evaluated: e.evaluated };
 }
 

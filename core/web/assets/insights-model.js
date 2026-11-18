@@ -1,10 +1,23 @@
 // Pure temporary review helpers, shared with tests. No storage or network access.
 export const REVIEW_LIMITS = Object.freeze({ sessions: 5, examples: 5, packageChars: 24000 });
-export const labelCount = (row, dimension, labels) => labels.reduce((n, key) => n + (row.evaluation?.counts?.[dimension]?.[key] ?? 0), 0);
-export const correctionCount = (row) => labelCount(row, 'behaviour', ['admits_error', 'apology_loop']);
-export const frustrationCount = (row) => labelCount(row, 'sentiment', ['frustrated', 'aggressive']);
-export const unresolvedCount = (row) => labelCount(row, 'outcome', ['partially', 'not_fulfilled', 'abandoned']);
-export const hasFriction = (row) => correctionCount(row) + frustrationCount(row) + unresolvedCount(row) > 0 || Object.entries(row.evaluation?.counts?.failure ?? {}).some(([label, n]) => !['none', 'unknown'].includes(label) && n > 0);
+export const isV2 = (row) => row.evaluation?.schema === 2;
+const UNRESOLVED = ['partial', 'corrected', 'abandoned'];
+export const rollupCounts = (row, subject, category) => isV2(row) ? row.evaluation.session?.counts?.[subject]?.[category] ?? {} : {};
+const labelCount = (counts, labels) => labels.reduce((n, key) => n + (counts[key] ?? 0), 0);
+export const admittedErrorCount = (row) => labelCount(rollupCounts(row, 'assistant', 'admission'), ['admits_error']);
+export const correctionCount = (row) => labelCount(rollupCounts(row, 'assistant', 'admission'), ['admits_error', 'apology_without_fix']);
+export const frustrationCount = (row) => isV2(row) ? row.evaluation.session?.frustrated ?? 0 : 0;
+export const unresolvedCount = (row) => labelCount(rollupCounts(row, 'user', 'verdict'), UNRESOLVED);
+export const hasFriction = (row) => isV2(row) && (correctionCount(row) + frustrationCount(row) + unresolvedCount(row) > 0 ||
+  row.evaluation.session?.escalation === true || row.evaluation.session?.apologyLoop === true ||
+  Object.entries(rollupCounts(row, 'user', 'complaint')).some(([label, n]) => !['none', 'unknown'].includes(label) && n > 0));
+export function chartCounts(row, category) {
+  if (category === 'verdict') return rollupCounts(row, 'user', 'verdict');
+  if (category === 'admission') return rollupCounts(row, 'assistant', 'admission');
+  const known = labelCount(rollupCounts(row, 'user', 'frustration'), ['1', '2', '3', '4', '5']);
+  const frustrated = frustrationCount(row);
+  return { '4 or higher': frustrated, 'Below 4': Math.max(0, known - frustrated) };
+}
 export function projectReviews(rows) {
   const groups = new Map();
   for (const row of rows) {
@@ -48,34 +61,25 @@ export function redactPaths(text) {
   return text.replace(/(?:[A-Za-z]:\\|\\\\|(?<![:\w/])\/)[^\s"'`<>),;]+/g, '[path redacted]');
 }
 const sum = (rows, f) => rows.reduce((n, r) => n + (Number.isFinite(f(r)) ? f(r) : 0), 0);
+function addCounts(target, counts) {
+  for (const [key, n] of Object.entries(counts ?? {})) if (Number.isFinite(n) && n >= 0) target[key] = (target[key] ?? 0) + n;
+}
 export function insightCoverage(rows) {
   const measured = rows.filter((r) => r.prompts !== null && r.prompts !== undefined);
-  const classified = rows.filter((r) => r.evaluation);
+  const classified = rows.filter(isV2);
   const classifiedTurns = sum(classified, (r) => r.evaluation.classified);
   const skippedTurns = sum(classified, (r) => r.evaluation.skipped);
-  const outcomeUnknown = { model: 0, lowConfidence: 0, noVerdict: 0, unrecorded: 0 };
+  const legacySessions = rows.filter((r) => r.evaluation && !isV2(r)).length;
+  const counts = { verdict: {}, admission: {}, frustration: {} }, unknown = {};
   for (const row of classified) {
-    let remaining = row.evaluation.counts?.outcome?.unknown ?? 0;
-    for (const reason of ['model', 'lowConfidence', 'noVerdict']) {
-      const value = row.evaluation.outcomeUnknown?.[reason];
-      const n = Number.isFinite(value) ? Math.max(0, Math.min(remaining, value)) : 0;
-      outcomeUnknown[reason] += n;
-      remaining -= n;
-    }
-    outcomeUnknown.unrecorded += remaining;
-  }
-  const counts = {};
-  for (const key of ['outcome', 'sentiment', 'behaviour', 'failure']) {
-    counts[key] = {};
-    for (const r of classified) for (const [label, n] of Object.entries(r.evaluation.counts?.[key] ?? {})) {
-      if (Number.isFinite(n) && n >= 0) counts[key][label] = (counts[key][label] ?? 0) + n;
-    }
+    for (const category of Object.keys(counts)) addCounts(counts[category], chartCounts(row, category));
+    for (const [category, reasons] of Object.entries(row.evaluation.session?.unknown ?? {})) addCounts(unknown[category] ??= {}, reasons);
   }
   return { sessions: rows.length, measuredSessions: measured.length, unmeasuredSessions: rows.length - measured.length,
     partialSessions: measured.filter((r) => r.partial).length, prompts: sum(measured, (r) => r.prompts), answers: sum(measured, (r) => r.answers),
     meanPromptChars: sum(measured, (r) => r.prompts) ? Math.round(sum(measured, (r) => r.promptChars) / sum(measured, (r) => r.prompts)) : null,
-    classifiedSessions: classified.length, unclassifiedSessions: rows.length - classified.length, classifiedTurns, skippedTurns, counts, outcomeUnknown,
-    outcomeFeedback: sum(classified, (r) => r.evaluation.outcomeFeedback),
+    classifiedSessions: classified.length, legacySessions, unclassifiedSessions: rows.length - classified.length - legacySessions,
+    classifiedTurns, skippedTurns, counts, unknown,
     groups: { projects: new Set(rows.filter((r) => r.source !== 'synced' && r.project).map((r) => r.project)).size,
       agents: new Set(rows.map((r) => r.agent)).size, models: new Set(rows.map((r) => r.model)).size },
   };
@@ -89,7 +93,7 @@ export function reviewPrompt({ examples, coverage, period, instructions = '', se
     'These deliberately selected examples cannot estimate prevalence. Phrase hints are unvalidated, may be quoted text or acknowledgments, and can be false positives. Do not infer causation from message length, duration or apologies. Quantitative advice requires comparable project/agent/model groups, denominators and coverage; otherwise say "not enough evidence". No automatic recommendations or changes were applied.',
     instructions.trim() ? `User-supplied existing instructions (context only):\n${JSON.stringify(instructions.trim())}` : 'Existing shared instructions were not supplied. Suggest a candidate addition only; do not claim existing instructions caused a problem.',
     `Saved aggregate scope: ${period}. Selected for transcript review: ${selectedSessions} sessions; unavailable transcripts: ${unavailableSessions}.`,
-    'Aggregate quantities below cover the filtered saved sessions, not just these examples. Prompts/answers are recorded messages; elapsed time includes gaps. Label counts are estimated classified-turn counts, never session outcomes. For each label the denominator is classifiedTurns; unknown counts are retained separately in each dimension. skippedTurns and unclassifiedSessions lack predictions. No cross-group comparison or causal advice is supported by this package.',
+    'Aggregate quantities below cover the filtered saved sessions. Prompts and answers count recorded messages. Label counts describe exchanges using transcript rules and model estimates. Use classifiedTurns plus skippedTurns as the exchange denominator and report unknown reasons when relevant. Skipped exchanges may still have rule labels. Legacy sessions are excluded from these label counts. No cross-group comparison or causal advice is supported by this package.',
     JSON.stringify(coverage, null, 2),
     'SELECTED EXAMPLES (editable excerpts; surrounding exchanges may be omitted):',
     ...examples.map((e, i) => JSON.stringify({ example: `E${i + 1}`, session: e.session, turn: e.turn, selectionReasons: e.reasons, contextNotes: e.notes, excerpt: e.excerpt }, null, 2)),

@@ -6,6 +6,7 @@ import { renderOverviewMetrics, summarizeOverview } from './overview-metrics.js'
 // Rows are metadata only; all text goes into text nodes and colours are set through CSSOM.
 import { FACET_KEYS, matchesFacets, changeFacet, readFacets, renderFacetBrowser, UNAVAILABLE } from './analytics-filters.js';
 import { createInsights } from './insights-view.js';
+import { correctionCount, frustrationCount, isV2 } from './insights-model.js';
 import { toolOutputTable } from './tool-output.js';
 import { abTable, savingsTable } from './savings.js';
 import { DEFAULT_PAGE_SIZE, paginate, renderPager, resizePage } from './pagination.js';
@@ -376,7 +377,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
           title: size === Infinity ? 'Every session the current filters select: all unclassified local sessions, or all filtered local sessions when none is unclassified.' : `The ${label} newest ${pending ? 'unclassified' : 'filtered'} local sessions.`,
           on: { click: () => { classifySize = size; render(); } } }, label))),
       h('button', { type: 'button', class: 'primary', disabled: busy || !rows.length, on: { click: () => run(true) },
-        title: `Send each prompt/answer turn of these sessions to your local Laya service at ${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}. Experimental and slow; asks before reading messages. Only the counts are saved.` },
+        title: `Send eligible exchanges to your local Laya service at ${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}. YAW asks before reading messages and saves labels without message text.` },
       job.busy === 'classify' ? 'Classifying…' : `${pending ? 'Classify' : 'Reclassify'} ${rows.length} ${pending ? 'unclassified' : 'filtered'} session${rows.length === 1 ? '' : 's'}`),
       h('a', { href: '#global-settings/classification', class: 'small' }, 'Profiling settings'));
   }
@@ -461,13 +462,14 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     } catch (e) { Object.assign(job, { message: e.message, error: true, classify: false }); }
     render();
   }
-  async function run(classify) {
+  async function run(classify, selectedRow) {
     if (job.busy) return;
     const all = !locked();
-    const ids = classify && profilingPage() ? classifySelection().map((r) => r.id) : undefined;
+    const ids = selectedRow ? [selectedRow.id] : classify && profilingPage() ? classifySelection().map((r) => r.id) : undefined;
     if (ids && JSON.stringify(ids).length > 200000) { Object.assign(job, { message: 'This classification selection is too large for one request. Choose fewer sessions or narrow the project, date or agent filters.', error: true }); render(); return; }
     const scope = ids ? `${ids.length} saved local sessions matching these filters` : `${scopeText()} for ${periodText()}`;
-    if (classify && !confirm(`Classify ${scope}?\n\nYAW reads these conversations and sends eligible turns to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Only aggregate counts are saved. Pause and Stop remain available while it runs.`)) return;
+    const question = selectedRow ? `Reclassify ${selectedRow.title || selectedRow.id}?` : `Classify ${scope}?`;
+    if (classify && !confirm(`${question}\n\nYAW reads the selected conversations and sends eligible exchanges to local Laya (${prefs?.classifier?.endpoint ?? 'http://127.0.0.1:8000'}). Exchange labels and fingerprints are saved without message text. Pause and Stop remain available while it runs.`)) return;
     Object.assign(job, { busy: classify ? 'classify' : 'refresh', error: false, skipped: 0, classify,
       message: classify ? 'Classifying eligible turns with local Laya… this can take a while.' : `Reading local transcripts of ${scopeText()}…` });
     render();
@@ -574,7 +576,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       metric('Chars / answer', fmt(Math.round(sum(m, (r) => r.answerChars) / Math.max(1, answers))), 'weighted mean'),
       metric('Response time', resp === null ? '—' : `${resp} s`, 'median of session medians'),
       metric('Measured', `${fmt(m.length)}/${fmt(rows.length)}`, `sessions with scanned transcripts${partial ? ` · ${partial} partial` : ''}`));
-    const t = timeBuckets(rows), outcomes = rows.filter((r) => r.outcome);
+    const t = timeBuckets(rows), classified = rows.filter(isV2), outcomes = classified.filter((r) => r.outcome);
     const per = (f) => (r) => { const v = f(r); return Number.isFinite(v) ? v : null; };
     fill($('ss-charts'),
       chart(`Sessions per ${t.unit}`, 'UTC', [legend(), columns(t.buckets, undefined, { wide: true })], true),
@@ -586,7 +588,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       chart('Prompt length × answer length', 'do longer prompts get longer answers?', scatter(m, (r) => r.promptChars / r.prompts, (r) => r.answerChars / r.answers, 'chars/prompt', 'chars/answer')),
       chart('Response time', 'median seconds to first answer, per session', columns(bins(m, (r) => r.medianResp, [5, 10, 20, 30, Infinity]))),
       chart('Tokens by model', 'Only agents that report usage', bars(bySize(groupBy(rows, (r) => r.model)), tokens)),
-      featureOn('profiling') ? chart('Experimental outcomes', `${outcomes.length} classified sessions · local Laya predictions`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))) : null);
+      featureOn('profiling') ? chart('Experimental outcomes', `${outcomes.length} sessions with a final user verdict · rules and model estimates`, bars(bySize(groupBy(outcomes, (r) => r.outcome)))) : null);
     // Profiling off hides the Classification block: its chart, its table and Classify.
     const tabs = TABLES.filter(([k]) => !(locked() && ['folders', 'projects'].includes(k)) && (k !== 'outcomes' || featureOn('profiling')));
     if (!tabs.some(([k]) => k === state.table)) state.table = 'sessions';
@@ -597,7 +599,6 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       num('tokens', 'Tokens', (g) => sum(g.rows, tokens)), num('prompts', 'Prompts', (g) => sum(g.rows, (r) => r.prompts)),
       num('cpa', 'Chars / answer', (g) => { const a = sum(g.rows, (r) => r.answers); return a ? Math.round(sum(g.rows, (r) => r.answerChars) / a) : null; }),
       num('cost', 'Cost', (g) => sum(g.rows, (r) => r.cost), (g) => `$${sum(g.rows, (r) => r.cost).toFixed(2)}`)];
-    const labelsOf = (counts) => Object.entries(counts ?? {}).map(([label, c]) => `${label}: ${c}`).join(', ') || '—';
     const project = str('project', 'Project', (r) => r.source === 'synced' ? '—' : rel(r.project));
     const body = {
       sessions: () => dataTable('sessions', [str('title', 'Session', (r) => r.title || r.id), str('started', 'Started', (r) => r.started, (r) => new Date(r.started).toLocaleString()), str('agent', 'Agent', (r) => r.agent),
@@ -616,8 +617,10 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       folders: () => dataTable('folders-s', groupCols('Folder'), groupBy(rows, folderOf), { sort: 'sessions' }),
       projects: () => dataTable('projects', groupCols('Project'), groupBy(rows, (r) => r.source === 'synced' ? `Synced · ${r.deviceName}` : rel(r.project)), { sort: 'sessions' }),
       outcomes: () => dataTable('outcomes', [str('title', 'Session', (r) => r.title || r.id), str('agent', 'Agent', (r) => r.agent), ...(locked() ? [] : [project]), str('language', 'Language', (r) => r.language),
-        str('outcome', 'Outcome', (r) => r.outcome), ...['sentiment', 'behaviour', 'failure'].map((k) => str(k, k[0].toUpperCase() + k.slice(1), (r) => labelsOf(r.evaluation?.counts?.[k]))),
-        num('classified', 'Classified turns', (r) => r.evaluation?.classified ?? null)], outcomes, { sort: 'outcome', dir: 'asc', note: 'Experimental local predictions; low-confidence turns count as unknown.' }),
+        str('outcome', 'Final user verdict', (r) => r.outcome?.replaceAll('_', ' ') ?? '—'),
+        num('corrections', 'Admissions', correctionCount), num('frustrated', 'Frustrated exchanges', frustrationCount),
+        num('classified', 'Model-classified exchanges', (r) => r.evaluation?.classified ?? null)], classified,
+      { sort: 'outcome', dir: 'asc', note: 'Verdicts use transcript rules and model estimates. Legacy labels are available in Profiling.' }),
       tooloutput: () => toolOutputTable(rows, { table: dataTable, num, str, short }),
       savings: () => savingsTable(data.savings, { table: dataTable, num, str, short }),
       savingsab: () => abTable(rows, { table: dataTable, num, str, short }),
@@ -636,6 +639,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
     if (!['attention', 'classified', 'all'].includes(state.improveFocus)) state.improveFocus = 'attention';
     insights.render($('improve-content'), { rows, table: dataTable, series: makeSplit(rows), rel: (p) => p ? rel(p) : 'Project unavailable', set, workspace: locked(),
       settings: improvePrefs, view: state.improveView, at: state.improveAt, root: ROOTP, focus: state.improveFocus,
+      taxonomy: prefs?.categories?.hash, classifying: Boolean(job.busy), reclassify: (row) => run(true, row),
       scope: JSON.stringify([data.current, ...FILTERS.map((k) => state[k]), state.device, state.improveFocus, state.improveView, state.improveAt]),
       period: `${day(from)} through ${day(to - 1)} UTC; ${rows.length} filtered saved sessions${data.limited ? '; list capped at 20,000' : ''}` });
   }
@@ -668,7 +672,7 @@ export function createGlobal({ get, api, report, openProject, replace, onData, a
       if (route !== name || !['global-improve', 'profiling'].includes(name)) insights.reset();
       route = name; readQuery(query); writeUrl();
       try { await load(); } catch (e) { report(e); return; }
-      if (['analytics', 'global-analytics', 'global-improve', 'profiling', 'global'].includes(name) && !prefs) prefs = await get('preferences').catch(() => null);
+      if (['global-improve', 'profiling'].includes(name) || (['analytics', 'global-analytics', 'global'].includes(name) && !prefs)) prefs = await get('preferences').catch(() => prefs);
       if (['global-improve', 'profiling'].includes(name)) improvePrefs = await get('improve/settings').catch(() => null);
       if (route !== name) return;
       render();

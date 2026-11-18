@@ -288,6 +288,7 @@ const bump = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
 export function rollup(exchanges, thresholds = {}) {
   const counts = { assistant: {}, user: {} }, unknown = {};
   const tags = {};
+  const unresolved = new Set(['partial', 'corrected', 'abandoned']);
   const note = (category, value, key) => {
     const reason = value.unknown === 'notApplicable' ? 'model' : value.unknown === 'lowConfidence' ? 'lowConfidence'
       : value.label === 'unknown' ? (value.p >= (thresholds[category] ?? 0.65) ? 'model' : 'lowConfidence') : null;
@@ -299,6 +300,7 @@ export function rollup(exchanges, thresholds = {}) {
     for (const [category, value] of Object.entries(e.assistant)) note(category, value, 'assistant');
     for (const [category, value] of Object.entries(e.user)) {
       if (category === 'tags') for (const t of value) bump(tags, t.key);
+      else if (category === 'complaint' && !unresolved.has(e.user.verdict?.label)) continue;
       else note(category, value, 'user');
     }
     if (e.user.verdict?.label === 'none') for (const category of ['verdict', 'frustration', 'complaint']) {
@@ -321,6 +323,7 @@ export function rollup(exchanges, thresholds = {}) {
     acceptance: mapped.length ? Math.round(mapped.filter((v) => v === 'accepted').length / mapped.length * 100) / 100 : null,
     adherence: mean(exchanges.map((e) => score(e.assistant.adherence)).filter((v) => v !== null)),
     frustrationPeak: frustration.length ? Math.max(...frustration) : null, frustrationMean: mean(frustration),
+    frustrated: frustration.filter((v) => v >= 4).length,
     escalation: rising,
     apologyLoop: exchanges.some((e, k) => k > 0 && exchanges[k - 1].i === e.i - 1 && admits(e) && admits(exchanges[k - 1])),
     counts, unknown,

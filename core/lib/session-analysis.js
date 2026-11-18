@@ -449,8 +449,9 @@ export async function collectAnalysis({ root, env, all = false, classify = false
   }
   const selectedIds = ids ? new Set(ids) : null;
   const saved = new Map(old.rows.filter((r) => r.file_key && r.stamp).map((r) => [r.file_key, r]));
-  // Unchanged transcripts keep their saved row; a classification run rereads text, so it never reuses.
-  const reuse = classify ? undefined : (path, stamp) => {
+  // Keep source stamps for later conversation reads. A classification run always rereads the transcript.
+  const reuse = (path, stamp) => {
+    if (classify) return null;
     const row = saved.get(sourceKey(path));
     return row?.stamp === stamp && row.reader === READER ? { reused: row, cwd: row.project, started: row.started } : null;
   };

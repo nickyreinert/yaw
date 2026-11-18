@@ -7,23 +7,39 @@ const el = (tag, attrs = {}, ...kids) => {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else if (['disabled', 'className'].includes(key)) node[key] = value;
+    else if (['disabled', 'className', 'value'].includes(key)) node[key] = value;
     else if (value !== false && value !== undefined) node.setAttribute(key, value);
   }
   node.append(...kids.flat(Infinity).filter((x) => x !== null && x !== undefined)); return node;
 };
 const button = (text, onclick, attrs = {}) => el('button', { type: 'button', onclick, ...attrs }, text);
 const date = (n) => new Date(n).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const humanLabel = (key) => key.replaceAll('_', ' ');
+
+function exchangeLabels({ assistant, user }) {
+  const labels = [];
+  for (const [category, value] of Object.entries({ ...assistant, verdict: user.verdict, frustration: user.frustration, complaint: user.complaint })) {
+    const label = value?.label ?? value?.level;
+    if (label == null || label === 'none' || label === 'unknown') continue;
+    const name = `${category} · ${humanLabel(String(label))}`;
+    labels.push({ name, detail: value.score == null ? name : `${category} · ${value.score}/5`, source: value.source });
+  }
+  for (const { key, source } of user.tags ?? []) labels.push({ name: humanLabel(key), detail: humanLabel(key), source });
+  return labels;
+}
 
 // api(action, input) reads the conversation; onChange() asks the owner to redraw; onClose() runs when the user closes it.
 // extra(session) may return { before, toolbar, after } node lists to add the owner's own actions around the dialogue.
 export function createSessionPreview({ api, onChange, onClose, rel = (path) => path, extra }) {
   let row = null, session = null, loading = false, message = '', clue = 0, version = 0, panel = null, show = 'all';
+  let classificationFilter = '', exchanges = [];
   const bubbles = new Map();
   // show: 'all' steps through corrections and apologies; a hint kind steps through that kind only.
   const marked = (m) => m.highlights.some((h) => show === 'all' ? h.kind !== 'recovery' : h.kind === show);
-  const moments = () => (session?.messages ?? []).filter(marked);
-  function clear() { version++; row = null; session = null; loading = false; message = ''; clue = 0; panel = null; show = 'all'; bubbles.clear(); }
+  const matchesLabel = (e) => !classificationFilter || (classificationFilter === 'frustration ≥ 4'
+    ? e.user.frustration?.score >= 4 : e.labels.some(({ name }) => name === classificationFilter));
+  const moments = () => visible().filter(marked);
+  function clear() { version++; row = null; session = null; loading = false; message = ''; clue = 0; panel = null; show = 'all'; classificationFilter = ''; exchanges = []; bubbles.clear(); }
   async function open(next) {
     const token = ++version;
     row = next; session = null; loading = true; message = ''; clue = 0; onChange?.();
@@ -31,6 +47,9 @@ export function createSessionPreview({ api, onChange, onClose, rel = (path) => p
       const result = await api('insights-review', { ids: [next.id], conversation: true, confirm: true });
       if (token !== version) return;
       session = result.sessions[0];
+      exchanges = (session.classification?.exchanges ?? []).map((exchange) => ({
+        ...exchange, labels: exchangeLabels(exchange),
+      }));
       if (session.unavailable) message = session.unavailable;
     } catch (e) { if (token === version) message = e.message; }
     finally { if (token === version) { loading = false; onChange?.(); jump(0); } }
@@ -63,35 +82,54 @@ export function createSessionPreview({ api, onChange, onClose, rel = (path) => p
   }
   // With a filter, only the turns holding that hint and one turn either side stay visible; gaps are counted.
   function visible() {
-    const all = session.messages ?? [];
+    const all = session?.messages ?? [];
+    if (classificationFilter) {
+      const turns = new Set(exchanges.filter(matchesLabel).map((e) => e.i));
+      return all.filter((m) => turns.has(m.turn) || (m.role === 'user' && turns.has(m.turn - 1)));
+    }
     if (show === 'all') return all;
     const turns = new Set(all.filter(marked).flatMap((m) => [m.turn - 1, m.turn, m.turn + 1]));
     return all.filter((m) => turns.has(m.turn));
   }
   function filters() {
     const all = session.messages ?? [], count = (kind) => all.filter((m) => m.highlights.some((h) => h.kind === kind)).length;
-    const pick = (value) => () => { show = value; clue = 0; onChange?.(); jump(0); };
+    const pick = (value) => () => { show = value; classificationFilter = ''; clue = 0; onChange?.(); jump(0); };
     return el('div', { className: 'subtabs clue-filter', role: 'group', 'aria-label': 'Show' }, el('span', { className: 'eyebrow' }, 'Show'),
       ...[['all', `All (${all.length})`], ['correction', `Corrections (${count('correction')})`], ['admission', `Apology / mistake (${count('admission')})`], ['recovery', `Recovery (${count('recovery')})`]]
-        .map(([value, label]) => button(label, pick(value), { 'aria-pressed': String(show === value), disabled: value !== 'all' && !count(value) })));
+        .map(([value, label]) => button(label, pick(value), { 'aria-pressed': String(!classificationFilter && show === value), disabled: value !== 'all' && !count(value) })));
+  }
+  function classificationControls() {
+    const names = [...new Set(exchanges.flatMap((e) => e.labels.map(({ name }) => name)))].sort();
+    if (exchanges.some((e) => e.user.frustration?.score >= 4)) names.unshift('frustration ≥ 4');
+    const select = el('select', { 'aria-label': 'Exchange label', 'data-exchange-filter': '', onchange: (event) => {
+      classificationFilter = event.target.value; show = 'all'; clue = 0; onChange?.();
+      panel?.querySelector('[data-exchange-filter]')?.focus?.();
+    } }, el('option', { value: '' }, 'All labels'), names.map((name) => el('option', { value: name }, name)));
+    select.value = classificationFilter;
+    const unmatched = session.classification?.unmatched;
+    return [names.length ? el('label', { className: 'small' }, 'Filter by exchange label ', select) : null,
+      unmatched ? el('p', { className: 'small muted' }, `${unmatched} saved exchange${unmatched === 1 ? '' : 's'} could not be matched to the readable transcript.`) : null];
   }
   function conversation(toolbar = []) {
     const list = moments(), messages = el('div', { className: 'improve-dialogue', 'aria-label': 'Recorded conversation' });
     bubbles.clear();
     const shown = visible();
+    const labelsByTurn = new Map(exchanges.filter(matchesLabel).map(({ i, labels }) => [i, labels]));
     shown.forEach((m, i) => {
       const gap = m.index - (i ? shown[i - 1].index + 1 : 0);
       if (gap > 0) messages.append(el('p', { className: 'conversation-gap small muted' }, `… ${gap} message${gap === 1 ? '' : 's'} hidden …`));
       const bubble = el('article', { className: `conversation-message from-${m.role}${m.highlights.some((h) => h.kind !== 'recovery') ? ' has-clue' : ''}` },
-        el('div', { className: 'message-role' }, m.role === 'user' ? 'You' : 'Assistant'), el('div', { className: 'message-text' }, ...highlighted(m)));
+        el('div', { className: 'message-role' }, m.role === 'user' ? 'You' : 'Assistant'), el('div', { className: 'message-text' }, ...highlighted(m)),
+        m.role === 'user' && labelsByTurn.get(m.turn)?.length
+          ? el('p', { className: 'small muted' }, `Exchange ${m.turn} · `, labelsByTurn.get(m.turn).map(({ detail, source }) => `${detail} (${source === 'model' ? 'estimate' : source})`).join(' · ')) : null);
       bubbles.set(m.index, bubble); messages.append(bubble);
     });
     const rest = (session.messages?.length ?? 0) - (shown.at(-1)?.index ?? -1) - 1;
-    if (show !== 'all' && rest > 0) messages.append(el('p', { className: 'conversation-gap small muted' }, `… ${rest} message${rest === 1 ? '' : 's'} hidden …`));
+    if ((show !== 'all' || classificationFilter) && rest > 0) messages.append(el('p', { className: 'conversation-gap small muted' }, `… ${rest} message${rest === 1 ? '' : 's'} hidden …`));
     return el('section', { className: 'conversation-reader' }, el('div', { className: 'conversation-toolbar' },
       el('div', {}, el('h3', {}, 'The conversation'), el('p', { className: 'small muted' }, `${session.messages?.length ?? 0} recorded messages${session.limited ? ' · Partial read: later messages or broken lines may be missing' : ''}`)),
       el('div', { className: 'clue-navigation' }, button('← Previous clue', () => jump(clue - 1), { disabled: !list.length }), el('span', { 'data-clue-count': '', 'aria-live': 'polite' }, list.length ? `${clue + 1} / ${list.length}` : 'No phrase clues'), button('Next clue →', () => jump(clue + 1), { disabled: !list.length }), ...toolbar)),
-    filters(),
+    filters(), ...classificationControls(),
     el('div', { className: 'clue-legend small' }, el('mark', { className: 'clue-correction' }, 'Correction'), el('mark', { className: 'clue-admission' }, 'Apology / mistake'), el('mark', { className: 'clue-recovery' }, 'Recovery'), el('span', { className: 'muted' }, 'Phrase hints, not confirmed errors. Paths redacted.')),
     messages);
   }

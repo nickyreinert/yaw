@@ -18,7 +18,8 @@ class Element {
 const button = (root, text) => root.all((n) => n.tag === 'button' && n.text === text)[0];
 const field = (root, label) => root.all((n) => n.attrs['aria-label'] === label)[0];
 const row = { id: 'codex:demo', source: 'local', title: 'Fix parser', agent: 'codex', model: 'Example', project: '/private/demo', started: Date.now(), prompts: 2, answers: 2, promptChars: 100,
-  evaluation: { classified: 2, skipped: 0, counts: { behaviour: { admits_error: 1 }, outcome: { fulfilled: 1, unknown: 1 } } } };
+  evaluation: { schema: 2, classified: 2, skipped: 0, taxonomy: 'current', session: { finalVerdict: 'accepted', frustrated: 0,
+    counts: { assistant: { admission: { admits_error: 1 } }, user: { verdict: { accepted: 1, unknown: 1 } } } } } };
 const response = { sessions: [{ id: row.id, turns: 2, candidates: [
   { turn: 2, reasons: ['Possible admission or apology'], notes: [], excerpt: 'user: Parser please. assistant: My mistake.' },
 ], messages: [
@@ -179,14 +180,14 @@ test('Read Conversation drills down into the conversation in place of the list; 
 
 test('the Signal filter narrows the session list to one saved label', (t) => {
   const { host, context } = environment(t);
-  const calm = { ...row, id: 'codex:calm', title: 'Calm session', evaluation: { classified: 1, skipped: 0, counts: { sentiment: { aggressive: 1 } } } };
+  const tense = { ...row, id: 'codex:tense', title: 'Tense session', evaluation: { schema: 2, classified: 1, skipped: 0, session: { frustrated: 1 } } };
   const view = createInsights({ api: () => { throw new Error('No transcript read'); } });
-  view.render(host, { ...context, rows: [row, calm], focus: 'all' });
-  assert.match(host.text, /Fix parser/); assert.match(host.text, /Calm session/);
-  button(host, 'Aggressive (1)').fire('click');
-  assert.doesNotMatch(host.text, /Fix parser/); assert.match(host.text, /Calm session/);
+  view.render(host, { ...context, rows: [row, tense], focus: 'all' });
+  assert.match(host.text, /Fix parser/); assert.match(host.text, /Tense session/);
+  button(host, 'Frustrated (1)').fire('click');
+  assert.doesNotMatch(host.text, /Fix parser/); assert.match(host.text, /Tense session/);
   button(host, 'Admitted error (1)').fire('click');
-  assert.match(host.text, /Fix parser/); assert.doesNotMatch(host.text, /Calm session/);
+  assert.match(host.text, /Fix parser/); assert.doesNotMatch(host.text, /Tense session/);
 });
 
 test('the conversation Show filter keeps matching turns with one turn of context and counts the hidden messages', async (t) => {
@@ -253,17 +254,54 @@ test('chart splitting uses the selected series rather than ignoring the shared s
   assert.equal(bars[0].children[0].style.width, '50%');
 });
 
-test('Profiling explains UNKNOWN causes and tells users how to update older results', (t) => {
+test('Profiling shows v2 diagnostics and marks legacy and older-criteria rows', async (t) => {
   const { host, context } = environment(t);
-  const fresh = { ...row, evaluation: { classified: 3, skipped: 0, counts: { outcome: { unknown: 3 } }, outcomeUnknown: { model: 1, lowConfidence: 2 } } };
+  const old = { ...row, id: 'old', title: 'Old criteria', evaluation: { ...row.evaluation, taxonomy: 'older' } };
+  const legacy = { ...row, id: 'legacy', title: 'Legacy', evaluation: { legacy: true, classified: 5, skipped: 0, counts: { outcome: { fulfilled: 5 } } } };
+  const synced = { ...legacy, id: 'synced', title: 'Synced', source: 'synced' };
+  const fresh = { ...row, evaluation: { ...row.evaluation, session: { ...row.evaluation.session, unknown: { verdict: { model: 1, lowConfidence: 2, noReaction: 1 } } } } };
+  const selected = [];
   const view = createInsights({ api: () => { throw new Error('Metadata only'); } });
-  view.render(host, { ...context, rows: [row, fresh] });
-  assert.match(host.text, /Each label estimates one request and its response/);
-  assert.match(host.text, /Unknown: 1 model uncertain · 2 below confidence threshold/);
-  assert.match(host.text, /1 reason unavailable from older or synced results/);
-  assert.match(host.text, /Reclassify local sessions to update/);
-  view.render(host, { ...context, rows: [fresh] });
-  assert.doesNotMatch(host.text, /reason unavailable/);
+  view.render(host, { ...context, rows: [fresh, old, legacy, synced], focus: 'classified', taxonomy: 'current', reclassify: (r) => selected.push(r.id) });
+  assert.match(host.text, /Unknown: 1 model uncertain · 2 below confidence threshold · 1 no user reaction/);
+  assert.match(host.text, /Classified with older criteria/);
+  assert.match(host.text, /Legacy classification/);
+  assert.match(host.text, /View saved labels.*fulfilled \(5\)/s);
+  assert.ok(!host.all((n) => n.tag === 'progress' && n.attrs['aria-label']?.includes('fulfilled')).length);
+  assert.equal(field(host, 'Reclassify Fix parser'), undefined);
+  assert.equal(field(host, 'Reclassify Synced'), undefined);
+  await field(host, 'Reclassify Old criteria').fire('click');
+  await field(host, 'Reclassify Legacy').fire('click');
+  assert.deepEqual(selected, ['old', 'legacy']);
+});
+
+test('exchange filters show the labelled prompt, reply and next reaction', async (t) => {
+  const { host, context } = environment(t);
+  const messages = [...response.sessions[0].messages,
+    { index: 4, turn: 3, role: 'user', text: 'That works.', highlights: [] },
+    { index: 5, turn: 3, role: 'assistant', text: 'Unrelated follow-up.', highlights: [] }];
+  const classification = { unmatched: 1, exchanges: [
+    { i: 1, assistant: {}, user: { frustration: { score: 4.2, level: 4, source: 'model' } } },
+    { i: 2, assistant: { admission: { label: 'admits_error', source: 'rule' } }, user: { verdict: { label: 'accepted', source: 'rule' } } },
+  ] };
+  const view = createInsights({ api: async () => ({ sessions: [{ ...response.sessions[0], messages, classification }] }) });
+  view.render(host, context);
+  await button(host, 'Read conversation →').fire('click');
+  assert.match(host.text, /frustration · 4\.2\/5 \(estimate\)/);
+  assert.match(host.text, /1 saved exchange could not be matched/);
+  const pick = async (value) => {
+    const select = field(host, 'Exchange label');
+    select.value = value;
+    await select.fire('change');
+  };
+  await pick('admission · admits error');
+  assert.match(host.text, /Parser please\..*My mistake\..*That works\./s);
+  assert.doesNotMatch(host.text, /I changed the renderer|Unrelated follow-up/);
+  await pick('frustration ≥ 4');
+  assert.match(host.text, /I changed the renderer.*Parser please\./s);
+  assert.doesNotMatch(host.text, /My mistake|That works\./);
+  await pick('');
+  assert.match(host.text, /Unrelated follow-up/);
 });
 
 test('folder levels list the next folders or projects, keep other sessions at the top, and walk up one level', async () => {

@@ -1,4 +1,4 @@
-import { automaticExamples, correctionCount, folderLevel, folderParent, frustrationCount, hasFriction, insightCoverage, labelCount, reviewPrompt, unresolvedCount } from './insights-model.js';
+import { admittedErrorCount, automaticExamples, chartCounts, correctionCount, folderLevel, folderParent, frustrationCount, hasFriction, insightCoverage, isV2, reviewPrompt, unresolvedCount } from './insights-model.js';
 import { CHATS } from './chat-services.js';
 import { createSessionPreview } from './session-preview.js';
 
@@ -14,14 +14,15 @@ const el = (tag, attrs = {}, ...kids) => {
 const button = (text, onclick, attrs = {}) => el('button', { type: 'button', onclick, ...attrs }, text);
 const number = (n) => Number(n ?? 0).toLocaleString('en');
 const date = (n) => new Date(n).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const labels = (counts) => Object.entries(counts ?? {}).filter(([, n]) => n > 0).map(([label, n]) => `${label.replaceAll('_', ' ')}: ${n}`).join(' · ') || 'Not classified';
 const metric = (title, value, note) => el('div', { className: 'metric' }, el('span', { className: 'eyebrow' }, title), el('strong', {}, value), el('span', { className: 'muted' }, note));
-const rate = (row, count) => row.evaluation?.classified ? count(row) / row.evaluation.classified : null;
+const exchanges = (row) => isV2(row) ? (row.evaluation.classified ?? 0) + (row.evaluation.skipped ?? 0) : 0;
+const rate = (row, count) => exchanges(row) ? count(row) / exchanges(row) : null;
 // Saved per-session label counts, so a session list can be narrowed to one kind of difficulty.
-const SIGNALS = [['any', 'Any', () => true], ['error', 'Admitted error', (r) => correctionCount(r) > 0],
-  ['frustrated', 'Frustrated', (r) => labelCount(r, 'sentiment', ['frustrated']) > 0], ['aggressive', 'Aggressive', (r) => labelCount(r, 'sentiment', ['aggressive']) > 0],
+const SIGNALS = [['any', 'Any', () => true], ['error', 'Admitted error', (r) => admittedErrorCount(r) > 0],
+  ['frustrated', 'Frustrated', (r) => frustrationCount(r) > 0],
   ['unresolved', 'Unresolved', (r) => unresolvedCount(r) > 0]];
-const rateText = (row, count) => row.evaluation?.classified ? `${count(row)}/${row.evaluation.classified} turns` : '—';
+const rateText = (row, count) => exchanges(row) ? `${count(row)}/${exchanges(row)} exchanges` : '—';
+const canRead = (row) => row.source !== 'synced' && row.prompts != null;
 
 export function createInsights({ api, get }) {
   let host, context, scope, version = 0, message = '', draft = '', target = null, job = null, poll = 0;
@@ -54,39 +55,51 @@ export function createInsights({ api, get }) {
     return el('div', { className: 'subtabs improve-signal', role: 'group', 'aria-label': 'Signal' }, el('span', { className: 'eyebrow' }, 'Signal'),
       ...SIGNALS.map(([key, label, test]) => button(`${label} (${rows.filter(test).length})`, () => { signal = key; draw(); }, { 'aria-pressed': String(signal === key) })));
   }
-  function chart(title, dimension, selectedLabels, kind) {
-    const coverage = insightCoverage(context.rows), counts = coverage.counts[dimension];
-    const entries = (selectedLabels ?? Object.keys(counts)).map((key) => [key, counts[key] ?? 0]).filter(([, value]) => value > 0);
+  function chart(coverage, title, category, selectedLabels, kind) {
+    const counts = coverage.counts[category], unknown = coverage.unknown[category];
+    const entries = selectedLabels.map((key) => [key, counts[key] ?? 0]).filter(([, value]) => value > 0);
     const max = Math.max(1, ...entries.map(([, n]) => n));
     const series = context.series;
     return el('article', { className: 'card improve-chart' }, el('h2', {}, title),
       entries.length ? entries.map(([label, n]) => {
         let bar;
         if (series?.keys.length > 1) {
-          bar = el('div', { className: 'improve-stacked-bar', role: 'img', 'aria-label': `${label}: ${n} classified turns` });
+          bar = el('div', { className: 'improve-stacked-bar', role: 'img', 'aria-label': `${label}: ${n} exchanges` });
           for (const group of series.keys) {
-            const count = context.rows.filter((r) => series.keyOf(r) === group).reduce((sum, r) => sum + (r.evaluation?.counts?.[dimension]?.[label] ?? 0), 0);
+            const count = context.rows.filter((r) => series.keyOf(r) === group).reduce((sum, r) => sum + (chartCounts(r, category)[label] ?? 0), 0);
             if (!count) continue;
-            const segment = el('span', { title: `${group}: ${count} classified turns` });
+            const segment = el('span', { title: `${group}: ${count} exchanges` });
             segment.style.width = `${count / max * 100}%`; segment.style.background = series.color(group); bar.append(segment);
           }
-        } else bar = el('progress', { max, value: n, className: kind, 'aria-label': `${label}: ${n} classified turns` });
+        } else bar = el('progress', { max, value: n, className: kind, 'aria-label': `${label}: ${n} exchanges` });
         return el('div', { className: 'improve-bar' }, el('span', {}, label.replaceAll('_', ' ')), bar, el('strong', {}, number(n)));
-      }) : el('p', { className: 'muted' }, 'Classify sessions to see this pattern.'),
+      }) : el('p', { className: 'muted' }, coverage.classifiedSessions ? 'No matching labels in these sessions.' : 'Classify sessions to see this pattern.'),
       series?.keys.length > 1 ? el('div', { className: 'legend' }, ...series.keys.map((group) => { const dot = el('i'); dot.style.background = series.color(group); return el('span', {}, dot, group); })) : null,
-      el('p', { className: 'small muted' }, `${number(coverage.classifiedTurns)} classified turns · ${number(coverage.skippedTurns)} skipped. Estimated labels.`),
-      dimension === 'outcome' ? el('p', { className: 'small muted' },
-        `Each label estimates one request and its response; it does not verify code or tests. ${number(coverage.outcomeFeedback)} labels from explicit user feedback or absence of a verdict; remaining labels estimated by Laya.`,
-        counts.unknown ? ` Unknown: ${number(coverage.outcomeUnknown.model)} model uncertain · ${number(coverage.outcomeUnknown.lowConfidence)} below confidence threshold · ${number(coverage.outcomeUnknown.noVerdict)} no user verdict` : '',
-        coverage.outcomeUnknown.unrecorded ? ` · ${number(coverage.outcomeUnknown.unrecorded)} reason unavailable from older or synced results. Reclassify local sessions to update.` : '') : null);
+      el('p', { className: 'small muted' }, `${number(coverage.classifiedTurns)} model-classified exchanges · ${number(coverage.skippedTurns)} skipped by the model. Labels come from transcript rules and model estimates.`),
+      unknown ? el('p', { className: 'small muted' }, `Unknown: ${number(unknown.model)} model uncertain · ${number(unknown.lowConfidence)} below confidence threshold · ${number(unknown.noReaction)} no user reaction`) : null);
   }
+  function classificationStatus(row) {
+    if (row.evaluation && !isV2(row)) return 'Legacy classification';
+    if (isV2(row) && context.taxonomy && row.evaluation.taxonomy !== context.taxonomy) return 'Classified with older criteria';
+    return '';
+  }
+  function savedVerdict(row) {
+    const counts = row.evaluation?.counts;
+    if (isV2(row) || !counts) return finalVerdict(row);
+    return el('details', {}, el('summary', {}, 'View saved labels'), Object.entries(counts).map(([category, labels]) =>
+      el('div', { className: 'small muted' }, `${category} · `, Object.entries(labels).map(([label, count]) => `${label.replaceAll('_', ' ')} (${count})`).join(' · '))));
+  }
+  const finalVerdict = (row) => (isV2(row) ? row.evaluation.session?.finalVerdict : null)?.replaceAll('_', ' ') ?? '—';
   const sessionTable = (id, rows) => context.table(id, [
-    { key: 'title', label: 'Session', value: (r) => r.title || r.id, show: (r) => el('div', {}, el('strong', { title: r.id }, r.title || `${r.agent} session`), el('div', { className: 'small muted' }, `${context.rel(r.project)} · ${r.agent} · ${r.model}`)) },
+    { key: 'title', label: 'Session', value: (r) => r.title || r.id, show: (r) => el('div', {}, el('strong', { title: r.id }, r.title || `${r.agent} session`), el('div', { className: 'small muted' }, `${context.rel(r.project)} · ${r.agent} · ${r.model}`),
+      classificationStatus(r) ? el('div', { className: 'small muted' }, classificationStatus(r)) : null) },
     { key: 'started', label: 'Started', value: (r) => r.started, show: (r) => date(r.started) },
-    { key: 'outcome', label: 'Outcome estimates', value: (r) => labels(r.evaluation?.counts?.outcome) },
+    { key: 'outcome', label: 'Final user verdict', value: finalVerdict, show: savedVerdict },
     { key: 'corrections', label: 'Admitted errors / apologies', value: (r) => rate(r, correctionCount), show: (r) => rateText(r, correctionCount) },
     { key: 'frustration', label: 'Frustration', value: (r) => rate(r, frustrationCount), show: (r) => rateText(r, frustrationCount) },
-    { key: 'read', label: 'Conversation', sortable: false, value: () => '', show: (r) => button(r.source === 'synced' || r.prompts === null ? 'Not on this device' : 'Read conversation →', () => read(r), { disabled: r.source === 'synced' || r.prompts === null, title: 'Read this session’s local transcript temporarily. No model is called.' }) },
+    { key: 'read', label: 'Conversation', sortable: false, value: () => '', show: (r) => el('div', {},
+      button(canRead(r) ? 'Read conversation →' : 'Not on this device', () => read(r), { disabled: !canRead(r), title: 'Read this session’s local transcript temporarily. No model is called.' }),
+      canRead(r) && classificationStatus(r) && context.reclassify ? button('Reclassify', () => context.reclassify(r), { disabled: context.classifying, 'aria-label': `Reclassify ${r.title || r.id}` }) : null) },
   ], rows, { sort: 'started', dir: 'desc' });
   // Folders and projects one level at a time; the sessions of the current project are listed under them.
   function folderBrowser(rows) {
@@ -107,9 +120,9 @@ export function createInsights({ api, get }) {
   function overview() {
     const coverage = insightCoverage(context.rows), attention = context.rows.filter(hasFriction);
     const metrics = el('div', { className: 'metrics compact improve-metrics' },
-      metric('Classified sessions', `${coverage.classifiedSessions}/${coverage.sessions}`, `${coverage.unclassifiedSessions} still unclassified`),
-      metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved outcome labels'),
-      metric('Local conversations', number(context.rows.filter((r) => r.source !== 'synced' && r.prompts !== null).length), 'available to open after a local scan'));
+      metric('Classified sessions', `${classified().length}/${coverage.sessions}`, `${coverage.unclassifiedSessions} unclassified${coverage.legacySessions ? ` · ${coverage.legacySessions} legacy (excluded from charts)` : ''}`),
+      metric('Worth a closer look', number(attention.length), 'sessions with friction or unresolved verdicts'),
+      metric('Local conversations', number(context.rows.filter(canRead).length), 'available to open after a local scan'));
     const tabs = el('div', { className: 'improve-browse-heading' }, el('div', {}, el('h2', {}, 'Where did work get difficult?'), el('p', { className: 'small muted' }, context.workspace ? 'Sessions of this workspace with saved signals.' : 'Browse by folder and project, or list every session with saved signals.')),
       context.workspace ? null : el('div', { className: 'improve-view-switch' }, el('span', { className: 'eyebrow' }, 'View'), el('div', { className: 'subtabs', 'aria-label': 'View' },
         ...[['folders', 'Folder Browser'], ['sessions', 'All Sessions']].map(([value, label]) => button(label, () => context.set({ improveView: value }), { 'aria-pressed': String(context.view === value) })))));
@@ -120,10 +133,10 @@ export function createInsights({ api, get }) {
     const empty = !rows.length ? el('div', { className: 'improve-empty' }, el('strong', {}, context.focus === 'attention' ? 'No matching friction labels yet' : 'No matching sessions'),
       el('p', {}, signal === 'any' ? 'Try All classified, choose another project, or classify the sessions in your current filters.' : 'No session here has this signal. Choose Any to see the others.'),
       signal === 'any' ? button('Browse all sessions', () => context.set({ improveFocus: 'all', improveView: 'sessions' })) : button('Show any signal', () => { signal = 'any'; draw(); })) : browse;
-    return [metrics, el('div', { className: 'improve-charts' }, chart('Did the task get done?', 'outcome', null, 'outcome'),
-      chart('Where did collaboration get difficult?', 'behaviour', ['admits_error', 'apology_loop', 'sycophantic_admission'], 'admission'),
-      chart('How did the user react?', 'sentiment', ['frustrated', 'aggressive', 'positive', 'neutral'], 'correction')),
-      el('article', { className: 'card improve-browser' }, preview.isOpen() ? null : tabs, preview.isOpen() ? null : options, preview.isOpen() ? null : signalFilter(), preview.isOpen() ? null : el('p', { className: 'small muted' }, 'Read conversation opens only that local transcript. Classifier labels are clues; outcome and collaboration remain separate. Rates use classified turns, so long sessions do not automatically rank worse.'), preview.layout(empty))];
+    return [metrics, el('div', { className: 'improve-charts' }, chart(coverage, 'User verdicts', 'verdict', ['accepted', 'partial', 'corrected', 'abandoned', 'new_topic'], 'outcome'),
+      chart(coverage, 'Assistant admissions', 'admission', ['admits_error', 'apology_without_fix'], 'admission'),
+      chart(coverage, 'User frustration', 'frustration', ['4 or higher', 'Below 4'], 'correction')),
+      el('article', { className: 'card improve-browser' }, preview.isOpen() ? null : tabs, preview.isOpen() ? null : options, preview.isOpen() ? null : signalFilter(), preview.isOpen() ? null : el('p', { className: 'small muted' }, 'Read conversation opens the local transcript. Rates use the total number of exchanges in each saved classification.'), preview.layout(empty))];
   }
   function prepare() {
     if (job?.status === 'running') return;

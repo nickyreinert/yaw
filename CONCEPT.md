@@ -24,8 +24,8 @@ Separate recorded quantities, estimated conversation signals and explanations th
 | Session length and volume | Saved session times, prompt/answer counts and usage where available already exist. | Compare elapsed duration and turns within similar projects and agents. Elapsed time includes gaps; it is not active work or proof of an overloaded context. |
 | Prompt and answer size | Saved scans already include total prompt/answer characters and answer-size percentiles. Mean prompt size can be derived; individual prompt-size distributions need another explicit transcript read and new aggregation. | Find changes in communication patterns. Short prompts can be appropriate follow-ups; size alone does not establish clarity. |
 | Response timing | Saved scans include median and p95 time from a user message to the first assistant message where timestamps exist. | Describe recorded response delays, not total task execution time. |
-| Outcome, sentiment, admitted errors and failure type | Optional local Laya classification already estimates these categories, including `admits_error`, `apology_loop`, `misunderstood_intent` and `wrong_scope`. Only counts are saved. | Locate groups worth investigating. Labels and confidence are estimates; an apology is not proof of failure or of a bad prompt. |
-| Corrections and recovery over a session | A new explicit transcript review can locate candidate exchanges and their turn positions. Saved counts cannot reconstruct this sequence. | Check whether friction repeats, appears late in sessions, or is followed by acceptance. Reliable semantic detection still needs validation. |
+| User verdicts, assistant admissions, frustration and complaints | Explicit local classification saves per-exchange labels and session roll-ups. Transcript rules cover explicit wording and signals. Laya fills other values as estimates. | Locate groups worth investigating and inspect the source of each label in the conversation. |
+| Corrections and recovery over a session | The conversation reader uses saved exchange indices and fingerprints to attach labels to the matching dialogue. | Check whether friction repeats, appears late in sessions, or is followed by acceptance. Semantic detection still needs validation. |
 | Task adherence and changes in direction | Requires task context and, for code-change claims, relevant change history beyond current conversation statistics. | Task references or topic changes are clues. They do not establish that the user ignored tasks or made erratic changes; report insufficient evidence when context is absent. |
 
 The first release can use existing metadata, optional local labels and manual sample selection. New detectors must be identified as proposed, not implied by the existing classifier categories.
@@ -45,7 +45,7 @@ Local phrase matching can cheaply suggest candidates; semantic classification ca
 ## Build a small review package
 
 1. **Choose scope.** Use the shared project, device, agent, model, time-range and programming-language filters. Show saved quantitative patterns first.
-2. **Find candidates explicitly.** Explain which selected local transcripts will be read and whether optional loopback Laya classification will run. Reread them only after confirmation; saved counts contain no excerpts or turn locations.
+2. **Find candidates explicitly.** Explain which selected local transcripts will be read and whether optional loopback Laya classification will run. Reread them only after confirmation. Classification saves labels, scores, exchange indices and fingerprints locally. Conversation text stays temporary.
 3. **Review a few examples.** Propose a small batch, initially around three to five exchanges across sessions. Let the user select, remove, edit or redact excerpts and add limited surrounding context. Include successful or recovered exchanges as comparisons when available. Label the batch as selected examples; it cannot estimate how common a problem is across all sessions.
 4. **Copy a ready-to-use review prompt.** Include the selected excerpts, anonymous example IDs, aggregate quantities and coverage, selection reasons, and a short analysis instruction. The user chooses a coding agent or web chat and pastes the package there. Users can instead explicitly run the existing configured Claude Code or Codex reviewer; it uses their installed CLI and may contact a hosted paid provider.
 5. **Choose an action.** The user reviews the verdict and can adapt a future request, start fresh sessions more deliberately, improve task boundaries or edit shared instructions. Applying a change remains a separate, explicit action.
@@ -88,11 +88,11 @@ These constraints preserve ADR-0018's content-free registry and ADR-0050's expli
 
 ## Open design choices
 
-Before implementation, settle the candidate-selection method and its scan limits, the context and export size limits, and the comparison/coverage rules required before quantitative advice. No persistent verdict or per-turn store and no automatic rule application is introduced; the former saved-verdicts history was removed by decision (read-only).
+Before implementation, settle the candidate-selection method and its scan limits, the context and export size limits, and the comparison/coverage rules required before quantitative advice. Review verdicts remain temporary. Exchange labels are persisted only by explicit classification.
 
 ### Current implementation limits
 
-Global → Improve uses saved classification counts to surface projects and sessions worth reviewing, with a manual All sessions option for work the user remembers. It shares Sessions filters, sorting, search and pagination. Classification from Improve uses only matching saved local session IDs, unclassified first; it preserves unrelated saved rows and existing pause/resume/stop behavior.
+Global → Profiling uses saved classification roll-ups to surface projects and sessions worth reviewing, with a manual All sessions option for work the user remembers. It shares Analytics filters, sorting, search and pagination. Bulk classification uses matching saved local session IDs, unclassified first. Each local legacy or older-criteria row also offers confirmed reclassification.
 
 Read conversation is the explicit read action for that named session. The reader returns chronological messages, colors tentative correction/apology/recovery phrases, and offers previous/next clue navigation. Reads are bounded at 8 MiB or 1,000 messages; larger Gemini JSON documents are unavailable. Filename-only discovery avoids parsing unselected histories. Hints include English and a small set of German, French and Spanish phrases and remain unvalidated.
 

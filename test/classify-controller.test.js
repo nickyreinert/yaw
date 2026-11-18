@@ -58,7 +58,8 @@ async function open(t, route, data = rows) {
   const { createGlobal } = await import('../core/web/assets/global-view.js');
   const body = { available: true, rows: data, projects: ['/work/p'], tasks: [], current: '/work/p', history: {}, savings: [] };
   const calls = [], reported = [];
-  const get = async (name) => name === 'sessions' ? body : name === 'preferences' ? { autoRefresh: false, classifier: { endpoint: 'http://127.0.0.1:8000' } } : null;
+  const get = async (name) => name === 'sessions' ? body : name === 'preferences' ? { autoRefresh: false,
+    classifier: { endpoint: 'http://127.0.0.1:8000' }, categories: { hash: 'current' } } : null;
   const api = async (name, input) => { calls.push({ name, input }); return { message: 'ok' }; };
   const view = createGlobal({ get, api, report: (e) => reported.push(e), openProject() {}, replace() {} });
   await view.show(route, route.endsWith('analytics') ? 'table=sessions' : '');
@@ -122,4 +123,22 @@ test('when everything is classified, All reclassifies the filtered local session
   assert.match(start().text, /^Reclassify 10 /);
   await start().click();
   assert.deepEqual(calls[1].input.ids, done.map((r) => r.id));
+});
+
+test('row reclassification asks first and targets only the chosen session even with unclassified sessions', async (t) => {
+  const old = { ...rows[0], evaluation: { schema: 2, taxonomy: 'older', classified: 2, skipped: 0, session: { frustrated: 1 } } };
+  const { byId, calls } = await open(t, 'profiling', [old, ...rows.slice(1)]);
+  const select = () => buttons(byId('improve-content')).find((n) => n.attrs['aria-label'] === 'Reclassify Session 0');
+  let confirmed = false;
+  Object.defineProperty(globalThis, 'confirm', { configurable: true, value: (message) => {
+    assert.match(message, /^Reclassify Session 0\?/);
+    assert.match(message, /fingerprints are saved without message text/);
+    return confirmed;
+  } });
+  assert.ok(select());
+  await select().click();
+  assert.deepEqual(calls, []);
+  confirmed = true;
+  await select().click();
+  assert.deepEqual(calls.map(({ name, input }) => [name, input.ids, input.confirm]), [['evaluate', ['s0'], true]]);
 });

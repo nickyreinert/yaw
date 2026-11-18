@@ -4,7 +4,7 @@ import { readFileSync, symlinkSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectAnalysis, LABELS, readAnalysis, readTurns } from '../core/lib/session-analysis.js';
 import { conversationMessages, INSIGHTS_LIMITS, reviewCandidates } from '../core/lib/session-insights.js';
-import { insightCoverage, redactPaths, reviewPrompt, REVIEW_LIMITS } from '../core/web/assets/insights-model.js';
+import { hasFriction, insightCoverage, redactPaths, reviewPrompt, REVIEW_LIMITS } from '../core/web/assets/insights-model.js';
 import { createWorkspaceApi } from '../core/web/workspace-api.js';
 import { startDashboard } from '../core/web/dashboard.js';
 import { writeUserData } from '../core/lib/user-store.js';
@@ -61,24 +61,49 @@ test('conversation reads return chronological messages and exact phrase ranges w
   assert.equal(repeated[0].highlights.length, 200, 'repeated phrase ranges are bounded');
 });
 
-test('classification from Improve touches only the filtered session IDs and preserves other saved rows', async () => {
+test('conversation review returns matched classifications without exposing fingerprints or writing data', async () => {
+  const f = fixture();
+  await collectAnalysis({ ...f, classify: true, fetchFn: async (_url, options) => layaV2(options) });
+  const saved = readAnalysis(f.env);
+  const evaluation = saved.rows[0].evaluation;
+  const fingerprints = evaluation.exchanges.map(({ fp }) => fp);
+  const original = readFileSync(f.file, 'utf8');
+  writeTree(f.env.CODEX_HOME, { 'sessions/2026/10/24/rollout-sample.jsonl': original.replace('I changed the renderer.', 'I changed the parser.') });
+  const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: () => assert.fail('Review must not call Laya') });
+  const session = (await api.action('insights-review', { ids: [f.id], conversation: true, confirm: true })).sessions[0];
+  assert.deepEqual(session.classification.exchanges.map(({ i }) => i), [2, 3]);
+  assert.equal(session.classification.unmatched, 1);
+  for (const fp of fingerprints) assert.ok(!JSON.stringify(session).includes(fp));
+  assert.deepEqual(readAnalysis(f.env), saved);
+});
+
+test('reclassification replaces the selected legacy result with the current criteria and preserves other rows', async () => {
   const f = fixture(), otherRoot = tmp();
   writeTree(f.env.CODEX_HOME, { 'sessions/2026/10/24/rollout-other.jsonl': [
     { type: 'session_meta', timestamp: time, payload: { id: 'other', cwd: otherRoot } },
     ...messages.map((m) => ({ type: 'response_item', timestamp: time, payload: { type: 'message', role: m.role, content: [{ type: 'text', text: m.text }] } })),
   ].map(JSON.stringify).join('\n') });
   await collectAnalysis({ ...f, all: true });
-  const before = JSON.stringify(readAnalysis(f.env).rows.find((r) => r.id === 'codex:other'));
+  const saved = readAnalysis(f.env);
+  saved.rows.find((r) => r.id === f.id).evaluation = { classified: 1, skipped: 0, counts: { outcome: { unknown: 1 } } };
+  writeUserData(f.env, 'session-analysis.json', saved);
+  const before = JSON.stringify(saved.rows.find((r) => r.id === 'codex:other'));
   let calls = 0;
   const api = createWorkspaceApi({ ...f, kitRoot: KIT_ROOT, fetchFn: async (_url, options) => {
     calls++;
     return layaV2(options);
   } });
+  const prefs = api.get['/api/preferences']();
+  const { hash } = await api.action('classifier-save', { classifier: { ...prefs.classifier, prompt: 'Use the explicit criteria.' } });
+  assert.notEqual(hash, prefs.categories.hash);
   await api.action('evaluate', { all: true, ids: [f.id], confirm: true });
   assert.equal(calls, 5);
   const after = readAnalysis(f.env);
   assert.equal(JSON.stringify(after.rows.find((r) => r.id === 'codex:other')), before);
-  assert.equal(after.rows.find((r) => r.id === f.id).evaluation.classified, 3);
+  const updated = after.rows.find((r) => r.id === f.id).evaluation;
+  assert.equal(updated.classified, 3);
+  assert.equal(updated.schema, 2);
+  assert.equal(updated.taxonomy, hash);
   await assert.rejects(api.action('evaluate', { all: true, ids: ['invented'], confirm: true }), /saved local sessions/);
   assert.equal(calls, 5);
 });
@@ -213,25 +238,39 @@ test('bounded reads preserve default full-reader behavior and mark byte/message 
 test('coverage retains mixed and unknown outcomes and separate collaboration counts with turn denominators', () => {
   const c = insightCoverage([
     { project: '/private/project', agent: 'codex', model: 'example', prompts: 4, answers: 4, promptChars: 400, partial: true,
-      evaluation: { classified: 3, skipped: 1, counts: { outcome: { fulfilled: 1, not_fulfilled: 1, unknown: 1 }, behaviour: { admits_error: 2, none: 1 } } } },
+      evaluation: { schema: 2, classified: 3, skipped: 1, session: { frustrated: 1,
+        counts: { assistant: { admission: { admits_error: 2, none: 1 } }, user: { verdict: { accepted: 1, corrected: 1, unknown: 1 }, frustration: { 4: 2 } } },
+        unknown: { verdict: { model: 1 } } } } },
     { project: '', agent: 'claude', model: 'Unknown', prompts: null, answers: null },
   ]);
   assert.deepEqual([c.sessions, c.measuredSessions, c.partialSessions, c.unclassifiedSessions, c.classifiedTurns, c.skippedTurns], [2, 1, 1, 1, 3, 1]);
-  assert.deepEqual(c.counts.outcome, { fulfilled: 1, not_fulfilled: 1, unknown: 1 });
-  assert.equal(c.counts.behaviour.admits_error, 2); assert.equal(c.meanPromptChars, 100);
-  assert.deepEqual(c.outcomeUnknown, { model: 0, lowConfidence: 0, noVerdict: 0, unrecorded: 1 });
+  assert.deepEqual(c.counts.verdict, { accepted: 1, corrected: 1, unknown: 1 });
+  assert.equal(c.counts.admission.admits_error, 2); assert.equal(c.meanPromptChars, 100);
+  assert.deepEqual(c.counts.frustration, { '4 or higher': 1, 'Below 4': 1 });
+  assert.deepEqual(c.unknown, { verdict: { model: 1 } });
   assert.doesNotMatch(JSON.stringify(c), /private\/project/);
 });
 
-test('UNKNOWN coverage combines new diagnostics and legacy rows without inventing reasons', () => {
-  const evaluation = (unknown, outcomeUnknown) => ({ classified: unknown, skipped: 0, counts: { outcome: { unknown } }, outcomeUnknown });
+test('v2 coverage excludes legacy count and unknown diagnostics', () => {
+  const evaluation = (unknown, reasons) => ({ schema: 2, classified: unknown, skipped: 0,
+    session: { counts: { user: { verdict: { unknown } } }, unknown: { verdict: reasons } } });
   const coverage = insightCoverage([
     { evaluation: evaluation(3, { model: 1, lowConfidence: 2 }) },
-    { source: 'synced', evaluation: evaluation(4) },
+    { source: 'synced', evaluation: { legacy: true, classified: 4, outcomeUnknown: { model: 4 } } },
     { evaluation: evaluation(2, { model: 1 }) },
   ]);
-  assert.equal(coverage.counts.outcome.unknown, 9);
-  assert.deepEqual(coverage.outcomeUnknown, { model: 2, lowConfidence: 2, noVerdict: 0, unrecorded: 5 });
+  assert.equal(coverage.counts.verdict.unknown, 5);
+  assert.equal(coverage.classifiedTurns, 5);
+  assert.equal(coverage.legacySessions, 1);
+  assert.deepEqual(coverage.unknown.verdict, { model: 2, lowConfidence: 2 });
+});
+
+test('friction includes v2 complaints, apology loops and escalation', () => {
+  for (const session of [{ apologyLoop: true }, { escalation: true }, { counts: { user: { complaint: { wrong_scope: 1 } } } }]) {
+    assert.equal(hasFriction({ evaluation: { schema: 2, session } }), true);
+  }
+  assert.equal(hasFriction({ evaluation: { legacy: true, counts: { behaviour: { admits_error: 2 } } } }), false);
+  assert.equal(hasFriction({ evaluation: { schema: 2, session: { counts: { user: { complaint: { none: 1, unknown: 1 } } } } } }), false);
 });
 
 test('review prompt exports only edited anonymous examples and asks for short, evidence-based verdicts', () => {
