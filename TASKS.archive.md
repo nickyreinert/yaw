@@ -1,5 +1,9 @@
 # Archive
 
+> **Audit snapshot from 2026-11-02.** Node 22.21.1. The audit used source review, isolated reproductions and repository checks. npm test reported 1,120 passed, 16 failed (9 invalid JAVA_HOME, 7 repository or test issues) and 8 skipped. All 28 schema examples and shellcheck passed. The optional Claude adapter npm audit reported zero vulnerabilities. Live provider and Telegram services and Linux isolation were outside the audit.
+
+- T-060 Fix "next steps" text mismatch — superseded 2026-11-18
+  reason: the composed, node-ts-vercel, node-web, node-static and node-app smoke cases currently fail in npm install with an edgesOut error before reaching the output assertions. T-063 carries the setup diagnosis and follow-up verification of the assertions.
 - T-057 Decide on L3 command rewrite — done 2026-11-09: decided not to build now (permission-rule bypass risk, small benefit); revisit after real Savings on/off data
 - T-045 Investigate Safe Verdicts — done 2026-11-08: panel removed by decision (read-only feature), commit bb85255
 - T-021 Add a cheap automatic CI gate — done 2026-11-08
